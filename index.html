@@ -88,14 +88,132 @@ const CYCLES = [
 ];
 // 완료(숙제)일 요일 집합. 여기에 없는 요일(화·일 등)은 '자유일'이라 자발 숙제가 가능하다.
 const COMP_DAYS = CYCLES.reduce((s,cy)=>{ cy.days.forEach(x=>{s[x.d]=true;}); return s; }, {});
-// 휴식일에 자발적으로 숙제했을 때 나오는 즐거운 이벤트. ※ 임시 stub — 데이터셋은 추후 일괄 정리 예정.
-const EVENTS = [
-  {emoji:'🍉', title:'수박 간식 등장!', line:'미리 숙제한 너에게 카피바라가 수박 한 조각을 나눠줬어!'},
-  {emoji:'🍊', title:'유자탕 타임', line:'카피바라들이 따뜻한 유자탕에 둥둥— 너 덕분에 여유로운 하루야.'},
-  {emoji:'🦋', title:'나비가 놀러왔어', line:'연못에 나비가 날아와 카피바라 코끝에 살짝 앉았어.'},
-  {emoji:'🌽', title:'옥수수 파티', line:'자발적 숙제 보너스! 카피바라들이 옥수수를 한 입씩 나눠 먹어.'},
-  {emoji:'⭐', title:'반짝이는 밤', line:'별빛 아래 카피바라들이 너를 응원하며 노래를 불러줬어.'}
+// ============================================================
+//  카피바라 데이터셋 (개성 · 표정 · 상호작용 · 깜짝친구 · 이벤트)
+//  ▸ 순수 데이터 모듈. capyMood(표정·행동) 태그가 곧 SVG 변형 '필요 목록'이 된다.
+//  ▸ 향후 SVG 작업 시 MOODS의 face/pose 힌트가 그대로 변형 사양으로 쓰인다.
+// ============================================================
+
+// 1) 개성(성격) — SPECIES.personality 값과 1:1. 기분 성향과 상호작용 반응 색깔.
+const PERSONALITY = {
+  '느긋':      {emoji:'😌', desc:'느긋하고 평온한 성격', moodBias:['평온','졸림','행복']},
+  '장난꾸러기':{emoji:'😜', desc:'장난기 많고 활발한 성격', moodBias:['신남','장난','놀람']},
+  '새침':      {emoji:'😼', desc:'새침하지만 속정 깊은 성격', moodBias:['도도','부끄럼','토라짐']},
+  '호기심':    {emoji:'🤓', desc:'호기심 가득한 탐험가 성격', moodBias:['놀람','신남','두근']},
+  '겁쟁이':    {emoji:'🫣', desc:'겁 많고 수줍은 성격', moodBias:['부끄럼','놀람','안심']}
+};
+
+// 2) 표정·행동 태그(capyMood) — 이벤트/상호작용이 가리키는 카피바라 상태.
+//    face/pose는 향후 SVG 변형 사양(눈·입·볼·자세) 힌트.
+const MOODS = {
+  '평온':  {emoji:'😌', face:'눈 반달, 입 옅은 미소', pose:'편안히 앉음'},
+  '행복':  {emoji:'😊', face:'눈 웃음, 볼 발그레', pose:'살짝 들썩'},
+  '졸림':  {emoji:'😴', face:'눈 감김, zzz', pose:'눕기 직전'},
+  '신남':  {emoji:'🤩', face:'눈 반짝(별), 입 활짝', pose:'폴짝'},
+  '놀람':  {emoji:'😲', face:'눈 동그래, 입 O', pose:'움찔'},
+  '부끄럼':{emoji:'☺️', face:'눈 곡선, 볼 진하게', pose:'고개 숙임'},
+  '먹는중':{emoji:'😋', face:'볼 오물오물', pose:'간식에 코 박기'},
+  '뿌듯':  {emoji:'😤', face:'눈 자신만만, 가슴 쭉', pose:'당당히'},
+  '토라짐':{emoji:'😠', face:'눈 옆으로, 입 삐죽', pose:'홱 돌아섬'},
+  '장난':  {emoji:'😏', face:'한쪽 눈 윙크, 혀', pose:'까불까불'},
+  '도도':  {emoji:'😼', face:'눈 반쯤, 턱 살짝 듦', pose:'우아하게'},
+  '두근':  {emoji:'😳', face:'눈 반짝, 하트', pose:'두근두근'},
+  '안심':  {emoji:'😮‍💨', face:'눈 스르르', pose:'긴장 풀림'}
+};
+
+// 3) 상호작용 — 카피바라에게 직접 해보는 행동(도감 상세에서). 개성별 반응 대사.
+const INTERACTIONS = [
+  {id:'pet', emoji:'🤚', label:'쓰다듬기', mood:'행복', intimacy:1, react:{
+    '느긋':'스르르… 기분 좋다는 듯 눈을 감아요.',
+    '장난꾸러기':'헤헤! 더 해달라고 머리를 비벼요.',
+    '새침':'흥, 별로… 하면서도 슬쩍 기대요.',
+    '호기심':'네 손을 신기하게 쳐다보다 배시시 웃어요.',
+    '겁쟁이':'처음엔 움찔하더니 곧 사르르 녹아요.',
+    '_default':'기분 좋은 듯 몸을 맡겨요.'}},
+  {id:'belly', emoji:'🫳', label:'출렁이는 뱃살 만지기', mood:'졸림', intimacy:1, react:{
+    '느긋':'뱃살이 출렁— 그대로 낮잠에 빠질 기세예요.',
+    '장난꾸러기':'간지럽다며 데굴데굴 굴러요.',
+    '새침':'…남들 앞에선 하지 말라며 새침을 떨어요.',
+    '호기심':'자기 뱃살을 같이 눌러보며 신기해해요.',
+    '겁쟁이':'부끄러운지 앞발로 얼굴을 가려요.',
+    '_default':'말랑말랑 뱃살이 기분 좋게 출렁여요.'}},
+  {id:'cheek', emoji:'👉', label:'볼 콕 찔러보기', mood:'놀람', intimacy:1, react:{
+    '느긋':'콕— 천천히 고개를 돌려 빤히 봐요.',
+    '장난꾸러기':'똑같이 네 볼을 콕 찌르려 들어요!',
+    '새침':'볼을 부풀리며 토라진 척해요.',
+    '호기심':'왜 찔렀냐는 듯 눈을 동그랗게 떠요.',
+    '겁쟁이':'화들짝 놀랐다가 이내 배시시 웃어요.',
+    '_default':'볼이 말랑— 놀란 표정이 귀여워요.'}}
 ];
+
+// 4) 깜짝친구 — 카피바라 외 동·식물의 깜짝 방문(이벤트 보상으로 등장).
+const GUESTS = [
+  {id:'butterfly', emoji:'🦋', name:'나비',     line:'카피바라 코끝에 살포시 앉았어요.'},
+  {id:'frog',      emoji:'🐸', name:'개구리',   line:'연잎 위에서 개굴— 인사를 건네요.'},
+  {id:'duck',      emoji:'🦆', name:'아기 오리', line:'줄지어 카피바라 등을 타고 지나가요.'},
+  {id:'squirrel',  emoji:'🐿️', name:'다람쥐',   line:'도토리를 한 알 선물하고 쏙 사라졌어요.'},
+  {id:'ladybug',   emoji:'🐞', name:'무당벌레', line:'행운을 가져다준다며 살며시 앉았어요.'},
+  {id:'sparrow',   emoji:'🐦', name:'참새',     line:'짹짹— 응원가를 불러줬어요.'},
+  {id:'turtle',    emoji:'🐢', name:'거북이',   line:'느릿느릿 다가와 함께 일광욕을 해요.'},
+  {id:'firefly',   emoji:'✨', name:'반딧불이', line:'저녁 연못을 반짝반짝 밝혀줬어요.'}
+];
+
+// 4-1) 수집 아이템 표시용 이모지(이벤트 reward.item 이름과 매칭).
+const ITEMS = { '수박':'🍉', '유자':'🍊', '옥수수':'🌽', '반짝별':'🌟' };
+
+// 5) 이벤트 — 부류 4종. reward 키: intimacy, item(수집), guest(깜짝친구 id),
+//    unlock(꾸미기 해금), 비우면 순수 연출. weight=같은 부류 내 랜덤 가중치.
+//    ▸ voluntary·catch는 현재 코드에 연결됨. milestone·rescue는 데이터 준비 완료,
+//      streak/사이클/위기회복 훅과는 다음 패스에서 연결 예정.
+const EVENTS = [
+  // [voluntary] 휴식일 자발 숙제 → 즐거운 깜짝 보상
+  {id:'ev_v_watermelon', category:'voluntary', rarity:'일반', weight:12, emoji:'🍉', mood:'먹는중',
+   title:'수박 간식 등장!', line:'미리 숙제한 너를 위해 카피바라가 수박 한 조각을 나눠줬어.', reward:{intimacy:1, item:'수박'}},
+  {id:'ev_v_yuzu', category:'voluntary', rarity:'일반', weight:10, emoji:'🍊', mood:'안심',
+   title:'유자탕 타임', line:'따뜻한 유자탕에 둥둥— 네 덕분에 여유로운 하루야.', reward:{intimacy:1, item:'유자'}},
+  {id:'ev_v_corn', category:'voluntary', rarity:'일반', weight:10, emoji:'🌽', mood:'먹는중',
+   title:'옥수수 파티', line:'카피바라들이 옥수수를 한 입씩 나눠 먹어.', reward:{intimacy:1, item:'옥수수'}},
+  {id:'ev_v_butterfly', category:'voluntary', rarity:'희귀', weight:6, emoji:'🦋', mood:'두근',
+   title:'작은 손님', line:'미리 숙제한 연못에 깜짝 친구가 찾아왔어.', reward:{intimacy:1, guest:'butterfly'}},
+  {id:'ev_v_nap', category:'voluntary', rarity:'일반', weight:8, emoji:'😴', mood:'졸림',
+   title:'행복한 낮잠', line:'할 일을 미리 끝낸 카피바라가 세상 편한 낮잠에 빠졌어.', reward:{intimacy:1}},
+  {id:'ev_v_star', category:'voluntary', rarity:'희귀', weight:4, emoji:'⭐', mood:'신남',
+   title:'반짝이는 밤', line:'별빛 아래 카피바라들이 너를 응원하며 노래해.', reward:{}},
+
+  // [milestone] 마일스톤 달성 (데이터 준비 — 훅 연결 예정)
+  {id:'ev_m_streak7', category:'milestone', trigger:{type:'streak', value:7}, rarity:'희귀', weight:1, emoji:'🔥', mood:'뿌듯',
+   title:'7일 연속 달성!', line:'일주일을 빠짐없이 해냈어. 카피바라들이 박수를 보내!', reward:{intimacy:2, item:'반짝별'}},
+  {id:'ev_m_streak14', category:'milestone', trigger:{type:'streak', value:14}, rarity:'영웅', weight:1, emoji:'🏅', mood:'신남',
+   title:'2주 연속! 대단해!', line:'꾸준함의 메달이 도착했어. 연못이 들썩여!', reward:{intimacy:3, unlock:'금메달 목걸이'}},
+  {id:'ev_m_cycle', category:'milestone', trigger:{type:'cycleComplete'}, rarity:'일반', weight:1, emoji:'🎯', mood:'뿌듯',
+   title:'한 사이클 완주!', line:'이번 숙제 묶음을 깔끔하게 끝냈어. 잘했어!', reward:{intimacy:1}},
+  {id:'ev_m_dexHalf', category:'milestone', trigger:{type:'dexPct', value:50}, rarity:'영웅', weight:1, emoji:'📚', mood:'두근',
+   title:'도감 절반 달성!', line:'친구의 절반을 모았어. 도감이 환하게 빛나!', reward:{unlock:'도감 배지'}},
+
+  // [catch] 포획 순간 연출 — 희귀도별
+  {id:'ev_c_normal', category:'catch', trigger:{type:'rarity', value:'일반'}, weight:1, emoji:'🌿', mood:'행복',
+   title:'반가운 만남', line:'평범하지만 소중한 친구가 연못에 들어왔어.', reward:{}},
+  {id:'ev_c_rare', category:'catch', trigger:{type:'rarity', value:'희귀'}, weight:1, emoji:'💎', mood:'신남',
+   title:'반짝— 희귀한 친구!', line:'쉽게 못 보는 친구가 너를 알아보고 다가왔어!', reward:{}},
+  {id:'ev_c_epic', category:'catch', trigger:{type:'rarity', value:'영웅'}, weight:1, emoji:'🛡️', mood:'뿌듯',
+   title:'영웅의 등장!', line:'늠름한 영웅 카피바라가 너의 노력을 인정했어.', reward:{}},
+  {id:'ev_c_legend', category:'catch', trigger:{type:'rarity', value:'전설'}, weight:1, emoji:'🌈', mood:'두근',
+   title:'전설이 깨어났다!', line:'전설은 매일의 작은 숙제로 완성돼. 네가 해냈어!', reward:{}},
+
+  // [rescue] 위기 구출 성공 (데이터 준비 — 훅 연결 예정)
+  {id:'ev_r_back', category:'rescue', weight:1, emoji:'💗', mood:'안심',
+   title:'친구가 돌아왔어!', line:'숙제를 다시 챙긴 덕에 떠나려던 친구가 연못으로 돌아왔어.', reward:{intimacy:1}},
+  {id:'ev_r_heal', category:'rescue', weight:1, emoji:'🌱', mood:'행복',
+   title:'기운을 되찾았어', line:'축 처져 있던 카피바라가 다시 통통하게 기운을 차렸어.', reward:{intimacy:1}}
+];
+
+// ── 데이터셋 헬퍼 ──
+function pickWeighted(list){ if(!list||!list.length)return null; const tot=list.reduce((s,e)=>s+(e.weight||1),0); let r=Math.random()*tot; for(let i=0;i<list.length;i++){ r-=(list[i].weight||1); if(r<0)return list[i]; } return list[list.length-1]; }
+function eventsBy(cat){ return EVENTS.filter(e=>e.category===cat); }
+function catchEvent(rarity){ return eventsBy('catch').find(e=>e.trigger&&e.trigger.value===rarity)||null; }
+function moodEmoji(m){ return (MOODS[m]||{}).emoji||'😊'; }
+function itemEmoji(name){ return ITEMS[name]||'🎁'; }
+function interactReact(personality, it){ return (it.react&&(it.react[personality]||it.react['_default']))||''; }
 const WB_COLORS = ['#c47a4e','#3f9b94','#cd7aa1','#d99441','#7a86c9','#6aa05a','#c2607a'];
 const POND_SLOTS = [[16,30],[44,20],[72,32],[26,58],[55,50],[82,62],[37,78],[64,74],[12,72],[88,40],[50,82],[20,44]];
 const SPECIES = [
@@ -129,7 +247,8 @@ const DEFAULT_STATE = {
   newWbName:'', rowEdit:{},
   todayKey:'tue', timerSec:0, timerRunning:false,
   lastDate:null, streakDate:null,
-  caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null, _wbSeq:3
+  caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
+  items:{}, unlocks:[], detailReaction:null, _wbSeq:3
 };
 
 let ST = {...DEFAULT_STATE};
@@ -303,9 +422,9 @@ function clearRow(day,wbId){
 function setMpp(v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}})); }
 function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,dayMin:{...s.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}})); }
 function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
-function openDetail(id) { setState({detailSpeciesId:id,overlay:'capyDetail'}); }
-function openDexDetail(id) { if(ST.dexSeen[id]) setState({detailSpeciesId:id,overlay:'capyDetail'}); }
-function closeOverlay() { setState({overlay:null}); }
+function openDetail(id) { setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
+function openDexDetail(id) { if(ST.dexSeen[id]) setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
+function closeOverlay() { setState({overlay:null,eventInfo:null,detailReaction:null}); }
 function toggleTimer() {
   if(ST.timerRunning){setState({timerRunning:false});}
   else{setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60}));}
@@ -323,12 +442,24 @@ function doVoluntary() {
   const today=new Date(), vc=voluntaryCycle(today); if(!vc) return;
   const wk=dwk(today), todayS=dstr(today);
   const dayLog={...ST.dayLog,[wk]:{date:todayS,pages:doneOnDate(wk,todayS)+1}};
+  const ev=pickWeighted(eventsBy('voluntary')), rw=ev.reward||{};
   const healthy=ST.pond.filter(c=>c.status==='healthy');
-  let pond=ST.pond, target=null;
-  if(healthy.length){ target=healthy[Math.floor(Math.random()*healthy.length)]; pond=ST.pond.map(c=>c.uid===target.uid?{...c,intimacy:(c.intimacy||0)+1}:c); }
-  const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
-  ST={...ST,dayLog,pond,eventInfo:{...ev,who:(target?sp(target.speciesId).name:'카피바라')},overlay:'event'};
+  const target=healthy.length?healthy[Math.floor(Math.random()*healthy.length)]:null;
+  let pond=ST.pond;
+  if(target&&rw.intimacy) pond=ST.pond.map(c=>c.uid===target.uid?{...c,intimacy:(c.intimacy||0)+rw.intimacy}:c);
+  let items=ST.items||{}; if(rw.item) items={...items,[rw.item]:(items[rw.item]||0)+1};
+  let unlocks=ST.unlocks||[]; if(rw.unlock&&unlocks.indexOf(rw.unlock)<0) unlocks=[...unlocks,rw.unlock];
+  const guest=rw.guest?GUESTS.find(g=>g.id===rw.guest):null;
+  const who=target?sp(target.speciesId).name:'카피바라';
+  ST={...ST,dayLog,pond,items,unlocks,eventInfo:{ev,who,guest,itemGot:rw.item||null,itemCount:rw.item?items[rw.item]:0,intimacy:rw.intimacy||0,unlock:rw.unlock||null},overlay:'event'};
   save(); render();
+}
+// 도감 상세에서 카피바라에게 직접 해보는 상호작용: 친밀도↑ + 개성별 반응.
+function interact(uid, id) {
+  const c=ST.pond.find(x=>x.uid===uid), it=INTERACTIONS.find(x=>x.id===id); if(!c||!it) return;
+  const personality=sp(c.speciesId).personality;
+  const pond=ST.pond.map(x=>x.uid===uid?{...x,intimacy:(x.intimacy||0)+(it.intimacy||1)}:x);
+  setState({pond,detailReaction:{emoji:it.emoji,mood:it.mood,line:interactReact(personality,it)}});
 }
 function finishDay() {
   const order=['gone','leaving','weak','healthy']; let rescued=false;
@@ -585,7 +716,9 @@ function renderCaught(T) {
   const rm=RARITY[cs.rarity]||RARITY['일반'];
   const emos=['🎉','✨','🌟','🎊','💛','🌸'];
   const confetti=Array.from({length:18}).map((_,i)=>`<div style="position:absolute;left:${Math.round((i*53+7)%96)}%;top:-20px;font-size:${16+(i%4)*5}px;animation:confettiFall ${(2.4+(i%5)*0.4).toFixed(1)}s linear ${((i%6)*0.25).toFixed(2)}s infinite;pointer-events:none;">${emos[i%emos.length]}</div>`).join('');
+  const ce=catchEvent(cs.rarity);
   const msg=ST.caughtNew?('성격: '+cs.personality+' · "'+cs.line+'"'):('이미 만난 친구라 친밀도가 올랐어요! "'+cs.line+'"');
+  const catchFlavor=ce?`<div style="margin-top:8px;font-size:13px;color:${T.accentDark};font-weight:700;">${ce.emoji} ${h(ce.title)} — ${h(ce.line)}</div>`:'';
   return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">${confetti}
   <div style="position:relative;background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
     <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;color:${T.accentDark};">${ST.caughtNew?'✨ 새로운 친구를 만났어! ✨':'🎉 다시 만나서 반가워!'}</div>
@@ -593,21 +726,30 @@ function renderCaught(T) {
     <div style="font-weight:900;font-size:22px;">${h(cs.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
     <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
+    ${catchFlavor}
     <div onclick="setState({overlay:null,screen:'home'})" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">연못으로 데려가기 🪷</div>
   </div></div>`;
 }
 
 function renderEvent(T) {
-  const e=ST.eventInfo; if(!e)return'';
+  const ei=ST.eventInfo; if(!ei||!ei.ev)return''; const ev=ei.ev;
   const cheer=ST.pond.filter(c=>c.status==='healthy');
   const cs=cheer.length?sp(cheer[0].speciesId):SPECIES[0];
+  const guestHtml=ei.guest?`<div style="margin-top:8px;font-size:13.5px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:10px 13px;">${ei.guest.emoji} <b>${h(ei.guest.name)}</b> ${h(ei.guest.line)}</div>`:'';
+  const bits=[];
+  if(ei.intimacy) bits.push(`💗 ${h(ei.who)} 친밀도 +${ei.intimacy}`);
+  if(ei.itemGot) bits.push(`${ev.emoji} ${h(ei.itemGot)} 수집 (총 ${ei.itemCount}개)`);
+  if(ei.unlock) bits.push(`🎀 ${h(ei.unlock)} 해금`);
+  if(!bits.length) bits.push('포근한 순간을 함께했어요 🌿');
+  const moodBadge=ev.mood?`<div style="position:absolute;top:-6px;right:-6px;font-size:26px;">${moodEmoji(ev.mood)}</div>`:'';
   return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
   <div style="background:${T.card};border-radius:30px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
-    <div style="font-size:52px;line-height:1;margin-bottom:4px;">${e.emoji}</div>
-    <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:${T.accentDark};">${h(e.title)}</div>
-    <div style="display:flex;justify-content:center;margin:10px 0 4px;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity})}</div>
-    <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(e.line)}</div>
-    <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;">💗 ${h(e.who)}와의 친밀도가 올랐어요!</div>
+    <div style="font-size:52px;line-height:1;margin-bottom:4px;">${ev.emoji}</div>
+    <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:${T.accentDark};">${h(ev.title)}</div>
+    <div style="display:flex;justify-content:center;margin:10px 0 4px;"><div style="position:relative;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity})}${moodBadge}</div></div>
+    <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(ev.line)}</div>
+    ${guestHtml}
+    <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;line-height:1.7;">${bits.map(h).join('<br>')}</div>
     <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">고마워! 🌿</div>
   </div></div>`;
 }
@@ -649,6 +791,7 @@ function renderDex(T,seen,total,pct) {
   <div style="padding:0 22px 10px;flex-shrink:0;">
     <div style="font-size:14px;color:${T.sub};font-weight:600;">${seen} / ${total}종 발견 · 완성도 ${pct}%</div>
     <div style="margin-top:6px;height:12px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${T.accent};border-radius:999px;"></div></div>
+    ${(()=>{ const its=Object.keys(ST.items||{}).filter(k=>ST.items[k]>0); return its.length?`<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:12px;font-weight:700;color:${T.sub};">🧺 모은 간식</span>${its.map(k=>`<span style="font-size:12.5px;font-weight:700;color:${T.ink};background:${T.card};border:2px solid ${T.line};border-radius:999px;padding:3px 9px;">${itemEmoji(k)} ${h(k)} ${ST.items[k]}</span>`).join('')}</div>`:''; })()}
   </div>
   <div style="flex:1;overflow-y:auto;padding:14px 18px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:12px;align-content:start;align-items:start;">${cards}</div>
 </div>`;
@@ -664,10 +807,12 @@ function renderDetail(T) {
   <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
     <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity})}</div>
     <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
-    <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${s.personality}</div>
+    <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${(PERSONALITY[s.personality]||{}).emoji||''}${s.personality}</div>
     <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
     <div style="margin-top:10px;font-size:13px;color:${T.sub};font-weight:600;">${statusLabel}</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.soft};color:${T.ink};font-weight:800;font-size:15px;padding:13px;border-radius:14px;">닫기</div>
+    ${owned?`${ST.detailReaction?`<div style="margin-top:12px;font-size:14px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:11px 13px;line-height:1.5;">${ST.detailReaction.emoji} ${moodEmoji(ST.detailReaction.mood)} ${h(ST.detailReaction.line)}</div>`:`<div style="margin-top:12px;font-size:12.5px;color:${T.sub};">아래 버튼으로 ${h(s.name)}와 놀아줄 수 있어요</div>`}
+    <div style="display:flex;gap:7px;margin-top:11px;">${INTERACTIONS.map(it=>`<div onclick="interact('${owned.uid}','${it.id}')" class="tapbtn" style="cursor:pointer;flex:1;background:${T.soft};border:2px solid ${T.line};border-radius:14px;padding:10px 4px;font-weight:800;font-size:11.5px;color:${T.ink};line-height:1.3;"><div style="font-size:20px;margin-bottom:2px;">${it.emoji}</div>${h(it.label)}</div>`).join('')}</div>`:''}
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:14px;background:${T.soft};color:${T.ink};font-weight:800;font-size:15px;padding:13px;border-radius:14px;">닫기</div>
   </div></div>`;
 }
 
