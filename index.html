@@ -354,7 +354,7 @@ const DEFAULT_STATE = {
   screen:'home', overlay:null, theme:'onsen',
   workbooks:[{id:'w1',name:'수학 익힘책',color:'#c47a4e'},{id:'w2',name:'국어 독해',color:'#3f9b94'}],
   assignments:{tue:[{workbookId:'w1',from:10,to:15},{workbookId:'w2',from:20,to:24}],thu:[{workbookId:'w1',from:16,to:22},{workbookId:'w2',from:25,to:28}]},
-  settings:{minsPerPage:10,dayMin:{mon:75,tue:20,wed:30,thu:70,fri:40,sat:20,sun:0},difficulty:'normal'},
+  settings:{minsPerPage:10,dayMin:{mon:75,tue:20,wed:30,thu:70,fri:40,sat:20,sun:0},difficulty:'normal',guardianPin:''},
   pond:[{uid:'c1',speciesId:'s1',status:'healthy',intimacy:0},{uid:'c2',speciesId:'s9',status:'healthy',intimacy:0},{uid:'c3',speciesId:'s3',status:'healthy',intimacy:1}],
   dexSeen:{s1:true,s9:true,s3:true},
   streak:3, dayLog:{}, setupDay:'tue',
@@ -363,7 +363,8 @@ const DEFAULT_STATE = {
   lastDate:null, streakDate:null,
   caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
   items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
-  milestonesFired:[], eventQueue:[], equip:{}
+  milestonesFired:[], eventQueue:[], equip:{},
+  pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:''
 };
 
 let ST = {...DEFAULT_STATE};
@@ -494,7 +495,7 @@ function setState(upd) {
   save(); render();
 }
 function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip})); } catch(e){}
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip,pendingReward:ST.pendingReward})); } catch(e){}
 }
 function load() {
   const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
@@ -561,9 +562,41 @@ function completePage() {
   const todayS=dstr(new Date()), cur=doneOnDate(k,todayS);
   if(cur>=planned) return; // 이미 끝낸 분량 — 채집 무한반복 방지
   const done=cur+1, dayLog={...ST.dayLog,[k]:{date:todayS,pages:done}};
-  if(done>=planned){ ST={...ST,dayLog,timerRunning:false,timerSec:0}; finishDay(); }
+  if(done>=planned){
+    ST={...ST,dayLog,timerRunning:false,timerSec:0};
+    // 마지막 쪽 완료: PIN이 설정돼 있으면 보호자 확인을 거쳐야 보상 지급.
+    if(pinSet()){ ST={...ST,pendingReward:{day:k,date:todayS},verifyFor:'reward',pinEntry:'',pinError:false,overlay:'verify'}; save(); render(); }
+    else finishDay();
+  }
   else setState({dayLog,timerRunning:false,timerSec:0,overlay:'break'});
 }
+// ── 보호자 PIN(보상 확인) ────────────────────────────────────
+function pinSet(){ const p=ST.settings.guardianPin; return !!(p&&p.length===6); }
+// 부모님 설정 진입: PIN이 있으면 잠금 화면을 먼저 띄운다(PIN 자체 변조 방지).
+function openSettings(){ if(pinSet()) setState({verifyFor:'settings',pinEntry:'',pinError:false,overlay:'verify'}); else setState({overlay:'settings'}); }
+// 대기 중인 보상 확인 다시 열기(배너에서).
+function reopenReward(){ if(ST.pendingReward) setState({verifyFor:'reward',pinEntry:'',pinError:false,overlay:'verify'}); }
+function closeVerify(){ setState({overlay:null,verifyFor:null,pinEntry:'',pinError:false}); }
+function pinDel(){ setState({pinEntry:(ST.pinEntry||'').slice(0,-1),pinError:false}); }
+function pinPress(d){
+  const e=((ST.pinEntry||'')+d).slice(0,6);
+  if(e.length<6){ setState({pinEntry:e,pinError:false}); return; }
+  // 6자리 완성 → 즉시 검증
+  if(e===ST.settings.guardianPin){
+    const purpose=ST.verifyFor;
+    if(purpose==='reward'){ ST={...ST,pinEntry:'',pinError:false,verifyFor:null,pendingReward:null,overlay:null}; finishDay(); }
+    else { setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings'}); }
+  } else {
+    setState({pinEntry:'',pinError:true});
+  }
+}
+// 설정에서 PIN 등록/변경. pinDraft(입력 버퍼)가 정확히 6자리 숫자여야 저장.
+function savePin(){
+  const d=(ST.pinDraft||'').trim();
+  if(!/^[0-9]{6}$/.test(d)){ setState({pinError:true}); return; }
+  setState(s=>({settings:{...s.settings,guardianPin:d},pinDraft:'',pinError:false}));
+}
+function clearPin(){ setState(s=>({settings:{...s.settings,guardianPin:''},pinDraft:''})); }
 // 이벤트 보상 적용: ctx(pond/items/unlocks)를 직접 갱신하고 표시용 eventInfo를 반환.
 //  targetUid 지정 시 그 카피바라에게, 아니면 건강한 카피바라 중 랜덤으로 친밀도를 준다.
 function applyEventReward(ev, ctx, targetUid) {
@@ -681,6 +714,7 @@ function render() {
   const cheerSp=cheerCandidates.length?sp(cheerCandidates[0].speciesId):SPECIES[0];
   const timerMin=String(Math.floor(ST.timerSec/60)).padStart(2,'0'), timerSec=String(ST.timerSec%60).padStart(2,'0');
   const showCrisisBanner=anyCrisis()&&ST.overlay===null;
+  const showPendingBanner=!!ST.pendingReward&&ST.overlay===null;
 
   document.getElementById('app').innerHTML = `
 <div style="min-height:100dvh;display:flex;justify-content:center;background:${T.bg};font-family:'Noto Sans KR',sans-serif;color:${T.ink};">
@@ -690,11 +724,12 @@ function render() {
     <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};line-height:1;">🌿 인우의 카피바라 연못</div>
     <div style="display:flex;align-items:center;gap:8px;">
       <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
-      <div onclick="setState({overlay:'settings'})" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">⚙️</div>
+      <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
     </div>
   </div>
 
   ${showCrisisBanner?`<div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;animation:tapPop 1.4s ease-in-out infinite;">😢</div><div style="flex:1;"><div style="font-weight:800;color:#c0503a;font-size:15px;">${crisisBannerText()}</div><div style="font-size:13px;color:#b06a5c;margin-top:1px;">지금 숙제하면 구할 수 있어! 탭해서 구출하러 가자 →</div></div></div>`:''}
+  ${showPendingBanner?`<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff7e8,#ffeecb);border:2px solid #f0d49a;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;">🔒</div><div style="flex:1;"><div style="font-weight:800;color:${T.accentDark};font-size:15px;">숙제 끝! 보호자 확인을 기다리고 있어요</div><div style="font-size:13px;color:${T.sub};margin-top:1px;">보호자가 PIN을 입력하면 친구를 데려올 수 있어요 →</div></div></div>`:''}
 
   <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;">
     ${ST.screen==='home'  ? renderHome(T,sch,dexPct,dateLabel,plannedToday,doneToday,allDone):''}
@@ -713,6 +748,7 @@ function render() {
   ${ST.overlay==='dex'       ? renderDex(T,dexSeenCount,dexTotal,dexPct):''}
   ${ST.overlay==='capyDetail'? renderDetail(T):''}
   ${ST.overlay==='settings'  ? renderSettings(T):''}
+  ${ST.overlay==='verify'    ? renderVerify(T):''}
 
 </div>
 </div>`;
@@ -983,6 +1019,31 @@ function renderDetail(T) {
   </div></div>`;
 }
 
+// 보호자 확인 / 설정 잠금 — 6자리 PIN 키패드.
+function renderVerify(T) {
+  const reward=ST.verifyFor==='reward';
+  const title=reward?'보호자 확인':'부모님 설정 잠금';
+  const sub=reward?'오늘 숙제를 정말 다 했나요?<br>보호자가 확인하면 친구가 찾아와요 🌿':'보호자 PIN을 입력하면 설정을 열 수 있어요.';
+  const entry=ST.pinEntry||'';
+  const dots=Array.from({length:6}).map((_,i)=>`<div style="width:15px;height:15px;border-radius:50%;background:${i<entry.length?T.accent:'transparent'};border:2px solid ${i<entry.length?T.accent:T.line};"></div>`).join('');
+  const kStyle=`cursor:pointer;display:flex;align-items:center;justify-content:center;height:56px;border-radius:16px;background:${T.soft};border:2px solid ${T.line};font-size:23px;font-weight:800;color:${T.ink};`;
+  const keys=['1','2','3','4','5','6','7','8','9'].map(d=>`<div onclick="pinPress('${d}')" class="tapbtn" style="${kStyle}">${d}</div>`).join('');
+  return `<div style="position:absolute;inset:0;z-index:66;background:rgba(40,30,25,0.5);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:${T.card};border-radius:28px;padding:26px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
+    <div style="font-size:34px;line-height:1;">🔒</div>
+    <div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;color:${T.accentDark};margin-top:4px;">${title}</div>
+    <div style="font-size:13.5px;color:${T.sub};line-height:1.5;margin-top:6px;">${sub}</div>
+    <div style="display:flex;gap:11px;justify-content:center;margin:18px 0 6px;">${dots}</div>
+    <div style="height:18px;font-size:12.5px;font-weight:700;color:#c0503a;">${ST.pinError?'PIN이 일치하지 않아요. 다시 입력해 주세요.':''}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:8px;">
+      ${keys}
+      <div onclick="closeVerify()" class="tapbtn" style="${kStyle}font-size:13px;color:${T.sub};">${reward?'나중에':'취소'}</div>
+      <div onclick="pinPress('0')" class="tapbtn" style="${kStyle}">0</div>
+      <div onclick="pinDel()" class="tapbtn" style="${kStyle}font-size:20px;">⌫</div>
+    </div>
+  </div></div>`;
+}
+
 function renderSettings(T) {
   const dayMinInputs=['mon','tue','wed','thu','fri','sat'].map(d=>`<div style="text-align:center;"><div style="font-weight:700;font-size:13px;color:${T.sub};margin-bottom:5px;">${DL[d]}</div><input data-daymin="${d}" type="number" inputmode="numeric" value="${ST.settings.dayMin[d]}" style="width:100%;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:12px;padding:10px;background:#fff;color:${T.ink};" /></div>`).join('');
   const diffBtns=[{k:'easy',l:'느슨하게'},{k:'normal',l:'보통'},{k:'firm',l:'단단하게'}].map(x=>{ const sel=ST.settings.difficulty===x.k; return `<div onclick="setDifficulty('${x.k}')" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:14px;padding:12px 6px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
@@ -999,6 +1060,16 @@ function renderSettings(T) {
     <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:6px 20px 40px;">
+    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🔒 보호자 확인 PIN ${pinSet()?'<span style="font-size:12px;color:#3f9b94;">· 설정됨</span>':`<span style="font-size:12px;color:${T.sub};">· 미설정</span>`}</div>
+      <div style="font-size:12.5px;color:${T.sub};line-height:1.5;margin-bottom:10px;">숙제를 끝내면 보호자가 PIN을 입력해야 보상(친구 데려오기)이 주어져요. 설정 진입에도 같은 PIN을 사용합니다.</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input data-pin-draft="1" type="password" inputmode="numeric" maxlength="6" placeholder="${pinSet()?'새 PIN 6자리':'PIN 6자리 숫자'}" value="" style="flex:1;min-width:0;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
+        <div onclick="savePin()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">${pinSet()?'변경':'저장'}</div>
+      </div>
+      ${ST.pinError?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">6자리 숫자를 입력해 주세요.</div>`:''}
+      ${pinSet()?`<div onclick="clearPin()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:9px;margin-top:6px;">PIN 해제 (확인 없이 보상 지급)</div>`:''}
+    </div>
     <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">📒 문제집 관리</div>
       ${wbRows}
@@ -1040,6 +1111,8 @@ function attachInputs() {
   });
   const nwb=document.querySelector('[data-new-wb]');
   if(nwb) nwb.addEventListener('input',e=>{ST.newWbName=e.target.value;});
+  const pinD=document.querySelector('[data-pin-draft]');
+  if(pinD) pinD.addEventListener('input',e=>{ST.pinDraft=e.target.value.replace(/[^0-9]/g,'');});
 
   function updateRowPg(key){ const d=ST.rowEdit[key]||{}; const f=parseInt(d.from),t=parseInt(d.to); const pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null; const el=document.getElementById('rowpg-'+key); if(el)el.textContent=pg!=null&&pg>0?pg+'쪽':(pg!=null?'확인!':''); }
   document.querySelectorAll('[data-row-from]').forEach(el=>{
