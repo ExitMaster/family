@@ -250,8 +250,8 @@ const ITEMS = { '수박':'🍉', '유자':'🍊', '옥수수':'🌽', '반짝별
 
 // 5) 이벤트 — 부류 4종. reward 키: intimacy, item(수집), guest(깜짝친구 id),
 //    unlock(꾸미기 해금), 비우면 순수 연출. weight=같은 부류 내 랜덤 가중치.
-//    ▸ voluntary·catch는 현재 코드에 연결됨. milestone·rescue는 데이터 준비 완료,
-//      streak/사이클/위기회복 훅과는 다음 패스에서 연결 예정.
+//    ▸ 네 부류 모두 연결됨: voluntary(자발숙제)·catch(포획)·
+//      milestone(streak7·14/cycleComplete/dexPct50)·rescue(위기회복).
 const EVENTS = [
   // [voluntary] 휴식일 자발 숙제 → 즐거운 깜짝 보상
   {id:'ev_v_watermelon', category:'voluntary', rarity:'일반', weight:12, emoji:'🍉', mood:'먹는중',
@@ -267,7 +267,7 @@ const EVENTS = [
   {id:'ev_v_star', category:'voluntary', rarity:'희귀', weight:4, emoji:'⭐', mood:'신남',
    title:'반짝이는 밤', line:'별빛 아래 카피바라들이 너를 응원하며 노래해.', reward:{}},
 
-  // [milestone] 마일스톤 달성 (데이터 준비 — 훅 연결 예정)
+  // [milestone] 마일스톤 달성 (finishDay에서 연결됨)
   {id:'ev_m_streak7', category:'milestone', trigger:{type:'streak', value:7}, rarity:'희귀', weight:1, emoji:'🔥', mood:'뿌듯',
    title:'7일 연속 달성!', line:'일주일을 빠짐없이 해냈어. 카피바라들이 박수를 보내!', reward:{intimacy:2, item:'반짝별'}},
   {id:'ev_m_streak14', category:'milestone', trigger:{type:'streak', value:14}, rarity:'영웅', weight:1, emoji:'🏅', mood:'신남',
@@ -287,7 +287,7 @@ const EVENTS = [
   {id:'ev_c_legend', category:'catch', trigger:{type:'rarity', value:'전설'}, weight:1, emoji:'🌈', mood:'두근',
    title:'전설이 깨어났다!', line:'전설은 매일의 작은 숙제로 완성돼. 네가 해냈어!', reward:{}},
 
-  // [rescue] 위기 구출 성공 (데이터 준비 — 훅 연결 예정)
+  // [rescue] 위기 구출 성공 (finishDay에서 연결됨)
   {id:'ev_r_back', category:'rescue', weight:1, emoji:'💗', mood:'안심',
    title:'친구가 돌아왔어!', line:'숙제를 다시 챙긴 덕에 떠나려던 친구가 연못으로 돌아왔어.', reward:{intimacy:1}},
   {id:'ev_r_heal', category:'rescue', weight:1, emoji:'🌱', mood:'행복',
@@ -335,7 +335,8 @@ const DEFAULT_STATE = {
   todayKey:'tue', timerSec:0, timerRunning:false,
   lastDate:null, streakDate:null,
   caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
-  items:{}, unlocks:[], detailReaction:null, _wbSeq:3
+  items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
+  milestonesFired:[], eventQueue:[]
 };
 
 let ST = {...DEFAULT_STATE};
@@ -466,7 +467,7 @@ function setState(upd) {
   save(); render();
 }
 function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme})); } catch(e){}
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired})); } catch(e){}
 }
 function load() {
   const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
@@ -512,6 +513,18 @@ function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:k
 function openDetail(id) { setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
 function openDexDetail(id) { if(ST.dexSeen[id]) setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
 function closeOverlay() { setState({overlay:null,eventInfo:null,detailReaction:null}); }
+// 포획 오버레이 닫기: 대기 중인 milestone/rescue 이벤트가 있으면 이어서 보여준다.
+function closeCaught() {
+  const q=ST.eventQueue||[];
+  if(q.length){ const [next,...rest]=q; setState({overlay:'event',eventInfo:next,eventQueue:rest,screen:'home',caughtSpecies:null}); }
+  else setState({overlay:null,screen:'home',caughtSpecies:null,eventQueue:[]});
+}
+// 이벤트 오버레이 닫기: 큐에 남은 이벤트가 있으면 다음 이벤트로, 없으면 종료.
+function closeEvent() {
+  const q=ST.eventQueue||[];
+  if(q.length){ const [next,...rest]=q; setState({eventInfo:next,eventQueue:rest}); }
+  else setState({overlay:null,eventInfo:null,eventQueue:[]});
+}
 function toggleTimer() {
   if(ST.timerRunning){setState({timerRunning:false});}
   else{setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60}));}
@@ -524,21 +537,30 @@ function completePage() {
   if(done>=planned){ ST={...ST,dayLog,timerRunning:false,timerSec:0}; finishDay(); }
   else setState({dayLog,timerRunning:false,timerSec:0,overlay:'break'});
 }
+// 이벤트 보상 적용: ctx(pond/items/unlocks)를 직접 갱신하고 표시용 eventInfo를 반환.
+//  targetUid 지정 시 그 카피바라에게, 아니면 건강한 카피바라 중 랜덤으로 친밀도를 준다.
+function applyEventReward(ev, ctx, targetUid) {
+  const rw=ev.reward||{}; let who='카피바라';
+  if(rw.intimacy){
+    const healthy=ctx.pond.filter(c=>c.status==='healthy');
+    const t = targetUid ? ctx.pond.find(c=>c.uid===targetUid)
+            : (healthy.length?healthy[Math.floor(Math.random()*healthy.length)]:null);
+    if(t){ ctx.pond=ctx.pond.map(c=>c.uid===t.uid?{...c,intimacy:(c.intimacy||0)+rw.intimacy}:c); who=sp(t.speciesId).name; }
+  }
+  if(rw.item) ctx.items={...ctx.items,[rw.item]:(ctx.items[rw.item]||0)+1};
+  if(rw.unlock&&ctx.unlocks.indexOf(rw.unlock)<0) ctx.unlocks=[...ctx.unlocks,rw.unlock];
+  const guest=rw.guest?GUESTS.find(g=>g.id===rw.guest):null;
+  return {ev,who,guest,itemGot:rw.item||null,itemCount:rw.item?ctx.items[rw.item]:0,intimacy:rw.intimacy||0,unlock:rw.unlock||null};
+}
 // 휴식일 자발 숙제: 한 쪽 미리 풀기 → 사이클 분량 차감(재계산) + 친밀도↑ + 랜덤 이벤트(포획 없음).
 function doVoluntary() {
   const today=new Date(), vc=voluntaryCycle(today); if(!vc) return;
   const wk=dwk(today), todayS=dstr(today);
   const dayLog={...ST.dayLog,[wk]:{date:todayS,pages:doneOnDate(wk,todayS)+1}};
-  const ev=pickWeighted(eventsBy('voluntary')), rw=ev.reward||{};
-  const healthy=ST.pond.filter(c=>c.status==='healthy');
-  const target=healthy.length?healthy[Math.floor(Math.random()*healthy.length)]:null;
-  let pond=ST.pond;
-  if(target&&rw.intimacy) pond=ST.pond.map(c=>c.uid===target.uid?{...c,intimacy:(c.intimacy||0)+rw.intimacy}:c);
-  let items=ST.items||{}; if(rw.item) items={...items,[rw.item]:(items[rw.item]||0)+1};
-  let unlocks=ST.unlocks||[]; if(rw.unlock&&unlocks.indexOf(rw.unlock)<0) unlocks=[...unlocks,rw.unlock];
-  const guest=rw.guest?GUESTS.find(g=>g.id===rw.guest):null;
-  const who=target?sp(target.speciesId).name:'카피바라';
-  ST={...ST,dayLog,pond,items,unlocks,eventInfo:{ev,who,guest,itemGot:rw.item||null,itemCount:rw.item?items[rw.item]:0,intimacy:rw.intimacy||0,unlock:rw.unlock||null},overlay:'event'};
+  const ev=pickWeighted(eventsBy('voluntary'));
+  const ctx={pond:ST.pond,items:ST.items||{},unlocks:ST.unlocks||[]};
+  const ei=applyEventReward(ev,ctx);
+  ST={...ST,dayLog,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,eventInfo:ei,eventQueue:[],overlay:'event'};
   save(); render();
 }
 // 도감 상세에서 카피바라에게 직접 해보는 상호작용: 친밀도↑ + 개성별 반응.
@@ -549,8 +571,10 @@ function interact(uid, id) {
   setState({pond,detailReaction:{emoji:it.emoji,mood:it.mood,line:interactReact(personality,it)}});
 }
 function finishDay() {
-  const order=['gone','leaving','weak','healthy']; let rescued=false;
-  let pond=ST.pond.map(c=>{ if(!rescued&&c.status!=='healthy'){rescued=true;const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
+  const today=new Date();
+  // 위기 회복: 건강하지 않은 한 마리를 한 단계 끌어올린다(이전 상태를 기억해 rescue 이벤트 분기).
+  const order=['gone','leaving','weak','healthy']; let rescued=null;
+  let pond=ST.pond.map(c=>{ if(!rescued&&c.status!=='healthy'){rescued={uid:c.uid,prior:c.status};const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
   const unseen=SPECIES.filter(s=>!ST.dexSeen[s.id]);
   let species,isNew;
   if(unseen.length){species=unseen[Math.floor(Math.random()*unseen.length)];isNew=true;}
@@ -558,9 +582,28 @@ function finishDay() {
   if(isNew){pond=[...pond,{uid:'c'+Date.now()+Math.floor(Math.random()*999),speciesId:species.id,status:'healthy',intimacy:0}];}
   else{let b=false;pond=pond.map(c=>{if(!b&&c.speciesId===species.id){b=true;return{...c,intimacy:(c.intimacy||0)+1};}return c;});if(!pond.find(c=>c.speciesId===species.id))pond=[...pond,{uid:'c'+Date.now(),speciesId:species.id,status:'healthy',intimacy:0}];}
   const dexSeen={...ST.dexSeen,[species.id]:true};
-  const todayS=dstr(new Date());
+  const todayS=dstr(today);
   const incStreak=ST.streakDate!==todayS; // 연속일수는 하루 1회만 증가
-  ST={...ST,pond,dexSeen,streak:incStreak?ST.streak+1:ST.streak,streakDate:todayS,caughtSpecies:species,caughtNew:isNew,overlay:'caught',crisisInfo:anyCrisis(pond)?ST.crisisInfo:null};
+  const newStreak=incStreak?ST.streak+1:ST.streak;
+
+  // ── milestone / rescue 이벤트 큐 구성 (caught 오버레이 닫은 뒤 순차 표시) ──
+  const ctx={pond,items:ST.items||{},unlocks:ST.unlocks||[]};
+  const queue=[]; let fired=ST.milestonesFired||[];
+  const pushEvent=(id,targetUid)=>{ const ev=EVENTS.find(e=>e.id===id); if(ev) queue.push(applyEventReward(ev,ctx,targetUid)); };
+  // rescue: 위기에서 한 단계 회복했을 때. weak→완쾌(heal), leaving/gone→복귀(back).
+  if(rescued) pushEvent(rescued.prior==='weak'?'ev_r_heal':'ev_r_back', rescued.uid);
+  // milestone(cycleComplete): 오늘이 속한 사이클이 방금 완주됐고, 그 사이클 인스턴스에서 처음일 때.
+  const pf=planForWeekday(ST.todayKey,today);
+  if(pf){ const cs2=cycleSchedule(pf.cy,today); if(cs2.cycleDone>=cs2.T){ const ck='cycle:'+pf.cy.key+':'+dstr(cs2.anchor); if(fired.indexOf(ck)<0){ pushEvent('ev_m_cycle'); fired=[...fired,ck]; } } }
+  // milestone(streak): 연속일수가 7·14에 도달하는 순간(증가한 날만).
+  if(incStreak){ if(newStreak===7) pushEvent('ev_m_streak7'); if(newStreak===14) pushEvent('ev_m_streak14'); }
+  // milestone(dexPct): 도감 완성도가 50%를 처음 넘는 순간.
+  const dexTotal=SPECIES.length;
+  const oldPct=Math.round(Object.keys(ST.dexSeen).filter(k=>ST.dexSeen[k]).length/dexTotal*100);
+  const newPct=Math.round(Object.keys(dexSeen).filter(k=>dexSeen[k]).length/dexTotal*100);
+  if(oldPct<50&&newPct>=50) pushEvent('ev_m_dexHalf');
+
+  ST={...ST,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,dexSeen,streak:newStreak,streakDate:todayS,milestonesFired:fired,caughtSpecies:species,caughtNew:isNew,overlay:'caught',eventQueue:queue,crisisInfo:anyCrisis(ctx.pond)?ST.crisisInfo:null};
   save(); render();
 }
 function skipDay() {
@@ -814,7 +857,7 @@ function renderCaught(T) {
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
     <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
     ${catchFlavor}
-    <div onclick="setState({overlay:null,screen:'home'})" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">연못으로 데려가기 🪷</div>
+    <div onclick="closeCaught()" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">연못으로 데려가기 🪷</div>
   </div></div>`;
 }
 
@@ -837,7 +880,7 @@ function renderEvent(T) {
     <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(ev.line)}</div>
     ${guestHtml}
     <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;line-height:1.7;">${bits.map(h).join('<br>')}</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">고마워! 🌿</div>
+    <div onclick="closeEvent()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">${(ST.eventQueue&&ST.eventQueue.length)?'다음 →':'고마워! 🌿'}</div>
   </div></div>`;
 }
 
