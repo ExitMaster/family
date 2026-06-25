@@ -80,6 +80,12 @@ const THEMES = {
 const RARITY = {'일반':{c:'#9aa0a6',bg:'#eef0f2'},'희귀':{c:'#3f9b94',bg:'#e2f2f0'},'영웅':{c:'#8a6fc9',bg:'#efeafb'},'전설':{c:'#d99441',bg:'#fbf0dc'}};
 const DL = {mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
 const DAY_ORDER = ['mon','tue','wed','thu','fri','sat','sun'];
+// 숙제 주기: 화요일에 받은 숙제는 수·목에, 목요일에 받은 숙제는 금·토·(다음)월에 완료한다.
+// assignDow = 받는 요일의 getDay() 인덱스(일0..토6). off = 받는 날로부터의 일수.
+const CYCLES = [
+  {key:'tue', label:'화요일 숙제', assignDow:2, days:[{d:'wed',off:1},{d:'thu',off:2}]},
+  {key:'thu', label:'목요일 숙제', assignDow:4, days:[{d:'fri',off:1},{d:'sat',off:2},{d:'mon',off:4}]}
+];
 const WB_COLORS = ['#c47a4e','#3f9b94','#cd7aa1','#d99441','#7a86c9','#6aa05a','#c2607a'];
 const POND_SLOTS = [[16,30],[44,20],[72,32],[26,58],[55,50],[82,62],[37,78],[64,74],[12,72],[88,40],[50,82],[20,44]];
 const SPECIES = [
@@ -109,8 +115,8 @@ const DEFAULT_STATE = {
   settings:{minsPerPage:10,dayMin:{mon:75,tue:20,wed:30,thu:70,fri:40,sat:20,sun:0},difficulty:'normal'},
   pond:[{uid:'c1',speciesId:'s1',status:'healthy',intimacy:0},{uid:'c2',speciesId:'s9',status:'healthy',intimacy:0},{uid:'c3',speciesId:'s3',status:'healthy',intimacy:1}],
   dexSeen:{s1:true,s9:true,s3:true},
-  streak:3, todayDone:{}, setupDay:'tue',
-  draftWb:null, draftFrom:'', draftTo:'', newWbName:'',
+  streak:3, dayLog:{}, setupDay:'tue',
+  newWbName:'', rowEdit:{},
   todayKey:'tue', timerSec:0, timerRunning:false,
   lastDate:null, streakDate:null,
   caughtSpecies:null, caughtNew:false, crisisInfo:null, detailSpeciesId:null, _wbSeq:3
@@ -133,12 +139,12 @@ function distribute(total,days) {
   return res;
 }
 function schedule() {
-  const tP=dayPages('tue'), hP=dayPages('thu');
-  const a=distribute(tP,['tue','wed']), b=distribute(hP,['thu','fri','sat']);
-  const pages={mon:0,tue:a.tue||0,wed:a.wed||0,thu:b.thu||0,fri:b.fri||0,sat:b.sat||0,sun:0};
+  const pages={mon:0,tue:0,wed:0,thu:0,fri:0,sat:0,sun:0};
+  let weekTotal=0;
+  CYCLES.forEach(cy=>{ const tot=dayPages(cy.key); weekTotal+=tot; const ds=cy.days.map(x=>x.d); const dist=distribute(tot,ds); ds.forEach(d=>{ pages[d]+=(dist[d]||0); }); });
   const m=mpp(); const days={};
   DAY_ORDER.forEach(d=>{ const pg=pages[d],mins=pg*m,cap=ST.settings.dayMin[d]||0; days[d]={pages:pg,mins,cap,fill:cap>0?Math.min(1,mins/cap):(mins>0?1:0),over:mins>cap&&cap>=0&&mins>0}; });
-  return {days,weekTotal:tP+hP};
+  return {days,weekTotal};
 }
 function anyCrisis(pond) { return (pond||ST.pond).some(c=>c.status!=='healthy'); }
 function crisisBannerText() {
@@ -154,6 +160,18 @@ function dstr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'
 function dparse(s){ const p=String(s).split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
 function dwk(d){ return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
 function dadd(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+// today 기준 가장 최근의 dow 요일 날짜(당일 포함).
+function dmostRecentDow(today,dow){ const x=new Date(today.getFullYear(),today.getMonth(),today.getDate()); x.setDate(x.getDate()-((x.getDay()-dow+7)%7)); return x; }
+// 한 사이클의 각 완료일에 해당하는 실제 날짜를 매핑. 이미 끝난 사이클이면 다음 주기로 넘어간다.
+function cycleDates(cy,today){
+  let anchor=dmostRecentDow(today,cy.assignDow);
+  const lastOff=Math.max.apply(null,cy.days.map(x=>x.off));
+  if(dstr(today)>dstr(dadd(anchor,lastOff))) anchor=dadd(anchor,7);
+  const map={}; cy.days.forEach(x=>{ map[x.d]=dstr(dadd(anchor,x.off)); }); return map;
+}
+// 특정 요일이 특정 날짜에 푼 페이지 수(날짜 스탬프가 일치할 때만).
+function doneOnDate(wk,ds){ const e=ST.dayLog&&ST.dayLog[wk]; return (e&&e.date===ds)?(e.pages||0):0; }
+function doneForDay(wk){ return doneOnDate(wk,dstr(new Date())); }
 
 // 카피바라 한 마리를 한 단계 악화(healthy→weak→leaving→gone). ST.pond를 변경하고 대상 마리를 반환.
 function degradeOne() {
@@ -181,13 +199,11 @@ function rollover() {
   if(ST.lastDate===todayS) return;
   const sched=schedule().days;
   let miss=0, cur=dparse(ST.lastDate);
-  // 마지막 활동일 자체: 숙제가 있었는데 완료하지 못했나?
-  if((sched[dwk(cur)]||{}).pages>0 && ST.streakDate!==ST.lastDate) miss++;
-  // 마지막 활동일과 오늘 사이에 앱을 한 번도 열지 않은 날 → 계획 요일이면 거른 것.
-  cur=dadd(cur,1);
-  while(dstr(cur)<todayS){ if((sched[dwk(cur)]||{}).pages>0) miss++; cur=dadd(cur,1); }
+  // 마지막 활동일부터 오늘 전날까지: 계획 요일인데 그날 분량을 못 채웠으면 거른 것.
+  // dayLog는 날짜 스탬프 기반이라 지난주 기록은 자동으로 0으로 간주된다.
+  while(dstr(cur)<todayS){ const wk=dwk(cur), planned=(sched[wk]||{}).pages||0; if(planned>0 && doneOnDate(wk,dstr(cur))<planned) miss++; cur=dadd(cur,1); }
   applyMiss(miss);
-  ST.todayDone={}; ST.lastDate=todayS;
+  ST.lastDate=todayS;
 }
 
 // ── State mutations ──────────────────────────────────────────
@@ -196,19 +212,20 @@ function setState(upd) {
   save(); render();
 }
 function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,todayDone:ST.todayDone,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme})); } catch(e){}
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme})); } catch(e){}
 }
 function load() {
   const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
   try { const r=localStorage.getItem('capy-v2-state'); if(r){const s=JSON.parse(r);ST={...DEFAULT_STATE,...s,todayKey:tk};} else { ST={...DEFAULT_STATE,todayKey:tk}; } } catch(e){ ST={...DEFAULT_STATE,todayKey:tk}; }
   rollover();
+  save(); // 앱을 여는 날짜를 즉시 고정해 두어야 다음날 거른 숙제를 감지할 수 있음
 }
 
 // Mutations
 function delWb(id) {
   const asgn={};
   Object.keys(ST.assignments).forEach(d=>{asgn[d]=ST.assignments[d].filter(it=>it.workbookId!==id);});
-  setState({workbooks:ST.workbooks.filter(w=>w.id!==id),assignments:asgn,draftWb:ST.draftWb===id?null:ST.draftWb});
+  setState({workbooks:ST.workbooks.filter(w=>w.id!==id),assignments:asgn});
 }
 function addWorkbook() {
   const name=(ST.newWbName||'').trim(); if(!name)return;
@@ -216,12 +233,25 @@ function addWorkbook() {
   const color=WB_COLORS[ST.workbooks.length%WB_COLORS.length];
   setState({workbooks:[...ST.workbooks,{id,name,color}],newWbName:'',_wbSeq:seq});
 }
-function addItem() {
-  const from=parseInt(ST.draftFrom),to=parseInt(ST.draftTo);
-  if(!ST.draftWb||isNaN(from)||isNaN(to)||(to-from+1)<=0)return;
-  setState({assignments:{...ST.assignments,[ST.setupDay]:[...(ST.assignments[ST.setupDay]||[]),{workbookId:ST.draftWb,from,to}]},draftFrom:'',draftTo:''});
+// 숙제 입력: 문제집마다 한 행(요일별 1구간). ✓로 확정, ✏️로 수정, ✕로 삭제.
+function rowKey(day,wbId){ return day+'|'+wbId; }
+function getAssign(day,wbId){ return (ST.assignments[day]||[]).find(it=>it.workbookId===wbId); }
+function confirmRow(day,wbId){
+  const key=rowKey(day,wbId), d=ST.rowEdit[key]||{}, from=parseInt(d.from), to=parseInt(d.to);
+  if(isNaN(from)||isNaN(to)||from<1||(to-from+1)<=0) return;
+  const rest=(ST.assignments[day]||[]).filter(it=>it.workbookId!==wbId);
+  const re={...ST.rowEdit}; delete re[key];
+  setState({assignments:{...ST.assignments,[day]:[...rest,{workbookId:wbId,from,to}]},rowEdit:re});
 }
-function delItem(day,idx) { setState({assignments:{...ST.assignments,[day]:ST.assignments[day].filter((_,i)=>i!==idx)}}); }
+function editRow(day,wbId){
+  const a=getAssign(day,wbId)||{}, key=rowKey(day,wbId);
+  setState({rowEdit:{...ST.rowEdit,[key]:{from:a.from!=null?String(a.from):'',to:a.to!=null?String(a.to):''}}});
+}
+function clearRow(day,wbId){
+  const rest=(ST.assignments[day]||[]).filter(it=>it.workbookId!==wbId);
+  const re={...ST.rowEdit}; delete re[rowKey(day,wbId)];
+  setState({assignments:{...ST.assignments,[day]:rest},rowEdit:re});
+}
 function setMpp(v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}})); }
 function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,dayMin:{...s.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}})); }
 function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
@@ -234,10 +264,11 @@ function toggleTimer() {
 }
 function completePage() {
   const k=ST.todayKey, planned=schedule().days[k].pages; if(!planned)return;
-  if((ST.todayDone[k]||0)>=planned) return; // 이미 끝낸 분량 — 채집 무한반복 방지
-  const done=(ST.todayDone[k]||0)+1, td={...ST.todayDone,[k]:done};
-  if(done>=planned){ ST={...ST,todayDone:td,timerRunning:false,timerSec:0}; finishDay(); }
-  else setState({todayDone:td,timerRunning:false,timerSec:0,overlay:'break'});
+  const todayS=dstr(new Date()), cur=doneOnDate(k,todayS);
+  if(cur>=planned) return; // 이미 끝낸 분량 — 채집 무한반복 방지
+  const done=cur+1, dayLog={...ST.dayLog,[k]:{date:todayS,pages:done}};
+  if(done>=planned){ ST={...ST,dayLog,timerRunning:false,timerSec:0}; finishDay(); }
+  else setState({dayLog,timerRunning:false,timerSec:0,overlay:'break'});
 }
 function finishDay() {
   const order=['gone','leaving','weak','healthy']; let rescued=false;
@@ -286,7 +317,7 @@ function render() {
   const T=THEMES[ST.theme]||THEMES.onsen;
   const sch=schedule(), tk=ST.todayKey;
   const plannedToday=sch.days[tk]?sch.days[tk].pages:0;
-  const doneToday=ST.todayDone[tk]||0;
+  const doneToday=doneForDay(tk);
   const allDone=plannedToday>0&&doneToday>=plannedToday;
   const dexTotal=SPECIES.length, dexSeenCount=SPECIES.filter(s=>ST.dexSeen[s.id]).length;
   const dexPct=Math.round((dexSeenCount/dexTotal)*100);
@@ -371,63 +402,76 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
 }
 
 function renderSetup(T,sch) {
-  const wbRows=ST.workbooks.map(w=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-      <div style="width:16px;height:16px;border-radius:50%;background:${w.color};flex:none;"></div>
-      <input data-wb-rename="${w.id}" value="${h(w.name)}" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;font-weight:600;color:${T.ink};background:${T.soft};border:2px solid transparent;border-radius:12px;padding:11px 14px;" />
-      <div onclick="delWb('${w.id}')" class="tapbtn" style="cursor:pointer;width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:${T.soft};border-radius:12px;font-size:18px;color:${T.sub};">✕</div>
-    </div>`).join('');
+  const day=ST.setupDay;
+  const daySel=[{k:'tue',l:'화요일'},{k:'thu',l:'목요일'}].map(x=>{ const sel=day===x.k; return `<div onclick="setState({setupDay:'${x.k}'})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:14px;padding:9px;border-radius:11px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
 
-  const chips=ST.workbooks.map(w=>{ const sel=ST.draftWb===w.id; return `<div onclick="setState({draftWb:'${w.id}',draftFrom:'',draftTo:''})" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:7px;padding:10px 15px;border-radius:999px;font-weight:700;font-size:14px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};"><span style="width:11px;height:11px;border-radius:50%;background:${w.color};"></span>${h(w.name)}</div>`; }).join('');
+  const rows=ST.workbooks.map(w=>{
+    const key=day+'|'+w.id, a=getAssign(day,w.id), editing=!a||(key in ST.rowEdit), ev=ST.rowEdit[key]||{};
+    const dot=`<span style="width:13px;height:13px;border-radius:50%;background:${w.color};flex:none;"></span>`;
+    if(editing){
+      const f=parseInt(ev.from),t=parseInt(ev.to), pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null;
+      const pgLabel=pg!=null&&pg>0?pg+'쪽':(pg!=null?'확인!':'');
+      return `<div style="display:flex;align-items:center;gap:6px;background:${T.soft};border-radius:13px;padding:10px 11px;margin-bottom:8px;flex-wrap:wrap;">
+        ${dot}<span style="font-weight:700;font-size:14px;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h(w.name)}</span>
+        <input data-row-from="${key}" type="number" inputmode="numeric" placeholder="시작" value="${h(ev.from||'')}" style="width:54px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:9px;padding:8px 3px;background:#fff;color:${T.ink};" />
+        <span style="color:${T.sub};font-weight:700;">~</span>
+        <input data-row-to="${key}" type="number" inputmode="numeric" placeholder="끝" value="${h(ev.to||'')}" style="width:54px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:9px;padding:8px 3px;background:#fff;color:${T.ink};" />
+        <span style="color:${T.sub};font-weight:600;font-size:13px;">쪽</span>
+        <span id="rowpg-${key}" style="font-weight:800;color:${T.accent};font-size:13px;min-width:28px;">${pgLabel}</span>
+        <div onclick="confirmRow('${day}','${w.id}')" class="tapbtn" style="cursor:pointer;margin-left:auto;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;border-radius:11px;">✓</div>
+      </div>`;
+    }
+    const pg=Math.max(0,a.to-a.from+1);
+    return `<div style="display:flex;align-items:center;gap:9px;background:${lighten(T.accent,0.86)};border:2px solid ${lighten(T.accent,0.62)};border-radius:13px;padding:11px 13px;margin-bottom:8px;">
+      ${dot}<span style="font-weight:700;font-size:15px;">${h(w.name)}</span>
+      <span style="color:${T.sub};font-weight:600;font-size:14px;">p.${a.from}~${a.to}</span>
+      <span style="font-weight:800;color:${T.accentDark};font-size:14px;">${pg}쪽</span>
+      <div onclick="editRow('${day}','${w.id}')" class="tapbtn" style="cursor:pointer;margin-left:auto;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;font-size:14px;">✏️</div>
+      <div onclick="clearRow('${day}','${w.id}')" class="tapbtn" style="cursor:pointer;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;color:${T.sub};font-size:14px;">✕</div>
+    </div>`;
+  }).join('');
+  const noWb=!ST.workbooks.length?`<div style="color:${T.sub};font-size:14px;padding:8px 2px;">문제집이 없어요. ⚙️ 설정 → 📒 문제집 관리에서 먼저 추가해 주세요.</div>`:'';
 
-  const dWb=ST.draftWb?wb(ST.draftWb):null;
-  const dF=parseInt(ST.draftFrom),dT=parseInt(ST.draftTo);
-  const dPg=(!isNaN(dF)&&!isNaN(dT))?(dT-dF+1):null;
-
-  const draft=ST.draftWb?`<div style="display:flex;align-items:center;gap:8px;background:${T.soft};border-radius:14px;padding:12px 14px;margin-bottom:14px;flex-wrap:wrap;">
-    <span style="font-weight:700;font-size:14px;">${dWb?h(dWb.name):''}</span>
-    <span style="color:${T.sub};font-weight:600;">p.</span>
-    <input data-draft-from="1" type="number" inputmode="numeric" placeholder="시작" value="${h(ST.draftFrom)}" style="width:74px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:10px;padding:9px;background:#fff;color:${T.ink};" />
-    <span style="color:${T.sub};font-weight:700;">~</span>
-    <input data-draft-to="1" type="number" inputmode="numeric" placeholder="끝" value="${h(ST.draftTo)}" style="width:74px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:10px;padding:9px;background:#fff;color:${T.ink};" />
-    <span id="draft-pages-label" style="font-weight:700;color:${T.accent};font-size:14px;">${dPg!==null&&dPg>0?'= '+dPg+'쪽':(dPg!==null?'쪽수 확인!':'')}</span>
-    <div onclick="addItem()" class="tapbtn" style="cursor:pointer;margin-left:auto;background:${T.accent};color:#fff;font-weight:800;padding:10px 18px;border-radius:12px;">항목 추가</div>
-  </div>`:'';
-
-  const items=(ST.assignments[ST.setupDay]||[]).map((it,idx)=>{ const w=wb(it.workbookId),pg=Math.max(0,it.to-it.from+1); return `<div style="display:flex;align-items:center;gap:10px;background:${T.soft};border-radius:12px;padding:11px 14px;margin-bottom:7px;"><span style="width:11px;height:11px;border-radius:50%;background:${w?w.color:'#ccc'};flex:none;"></span><span style="font-weight:700;font-size:15px;">${w?h(w.name):'?'}</span><span style="color:${T.sub};font-weight:600;font-size:14px;">p.${it.from}~${it.to}</span><span style="margin-left:auto;font-weight:800;color:${T.accent};font-size:14px;">${pg}쪽</span><div onclick="delItem('${ST.setupDay}',${idx})" class="tapbtn" style="cursor:pointer;width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;color:${T.sub};font-size:15px;">✕</div></div>`; }).join('');
-
-  const schedRows=DAY_ORDER.map(d=>{ const info=sch.days[d]; const detail=info.pages===0?(d==='sun'?'휴무':'0쪽'):info.pages+'쪽 · '+info.mins+'분/'+info.cap+'분'; return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><div style="width:30px;text-align:center;font-weight:800;font-size:15px;color:${d===ST.todayKey?T.accent:T.sub};">${DL[d]}</div><div style="flex:1;height:22px;background:${T.soft};border-radius:999px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;bottom:0;width:${Math.round(info.fill*100)}%;background:${info.over?'#e08a6e':T.accent};border-radius:999px;"></div></div><div style="width:118px;text-align:right;font-size:13px;font-weight:600;color:${info.over?'#c0503a':T.sub};">${detail}</div></div>`; }).join('');
+  const today=new Date(), todayS=dstr(today);
+  const cyclePreview=CYCLES.map(cy=>{
+    const total=cy.days.reduce((s,x)=>s+sch.days[x.d].pages,0), active=total>0, dates=cycleDates(cy,today);
+    let doneTotal=0;
+    const dayRows=cy.days.map(x=>{
+      const planned=sch.days[x.d].pages, dn=Math.min(planned,doneOnDate(x.d,dates[x.d])), isToday=dates[x.d]===todayS;
+      doneTotal+=dn;
+      let dots='';
+      for(let i=0;i<planned;i++){ const filled=i<dn; dots+=`<span style="width:11px;height:11px;border-radius:50%;flex:none;background:${filled?T.accent:'transparent'};border:2px solid ${filled?T.accent:lighten(T.accent,0.5)};"></span>`; }
+      if(!planned) dots=`<span style="font-size:12px;color:${T.sub};">–</span>`;
+      return `<div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
+        <div style="width:30px;text-align:center;font-weight:800;font-size:14px;color:${isToday?T.accentDark:T.sub};">${DL[x.d]}${isToday?`<div style="font-size:9px;font-weight:700;color:${T.accent};line-height:1;">오늘</div>`:''}</div>
+        <div style="flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:15px;">${dots}</div>
+        <div style="font-size:12px;font-weight:700;color:${T.sub};width:42px;text-align:right;">${planned?dn+'/'+planned:'–'}</div>
+      </div>`;
+    }).join('');
+    return `<div style="background:${active?T.soft:'transparent'};border:2px solid ${active?'transparent':T.line};border-radius:16px;padding:13px 14px;margin-bottom:10px;opacity:${active?1:0.55};">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-weight:800;font-size:14px;">${cy.label} <span style="font-weight:600;color:${T.sub};font-size:12px;">(${cy.days.map(x=>DL[x.d]).join('·')})</span></div>
+        <div style="font-weight:800;color:${active?T.accent:T.sub};font-size:13px;">${active?doneTotal+' / '+total+'쪽':'숙제 없음'}</div>
+      </div>
+      ${dayRows}
+    </div>`;
+  }).join('');
 
   return `<div>
   <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">✏️ 숙제 설정</div>
   <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
-    <div style="font-weight:800;font-size:16px;margin-bottom:10px;">📒 문제집 관리</div>
-    ${wbRows}
-    <div style="display:flex;gap:8px;margin-top:6px;">
-      <input data-new-wb="1" value="${h(ST.newWbName)}" placeholder="새 문제집 이름 (예: 영어 단어장)" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;background:#fff;border:2px dashed ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
-      <div onclick="addWorkbook()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">+ 추가</div>
-    </div>
-  </div>
-  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
     <div style="font-weight:800;font-size:16px;margin-bottom:4px;">🗓️ 숙제 입력</div>
-    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">요일을 고르고 → 문제집을 탭한 뒤 → 시작쪽·끝쪽을 넣어 추가해요.</div>
-    <div style="display:flex;gap:10px;margin-bottom:14px;">
-      <div onclick="setState({setupDay:'tue',draftWb:null})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:17px;padding:13px;border-radius:14px;background:${ST.setupDay==='tue'?T.accent:T.soft};color:${ST.setupDay==='tue'?'#fff':T.ink};border:2px solid ${ST.setupDay==='tue'?T.accent:T.line};">화요일</div>
-      <div onclick="setState({setupDay:'thu',draftWb:null})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:17px;padding:13px;border-radius:14px;background:${ST.setupDay==='thu'?T.accent:T.soft};color:${ST.setupDay==='thu'?'#fff':T.ink};border:2px solid ${ST.setupDay==='thu'?T.accent:T.line};">목요일</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${chips}</div>
-    ${draft}
-    <div style="font-weight:700;font-size:14px;color:${T.sub};margin-bottom:8px;">${ST.setupDay==='tue'?'화':'목'}요일 숙제 (${dayPages(ST.setupDay)}쪽)</div>
-    ${items}
-    ${!(ST.assignments[ST.setupDay]||[]).length?`<div style="color:${T.sub};font-size:14px;padding:6px 2px;">아직 이 요일 숙제가 없어요. 위에서 문제집을 골라 추가해 보세요.</div>`:''}
+    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">요일을 고르고, 문제집마다 시작·끝 쪽을 넣고 ✓를 누르면 확정돼요.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;max-width:230px;">${daySel}</div>
+    ${rows}${noWb}
   </div>
   <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:8px;">
     <div style="display:flex;align-items:baseline;justify-content:space-between;">
-      <div style="font-weight:800;font-size:16px;">📊 주간 자동 배분 미리보기</div>
+      <div style="font-weight:800;font-size:16px;">📊 주간 배분 미리보기</div>
       <div style="font-weight:800;color:${T.accent};font-size:15px;">총 ${sch.weekTotal}쪽</div>
     </div>
-    <div style="font-size:12.5px;color:${T.sub};margin:4px 0 14px;">화 숙제는 화·수, 목 숙제는 목·금·토에 나눠 담았어요 (1쪽 ≈ ${mpp()}분).</div>
-    ${schedRows}
+    <div style="font-size:12.5px;color:${T.sub};margin:4px 0 14px;">화 숙제는 수·목, 목 숙제는 금·토·월에 나눠 담아요 (1쪽 ≈ ${mpp()}분). ● 완료 / ○ 남음</div>
+    ${cyclePreview}
   </div>
 </div>`;
 }
@@ -547,12 +591,26 @@ function renderSettings(T) {
   const dayMinInputs=['mon','tue','wed','thu','fri','sat'].map(d=>`<div style="text-align:center;"><div style="font-weight:700;font-size:13px;color:${T.sub};margin-bottom:5px;">${DL[d]}</div><input data-daymin="${d}" type="number" inputmode="numeric" value="${ST.settings.dayMin[d]}" style="width:100%;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:12px;padding:10px;background:#fff;color:${T.ink};" /></div>`).join('');
   const diffBtns=[{k:'easy',l:'느슨하게'},{k:'normal',l:'보통'},{k:'firm',l:'단단하게'}].map(x=>{ const sel=ST.settings.difficulty===x.k; return `<div onclick="setDifficulty('${x.k}')" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:14px;padding:12px 6px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
   const themes=[{k:'onsen',l:'온천 어스톤'},{k:'riverside',l:'강가 아침'},{k:'sakura',l:'벚꽃 황혼'}].map(x=>{ const sel=ST.theme===x.k; return `<div onclick="setState({theme:'${x.k}'})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:13px;padding:11px 4px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
+  const wbRows=ST.workbooks.map(w=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:16px;height:16px;border-radius:50%;background:${w.color};flex:none;"></div>
+      <input data-wb-rename="${w.id}" value="${h(w.name)}" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;font-weight:600;color:${T.ink};background:${T.soft};border:2px solid transparent;border-radius:12px;padding:11px 14px;" />
+      <div onclick="delWb('${w.id}')" class="tapbtn" style="cursor:pointer;width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:${T.soft};border-radius:12px;font-size:18px;color:${T.sub};">✕</div>
+    </div>`).join('');
   return `<div style="position:absolute;inset:0;z-index:58;background:${T.bg};display:flex;flex-direction:column;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
     <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">⚙️ 부모님 설정</div>
     <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:6px 20px 40px;">
+    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">📒 문제집 관리</div>
+      ${wbRows}
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <input data-new-wb="1" value="${h(ST.newWbName)}" placeholder="새 문제집 이름 (예: 영어 단어장)" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;background:#fff;border:2px dashed ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
+        <div onclick="addWorkbook()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">+ 추가</div>
+      </div>
+    </div>
     <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:8px;">🎨 테마</div>
       <div style="display:flex;gap:8px;">${themes}</div>
@@ -587,16 +645,13 @@ function attachInputs() {
   const nwb=document.querySelector('[data-new-wb]');
   if(nwb) nwb.addEventListener('input',e=>{ST.newWbName=e.target.value;});
 
-  function updateDraftLabel(){
-    const f=parseInt(ST.draftFrom),t=parseInt(ST.draftTo);
-    const pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null;
-    const el=document.getElementById('draft-pages-label');
-    if(el)el.textContent=pg!==null&&pg>0?'= '+pg+'쪽':(pg!==null?'쪽수 확인!':'');
-  }
-  const df=document.querySelector('[data-draft-from]');
-  if(df)df.addEventListener('input',e=>{ST.draftFrom=e.target.value;updateDraftLabel();});
-  const dt=document.querySelector('[data-draft-to]');
-  if(dt)dt.addEventListener('input',e=>{ST.draftTo=e.target.value;updateDraftLabel();});
+  function updateRowPg(key){ const d=ST.rowEdit[key]||{}; const f=parseInt(d.from),t=parseInt(d.to); const pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null; const el=document.getElementById('rowpg-'+key); if(el)el.textContent=pg!=null&&pg>0?pg+'쪽':(pg!=null?'확인!':''); }
+  document.querySelectorAll('[data-row-from]').forEach(el=>{
+    el.addEventListener('input',e=>{ const key=el.getAttribute('data-row-from'); ST.rowEdit={...ST.rowEdit,[key]:{...(ST.rowEdit[key]||{}),from:e.target.value}}; updateRowPg(key); });
+  });
+  document.querySelectorAll('[data-row-to]').forEach(el=>{
+    el.addEventListener('input',e=>{ const key=el.getAttribute('data-row-to'); ST.rowEdit={...ST.rowEdit,[key]:{...(ST.rowEdit[key]||{}),to:e.target.value}}; updateRowPg(key); });
+  });
 
   const mppEl=document.querySelector('[data-mpp]');
   if(mppEl)mppEl.addEventListener('input',e=>setMpp(e.target.value));
