@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>카피바라 숙제 탐험대</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin:0; padding:0; height:100%; overscroll-behavior:none; }
+@keyframes capyBob { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-0.07em) rotate(0.3deg)} }
+@keyframes capyFloat { 0%,100%{transform:translateY(0) rotate(-1.6deg)} 50%{transform:translateY(-0.12em) rotate(1.6deg)} }
+@keyframes capyNap { 0%,100%{transform:scale(1.0,1.0)} 50%{transform:scale(1.02,0.98)} }
+@keyframes capySpark { 0%,100%{opacity:.35; transform:scale(.85)} 50%{opacity:1; transform:scale(1.15)} }
+@keyframes capyPop { 0%{transform:scale(0.6); opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1); opacity:1} }
+@keyframes confettiFall { 0%{transform:translateY(-30px) rotate(0deg); opacity:1} 100%{transform:translateY(420px) rotate(420deg); opacity:0} }
+@keyframes lilyDrift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+@keyframes tapPop { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
+.tapbtn:active { animation: tapPop 0.25s ease; }
+::-webkit-scrollbar { width:0; height:0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── Color utilities ──────────────────────────────────────────
+function _mix(hex, amt, toWhite) {
+  try {
+    const h = hex.replace('#','');
+    const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+    const f = c => { const v = toWhite ? Math.round(c+(255-c)*amt) : Math.round(c*(1-amt)); return Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0'); };
+    return '#'+f(r)+f(g)+f(b);
+  } catch(e) { return hex; }
+}
+const lighten = (h,a) => _mix(h,a,true);
+const darken  = (h,a) => _mix(h,a,false);
+
+// ── Capybara renderer ────────────────────────────────────────
+function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반'}) {
+  const animMap = { bob:'capyBob 2.8s ease-in-out infinite', float:'capyFloat 4.2s ease-in-out infinite', nap:'capyNap 3.4s ease-in-out infinite', none:'none' };
+  const sm = { healthy:{f:'none',o:1,e:''}, weak:{f:'saturate(0.7) brightness(0.99)',o:0.95,e:'😟'}, leaving:{f:'grayscale(0.45) brightness(0.98)',o:0.9,e:'😢'}, gone:{f:'grayscale(0.9) brightness(1.02)',o:0.4,e:'💨'}, locked:{f:'grayscale(1) brightness(0.5) contrast(0.7)',o:0.85,e:''} }[status] || {f:'none',o:1,e:''};
+  const base = status==='locked' ? '#9aa0a6' : color;
+  const bc=base, fc=darken(base,0.06), pc=darken(base,0.04), oc=darken(base,0.44), ml=darken(base,0.24), ie=darken(base,0.16);
+  const isNap = idle==='nap', isGlasses = accessory==='👓';
+  const anim = status==='gone' ? 'none' : (animMap[idle]||animMap.bob);
+  const eyesOpen = !isNap && status!=='gone';
+  const acc = status==='locked' ? '' : accessory;
+  const sparkle = (rarity==='영웅'||rarity==='전설') && status!=='locked';
+  const accTop = isGlasses ? '0.7em' : '-0.04em';
+  return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
+  ${sparkle?`<div style="position:absolute;top:-0.05em;right:-0.05em;font-size:0.46em;animation:capySpark 1.6s ease-in-out infinite;pointer-events:none;z-index:9;">✨</div>`:''}
+  <div style="position:relative;width:2em;height:2.35em;transform-origin:50% 95%;animation:${anim};">
+    <div style="position:absolute;top:2.0em;left:0.16em;width:0.46em;height:0.3em;border-radius:50%;background:${fc};border:0.06em solid ${oc};z-index:1;"></div>
+    <div style="position:absolute;top:2.0em;right:0.16em;width:0.46em;height:0.3em;border-radius:50%;background:${fc};border:0.06em solid ${oc};z-index:1;"></div>
+    <div style="position:absolute;top:0.04em;left:0.34em;width:0.4em;height:0.42em;border-radius:50%;background:${bc};border:0.06em solid ${oc};z-index:1;"><div style="position:absolute;top:0.08em;left:50%;transform:translateX(-50%);width:0.17em;height:0.18em;border-radius:50%;background:${ie};"></div></div>
+    <div style="position:absolute;top:0.04em;right:0.34em;width:0.4em;height:0.42em;border-radius:50%;background:${bc};border:0.06em solid ${oc};z-index:1;"><div style="position:absolute;top:0.08em;left:50%;transform:translateX(-50%);width:0.17em;height:0.18em;border-radius:50%;background:${ie};"></div></div>
+    <div style="position:absolute;left:0.2em;top:0.2em;width:1.6em;height:2.0em;border-radius:50% 50% 47% 47%/43% 43% 53% 53%;background:${bc};border:0.06em solid ${oc};box-shadow:inset 0 -0.26em 0 rgba(0,0,0,0.04),inset 0 0.2em 0 rgba(255,255,255,0.15);z-index:2;"></div>
+    <div style="position:absolute;top:1.5em;left:0.6em;width:0.36em;height:0.46em;border-radius:48% 48% 50% 50%;background:${pc};border:0.06em solid ${oc};z-index:3;"></div>
+    <div style="position:absolute;top:1.5em;right:0.6em;width:0.36em;height:0.46em;border-radius:48% 48% 50% 50%;background:${pc};border:0.06em solid ${oc};z-index:3;"></div>
+    <div style="position:absolute;top:1.04em;left:0.32em;width:0.3em;height:0.18em;border-radius:50%;background:#ef9bb0;opacity:0.5;z-index:4;"></div>
+    <div style="position:absolute;top:1.04em;right:0.32em;width:0.3em;height:0.18em;border-radius:50%;background:#ef9bb0;opacity:0.5;z-index:4;"></div>
+    <div style="position:absolute;top:0.98em;left:50%;transform:translateX(-50%);width:0.78em;height:0.56em;border-radius:48% 48% 52% 52%;background:${bc};box-shadow:inset 0 0.07em 0 rgba(255,255,255,0.2),inset 0 -0.04em 0.06em rgba(0,0,0,0.05);z-index:4;"></div>
+    <div style="position:absolute;top:1.0em;left:50%;transform:translateX(-50%);width:0.36em;height:0.24em;border-radius:46% 46% 50% 50%;background:${oc};z-index:5;"></div>
+    <div style="position:absolute;top:1.22em;left:50%;transform:translateX(-50%);width:0.06em;height:0.12em;border-radius:0 0 0.05em 0.05em;background:${ml};z-index:5;"></div>
+    ${eyesOpen ? `<div style="position:absolute;top:0.72em;left:0.56em;width:0.21em;height:0.28em;border-radius:50%;background:#3a2a1d;z-index:5;"><div style="position:absolute;top:0.035em;left:0.035em;width:0.08em;height:0.08em;border-radius:50%;background:#fff;opacity:0.9;"></div></div><div style="position:absolute;top:0.72em;right:0.56em;width:0.21em;height:0.28em;border-radius:50%;background:#3a2a1d;z-index:5;"><div style="position:absolute;top:0.035em;left:0.035em;width:0.08em;height:0.08em;border-radius:50%;background:#fff;opacity:0.9;"></div></div>` : `<div style="position:absolute;top:0.82em;left:0.52em;width:0.28em;height:0.15em;border-bottom:0.055em solid #3a2a1d;border-radius:0 0 0.28em 0.28em;z-index:5;"></div><div style="position:absolute;top:0.82em;right:0.52em;width:0.28em;height:0.15em;border-bottom:0.055em solid #3a2a1d;border-radius:0 0 0.28em 0.28em;z-index:5;"></div>`}
+    ${acc ? `<div style="position:absolute;font-size:0.56em;z-index:6;pointer-events:none;left:50%;top:${accTop};transform:translateX(-50%);">${acc}</div>` : ''}
+  </div>
+  ${sm.e ? `<div style="position:absolute;top:0.1em;left:-0.05em;font-size:0.44em;z-index:8;pointer-events:none;">${sm.e}</div>` : ''}
+</div>`;
+}
+
+// ── Constants ────────────────────────────────────────────────
+const THEMES = {
+  onsen:    {bg:'linear-gradient(180deg,#fdf4e8,#f4e7d4)', water:'linear-gradient(180deg,#d9ece4,#bfdcd2)', card:'#fffaf2', accent:'#c97a4e', accentDark:'#a8623c', ink:'#574437', sub:'#9c8775', line:'#efe2d0', soft:'#f6ebda'},
+  riverside:{bg:'linear-gradient(180deg,#eef7f4,#e0eef0)', water:'linear-gradient(180deg,#c5e6ea,#a9d8de)', card:'#ffffff', accent:'#3f9b94', accentDark:'#2f7b75', ink:'#37494a', sub:'#7b9192', line:'#dcebea', soft:'#e6f4f2'},
+  sakura:   {bg:'linear-gradient(180deg,#fceef4,#f3e2ee)', water:'linear-gradient(180deg,#ecd6ea,#ddc2dd)', card:'#fff8fc', accent:'#cd7aa1', accentDark:'#b15f86', ink:'#56414f', sub:'#9c8593', line:'#f1dde9', soft:'#faecf4'}
+};
+const RARITY = {'일반':{c:'#9aa0a6',bg:'#eef0f2'},'희귀':{c:'#3f9b94',bg:'#e2f2f0'},'영웅':{c:'#8a6fc9',bg:'#efeafb'},'전설':{c:'#d99441',bg:'#fbf0dc'}};
+const DL = {mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
+const DAY_ORDER = ['mon','tue','wed','thu','fri','sat','sun'];
+const WB_COLORS = ['#c47a4e','#3f9b94','#cd7aa1','#d99441','#7a86c9','#6aa05a','#c2607a'];
+const POND_SLOTS = [[16,30],[44,20],[72,32],[26,58],[55,50],[82,62],[37,78],[64,74],[12,72],[88,40],[50,82],[20,44]];
+const SPECIES = [
+  {id:'s1',  name:'강가 통통이', biome:'강가',     color:'#b08968', accessory:'',   idle:'bob',   personality:'느긋',     line:'인우야~ 같이 첨벙첨벙 하자!',         rarity:'일반'},
+  {id:'s2',  name:'풀먹보',      biome:'강가',     color:'#a87e5a', accessory:'🍃', idle:'bob',   personality:'장난꾸러기',line:'한 입만 더 먹고 도와줄게!',           rarity:'일반'},
+  {id:'s3',  name:'온천 유자',   biome:'온천',     color:'#c98a5e', accessory:'🍊', idle:'float', personality:'느긋',     line:'탕에 몸 담그면 숙제 걱정도 사르르~', rarity:'희귀'},
+  {id:'s4',  name:'김 모락이',   biome:'온천',     color:'#cf9b6f', accessory:'',   idle:'float', personality:'새침',     line:'수증기 사이로 보이니? 나야 나.',       rarity:'일반'},
+  {id:'s5',  name:'정글 탐험가', biome:'정글',     color:'#9c8550', accessory:'🎩', idle:'bob',   personality:'호기심',   line:'오늘은 어떤 페이지를 모험할까?',       rarity:'희귀'},
+  {id:'s6',  name:'잎우산',      biome:'정글',     color:'#8f7a4d', accessory:'☂️', idle:'bob',   personality:'겁쟁이',   line:'비 와도 숙제는 해야지… 같이 가자.',   rarity:'일반'},
+  {id:'s7',  name:'뽀시래기',    biome:'설원',     color:'#e2e7ea', accessory:'',   idle:'nap',   personality:'느긋',     line:'이불 속에서 너를 응원하고 있어~',      rarity:'희귀'},
+  {id:'s8',  name:'눈송이',      biome:'설원',     color:'#dbe4ea', accessory:'❄️', idle:'float', personality:'새침',     line:'반짝— 너의 한 페이지가 눈부셔.',       rarity:'영웅'},
+  {id:'s9',  name:'공원 산책러', biome:'도시공원', color:'#ab8763', accessory:'🎀', idle:'bob',   personality:'호기심',   line:'산책하듯 가볍게 한 장 어때?',          rarity:'일반'},
+  {id:'s10', name:'비둘기 친구', biome:'도시공원', color:'#a17f5c', accessory:'🐤', idle:'bob',   personality:'장난꾸러기',line:'구구— 내가 페이지 넘겨줄게!',          rarity:'희귀'},
+  {id:'s11', name:'안경 박사',   biome:'도시공원', color:'#9a7a58', accessory:'👓', idle:'bob',   personality:'호기심',   line:'음, 이 문제 꽤 흥미로운걸?',           rarity:'영웅'},
+  {id:'s12', name:'꽃단장',      biome:'강가',     color:'#c98aa0', accessory:'🌸', idle:'float', personality:'새침',     line:'예쁘게 하고 너 기다렸어~',             rarity:'희귀'},
+  {id:'s13', name:'금빛 영웅',   biome:'온천',     color:'#e6b34d', accessory:'👑', idle:'float', personality:'느긋',     line:'황금빛 노력엔 황금빛 보상이지!',       rarity:'영웅'},
+  {id:'s14', name:'은빛 달님',   biome:'설원',     color:'#c2cdd6', accessory:'',   idle:'float', personality:'새침',     line:'달빛처럼 조용히 곁에 있을게.',         rarity:'영웅'},
+  {id:'s15', name:'무지개 전설', biome:'강가',     color:'#d98ec4', accessory:'🌈', idle:'float', personality:'호기심',   line:'전설은 매일의 작은 숙제로 완성돼!',   rarity:'전설'},
+  {id:'s16', name:'벚꽃 정령',   biome:'도시공원', color:'#f0a6c0', accessory:'🌸', idle:'float', personality:'느긋',     line:'꽃잎처럼 살랑— 오늘도 잘했어.',       rarity:'전설'}
+];
+
+// ── State ────────────────────────────────────────────────────
+const DEFAULT_STATE = {
+  screen:'home', overlay:null, theme:'onsen',
+  workbooks:[{id:'w1',name:'수학 익힘책',color:'#c47a4e'},{id:'w2',name:'국어 독해',color:'#3f9b94'}],
+  assignments:{tue:[{workbookId:'w1',from:10,to:15},{workbookId:'w2',from:20,to:24}],thu:[{workbookId:'w1',from:16,to:22},{workbookId:'w2',from:25,to:28}]},
+  settings:{minsPerPage:10,dayMin:{mon:75,tue:20,wed:30,thu:70,fri:40,sat:20,sun:0},difficulty:'normal'},
+  pond:[{uid:'c1',speciesId:'s1',status:'healthy',intimacy:0},{uid:'c2',speciesId:'s9',status:'healthy',intimacy:0},{uid:'c3',speciesId:'s3',status:'healthy',intimacy:1}],
+  dexSeen:{s1:true,s9:true,s3:true},
+  streak:3, todayDone:{}, setupDay:'tue',
+  draftWb:null, draftFrom:'', draftTo:'', newWbName:'',
+  todayKey:'tue', timerSec:0, timerRunning:false,
+  lastDate:null, streakDate:null,
+  caughtSpecies:null, caughtNew:false, crisisInfo:null, detailSpeciesId:null, _wbSeq:3
+};
+
+let ST = {...DEFAULT_STATE};
+let _timerInterval = null;
+
+function sp(id) { return SPECIES.find(s=>s.id===id)||SPECIES[0]; }
+function wb(id) { return ST.workbooks.find(w=>w.id===id); }
+function mpp()  { return Math.max(1, ST.settings.minsPerPage||10); }
+
+function dayPages(day) {
+  return (ST.assignments[day]||[]).reduce((s,it)=>{ const p=it.to-it.from+1; return s+(p>0?p:0); },0);
+}
+function capPages(day) { return Math.max(0,Math.floor((ST.settings.dayMin[day]||0)/mpp())); }
+function distribute(total,days) {
+  const res={}; let rem=total;
+  days.forEach((d,i)=>{ if(i===days.length-1){res[d]=rem;rem=0;}else{const t=Math.min(rem,capPages(d));res[d]=t;rem-=t;} });
+  return res;
+}
+function schedule() {
+  const tP=dayPages('tue'), hP=dayPages('thu');
+  const a=distribute(tP,['tue','wed']), b=distribute(hP,['thu','fri','sat']);
+  const pages={mon:0,tue:a.tue||0,wed:a.wed||0,thu:b.thu||0,fri:b.fri||0,sat:b.sat||0,sun:0};
+  const m=mpp(); const days={};
+  DAY_ORDER.forEach(d=>{ const pg=pages[d],mins=pg*m,cap=ST.settings.dayMin[d]||0; days[d]={pages:pg,mins,cap,fill:cap>0?Math.min(1,mins/cap):(mins>0?1:0),over:mins>cap&&cap>=0&&mins>0}; });
+  return {days,weekTotal:tP+hP};
+}
+function anyCrisis(pond) { return (pond||ST.pond).some(c=>c.status!=='healthy'); }
+function crisisBannerText() {
+  const c=ST.pond.find(x=>x.status!=='healthy'); if(!c) return '';
+  const s=sp(c.speciesId);
+  return ({weak:s.name+'이(가) 기운이 없어요',leaving:s.name+'이(가) 떠나려 해요',gone:s.name+'이(가) 잠시 사라졌어요'})[c.status]||s.name+'이(가) 위기예요';
+}
+
+function h(s) { if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Date / rollover helpers ──────────────────────────────────
+function dstr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dparse(s){ const p=String(s).split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
+function dwk(d){ return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
+function dadd(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+
+// 카피바라 한 마리를 한 단계 악화(healthy→weak→leaving→gone). ST.pond를 변경하고 대상 마리를 반환.
+function degradeOne() {
+  const order=['healthy','weak','leaving','gone']; let target=null;
+  ST.pond=ST.pond.map(c=>{ if(!target&&c.status!=='gone'){target=c;const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
+  return target;
+}
+// 거른 숙제일(miss) 수만큼 위기를 적용. 난이도에 따라 강도 조절.
+function applyMiss(miss) {
+  if(miss<=0) return;
+  const diff=ST.settings.difficulty||'normal';
+  let stages, resetStreak;
+  if(diff==='easy'){ stages=1; resetStreak=miss>=2; }
+  else if(diff==='firm'){ stages=miss+1; resetStreak=true; }
+  else { stages=miss; resetStreak=true; }
+  for(let i=0;i<stages;i++) degradeOne();
+  if(resetStreak) ST.streak=0;
+  const worst=ST.pond.find(c=>c.status!=='healthy');
+  if(worst) ST.crisisInfo={uid:worst.uid,name:sp(worst.speciesId).name,story:'며칠 숙제를 못 했더니 친구가 기운을 잃었어요…'};
+}
+// 날짜가 바뀐 경우: 거른 계획 요일을 집계해 위기 적용, 오늘 진행도 초기화.
+function rollover() {
+  const todayS=dstr(new Date());
+  if(!ST.lastDate){ ST.lastDate=todayS; return; }
+  if(ST.lastDate===todayS) return;
+  const sched=schedule().days;
+  let miss=0, cur=dparse(ST.lastDate);
+  // 마지막 활동일 자체: 숙제가 있었는데 완료하지 못했나?
+  if((sched[dwk(cur)]||{}).pages>0 && ST.streakDate!==ST.lastDate) miss++;
+  // 마지막 활동일과 오늘 사이에 앱을 한 번도 열지 않은 날 → 계획 요일이면 거른 것.
+  cur=dadd(cur,1);
+  while(dstr(cur)<todayS){ if((sched[dwk(cur)]||{}).pages>0) miss++; cur=dadd(cur,1); }
+  applyMiss(miss);
+  ST.todayDone={}; ST.lastDate=todayS;
+}
+
+// ── State mutations ──────────────────────────────────────────
+function setState(upd) {
+  ST = typeof upd==='function' ? {...ST,...upd(ST)} : {...ST,...upd};
+  save(); render();
+}
+function save() {
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,todayDone:ST.todayDone,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme})); } catch(e){}
+}
+function load() {
+  const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
+  try { const r=localStorage.getItem('capy-v2-state'); if(r){const s=JSON.parse(r);ST={...DEFAULT_STATE,...s,todayKey:tk};} else { ST={...DEFAULT_STATE,todayKey:tk}; } } catch(e){ ST={...DEFAULT_STATE,todayKey:tk}; }
+  rollover();
+}
+
+// Mutations
+function delWb(id) {
+  const asgn={};
+  Object.keys(ST.assignments).forEach(d=>{asgn[d]=ST.assignments[d].filter(it=>it.workbookId!==id);});
+  setState({workbooks:ST.workbooks.filter(w=>w.id!==id),assignments:asgn,draftWb:ST.draftWb===id?null:ST.draftWb});
+}
+function addWorkbook() {
+  const name=(ST.newWbName||'').trim(); if(!name)return;
+  const seq=(ST._wbSeq||0)+1, id='w'+seq+'_'+Date.now().toString(36).slice(-4);
+  const color=WB_COLORS[ST.workbooks.length%WB_COLORS.length];
+  setState({workbooks:[...ST.workbooks,{id,name,color}],newWbName:'',_wbSeq:seq});
+}
+function addItem() {
+  const from=parseInt(ST.draftFrom),to=parseInt(ST.draftTo);
+  if(!ST.draftWb||isNaN(from)||isNaN(to)||(to-from+1)<=0)return;
+  setState({assignments:{...ST.assignments,[ST.setupDay]:[...(ST.assignments[ST.setupDay]||[]),{workbookId:ST.draftWb,from,to}]},draftFrom:'',draftTo:''});
+}
+function delItem(day,idx) { setState({assignments:{...ST.assignments,[day]:ST.assignments[day].filter((_,i)=>i!==idx)}}); }
+function setMpp(v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}})); }
+function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,dayMin:{...s.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}})); }
+function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
+function openDetail(id) { setState({detailSpeciesId:id,overlay:'capyDetail'}); }
+function openDexDetail(id) { if(ST.dexSeen[id]) setState({detailSpeciesId:id,overlay:'capyDetail'}); }
+function closeOverlay() { setState({overlay:null}); }
+function toggleTimer() {
+  if(ST.timerRunning){setState({timerRunning:false});}
+  else{setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60}));}
+}
+function completePage() {
+  const k=ST.todayKey, planned=schedule().days[k].pages; if(!planned)return;
+  if((ST.todayDone[k]||0)>=planned) return; // 이미 끝낸 분량 — 채집 무한반복 방지
+  const done=(ST.todayDone[k]||0)+1, td={...ST.todayDone,[k]:done};
+  if(done>=planned){ ST={...ST,todayDone:td,timerRunning:false,timerSec:0}; finishDay(); }
+  else setState({todayDone:td,timerRunning:false,timerSec:0,overlay:'break'});
+}
+function finishDay() {
+  const order=['gone','leaving','weak','healthy']; let rescued=false;
+  let pond=ST.pond.map(c=>{ if(!rescued&&c.status!=='healthy'){rescued=true;const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
+  const unseen=SPECIES.filter(s=>!ST.dexSeen[s.id]);
+  let species,isNew;
+  if(unseen.length){species=unseen[Math.floor(Math.random()*unseen.length)];isNew=true;}
+  else{species=SPECIES[Math.floor(Math.random()*SPECIES.length)];isNew=false;}
+  if(isNew){pond=[...pond,{uid:'c'+Date.now()+Math.floor(Math.random()*999),speciesId:species.id,status:'healthy',intimacy:0}];}
+  else{let b=false;pond=pond.map(c=>{if(!b&&c.speciesId===species.id){b=true;return{...c,intimacy:(c.intimacy||0)+1};}return c;});if(!pond.find(c=>c.speciesId===species.id))pond=[...pond,{uid:'c'+Date.now(),speciesId:species.id,status:'healthy',intimacy:0}];}
+  const dexSeen={...ST.dexSeen,[species.id]:true};
+  const todayS=dstr(new Date());
+  const incStreak=ST.streakDate!==todayS; // 연속일수는 하루 1회만 증가
+  ST={...ST,pond,dexSeen,streak:incStreak?ST.streak+1:ST.streak,streakDate:todayS,caughtSpecies:species,caughtNew:isNew,overlay:'caught',crisisInfo:anyCrisis(pond)?ST.crisisInfo:null};
+  save(); render();
+}
+function skipDay() {
+  const stories=['게으름 바이러스에 살짝 감염됐어!','미루기 마왕이 데려가려 해!','너무 심심해서 깊은 잠에 빠졌어…','연못 밖에서 길을 잃었대!'];
+  const target=degradeOne();
+  if(!target)return;
+  const s=sp(target.speciesId), story=stories[Math.floor(Math.random()*stories.length)];
+  setState({pond:ST.pond,crisisInfo:{uid:target.uid,name:s.name,story},overlay:'crisis',streak:0});
+}
+function demoCrisis() { skipDay(); }
+function resetAll() {
+  try{localStorage.removeItem('capy-v2-state');}catch(e){}
+  const tk=['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
+  ST={...DEFAULT_STATE,todayKey:tk}; rollover(); render();
+}
+
+// ── Timer ────────────────────────────────────────────────────
+function startTick() {
+  if(_timerInterval)clearInterval(_timerInterval);
+  _timerInterval=setInterval(()=>{
+    if(!ST.timerRunning)return;
+    if(ST.timerSec>1){
+      ST.timerSec-=1;
+      const el=document.getElementById('timer-display');
+      if(el)el.textContent=String(Math.floor(ST.timerSec/60)).padStart(2,'0')+':'+String(ST.timerSec%60).padStart(2,'0');
+    } else { ST.timerSec=0; ST.timerRunning=false; render(); }
+  },1000);
+}
+
+// ── Render ───────────────────────────────────────────────────
+function render() {
+  const T=THEMES[ST.theme]||THEMES.onsen;
+  const sch=schedule(), tk=ST.todayKey;
+  const plannedToday=sch.days[tk]?sch.days[tk].pages:0;
+  const doneToday=ST.todayDone[tk]||0;
+  const allDone=plannedToday>0&&doneToday>=plannedToday;
+  const dexTotal=SPECIES.length, dexSeenCount=SPECIES.filter(s=>ST.dexSeen[s.id]).length;
+  const dexPct=Math.round((dexSeenCount/dexTotal)*100);
+  const now=new Date(), wd=['일','월','화','수','목','금','토'][now.getDay()];
+  const dateLabel=(now.getMonth()+1)+'월 '+now.getDate()+'일 '+wd+'요일';
+  const cheerCandidates=ST.pond.filter(c=>c.status==='healthy');
+  const cheerSp=cheerCandidates.length?sp(cheerCandidates[0].speciesId):SPECIES[0];
+  const timerMin=String(Math.floor(ST.timerSec/60)).padStart(2,'0'), timerSec=String(ST.timerSec%60).padStart(2,'0');
+  const showCrisisBanner=anyCrisis()&&ST.overlay===null;
+
+  document.getElementById('app').innerHTML = `
+<div style="min-height:100dvh;display:flex;justify-content:center;background:${T.bg};font-family:'Noto Sans KR',sans-serif;color:${T.ink};">
+<div style="position:relative;width:100%;max-width:480px;height:100dvh;display:flex;flex-direction:column;background:${T.bg};overflow:hidden;margin:0 auto;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px 12px;flex-shrink:0;">
+    <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};line-height:1;">🌿 인우의 카피바라 연못</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
+      <div onclick="setState({overlay:'settings'})" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">⚙️</div>
+    </div>
+  </div>
+
+  ${showCrisisBanner?`<div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;animation:tapPop 1.4s ease-in-out infinite;">😢</div><div style="flex:1;"><div style="font-weight:800;color:#c0503a;font-size:15px;">${crisisBannerText()}</div><div style="font-size:13px;color:#b06a5c;margin-top:1px;">지금 숙제하면 구할 수 있어! 탭해서 구출하러 가자 →</div></div></div>`:''}
+
+  <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;">
+    ${ST.screen==='home'  ? renderHome(T,sch,dexPct,dateLabel,plannedToday,doneToday,allDone):''}
+    ${ST.screen==='setup' ? renderSetup(T,sch):''}
+    ${ST.screen==='today' ? renderToday(T,sch,tk,plannedToday,doneToday,allDone,cheerSp,timerMin,timerSec):''}
+  </div>
+
+  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:10px 16px 16px;background:linear-gradient(180deg,transparent,${T.bg} 38%);">
+    ${renderNav(T)}
+  </div>
+
+  ${ST.overlay==='caught'    ? renderCaught(T):''}
+  ${ST.overlay==='break'     ? renderBreak(T,cheerSp):''}
+  ${ST.overlay==='crisis'    ? renderCrisis(T):''}
+  ${ST.overlay==='dex'       ? renderDex(T,dexSeenCount,dexTotal,dexPct):''}
+  ${ST.overlay==='capyDetail'? renderDetail(T):''}
+  ${ST.overlay==='settings'  ? renderSettings(T):''}
+
+</div>
+</div>`;
+  attachInputs();
+}
+
+// ── Screen renderers ─────────────────────────────────────────
+function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
+  const lilyPads=[{l:8,t:24,s:54,h:30,c:'#86b89f',d:5},{l:60,t:16,s:70,h:38,c:'#7fae97',d:6},{l:78,t:78,s:60,h:34,c:'#8cbfa4',d:5.5},{l:30,t:86,s:48,h:26,c:'#79a890',d:4.5}];
+  const lilies=lilyPads.map(p=>`<div style="position:absolute;left:${p.l}%;top:${p.t}%;width:${p.s}px;height:${p.h}px;background:${p.c};border-radius:50%;opacity:0.5;animation:lilyDrift ${p.d}s ease-in-out infinite;"></div>`).join('');
+  const pond=ST.pond.map((c,i)=>{
+    const s=sp(c.speciesId), slot=POND_SLOTS[i%POND_SLOTS.length], sz=Math.round(64+(slot[1]/100)*30);
+    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity})}</div>`;
+  }).join('');
+  const progPct=planned>0?Math.round((done/planned)*100):(planned===0?100:0);
+  const progLabel=planned===0?'푹 쉬는 날':(done+' / '+planned+'쪽 완료');
+  const headline=planned===0?'오늘은 숙제가 없어요 🌿':(allDone?'오늘 숙제 끝! 잘했어 🎉':'오늘 '+planned+'쪽이 있어요');
+  return `<div>
+  <div style="position:relative;isolation:isolate;height:46dvh;min-height:340px;border-radius:30px;background:${T.water};overflow:hidden;box-shadow:inset 0 -10px 30px rgba(0,0,0,0.05),0 8px 22px rgba(0,0,0,0.06);">
+    <div style="position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;flex-wrap:wrap;z-index:90;">
+      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🦫 채집 ${ST.pond.length}마리</div>
+      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">📚 도감 ${dexPct}%</div>
+      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🔥 ${ST.streak}일 연속</div>
+    </div>
+    ${lilies}${pond}
+    ${!ST.pond.length?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${T.sub};font-weight:600;"><div style="font-family:'Gaegu',cursive;font-size:24px;color:${T.ink};">아직 연못이 조용해요</div><div style="font-size:14px;margin-top:4px;">오늘 숙제를 끝내고 첫 친구를 데려오자!</div></div>`:''}
+  </div>
+  <div style="margin-top:16px;background:${T.card};border:2px solid ${T.line};border-radius:24px;padding:18px 20px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:14px;color:${T.sub};font-weight:600;">${dateLabel}</div>
+        <div style="font-family:'Gaegu',cursive;font-size:28px;font-weight:700;margin-top:2px;">${headline}</div>
+      </div>
+      <div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;font-size:17px;padding:15px 26px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">오늘의 숙제 하기 →</div>
+    </div>
+    <div style="margin-top:14px;height:16px;background:${T.soft};border-radius:999px;overflow:hidden;">
+      <div style="height:100%;width:${progPct}%;background:${T.accent};border-radius:999px;transition:width 0.4s ease;"></div>
+    </div>
+    <div style="margin-top:8px;font-size:13px;color:${T.sub};font-weight:600;">${progLabel}</div>
+  </div>
+</div>`;
+}
+
+function renderSetup(T,sch) {
+  const wbRows=ST.workbooks.map(w=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="width:16px;height:16px;border-radius:50%;background:${w.color};flex:none;"></div>
+      <input data-wb-rename="${w.id}" value="${h(w.name)}" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;font-weight:600;color:${T.ink};background:${T.soft};border:2px solid transparent;border-radius:12px;padding:11px 14px;" />
+      <div onclick="delWb('${w.id}')" class="tapbtn" style="cursor:pointer;width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:${T.soft};border-radius:12px;font-size:18px;color:${T.sub};">✕</div>
+    </div>`).join('');
+
+  const chips=ST.workbooks.map(w=>{ const sel=ST.draftWb===w.id; return `<div onclick="setState({draftWb:'${w.id}',draftFrom:'',draftTo:''})" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:7px;padding:10px 15px;border-radius:999px;font-weight:700;font-size:14px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};"><span style="width:11px;height:11px;border-radius:50%;background:${w.color};"></span>${h(w.name)}</div>`; }).join('');
+
+  const dWb=ST.draftWb?wb(ST.draftWb):null;
+  const dF=parseInt(ST.draftFrom),dT=parseInt(ST.draftTo);
+  const dPg=(!isNaN(dF)&&!isNaN(dT))?(dT-dF+1):null;
+
+  const draft=ST.draftWb?`<div style="display:flex;align-items:center;gap:8px;background:${T.soft};border-radius:14px;padding:12px 14px;margin-bottom:14px;flex-wrap:wrap;">
+    <span style="font-weight:700;font-size:14px;">${dWb?h(dWb.name):''}</span>
+    <span style="color:${T.sub};font-weight:600;">p.</span>
+    <input data-draft-from="1" type="number" inputmode="numeric" placeholder="시작" value="${h(ST.draftFrom)}" style="width:74px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:10px;padding:9px;background:#fff;color:${T.ink};" />
+    <span style="color:${T.sub};font-weight:700;">~</span>
+    <input data-draft-to="1" type="number" inputmode="numeric" placeholder="끝" value="${h(ST.draftTo)}" style="width:74px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:10px;padding:9px;background:#fff;color:${T.ink};" />
+    <span id="draft-pages-label" style="font-weight:700;color:${T.accent};font-size:14px;">${dPg!==null&&dPg>0?'= '+dPg+'쪽':(dPg!==null?'쪽수 확인!':'')}</span>
+    <div onclick="addItem()" class="tapbtn" style="cursor:pointer;margin-left:auto;background:${T.accent};color:#fff;font-weight:800;padding:10px 18px;border-radius:12px;">항목 추가</div>
+  </div>`:'';
+
+  const items=(ST.assignments[ST.setupDay]||[]).map((it,idx)=>{ const w=wb(it.workbookId),pg=Math.max(0,it.to-it.from+1); return `<div style="display:flex;align-items:center;gap:10px;background:${T.soft};border-radius:12px;padding:11px 14px;margin-bottom:7px;"><span style="width:11px;height:11px;border-radius:50%;background:${w?w.color:'#ccc'};flex:none;"></span><span style="font-weight:700;font-size:15px;">${w?h(w.name):'?'}</span><span style="color:${T.sub};font-weight:600;font-size:14px;">p.${it.from}~${it.to}</span><span style="margin-left:auto;font-weight:800;color:${T.accent};font-size:14px;">${pg}쪽</span><div onclick="delItem('${ST.setupDay}',${idx})" class="tapbtn" style="cursor:pointer;width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;color:${T.sub};font-size:15px;">✕</div></div>`; }).join('');
+
+  const schedRows=DAY_ORDER.map(d=>{ const info=sch.days[d]; const detail=info.pages===0?(d==='sun'?'휴무':'0쪽'):info.pages+'쪽 · '+info.mins+'분/'+info.cap+'분'; return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><div style="width:30px;text-align:center;font-weight:800;font-size:15px;color:${d===ST.todayKey?T.accent:T.sub};">${DL[d]}</div><div style="flex:1;height:22px;background:${T.soft};border-radius:999px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;bottom:0;width:${Math.round(info.fill*100)}%;background:${info.over?'#e08a6e':T.accent};border-radius:999px;"></div></div><div style="width:118px;text-align:right;font-size:13px;font-weight:600;color:${info.over?'#c0503a':T.sub};">${detail}</div></div>`; }).join('');
+
+  return `<div>
+  <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">✏️ 숙제 설정</div>
+  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
+    <div style="font-weight:800;font-size:16px;margin-bottom:10px;">📒 문제집 관리</div>
+    ${wbRows}
+    <div style="display:flex;gap:8px;margin-top:6px;">
+      <input data-new-wb="1" value="${h(ST.newWbName)}" placeholder="새 문제집 이름 (예: 영어 단어장)" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;background:#fff;border:2px dashed ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
+      <div onclick="addWorkbook()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">+ 추가</div>
+    </div>
+  </div>
+  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
+    <div style="font-weight:800;font-size:16px;margin-bottom:4px;">🗓️ 숙제 입력</div>
+    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">요일을 고르고 → 문제집을 탭한 뒤 → 시작쪽·끝쪽을 넣어 추가해요.</div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;">
+      <div onclick="setState({setupDay:'tue',draftWb:null})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:17px;padding:13px;border-radius:14px;background:${ST.setupDay==='tue'?T.accent:T.soft};color:${ST.setupDay==='tue'?'#fff':T.ink};border:2px solid ${ST.setupDay==='tue'?T.accent:T.line};">화요일</div>
+      <div onclick="setState({setupDay:'thu',draftWb:null})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:17px;padding:13px;border-radius:14px;background:${ST.setupDay==='thu'?T.accent:T.soft};color:${ST.setupDay==='thu'?'#fff':T.ink};border:2px solid ${ST.setupDay==='thu'?T.accent:T.line};">목요일</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${chips}</div>
+    ${draft}
+    <div style="font-weight:700;font-size:14px;color:${T.sub};margin-bottom:8px;">${ST.setupDay==='tue'?'화':'목'}요일 숙제 (${dayPages(ST.setupDay)}쪽)</div>
+    ${items}
+    ${!(ST.assignments[ST.setupDay]||[]).length?`<div style="color:${T.sub};font-size:14px;padding:6px 2px;">아직 이 요일 숙제가 없어요. 위에서 문제집을 골라 추가해 보세요.</div>`:''}
+  </div>
+  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:8px;">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;">
+      <div style="font-weight:800;font-size:16px;">📊 주간 자동 배분 미리보기</div>
+      <div style="font-weight:800;color:${T.accent};font-size:15px;">총 ${sch.weekTotal}쪽</div>
+    </div>
+    <div style="font-size:12.5px;color:${T.sub};margin:4px 0 14px;">화 숙제는 화·수, 목 숙제는 목·금·토에 나눠 담았어요 (1쪽 ≈ ${mpp()}분).</div>
+    ${schedRows}
+  </div>
+</div>`;
+}
+
+function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
+  const daySel=['mon','tue','wed','thu','fri','sat'].map(d=>{ const sel=d===tk,pg=sch.days[d].pages; return `<div onclick="setState({todayKey:'${d}',timerRunning:false,timerSec:0})" class="tapbtn" style="cursor:pointer;flex:1;min-width:48px;text-align:center;font-weight:800;font-size:15px;padding:11px 0;border-radius:13px;background:${sel?T.accent:T.card};color:${sel?'#fff':(pg>0?T.ink:T.sub)};border:2px solid ${sel?T.accent:T.line};">${DL[d]}<div style="font-size:11px;font-weight:600;margin-top:2px;opacity:0.85;">${pg>0?pg+'쪽':'휴식'}</div></div>`; }).join('');
+
+  const tokens=[];
+  for(let i=0;i<planned;i++){ const d=i<done; tokens.push(`<div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};">${d?'✓':(i+1)}</div>`); }
+
+  const body=planned>0?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:22px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
+    <div style="display:flex;align-items:flex-start;gap:14px;">
+      <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity})}</div>
+      <div style="flex:1;background:${T.soft};border-radius:16px;padding:13px 16px;font-weight:600;font-size:15px;line-height:1.5;">${allDone?'인우야, 오늘 다 해냈어! 새 친구를 데려가자 🎉':h(cheerSp.line)}</div>
+    </div>
+    <div style="text-align:center;margin:22px 0 6px;">
+      <div style="font-size:14px;color:${T.sub};font-weight:600;">${allDone?'오늘 분량 완료!':(planned+'쪽 중 '+(done+1)+'쪽째')}</div>
+      <div id="timer-display" style="font-family:'Gaegu',cursive;font-size:64px;font-weight:700;color:${T.accent};line-height:1;margin-top:4px;">${timerMin}:${timerSec}</div>
+      <div style="font-size:13px;color:${T.sub};margin-top:2px;">이 쪽 집중 타이머 (1쪽 ≈ ${mpp()}분)</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;margin:14px 0 18px;">
+      <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:12px 24px;border-radius:14px;font-weight:800;font-size:15px;background:${T.soft};color:${T.ink};border:2px solid ${T.line};">${ST.timerRunning?'⏸ 잠깐 멈춤':'▶ 타이머 시작'}</div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:18px;">${tokens.join('')}</div>
+    ${allDone?`<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`:`<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`}
+  </div>`:`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:36px 22px;text-align:center;"><div style="display:flex;justify-content:center;margin-bottom:8px;">${capy({size:82,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div><div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;">오늘은 숙제가 없는 날이에요</div><div style="font-size:14px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요. 다른 요일을 눌러 미리 해둘 수도 있어요!</div></div>`;
+
+  return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}</div>`;
+}
+
+function renderNav(T) {
+  return [{k:'home',i:'🪷',l:'연못'},{k:'setup',i:'✏️',l:'숙제설정'},{k:'today',i:'📖',l:'오늘'},{k:'dex',i:'📚',l:'도감'}].map(n=>{
+    const active=n.k==='dex'?ST.overlay==='dex':(ST.overlay===null&&ST.screen===n.k);
+    const click=n.k==='dex'?`setState({overlay:'dex'})`:`setState({screen:'${n.k}',overlay:null})`;
+    return `<div onclick="${click}" class="tapbtn" style="cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0;border-radius:18px;background:${active?T.accent:T.card};border:2px solid ${active?T.accent:T.line};"><div style="font-size:23px;">${n.i}</div><div style="font-size:12px;font-weight:800;color:${active?'#fff':T.sub};">${n.l}</div></div>`;
+  }).join('');
+}
+
+// ── Overlay renderers ────────────────────────────────────────
+function renderCaught(T) {
+  const cs=ST.caughtSpecies; if(!cs)return'';
+  const rm=RARITY[cs.rarity]||RARITY['일반'];
+  const emos=['🎉','✨','🌟','🎊','💛','🌸'];
+  const confetti=Array.from({length:18}).map((_,i)=>`<div style="position:absolute;left:${Math.round((i*53+7)%96)}%;top:-20px;font-size:${16+(i%4)*5}px;animation:confettiFall ${(2.4+(i%5)*0.4).toFixed(1)}s linear ${((i%6)*0.25).toFixed(2)}s infinite;pointer-events:none;">${emos[i%emos.length]}</div>`).join('');
+  const msg=ST.caughtNew?('성격: '+cs.personality+' · "'+cs.line+'"'):('이미 만난 친구라 친밀도가 올랐어요! "'+cs.line+'"');
+  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">${confetti}
+  <div style="position:relative;background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
+    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;color:${T.accentDark};">${ST.caughtNew?'✨ 새로운 친구를 만났어! ✨':'🎉 다시 만나서 반가워!'}</div>
+    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:112,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity})}</div>
+    <div style="font-weight:900;font-size:22px;">${h(cs.name)}</div>
+    <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
+    <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
+    <div onclick="setState({overlay:null,screen:'home'})" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">연못으로 데려가기 🪷</div>
+  </div></div>`;
+}
+
+function renderBreak(T,cheerSp) {
+  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:${T.card};border-radius:30px;padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
+    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">한 쪽 끝! 잠깐 쉬어가자 💤</div>
+    <div style="display:flex;justify-content:center;margin:14px 0;">${capy({size:104,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div>
+    <div style="font-size:14.5px;color:${T.sub};line-height:1.5;">카피바라도 유자탕에서 5분 쉬는 중이에요.<br>눈 깜빡, 어깨 으쓱, 물 한 모금!</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">다음 쪽 시작하기 →</div>
+  </div></div>`;
+}
+
+function renderCrisis(T) {
+  const ci=ST.crisisInfo; if(!ci)return'';
+  const c=ST.pond.find(x=>x.uid===ci.uid), status=c?c.status:'weak';
+  const s=c?sp(c.speciesId):SPECIES[0];
+  const stageLabel=({weak:'기운이 없어요 (1회 미완료)',leaving:'떠나려 해요 (연속 미완료)',gone:'잠시 사라졌어요 — 숙제로 데려오자!'})[status]||'';
+  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.5);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
+    <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:#c0503a;">앗, 친구가 위기에 빠졌어!</div>
+    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:104,color:s.color,accessory:s.accessory,idle:'bob',status,rarity:s.rarity})}</div>
+    <div style="font-weight:900;font-size:20px;">${h(ci.name)}</div>
+    <div style="margin-top:10px;font-size:14.5px;color:${T.ink};line-height:1.5;background:#fff1ec;border-radius:14px;padding:12px 14px;">${h(ci.story)}<br><b style="color:#c0503a;">${stageLabel}</b></div>
+    <div style="margin-top:12px;font-size:14px;color:${T.accentDark};font-weight:700;">걱정 마! 지금 숙제하면 다시 데려올 수 있어 🌱</div>
+    <div onclick="setState({overlay:null,screen:'today'})" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">구출하러 가기 🚑</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:9px;color:${T.sub};font-weight:700;font-size:14px;padding:6px;">나중에</div>
+  </div></div>`;
+}
+
+function renderDex(T,seen,total,pct) {
+  const cards=SPECIES.map(s=>{ const found=!!ST.dexSeen[s.id],rm=RARITY[s.rarity]; return `<div onclick="openDexDetail('${s.id}')" class="tapbtn" style="cursor:${found?'pointer':'default'};background:${found?T.card:T.soft};border:2px solid ${found?T.line:'transparent'};border-radius:18px;padding:12px 8px 10px;text-align:center;position:relative;"><div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:${found?rm.c:T.sub};">${found?s.rarity:'?'}</div><div style="display:flex;justify-content:center;height:96px;align-items:center;">${capy({size:40,color:s.color,accessory:s.accessory,idle:'bob',status:found?'healthy':'locked',rarity:s.rarity})}</div><div style="margin-top:6px;font-weight:700;font-size:12.5px;color:${found?T.ink:T.sub};">${found?h(s.name):'???'}</div><div style="font-size:10.5px;color:${T.sub};">${found?s.biome:'미발견'}</div></div>`; }).join('');
+  return `<div style="position:absolute;inset:0;z-index:55;background:${T.bg};display:flex;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
+    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">📚 카피바라 도감</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
+  </div>
+  <div style="padding:0 22px 10px;flex-shrink:0;">
+    <div style="font-size:14px;color:${T.sub};font-weight:600;">${seen} / ${total}종 발견 · 완성도 ${pct}%</div>
+    <div style="margin-top:6px;height:12px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${T.accent};border-radius:999px;"></div></div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 18px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:12px;align-content:start;align-items:start;">${cards}</div>
+</div>`;
+}
+
+function renderDetail(T) {
+  const s=ST.detailSpeciesId?sp(ST.detailSpeciesId):null; if(!s)return'';
+  const owned=ST.pond.find(c=>c.speciesId===s.id), rm=RARITY[s.rarity]||RARITY['일반'];
+  let statusLabel='';
+  if(owned){ const sl={healthy:'😊 건강하게 연못에 살고 있어요',weak:'😟 기운이 없어요',leaving:'😢 떠나려 해요',gone:'💨 잠시 사라졌어요 (숙제로 복귀)'}; statusLabel=(sl[owned.status]||'')+' · 친밀도 '+((owned.intimacy||0)+1); }
+  else statusLabel='아직 데려오지 못한 친구예요';
+  return `<div onclick="closeOverlay()" style="position:absolute;inset:0;z-index:62;background:rgba(40,30,25,0.45);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity})}</div>
+    <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
+    <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${s.personality}</div>
+    <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
+    <div style="margin-top:10px;font-size:13px;color:${T.sub};font-weight:600;">${statusLabel}</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.soft};color:${T.ink};font-weight:800;font-size:15px;padding:13px;border-radius:14px;">닫기</div>
+  </div></div>`;
+}
+
+function renderSettings(T) {
+  const dayMinInputs=['mon','tue','wed','thu','fri','sat'].map(d=>`<div style="text-align:center;"><div style="font-weight:700;font-size:13px;color:${T.sub};margin-bottom:5px;">${DL[d]}</div><input data-daymin="${d}" type="number" inputmode="numeric" value="${ST.settings.dayMin[d]}" style="width:100%;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:12px;padding:10px;background:#fff;color:${T.ink};" /></div>`).join('');
+  const diffBtns=[{k:'easy',l:'느슨하게'},{k:'normal',l:'보통'},{k:'firm',l:'단단하게'}].map(x=>{ const sel=ST.settings.difficulty===x.k; return `<div onclick="setDifficulty('${x.k}')" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:14px;padding:12px 6px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
+  const themes=[{k:'onsen',l:'온천 어스톤'},{k:'riverside',l:'강가 아침'},{k:'sakura',l:'벚꽃 황혼'}].map(x=>{ const sel=ST.theme===x.k; return `<div onclick="setState({theme:'${x.k}'})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:13px;padding:11px 4px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
+  return `<div style="position:absolute;inset:0;z-index:58;background:${T.bg};display:flex;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
+    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">⚙️ 부모님 설정</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:6px 20px 40px;">
+    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:8px;">🎨 테마</div>
+      <div style="display:flex;gap:8px;">${themes}</div>
+    </div>
+    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:4px;">⏱️ 1쪽당 예상 시간</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <input data-mpp="1" type="number" inputmode="numeric" value="${ST.settings.minsPerPage}" style="width:90px;font-size:16px;text-align:center;border:2px solid ${T.line};border-radius:12px;padding:11px;background:#fff;color:${T.ink};" />
+        <span style="color:${T.sub};font-weight:600;">분 / 쪽</span>
+      </div>
+    </div>
+    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🗓️ 요일별 최대 숙제 시간 (분)</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">${dayMinInputs}</div>
+      <div style="font-size:12px;color:${T.sub};margin-top:8px;">일요일은 휴무예요.</div>
+    </div>
+    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
+      <div style="font-weight:800;font-size:15px;margin-bottom:6px;">🌱 위기 난이도</div>
+      <div style="font-size:12.5px;color:${T.sub};margin-bottom:10px;">영구 상실은 없어요. 숙제로 항상 되찾을 수 있습니다.</div>
+      <div style="display:flex;gap:8px;">${diffBtns}</div>
+    </div>
+    <div onclick="demoCrisis()" class="tapbtn" style="cursor:pointer;text-align:center;background:#fff1ec;color:#c0503a;border:2px solid #f3c4b8;font-weight:800;font-size:14px;padding:13px;border-radius:14px;margin-bottom:10px;">🧪 (데모) 숙제 거른 날 만들기 — 위기 연출 보기</div>
+    <div onclick="resetAll()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:10px;">전체 초기화</div>
+  </div></div>`;
+}
+
+// ── Input attachment ─────────────────────────────────────────
+function attachInputs() {
+  document.querySelectorAll('[data-wb-rename]').forEach(el=>{
+    el.addEventListener('input',e=>{ const id=el.getAttribute('data-wb-rename'); ST.workbooks=ST.workbooks.map(w=>w.id===id?{...w,name:e.target.value}:w); save(); });
+  });
+  const nwb=document.querySelector('[data-new-wb]');
+  if(nwb) nwb.addEventListener('input',e=>{ST.newWbName=e.target.value;});
+
+  function updateDraftLabel(){
+    const f=parseInt(ST.draftFrom),t=parseInt(ST.draftTo);
+    const pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null;
+    const el=document.getElementById('draft-pages-label');
+    if(el)el.textContent=pg!==null&&pg>0?'= '+pg+'쪽':(pg!==null?'쪽수 확인!':'');
+  }
+  const df=document.querySelector('[data-draft-from]');
+  if(df)df.addEventListener('input',e=>{ST.draftFrom=e.target.value;updateDraftLabel();});
+  const dt=document.querySelector('[data-draft-to]');
+  if(dt)dt.addEventListener('input',e=>{ST.draftTo=e.target.value;updateDraftLabel();});
+
+  const mppEl=document.querySelector('[data-mpp]');
+  if(mppEl)mppEl.addEventListener('input',e=>setMpp(e.target.value));
+
+  document.querySelectorAll('[data-daymin]').forEach(el=>{
+    el.addEventListener('input',e=>setDayMin(el.getAttribute('data-daymin'),e.target.value));
+  });
+}
+
+// ── Init ─────────────────────────────────────────────────────
+load();
+render();
+startTick();
+</script>
+</body>
+</html>
