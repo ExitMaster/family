@@ -86,6 +86,16 @@ const CYCLES = [
   {key:'tue', label:'화요일 숙제', assignDow:2, days:[{d:'wed',off:1},{d:'thu',off:2}]},
   {key:'thu', label:'목요일 숙제', assignDow:4, days:[{d:'fri',off:1},{d:'sat',off:2},{d:'mon',off:4}]}
 ];
+// 완료(숙제)일 요일 집합. 여기에 없는 요일(화·일 등)은 '자유일'이라 자발 숙제가 가능하다.
+const COMP_DAYS = CYCLES.reduce((s,cy)=>{ cy.days.forEach(x=>{s[x.d]=true;}); return s; }, {});
+// 휴식일에 자발적으로 숙제했을 때 나오는 즐거운 이벤트. ※ 임시 stub — 데이터셋은 추후 일괄 정리 예정.
+const EVENTS = [
+  {emoji:'🍉', title:'수박 간식 등장!', line:'미리 숙제한 너에게 카피바라가 수박 한 조각을 나눠줬어!'},
+  {emoji:'🍊', title:'유자탕 타임', line:'카피바라들이 따뜻한 유자탕에 둥둥— 너 덕분에 여유로운 하루야.'},
+  {emoji:'🦋', title:'나비가 놀러왔어', line:'연못에 나비가 날아와 카피바라 코끝에 살짝 앉았어.'},
+  {emoji:'🌽', title:'옥수수 파티', line:'자발적 숙제 보너스! 카피바라들이 옥수수를 한 입씩 나눠 먹어.'},
+  {emoji:'⭐', title:'반짝이는 밤', line:'별빛 아래 카피바라들이 너를 응원하며 노래를 불러줬어.'}
+];
 const WB_COLORS = ['#c47a4e','#3f9b94','#cd7aa1','#d99441','#7a86c9','#6aa05a','#c2607a'];
 const POND_SLOTS = [[16,30],[44,20],[72,32],[26,58],[55,50],[82,62],[37,78],[64,74],[12,72],[88,40],[50,82],[20,44]];
 const SPECIES = [
@@ -119,7 +129,7 @@ const DEFAULT_STATE = {
   newWbName:'', rowEdit:{},
   todayKey:'tue', timerSec:0, timerRunning:false,
   lastDate:null, streakDate:null,
-  caughtSpecies:null, caughtNew:false, crisisInfo:null, detailSpeciesId:null, _wbSeq:3
+  caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null, _wbSeq:3
 };
 
 let ST = {...DEFAULT_STATE};
@@ -138,10 +148,11 @@ function distribute(total,days) {
   days.forEach((d,i)=>{ if(i===days.length-1){res[d]=rem;rem=0;}else{const t=Math.min(rem,capPages(d));res[d]=t;rem-=t;} });
   return res;
 }
-function schedule() {
+function schedule(today) {
+  today = today || new Date();
   const pages={mon:0,tue:0,wed:0,thu:0,fri:0,sat:0,sun:0};
   let weekTotal=0;
-  CYCLES.forEach(cy=>{ const tot=dayPages(cy.key); weekTotal+=tot; const ds=cy.days.map(x=>x.d); const dist=distribute(tot,ds); ds.forEach(d=>{ pages[d]+=(dist[d]||0); }); });
+  CYCLES.forEach(cy=>{ const cs=cycleSchedule(cy,today); weekTotal+=cs.T; cs.rows.forEach(r=>{ pages[r.wk]=r.required; }); });
   const m=mpp(); const days={};
   DAY_ORDER.forEach(d=>{ const pg=pages[d],mins=pg*m,cap=ST.settings.dayMin[d]||0; days[d]={pages:pg,mins,cap,fill:cap>0?Math.min(1,mins/cap):(mins>0?1:0),over:mins>cap&&cap>=0&&mins>0}; });
   return {days,weekTotal};
@@ -162,16 +173,48 @@ function dwk(d){ return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()];
 function dadd(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 // today 기준 가장 최근의 dow 요일 날짜(당일 포함).
 function dmostRecentDow(today,dow){ const x=new Date(today.getFullYear(),today.getMonth(),today.getDate()); x.setDate(x.getDate()-((x.getDay()-dow+7)%7)); return x; }
-// 한 사이클의 각 완료일에 해당하는 실제 날짜를 매핑. 이미 끝난 사이클이면 다음 주기로 넘어간다.
-function cycleDates(cy,today){
-  let anchor=dmostRecentDow(today,cy.assignDow);
+function isFreeWk(wk){ return !COMP_DAYS[wk]; }
+// today 기준 사이클의 받는날(앵커) 날짜. 이미 끝난 사이클이면 다음 주기로.
+function cycleAnchor(cy,today){
+  let a=dmostRecentDow(today,cy.assignDow);
   const lastOff=Math.max.apply(null,cy.days.map(x=>x.off));
-  if(dstr(today)>dstr(dadd(anchor,lastOff))) anchor=dadd(anchor,7);
-  const map={}; cy.days.forEach(x=>{ map[x.d]=dstr(dadd(anchor,x.off)); }); return map;
+  if(dstr(today)>dstr(dadd(a,lastOff))) a=dadd(a,7);
+  return a;
 }
+// 한 사이클의 각 완료일에 해당하는 실제 날짜를 매핑.
+function cycleDates(cy,today){ const a=cycleAnchor(cy,today); const map={}; cy.days.forEach(x=>{ map[x.d]=dstr(dadd(a,x.off)); }); return map; }
 // 특정 요일이 특정 날짜에 푼 페이지 수(날짜 스탬프가 일치할 때만).
 function doneOnDate(wk,ds){ const e=ST.dayLog&&ST.dayLog[wk]; return (e&&e.date===ds)?(e.pages||0):0; }
 function doneForDay(wk){ return doneOnDate(wk,dstr(new Date())); }
+// 사이클 재계산: 자유일(휴식일)에 미리 푼 분량을 풀에서 빼고, 남은 양을 완료일 순서대로 재분배.
+function cycleSchedule(cy,today){
+  const a=cycleAnchor(cy,today), T=dayPages(cy.key), lastOff=Math.max.apply(null,cy.days.map(x=>x.off)), todayS=dstr(today);
+  let voluntaryDone=0;
+  for(let o=0;o<=lastOff;o++){ const dt=dadd(a,o), wk=dwk(dt); if(isFreeWk(wk)) voluntaryDone+=doneOnDate(wk,dstr(dt)); }
+  voluntaryDone=Math.min(voluntaryDone,T);
+  const pool=Math.max(0,T-voluntaryDone);
+  const dist=distribute(pool,cy.days.map(x=>x.d));
+  const rows=cy.days.map(x=>{
+    const ds=dstr(dadd(a,x.off)), required=dist[x.d]||0, doneRaw=doneOnDate(x.d,ds);
+    return {wk:x.d,date:ds,required,doneRaw,done:Math.min(doneRaw,required),isPast:ds<todayS,isToday:ds===todayS};
+  });
+  const cycleDone=Math.min(T,voluntaryDone+rows.reduce((s,r)=>s+r.doneRaw,0));
+  return {anchor:a,T,voluntaryDone,rows,cycleDone};
+}
+// 특정 요일(완료일)이 today 기준 어느 사이클의 어느 행인지.
+function planForWeekday(wk,today){
+  for(let i=0;i<CYCLES.length;i++){ const cs=cycleSchedule(CYCLES[i],today), r=cs.rows.find(x=>x.wk===wk); if(r) return {cy:CYCLES[i],cs,row:r}; }
+  return null;
+}
+// today가 자유일이면, 미리 풀 수 있는 (남은 분량이 있는) 사이클을 반환.
+function voluntaryCycle(today){
+  if(!isFreeWk(dwk(today))) return null;
+  for(let i=0;i<CYCLES.length;i++){ const cy=CYCLES[i]; if(dayPages(cy.key)<=0) continue;
+    const a=cycleAnchor(cy,today), lastOff=Math.max.apply(null,cy.days.map(x=>x.off)), tS=dstr(today);
+    if(tS>=dstr(a)&&tS<=dstr(dadd(a,lastOff))){ const cs=cycleSchedule(cy,today); if(cs.cycleDone<cs.T) return {cy,cs}; }
+  }
+  return null;
+}
 
 // 카피바라 한 마리를 한 단계 악화(healthy→weak→leaving→gone). ST.pond를 변경하고 대상 마리를 반환.
 function degradeOne() {
@@ -197,11 +240,16 @@ function rollover() {
   const todayS=dstr(new Date());
   if(!ST.lastDate){ ST.lastDate=todayS; return; }
   if(ST.lastDate===todayS) return;
-  const sched=schedule().days;
   let miss=0, cur=dparse(ST.lastDate);
-  // 마지막 활동일부터 오늘 전날까지: 계획 요일인데 그날 분량을 못 채웠으면 거른 것.
-  // dayLog는 날짜 스탬프 기반이라 지난주 기록은 자동으로 0으로 간주된다.
-  while(dstr(cur)<todayS){ const wk=dwk(cur), planned=(sched[wk]||{}).pages||0; if(planned>0 && doneOnDate(wk,dstr(cur))<planned) miss++; cur=dadd(cur,1); }
+  // 마지막 활동일부터 오늘 전날까지 훑으며, 그날 마감된 사이클이 미완료면 위기 1회(사이클 단위).
+  while(dstr(cur)<todayS){
+    CYCLES.forEach(cy=>{
+      if(dayPages(cy.key)<=0) return;
+      const a=cycleAnchor(cy,cur), lastOff=Math.max.apply(null,cy.days.map(x=>x.off));
+      if(dstr(dadd(a,lastOff))===dstr(cur)){ const cs=cycleSchedule(cy,cur); if(cs.cycleDone<cs.T) miss++; }
+    });
+    cur=dadd(cur,1);
+  }
   applyMiss(miss);
   ST.lastDate=todayS;
 }
@@ -269,6 +317,18 @@ function completePage() {
   const done=cur+1, dayLog={...ST.dayLog,[k]:{date:todayS,pages:done}};
   if(done>=planned){ ST={...ST,dayLog,timerRunning:false,timerSec:0}; finishDay(); }
   else setState({dayLog,timerRunning:false,timerSec:0,overlay:'break'});
+}
+// 휴식일 자발 숙제: 한 쪽 미리 풀기 → 사이클 분량 차감(재계산) + 친밀도↑ + 랜덤 이벤트(포획 없음).
+function doVoluntary() {
+  const today=new Date(), vc=voluntaryCycle(today); if(!vc) return;
+  const wk=dwk(today), todayS=dstr(today);
+  const dayLog={...ST.dayLog,[wk]:{date:todayS,pages:doneOnDate(wk,todayS)+1}};
+  const healthy=ST.pond.filter(c=>c.status==='healthy');
+  let pond=ST.pond, target=null;
+  if(healthy.length){ target=healthy[Math.floor(Math.random()*healthy.length)]; pond=ST.pond.map(c=>c.uid===target.uid?{...c,intimacy:(c.intimacy||0)+1}:c); }
+  const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+  ST={...ST,dayLog,pond,eventInfo:{...ev,who:(target?sp(target.speciesId).name:'카피바라')},overlay:'event'};
+  save(); render();
 }
 function finishDay() {
   const order=['gone','leaving','weak','healthy']; let rescued=false;
@@ -353,6 +413,7 @@ function render() {
   </div>
 
   ${ST.overlay==='caught'    ? renderCaught(T):''}
+  ${ST.overlay==='event'     ? renderEvent(T):''}
   ${ST.overlay==='break'     ? renderBreak(T,cheerSp):''}
   ${ST.overlay==='crisis'    ? renderCrisis(T):''}
   ${ST.overlay==='dex'       ? renderDex(T,dexSeenCount,dexTotal,dexPct):''}
@@ -432,28 +493,26 @@ function renderSetup(T,sch) {
   }).join('');
   const noWb=!ST.workbooks.length?`<div style="color:${T.sub};font-size:14px;padding:8px 2px;">문제집이 없어요. ⚙️ 설정 → 📒 문제집 관리에서 먼저 추가해 주세요.</div>`:'';
 
-  const today=new Date(), todayS=dstr(today);
+  const today=new Date();
   const cyclePreview=CYCLES.map(cy=>{
-    const total=cy.days.reduce((s,x)=>s+sch.days[x.d].pages,0), active=total>0, dates=cycleDates(cy,today);
-    let doneTotal=0;
-    const dayRows=cy.days.map(x=>{
-      const planned=sch.days[x.d].pages, dn=Math.min(planned,doneOnDate(x.d,dates[x.d])), isToday=dates[x.d]===todayS;
-      doneTotal+=dn;
+    const cs=cycleSchedule(cy,today), active=cs.T>0;
+    const dayRows=cs.rows.map(r=>{
       let dots='';
-      for(let i=0;i<planned;i++){ const filled=i<dn; dots+=`<span style="width:11px;height:11px;border-radius:50%;flex:none;background:${filled?T.accent:'transparent'};border:2px solid ${filled?T.accent:lighten(T.accent,0.5)};"></span>`; }
-      if(!planned) dots=`<span style="font-size:12px;color:${T.sub};">–</span>`;
+      for(let i=0;i<r.required;i++){ const filled=i<r.done; dots+=`<span style="width:11px;height:11px;border-radius:50%;flex:none;background:${filled?T.accent:'transparent'};border:2px solid ${filled?T.accent:lighten(T.accent,0.5)};"></span>`; }
+      if(!r.required) dots=`<span style="font-size:12px;color:${T.sub};">–</span>`;
       return `<div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
-        <div style="width:30px;text-align:center;font-weight:800;font-size:14px;color:${isToday?T.accentDark:T.sub};">${DL[x.d]}${isToday?`<div style="font-size:9px;font-weight:700;color:${T.accent};line-height:1;">오늘</div>`:''}</div>
+        <div style="width:30px;text-align:center;font-weight:800;font-size:14px;color:${r.isToday?T.accentDark:T.sub};">${DL[r.wk]}${r.isToday?`<div style="font-size:9px;font-weight:700;color:${T.accent};line-height:1;">오늘</div>`:''}</div>
         <div style="flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:15px;">${dots}</div>
-        <div style="font-size:12px;font-weight:700;color:${T.sub};width:42px;text-align:right;">${planned?dn+'/'+planned:'–'}</div>
+        <div style="font-size:12px;font-weight:700;color:${T.sub};width:42px;text-align:right;">${r.required?r.done+'/'+r.required:'–'}</div>
       </div>`;
     }).join('');
+    const volNote=cs.voluntaryDone>0?`<div style="font-size:11.5px;color:${T.accentDark};font-weight:700;margin-bottom:8px;">🌟 미리 푼 ${cs.voluntaryDone}쪽이 반영돼 분량이 줄었어요</div>`:'';
     return `<div style="background:${active?T.soft:'transparent'};border:2px solid ${active?'transparent':T.line};border-radius:16px;padding:13px 14px;margin-bottom:10px;opacity:${active?1:0.55};">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
         <div style="font-weight:800;font-size:14px;">${cy.label} <span style="font-weight:600;color:${T.sub};font-size:12px;">(${cy.days.map(x=>DL[x.d]).join('·')})</span></div>
-        <div style="font-weight:800;color:${active?T.accent:T.sub};font-size:13px;">${active?doneTotal+' / '+total+'쪽':'숙제 없음'}</div>
+        <div style="font-weight:800;color:${active?T.accent:T.sub};font-size:13px;">${active?cs.cycleDone+' / '+cs.T+'쪽':'숙제 없음'}</div>
       </div>
-      ${dayRows}
+      ${volNote}${dayRows}
     </div>`;
   }).join('');
 
@@ -482,6 +541,16 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
   const tokens=[];
   for(let i=0;i<planned;i++){ const d=i<done; tokens.push(`<div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};">${d?'✓':(i+1)}</div>`); }
 
+  const todayWk=dwk(new Date()), vcToday=(tk===todayWk)?voluntaryCycle(new Date()):null;
+  const volDoneToday=vcToday?doneOnDate(todayWk,dstr(new Date())):0;
+  const napCard=`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:36px 22px;text-align:center;"><div style="display:flex;justify-content:center;margin-bottom:8px;">${capy({size:82,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div><div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;">오늘은 숙제가 없는 날이에요</div><div style="font-size:14px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요. 다른 요일을 눌러 미리 둘러볼 수도 있어요!</div></div>`;
+  const restCard=vcToday?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:26px 22px;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:78,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity})}</div>
+    <div style="font-family:'Gaegu',cursive;font-size:23px;font-weight:700;">오늘은 쉬는 날이에요 🌿</div>
+    <div style="font-size:13.5px;color:${T.sub};margin-top:4px;line-height:1.5;">그래도 미리 풀고 싶다면 <b style="color:${T.accentDark};">${vcToday.cy.label}</b>를 당겨서 할 수 있어요.<br>미리 하면 친밀도가 오르고 즐거운 일이 생겨요!</div>
+    <div style="margin:14px 0 4px;font-size:13px;color:${T.sub};font-weight:700;">오늘 미리 푼 양 <span style="color:${T.accent};">${volDoneToday}쪽</span> · 사이클 남은 <span style="color:${T.accent};">${Math.max(0,vcToday.cs.T-vcToday.cs.cycleDone)}쪽</span></div>
+    <div onclick="doVoluntary()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:17px;padding:16px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};margin-top:8px;">한 쪽 미리 풀기 ✏️</div>
+  </div>`:napCard;
   const body=planned>0?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:22px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
     <div style="display:flex;align-items:flex-start;gap:14px;">
       <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity})}</div>
@@ -497,7 +566,7 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
     </div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:18px;">${tokens.join('')}</div>
     ${allDone?`<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`:`<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`}
-  </div>`:`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:36px 22px;text-align:center;"><div style="display:flex;justify-content:center;margin-bottom:8px;">${capy({size:82,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div><div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;">오늘은 숙제가 없는 날이에요</div><div style="font-size:14px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요. 다른 요일을 눌러 미리 해둘 수도 있어요!</div></div>`;
+  </div>`:restCard;
 
   return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}</div>`;
 }
@@ -525,6 +594,21 @@ function renderCaught(T) {
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
     <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
     <div onclick="setState({overlay:null,screen:'home'})" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">연못으로 데려가기 🪷</div>
+  </div></div>`;
+}
+
+function renderEvent(T) {
+  const e=ST.eventInfo; if(!e)return'';
+  const cheer=ST.pond.filter(c=>c.status==='healthy');
+  const cs=cheer.length?sp(cheer[0].speciesId):SPECIES[0];
+  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:${T.card};border-radius:30px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
+    <div style="font-size:52px;line-height:1;margin-bottom:4px;">${e.emoji}</div>
+    <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:${T.accentDark};">${h(e.title)}</div>
+    <div style="display:flex;justify-content:center;margin:10px 0 4px;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity})}</div>
+    <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(e.line)}</div>
+    <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;">💗 ${h(e.who)}와의 친밀도가 올랐어요!</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">고마워! 🌿</div>
   </div></div>`;
 }
 
