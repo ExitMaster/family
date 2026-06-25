@@ -364,7 +364,8 @@ const DEFAULT_STATE = {
   caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
   items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
   milestonesFired:[], eventQueue:[], equip:{},
-  pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:''
+  pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:'', pinDraft2:'', pinSaveErr:'',
+  assignDraft:null
 };
 
 let ST = {...DEFAULT_STATE};
@@ -374,8 +375,8 @@ function sp(id) { return SPECIES.find(s=>s.id===id)||SPECIES[0]; }
 function wb(id) { return ST.workbooks.find(w=>w.id===id); }
 function mpp()  { return Math.max(1, ST.settings.minsPerPage||10); }
 
-function dayPages(day) {
-  return (ST.assignments[day]||[]).reduce((s,it)=>{ const p=it.to-it.from+1; return s+(p>0?p:0); },0);
+function dayPages(day, asg) {
+  return ((asg||ST.assignments)[day]||[]).reduce((s,it)=>{ const p=it.to-it.from+1; return s+(p>0?p:0); },0);
 }
 function capPages(day) { return Math.max(0,Math.floor((ST.settings.dayMin[day]||0)/mpp())); }
 function distribute(total,days) {
@@ -383,11 +384,11 @@ function distribute(total,days) {
   days.forEach((d,i)=>{ if(i===days.length-1){res[d]=rem;rem=0;}else{const t=Math.min(rem,capPages(d));res[d]=t;rem-=t;} });
   return res;
 }
-function schedule(today) {
+function schedule(today,asg) {
   today = today || new Date();
   const pages={mon:0,tue:0,wed:0,thu:0,fri:0,sat:0,sun:0};
   let weekTotal=0;
-  CYCLES.forEach(cy=>{ const cs=cycleSchedule(cy,today); weekTotal+=cs.T; cs.rows.forEach(r=>{ pages[r.wk]=r.required; }); });
+  CYCLES.forEach(cy=>{ const cs=cycleSchedule(cy,today,asg); weekTotal+=cs.T; cs.rows.forEach(r=>{ pages[r.wk]=r.required; }); });
   const m=mpp(); const days={};
   DAY_ORDER.forEach(d=>{ const pg=pages[d],mins=pg*m,cap=ST.settings.dayMin[d]||0; days[d]={pages:pg,mins,cap,fill:cap>0?Math.min(1,mins/cap):(mins>0?1:0),over:mins>cap&&cap>=0&&mins>0}; });
   return {days,weekTotal};
@@ -422,8 +423,8 @@ function cycleDates(cy,today){ const a=cycleAnchor(cy,today); const map={}; cy.d
 function doneOnDate(wk,ds){ const e=ST.dayLog&&ST.dayLog[wk]; return (e&&e.date===ds)?(e.pages||0):0; }
 function doneForDay(wk){ return doneOnDate(wk,dstr(new Date())); }
 // 사이클 재계산: 자유일(휴식일)에 미리 푼 분량을 풀에서 빼고, 남은 양을 완료일 순서대로 재분배.
-function cycleSchedule(cy,today){
-  const a=cycleAnchor(cy,today), T=dayPages(cy.key), lastOff=Math.max.apply(null,cy.days.map(x=>x.off)), todayS=dstr(today);
+function cycleSchedule(cy,today,asg){
+  const a=cycleAnchor(cy,today), T=dayPages(cy.key,asg), lastOff=Math.max.apply(null,cy.days.map(x=>x.off)), todayS=dstr(today);
   let voluntaryDone=0;
   for(let o=0;o<=lastOff;o++){ const dt=dadd(a,o), wk=dwk(dt); if(isFreeWk(wk)) voluntaryDone+=doneOnDate(wk,dstr(dt)); }
   voluntaryDone=Math.min(voluntaryDone,T);
@@ -517,24 +518,42 @@ function addWorkbook() {
   setState({workbooks:[...ST.workbooks,{id,name,color}],newWbName:'',_wbSeq:seq});
 }
 // 숙제 입력: 문제집마다 한 행(요일별 1구간). ✓로 확정, ✏️로 수정, ✕로 삭제.
+//  ▸ 입력은 초안(assignDraft)에만 반영되고, '변경 내용 확인받기'로 보호자 PIN 승인을
+//    거쳐야 실제 숙제(ST.assignments)에 적용된다. 아이가 임의로 분량을 바꾸지 못하게.
 function rowKey(day,wbId){ return day+'|'+wbId; }
-function getAssign(day,wbId){ return (ST.assignments[day]||[]).find(it=>it.workbookId===wbId); }
+function cloneAssign(a){ const o={}; Object.keys(a||{}).forEach(d=>{ o[d]=(a[d]||[]).map(x=>({...x})); }); return o; }
+function effAssign(){ return ST.assignDraft || ST.assignments; }                 // 화면 표시용(초안 우선)
+function assignDirty(){ return !!ST.assignDraft && JSON.stringify(ST.assignDraft)!==JSON.stringify(ST.assignments); }
+function getAssign(day,wbId){ return (effAssign()[day]||[]).find(it=>it.workbookId===wbId); }
 function confirmRow(day,wbId){
   const key=rowKey(day,wbId), d=ST.rowEdit[key]||{}, from=parseInt(d.from), to=parseInt(d.to);
   if(isNaN(from)||isNaN(to)||from<1||(to-from+1)<=0) return;
-  const rest=(ST.assignments[day]||[]).filter(it=>it.workbookId!==wbId);
+  const draft=cloneAssign(effAssign());
+  draft[day]=[...(draft[day]||[]).filter(it=>it.workbookId!==wbId),{workbookId:wbId,from,to}];
   const re={...ST.rowEdit}; delete re[key];
-  setState({assignments:{...ST.assignments,[day]:[...rest,{workbookId:wbId,from,to}]},rowEdit:re});
+  setState({assignDraft:draft,rowEdit:re});
 }
 function editRow(day,wbId){
   const a=getAssign(day,wbId)||{}, key=rowKey(day,wbId);
   setState({rowEdit:{...ST.rowEdit,[key]:{from:a.from!=null?String(a.from):'',to:a.to!=null?String(a.to):''}}});
 }
 function clearRow(day,wbId){
-  const rest=(ST.assignments[day]||[]).filter(it=>it.workbookId!==wbId);
+  const draft=cloneAssign(effAssign());
+  draft[day]=(draft[day]||[]).filter(it=>it.workbookId!==wbId);
   const re={...ST.rowEdit}; delete re[rowKey(day,wbId)];
-  setState({assignments:{...ST.assignments,[day]:rest},rowEdit:re});
+  setState({assignDraft:draft,rowEdit:re});
 }
+// 초안 적용: PIN이 있으면 확인 화면(검토+PIN)을 거치고, 없으면 바로 반영.
+function applyAssignDraft(){
+  if(!assignDirty()){ setState({assignDraft:null}); return; }
+  if(pinSet()) setState({verifyFor:'assignments',pinEntry:'',pinError:false,overlay:'verify'});
+  else commitAssignDraft();
+}
+function commitAssignDraft(){
+  if(!ST.assignDraft){ setState({overlay:null,verifyFor:null}); return; }
+  setState({assignments:ST.assignDraft,assignDraft:null,rowEdit:{},overlay:null,verifyFor:null,pinEntry:'',pinError:false});
+}
+function discardAssignDraft(){ setState({assignDraft:null,rowEdit:{}}); }
 function setMpp(v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}})); }
 function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,dayMin:{...s.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}})); }
 function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
@@ -585,18 +604,20 @@ function pinPress(d){
   if(e===ST.settings.guardianPin){
     const purpose=ST.verifyFor;
     if(purpose==='reward'){ ST={...ST,pinEntry:'',pinError:false,verifyFor:null,pendingReward:null,overlay:null}; finishDay(); }
+    else if(purpose==='assignments'){ commitAssignDraft(); }
     else { setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings'}); }
   } else {
     setState({pinEntry:'',pinError:true});
   }
 }
-// 설정에서 PIN 등록/변경. pinDraft(입력 버퍼)가 정확히 6자리 숫자여야 저장.
+// 설정에서 PIN 등록/변경. 두 번 입력이 모두 6자리 숫자이고 서로 같아야 저장(오타 방지).
 function savePin(){
-  const d=(ST.pinDraft||'').trim();
-  if(!/^[0-9]{6}$/.test(d)){ setState({pinError:true}); return; }
-  setState(s=>({settings:{...s.settings,guardianPin:d},pinDraft:'',pinError:false}));
+  const a=(ST.pinDraft||'').trim(), b=(ST.pinDraft2||'').trim();
+  if(!/^[0-9]{6}$/.test(a)){ setState({pinSaveErr:'len'}); return; }
+  if(a!==b){ setState({pinSaveErr:'mismatch'}); return; }
+  setState(s=>({settings:{...s.settings,guardianPin:a},pinDraft:'',pinDraft2:'',pinSaveErr:''}));
 }
-function clearPin(){ setState(s=>({settings:{...s.settings,guardianPin:''},pinDraft:''})); }
+function clearPin(){ setState(s=>({settings:{...s.settings,guardianPin:''},pinDraft:'',pinDraft2:'',pinSaveErr:''})); }
 // 이벤트 보상 적용: ctx(pond/items/unlocks)를 직접 갱신하고 표시용 eventInfo를 반환.
 //  targetUid 지정 시 그 카피바라에게, 아니면 건강한 카피바라 중 랜덤으로 친밀도를 준다.
 function applyEventReward(ev, ctx, targetUid) {
@@ -695,6 +716,8 @@ function startTick() {
       ST.timerSec-=1;
       const el=document.getElementById('timer-display');
       if(el)el.textContent=String(Math.floor(ST.timerSec/60)).padStart(2,'0')+':'+String(ST.timerSec%60).padStart(2,'0');
+      const bar=document.getElementById('timer-bar');
+      if(bar){ const tot=mpp()*60; bar.style.width=(tot>0?Math.min(100,Math.max(0,ST.timerSec/tot*100)):0)+'%'; }
     } else { ST.timerSec=0; ST.timerRunning=false; render(); }
   },1000);
 }
@@ -824,8 +847,9 @@ function renderSetup(T,sch) {
   const noWb=!ST.workbooks.length?`<div style="color:${T.sub};font-size:14px;padding:8px 2px;">문제집이 없어요. ⚙️ 설정 → 📒 문제집 관리에서 먼저 추가해 주세요.</div>`:'';
 
   const today=new Date();
+  const eff=effAssign(), schEff=schedule(today,eff);          // 미리보기는 초안 기준
   const cyclePreview=CYCLES.map(cy=>{
-    const cs=cycleSchedule(cy,today), active=cs.T>0;
+    const cs=cycleSchedule(cy,today,eff), active=cs.T>0;
     const dayRows=cs.rows.map(r=>{
       let dots='';
       for(let i=0;i<r.required;i++){ const filled=i<r.done; dots+=`<span style="width:11px;height:11px;border-radius:50%;flex:none;background:${filled?T.accent:'transparent'};border:2px solid ${filled?T.accent:lighten(T.accent,0.5)};"></span>`; }
@@ -850,14 +874,21 @@ function renderSetup(T,sch) {
   <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">✏️ 숙제 설정</div>
   <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
     <div style="font-weight:800;font-size:16px;margin-bottom:4px;">🗓️ 숙제 입력</div>
-    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">요일을 고르고, 문제집마다 시작·끝 쪽을 넣고 ✓를 누르면 확정돼요.</div>
+    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">요일을 고르고, 문제집마다 시작·끝 쪽을 넣어 ✓로 입력해요. 아래 <b>확인받기</b>로 보호자 승인을 받아야 실제 숙제에 반영돼요.</div>
     <div style="display:flex;gap:8px;margin-bottom:14px;max-width:230px;">${daySel}</div>
     ${rows}${noWb}
+    ${assignDirty()?`<div style="margin-top:8px;background:${lighten(T.accent,0.8)};border:2px dashed ${T.accent};border-radius:14px;padding:12px 13px;">
+      <div style="font-size:12.5px;color:${T.accentDark};font-weight:700;margin-bottom:9px;line-height:1.5;">✏️ 변경한 내용이 아직 적용되지 않았어요.<br>${pinSet()?'보호자 PIN 확인을 받아야 반영돼요.':'아래 버튼으로 적용하세요.'}</div>
+      <div style="display:flex;gap:8px;">
+        <div onclick="applyAssignDraft()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:14.5px;padding:12px;border-radius:12px;">${pinSet()?'🔒 변경 내용 확인받기':'변경 내용 적용'}</div>
+        <div onclick="discardAssignDraft()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.soft};color:${T.sub};font-weight:800;font-size:14.5px;padding:12px 16px;border-radius:12px;">취소</div>
+      </div>
+    </div>`:''}
   </div>
   <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:8px;">
     <div style="display:flex;align-items:baseline;justify-content:space-between;">
-      <div style="font-weight:800;font-size:16px;">📊 주간 배분 미리보기</div>
-      <div style="font-weight:800;color:${T.accent};font-size:15px;">총 ${sch.weekTotal}쪽</div>
+      <div style="font-weight:800;font-size:16px;">📊 주간 배분 미리보기${assignDirty()?` <span style="font-size:11px;color:${T.accentDark};">· 미적용 변경 포함</span>`:''}</div>
+      <div style="font-weight:800;color:${T.accent};font-size:15px;">총 ${schEff.weekTotal}쪽</div>
     </div>
     <div style="font-size:12.5px;color:${T.sub};margin:4px 0 14px;">화 숙제는 수·목, 목 숙제는 금·토·월에 나눠 담아요 (1쪽 ≈ ${mpp()}분). ● 완료 / ○ 남음</div>
     ${cyclePreview}
@@ -889,13 +920,23 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
     <div style="text-align:center;margin:22px 0 6px;">
       <div style="font-size:14px;color:${T.sub};font-weight:600;">${allDone?'오늘 분량 완료!':(planned+'쪽 중 '+(done+1)+'쪽째')}</div>
       <div id="timer-display" style="font-family:'Gaegu',cursive;font-size:64px;font-weight:700;color:${T.accent};line-height:1;margin-top:4px;">${timerMin}:${timerSec}</div>
-      <div style="font-size:13px;color:${T.sub};margin-top:2px;">이 쪽 집중 타이머 (1쪽 ≈ ${mpp()}분)</div>
+      <div style="margin:12px auto 0;max-width:250px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">⏳</span>
+        <div style="flex:1;height:13px;background:${T.soft};border-radius:999px;overflow:hidden;border:1px solid ${T.line};">
+          <div id="timer-bar" style="height:100%;width:${(()=>{const t=mpp()*60;return t>0?Math.min(100,Math.max(0,Math.round(ST.timerSec/t*100))):0;})()}%;background:linear-gradient(90deg,${T.accent},${lighten(T.accent,0.25)});border-radius:999px;transition:width 1s linear;"></div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:${T.sub};margin-top:6px;">이 쪽 집중 타이머 (1쪽 ≈ ${mpp()}분) · ${ST.timerRunning?'집중 중':'대기'}</div>
     </div>
     <div style="display:flex;gap:10px;justify-content:center;margin:14px 0 18px;">
       <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:12px 24px;border-radius:14px;font-weight:800;font-size:15px;background:${T.soft};color:${T.ink};border:2px solid ${T.line};">${ST.timerRunning?'⏸ 잠깐 멈춤':'▶ 타이머 시작'}</div>
     </div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:18px;">${tokens.join('')}</div>
-    ${allDone?`<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`:`<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`}
+    ${allDone
+      ? (ST.pendingReward
+          ? `<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;text-align:center;background:linear-gradient(180deg,#f3b24e,#e09a36);color:#fff;font-weight:800;font-size:16.5px;padding:16px;border-radius:18px;box-shadow:0 5px 0 #c07f24;line-height:1.45;">🔒 보호자 확인을 받고<br>오늘의 리워드를 받으세요<br><span style="font-size:12.5px;font-weight:700;opacity:0.95;">탭하면 PIN 입력창이 열려요</span></div>`
+          : `<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`)
+      : `<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`}
   </div>`:restCard;
 
   return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}</div>`;
@@ -1019,20 +1060,34 @@ function renderDetail(T) {
   </div></div>`;
 }
 
-// 보호자 확인 / 설정 잠금 — 6자리 PIN 키패드.
+// 숙제 변경 확인 화면에 띄울 '바뀔 내용' 요약.
+function assignReviewRows(T){
+  const d=ST.assignDraft||ST.assignments;
+  return [{k:'tue',l:'화요일 받는 숙제'},{k:'thu',l:'목요일 받는 숙제'}].map(o=>{
+    const items=(d[o.k]||[]).filter(it=>it.to-it.from+1>0);
+    const total=items.reduce((s,it)=>s+(it.to-it.from+1),0);
+    const detail=items.length?items.map(it=>{const w=ST.workbooks.find(x=>x.id===it.workbookId);return (w?h(w.name):'문제집')+' p.'+it.from+'~'+it.to;}).join('<br>'):`<span style="color:${T.sub};">숙제 없음</span>`;
+    return `<div style="padding:6px 0;border-bottom:1px solid ${T.line};"><b>${o.l} · ${total}쪽</b><div style="font-size:11.5px;color:${T.sub};margin-top:2px;line-height:1.5;">${detail}</div></div>`;
+  }).join('');
+}
+// 보호자 확인 / 설정 잠금 / 숙제 변경 확인 — 6자리 PIN 키패드.
 function renderVerify(T) {
-  const reward=ST.verifyFor==='reward';
-  const title=reward?'보호자 확인':'부모님 설정 잠금';
-  const sub=reward?'오늘 숙제를 정말 다 했나요?<br>보호자가 확인하면 친구가 찾아와요 🌿':'보호자 PIN을 입력하면 설정을 열 수 있어요.';
+  const purpose=ST.verifyFor, reward=purpose==='reward', isAssign=purpose==='assignments';
+  const title=reward?'보호자 확인':isAssign?'숙제 변경 확인':'부모님 설정 잠금';
+  const sub=reward?'오늘 숙제를 정말 다 했나요?<br>보호자가 확인하면 친구가 찾아와요 🌿'
+          :isAssign?'아래 내용으로 숙제를 바꿀까요?<br>보호자 PIN으로 확인해 주세요.'
+          :'보호자 PIN을 입력하면 설정을 열 수 있어요.';
+  const review=isAssign?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;">${assignReviewRows(T)}</div>`:'';
   const entry=ST.pinEntry||'';
   const dots=Array.from({length:6}).map((_,i)=>`<div style="width:15px;height:15px;border-radius:50%;background:${i<entry.length?T.accent:'transparent'};border:2px solid ${i<entry.length?T.accent:T.line};"></div>`).join('');
   const kStyle=`cursor:pointer;display:flex;align-items:center;justify-content:center;height:56px;border-radius:16px;background:${T.soft};border:2px solid ${T.line};font-size:23px;font-weight:800;color:${T.ink};`;
   const keys=['1','2','3','4','5','6','7','8','9'].map(d=>`<div onclick="pinPress('${d}')" class="tapbtn" style="${kStyle}">${d}</div>`).join('');
   return `<div style="position:absolute;inset:0;z-index:66;background:rgba(40,30,25,0.5);display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:${T.card};border-radius:28px;padding:26px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
+  <div style="background:${T.card};border-radius:28px;padding:26px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;max-height:92dvh;overflow-y:auto;">
     <div style="font-size:34px;line-height:1;">🔒</div>
     <div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;color:${T.accentDark};margin-top:4px;">${title}</div>
     <div style="font-size:13.5px;color:${T.sub};line-height:1.5;margin-top:6px;">${sub}</div>
+    ${review}
     <div style="display:flex;gap:11px;justify-content:center;margin:18px 0 6px;">${dots}</div>
     <div style="height:18px;font-size:12.5px;font-weight:700;color:#c0503a;">${ST.pinError?'PIN이 일치하지 않아요. 다시 입력해 주세요.':''}</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:8px;">
@@ -1062,12 +1117,14 @@ function renderSettings(T) {
   <div style="flex:1;overflow-y:auto;padding:6px 20px 40px;">
     <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🔒 보호자 확인 PIN ${pinSet()?'<span style="font-size:12px;color:#3f9b94;">· 설정됨</span>':`<span style="font-size:12px;color:${T.sub};">· 미설정</span>`}</div>
-      <div style="font-size:12.5px;color:${T.sub};line-height:1.5;margin-bottom:10px;">숙제를 끝내면 보호자가 PIN을 입력해야 보상(친구 데려오기)이 주어져요. 설정 진입에도 같은 PIN을 사용합니다.</div>
+      <div style="font-size:12.5px;color:${T.sub};line-height:1.5;margin-bottom:10px;">숙제를 끝내면 보호자가 PIN을 입력해야 보상(친구 데려오기)이 주어져요. 설정 진입과 숙제 변경 승인에도 같은 PIN을 사용합니다.</div>
+      <input data-pin-draft="1" type="password" inputmode="numeric" maxlength="6" placeholder="${pinSet()?'새 PIN 6자리':'PIN 6자리 숫자'}" value="" style="width:100%;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};margin-bottom:8px;" />
       <div style="display:flex;gap:8px;align-items:center;">
-        <input data-pin-draft="1" type="password" inputmode="numeric" maxlength="6" placeholder="${pinSet()?'새 PIN 6자리':'PIN 6자리 숫자'}" value="" style="flex:1;min-width:0;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
+        <input data-pin-draft2="1" type="password" inputmode="numeric" maxlength="6" placeholder="PIN 다시 입력" value="" style="flex:1;min-width:0;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
         <div onclick="savePin()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">${pinSet()?'변경':'저장'}</div>
       </div>
-      ${ST.pinError?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">6자리 숫자를 입력해 주세요.</div>`:''}
+      ${ST.pinSaveErr==='len'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">6자리 숫자를 입력해 주세요.</div>`:''}
+      ${ST.pinSaveErr==='mismatch'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">두 번 입력한 PIN이 서로 달라요. 다시 확인해 주세요.</div>`:''}
       ${pinSet()?`<div onclick="clearPin()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:9px;margin-top:6px;">PIN 해제 (확인 없이 보상 지급)</div>`:''}
     </div>
     <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
@@ -1113,6 +1170,8 @@ function attachInputs() {
   if(nwb) nwb.addEventListener('input',e=>{ST.newWbName=e.target.value;});
   const pinD=document.querySelector('[data-pin-draft]');
   if(pinD) pinD.addEventListener('input',e=>{ST.pinDraft=e.target.value.replace(/[^0-9]/g,'');});
+  const pinD2=document.querySelector('[data-pin-draft2]');
+  if(pinD2) pinD2.addEventListener('input',e=>{ST.pinDraft2=e.target.value.replace(/[^0-9]/g,'');});
 
   function updateRowPg(key){ const d=ST.rowEdit[key]||{}; const f=parseInt(d.from),t=parseInt(d.to); const pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null; const el=document.getElementById('rowpg-'+key); if(el)el.textContent=pg!=null&&pg>0?pg+'쪽':(pg!=null?'확인!':''); }
   document.querySelectorAll('[data-row-from]').forEach(el=>{
