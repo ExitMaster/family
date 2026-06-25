@@ -69,7 +69,7 @@ const EXTRA_ART = {
   sigh: '<text x="69" y="73" font-size="12">💨</text>'
 };
 
-function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반', mood=null, personality=null}) {
+function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반', mood=null, personality=null, decor=null}) {
   const animMap = { bob:'capyBob 2.8s ease-in-out infinite', float:'capyFloat 4.2s ease-in-out infinite', nap:'capyNap 3.4s ease-in-out infinite', none:'none' };
   const sm = { healthy:{f:'none',o:1,e:''}, weak:{f:'saturate(0.7) brightness(0.99)',o:0.95,e:'😟'}, leaving:{f:'grayscale(0.45) brightness(0.98)',o:0.9,e:'😢'}, gone:{f:'grayscale(0.9) brightness(1.02)',o:0.4,e:'💨'}, locked:{f:'grayscale(1) brightness(0.5) contrast(0.7)',o:0.85,e:''} }[status] || {f:'none',o:1,e:''};
   const base = status==='locked' ? '#9aa0a6' : color;
@@ -124,9 +124,19 @@ function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healt
   let lt=art.eye, rt=art.eye;
   if(art.eye==='wink'){ lt='happy'; rt='round'; }   // 한쪽 눈 윙크
   const eyes = eye(lt,35,50,-1) + eye(rt,65,50,1);
-  const accSvg = acc ? (isGlasses
+  // 꾸미기 장식(해금·수집으로 얻는다). hat 슬롯은 종족 모자 악세서리를 대체한다.
+  const dec = (status==='locked') ? null : decor;
+  const decHat = dec && dec.slot==='hat';
+  const showAcc = acc && !(decHat && !isGlasses);
+  const accSvg = showAcc ? (isGlasses
       ? `<text x="50" y="55" font-size="22" text-anchor="middle">${acc}</text>`
       : `<text x="50" y="14" font-size="20" text-anchor="middle">${acc}</text>`) : '';
+  const decSvg = dec ? ({
+      hat:   `<text x="50" y="15" font-size="20" text-anchor="middle">${dec.emoji}</text>`,
+      neck:  `<text x="50" y="97" font-size="15" text-anchor="middle">${dec.emoji}</text>`,
+      badge: `<text x="34" y="94" font-size="13" text-anchor="middle">${dec.emoji}</text>`,
+      side:  `<text x="85" y="32" font-size="14" text-anchor="middle">${dec.emoji}</text>`
+    }[dec.slot] || `<text x="50" y="15" font-size="18" text-anchor="middle">${dec.emoji}</text>`) : '';
   const extraSvg = (status==='healthy' && art.extra) ? (EXTRA_ART[art.extra]||'') : '';
 
   return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
@@ -150,6 +160,7 @@ function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healt
         ${mouth(art.mouth)}
         ${eyes}
         ${accSvg}
+        ${decSvg}
         ${extraSvg}
       </g>
     </svg>
@@ -248,6 +259,22 @@ const GUESTS = [
 // 4-1) 수집 아이템 표시용 이모지(이벤트 reward.item 이름과 매칭).
 const ITEMS = { '수박':'🍉', '유자':'🍊', '옥수수':'🌽', '반짝별':'🌟' };
 
+// 4-2) 꾸미기 장식 — 카피바라에게 입히는 악세서리.
+//   slot: hat(모자·머리, 종족 모자 대체) · neck(목걸이) · badge(가슴) · side(옆에 둥둥).
+//   unlocked(ST): 해금 조건. 이벤트 unlock 보상(ST.unlocks) 또는 간식 수집(ST.items)과 연동.
+const DECOR = [
+  {id:'medal',  name:'금메달 목걸이', emoji:'🏅', slot:'neck',  src:'2주 연속 달성 보상', unlocked:s=>(s.unlocks||[]).includes('금메달 목걸이')},
+  {id:'badge',  name:'도감 배지',     emoji:'🎖️', slot:'badge', src:'도감 50% 보상',     unlocked:s=>(s.unlocks||[]).includes('도감 배지')},
+  {id:'star',   name:'반짝별 장식',   emoji:'🌟', slot:'hat',   src:'반짝별 수집',       unlocked:s=>((s.items||{})['반짝별']||0)>0},
+  {id:'melon',  name:'수박 모자',     emoji:'🍉', slot:'hat',   src:'수박 수집',         unlocked:s=>((s.items||{})['수박']||0)>0},
+  {id:'corn',   name:'옥수수',        emoji:'🌽', slot:'side',  src:'옥수수 수집',       unlocked:s=>((s.items||{})['옥수수']||0)>0},
+  {id:'yuzu',   name:'유자',          emoji:'🍊', slot:'side',  src:'유자 수집',         unlocked:s=>((s.items||{})['유자']||0)>0}
+];
+function decorById(id){ return DECOR.find(d=>d.id===id)||null; }
+function availableDecor(){ return DECOR.filter(d=>d.unlocked(ST)); }
+// 카피바라(uid)가 착용 중인 장식을 capy()용 {emoji,slot}로. 해금이 풀린 경우만 반영.
+function decorFor(uid){ const id=(ST.equip||{})[uid]; const d=decorById(id); return (d&&d.unlocked(ST))?{emoji:d.emoji,slot:d.slot}:null; }
+
 // 5) 이벤트 — 부류 4종. reward 키: intimacy, item(수집), guest(깜짝친구 id),
 //    unlock(꾸미기 해금), 비우면 순수 연출. weight=같은 부류 내 랜덤 가중치.
 //    ▸ 네 부류 모두 연결됨: voluntary(자발숙제)·catch(포획)·
@@ -336,7 +363,7 @@ const DEFAULT_STATE = {
   lastDate:null, streakDate:null,
   caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
   items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
-  milestonesFired:[], eventQueue:[]
+  milestonesFired:[], eventQueue:[], equip:{}
 };
 
 let ST = {...DEFAULT_STATE};
@@ -467,7 +494,7 @@ function setState(upd) {
   save(); render();
 }
 function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired})); } catch(e){}
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip})); } catch(e){}
 }
 function load() {
   const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
@@ -569,6 +596,12 @@ function interact(uid, id) {
   const personality=sp(c.speciesId).personality;
   const pond=ST.pond.map(x=>x.uid===uid?{...x,intimacy:(x.intimacy||0)+(it.intimacy||1)}:x);
   setState({pond,detailReaction:{emoji:it.emoji,mood:it.mood,line:interactReact(personality,it)}});
+}
+// 꾸미기: 같은 장식을 다시 누르면 벗고, 다른 장식이면 갈아 끼운다(카피바라당 1개).
+function equipDecor(uid, decorId) {
+  const cur=(ST.equip||{})[uid];
+  const equip={...(ST.equip||{})}; if(cur===decorId) delete equip[uid]; else equip[uid]=decorId;
+  setState({equip});
 }
 function finishDay() {
   const today=new Date();
@@ -692,7 +725,7 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
   const lilies=lilyPads.map(p=>`<div style="position:absolute;left:${p.l}%;top:${p.t}%;width:${p.s}px;height:${p.h}px;background:${p.c};border-radius:50%;opacity:0.5;animation:lilyDrift ${p.d}s ease-in-out infinite;"></div>`).join('');
   const pond=ST.pond.map((c,i)=>{
     const s=sp(c.speciesId), slot=POND_SLOTS[i%POND_SLOTS.length], sz=Math.round(64+(slot[1]/100)*30);
-    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality})}</div>`;
+    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality,decor:decorFor(c.uid)})}</div>`;
   }).join('');
   const progPct=planned>0?Math.round((done/planned)*100):(planned===0?100:0);
   const progLabel=planned===0?'푹 쉬는 날':(done+' / '+planned+'쪽 완료');
@@ -935,13 +968,17 @@ function renderDetail(T) {
   else statusLabel='아직 데려오지 못한 친구예요';
   return `<div onclick="closeOverlay()" style="position:absolute;inset:0;z-index:62;background:rgba(40,30,25,0.45);display:flex;align-items:center;justify-content:center;padding:24px;">
   <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null})}</div>
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null,decor:owned?decorFor(owned.uid):null})}</div>
     <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${(PERSONALITY[s.personality]||{}).emoji||''}${s.personality}</div>
     <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
     <div style="margin-top:10px;font-size:13px;color:${T.sub};font-weight:600;">${statusLabel}</div>
     ${owned?`${ST.detailReaction?`<div style="margin-top:12px;font-size:14px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:11px 13px;line-height:1.5;">${ST.detailReaction.emoji} ${moodEmoji(ST.detailReaction.mood)} ${h(ST.detailReaction.line)}</div>`:`<div style="margin-top:12px;font-size:12.5px;color:${T.sub};">아래 버튼으로 ${h(s.name)}와 놀아줄 수 있어요</div>`}
-    <div style="display:flex;gap:7px;margin-top:11px;">${INTERACTIONS.map(it=>`<div onclick="interact('${owned.uid}','${it.id}')" class="tapbtn" style="cursor:pointer;flex:1;background:${T.soft};border:2px solid ${T.line};border-radius:14px;padding:10px 4px;font-weight:800;font-size:11.5px;color:${T.ink};line-height:1.3;"><div style="font-size:20px;margin-bottom:2px;">${it.emoji}</div>${h(it.label)}</div>`).join('')}</div>`:''}
+    <div style="display:flex;gap:7px;margin-top:11px;">${INTERACTIONS.map(it=>`<div onclick="interact('${owned.uid}','${it.id}')" class="tapbtn" style="cursor:pointer;flex:1;background:${T.soft};border:2px solid ${T.line};border-radius:14px;padding:10px 4px;font-weight:800;font-size:11.5px;color:${T.ink};line-height:1.3;"><div style="font-size:20px;margin-bottom:2px;">${it.emoji}</div>${h(it.label)}</div>`).join('')}</div>
+    <div style="margin-top:13px;border-top:1px dashed ${T.line};padding-top:11px;">
+      <div style="font-size:12.5px;font-weight:800;color:${T.sub};margin-bottom:7px;text-align:left;">🎀 꾸미기 ${(ST.equip||{})[owned.uid]?`<span style="color:${T.accentDark};">(${h((decorById((ST.equip||{})[owned.uid])||{}).name||'')} 착용중 · 다시 누르면 벗기)</span>`:''}</div>
+      ${availableDecor().length?`<div style="display:flex;gap:6px;flex-wrap:wrap;">${availableDecor().map(d=>{const on=(ST.equip||{})[owned.uid]===d.id;return `<div onclick="equipDecor('${owned.uid}','${d.id}')" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:4px;background:${on?T.accent:T.soft};color:${on?'#fff':T.ink};border:2px solid ${on?T.accent:T.line};border-radius:999px;padding:6px 11px;font-weight:700;font-size:12px;"><span style="font-size:15px;">${d.emoji}</span>${h(d.name)}</div>`;}).join('')}</div>`:`<div style="font-size:12px;color:${T.sub};text-align:left;line-height:1.5;">아직 꾸미기 아이템이 없어요.<br>연속 달성·도감·간식 수집으로 모아보세요!</div>`}
+    </div>`:''}
     <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:14px;background:${T.soft};color:${T.ink};font-weight:800;font-size:15px;padding:13px;border-radius:14px;">닫기</div>
   </div></div>`;
 }
