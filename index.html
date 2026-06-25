@@ -37,35 +37,122 @@ function _mix(hex, amt, toWhite) {
 const lighten = (h,a) => _mix(h,a,true);
 const darken  = (h,a) => _mix(h,a,false);
 
-// ── Capybara renderer ────────────────────────────────────────
-function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반'}) {
+// ── Capybara renderer (parametric SVG) ───────────────────────
+//  MOODS의 face/pose 힌트를 실제 그림 파라미터로 옮긴 사양표.
+//  눈(eye)·입(mouth)·볼(blush)·자세(pose)·부가연출(extra)을 조합해
+//  한 마리의 공통 카피바라에서 표정/포즈 변형을 만든다.
+const MOOD_ART = {
+  '평온':  {eye:'happy',     mouth:'smile_s',    blush:.35, pose:'calm'},
+  '행복':  {eye:'happy',     mouth:'smile_open', blush:.6,  pose:'bounce'},
+  '졸림':  {eye:'closed',    mouth:'small',      blush:.30, pose:'lean',     extra:'zzz'},
+  '신남':  {eye:'star',      mouth:'open_big',   blush:.5,  pose:'jump',     extra:'spark'},
+  '놀람':  {eye:'wide',      mouth:'o',          blush:.30, pose:'jolt'},
+  '부끄럼':{eye:'happy',     mouth:'small',      blush:.85, pose:'duck'},
+  '먹는중':{eye:'happy',     mouth:'chew',       blush:.45, pose:'calm'},
+  '뿌듯':  {eye:'confident', mouth:'smile_s',    blush:.40, pose:'proud',    extra:'spark'},
+  '토라짐':{eye:'side',      mouth:'pout',       blush:.30, pose:'turn',     extra:'angry'},
+  '장난':  {eye:'wink',      mouth:'tongue',     blush:.40, pose:'mischief'},
+  '도도':  {eye:'half',      mouth:'smile_s',    blush:.25, pose:'chinup'},
+  '두근':  {eye:'sparkle',   mouth:'small',      blush:.70, pose:'calm',     extra:'heart'},
+  '안심':  {eye:'closed',    mouth:'smile_s',    blush:.35, pose:'relax',    extra:'sigh'},
+  '_default':{eye:'round',   mouth:'smile_s',    blush:.40, pose:'calm'}
+};
+// 개성 → 평상시(이벤트가 없을 때) 기본 표정·눈 크기. 개성별 '생김새'가 도감/연못에서 드러난다.
+const PERSONALITY_REST = {'느긋':'평온','장난꾸러기':'장난','새침':'도도','호기심':'두근','겁쟁이':'부끄럼'};
+const PERSONALITY_EYE  = {'호기심':1.18,'겁쟁이':1.12,'장난꾸러기':1.06};
+const POSE_TF = {calm:'',bounce:'',jump:'',jolt:'',lean:'rotate(-7 50 70)',duck:'translate(0 4)',proud:'translate(0 -2)',turn:'translate(100 0) scale(-1 1)',mischief:'rotate(5 50 70)',chinup:'rotate(-4 50 66)',relax:'rotate(4 50 70)'};
+const EXTRA_ART = {
+  zzz:  '<text x="71" y="27" font-size="15">💤</text>',
+  spark:'<text x="14" y="27" font-size="13">✨</text>',
+  heart:'<text x="59" y="15" font-size="15">💗</text>',
+  angry:'<text x="69" y="25" font-size="14">💢</text>',
+  sigh: '<text x="69" y="73" font-size="12">💨</text>'
+};
+
+function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반', mood=null, personality=null}) {
   const animMap = { bob:'capyBob 2.8s ease-in-out infinite', float:'capyFloat 4.2s ease-in-out infinite', nap:'capyNap 3.4s ease-in-out infinite', none:'none' };
   const sm = { healthy:{f:'none',o:1,e:''}, weak:{f:'saturate(0.7) brightness(0.99)',o:0.95,e:'😟'}, leaving:{f:'grayscale(0.45) brightness(0.98)',o:0.9,e:'😢'}, gone:{f:'grayscale(0.9) brightness(1.02)',o:0.4,e:'💨'}, locked:{f:'grayscale(1) brightness(0.5) contrast(0.7)',o:0.85,e:''} }[status] || {f:'none',o:1,e:''};
   const base = status==='locked' ? '#9aa0a6' : color;
-  const bc=base, fc=darken(base,0.06), pc=darken(base,0.04), oc=darken(base,0.44), ml=darken(base,0.24), ie=darken(base,0.16);
-  const isNap = idle==='nap', isGlasses = accessory==='👓';
+  const ink='#3a2a1d';
+  const oc=darken(base,0.46), earIn=darken(base,0.20), muz=lighten(base,0.12), nz=darken(base,0.50), nzd=darken(base,0.62), foot=darken(base,0.07);
   const anim = status==='gone' ? 'none' : (animMap[idle]||animMap.bob);
-  const eyesOpen = !isNap && status!=='gone';
+  const isGlasses = accessory==='👓';
   const acc = status==='locked' ? '' : accessory;
   const sparkle = (rarity==='영웅'||rarity==='전설') && status!=='locked';
-  const accTop = isGlasses ? '0.7em' : '-0.04em';
+
+  // 표정 사양 결정: 위기 상태 > 명시 mood > 낮잠 > 개성 평상시 > 기본
+  let art;
+  if(status==='gone')         art={eye:'closed',  mouth:'small', blush:.15, pose:'relax'};
+  else if(status==='leaving') art={eye:'sad',     mouth:'frown', blush:.20, pose:'duck'};
+  else if(status==='weak')    art={eye:'worried', mouth:'frown', blush:.25, pose:'calm'};
+  else { const m = mood || (idle==='nap'?'졸림':null) || PERSONALITY_REST[personality]; art = MOOD_ART[m] || MOOD_ART._default; }
+  const sc = PERSONALITY_EYE[personality] || 1;
+  const pose = POSE_TF[art.pose] || '';
+
+  function eye(type, cx, cy, side){
+    const hl = `<circle cx="${cx-1.6}" cy="${cy-2}" r="1.5" fill="#fff" opacity="0.92"/>`;
+    switch(type){
+      case 'round':   return `<ellipse cx="${cx}" cy="${cy}" rx="${5*sc}" ry="${6.2*sc}" fill="${ink}"/>${hl}`;
+      case 'wide':    return `<ellipse cx="${cx}" cy="${cy}" rx="${6.2*sc}" ry="${7.2*sc}" fill="#fff" stroke="${ink}" stroke-width="1.4"/><circle cx="${cx}" cy="${cy+0.5}" r="${3*sc}" fill="${ink}"/>${hl}`;
+      case 'happy':   return `<path d="M ${cx-5.5} ${cy+1.8} Q ${cx} ${cy-5} ${cx+5.5} ${cy+1.8}" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>`;
+      case 'closed':  return `<path d="M ${cx-5} ${cy-0.5} Q ${cx} ${cy+4.5} ${cx+5} ${cy-0.5}" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>`;
+      case 'star':    return `<path d="M ${cx} ${cy-6.5} L ${cx+1.7} ${cy-1.7} L ${cx+6.5} ${cy} L ${cx+1.7} ${cy+1.7} L ${cx} ${cy+6.5} L ${cx-1.7} ${cy+1.7} L ${cx-6.5} ${cy} L ${cx-1.7} ${cy-1.7} Z" fill="${ink}"/><circle cx="${cx-1}" cy="${cy-1.5}" r="1.1" fill="#fff" opacity="0.85"/>`;
+      case 'sparkle': return `<ellipse cx="${cx}" cy="${cy}" rx="${5.2*sc}" ry="${6.4*sc}" fill="${ink}"/><circle cx="${cx-1.6}" cy="${cy-2}" r="2" fill="#fff" opacity="0.95"/><circle cx="${cx+1.8}" cy="${cy+1.8}" r="1" fill="#fff" opacity="0.8"/>`;
+      case 'confident': return `<path d="M ${cx-5} ${cy+1} A 5 5 0 0 0 ${cx+5} ${cy+1} Z" fill="${ink}"/><path d="M ${cx-5} ${cy-3} L ${cx+5} ${cy-4.5}" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`;
+      case 'side':    return `<ellipse cx="${cx}" cy="${cy}" rx="5" ry="4" fill="#fff" stroke="${ink}" stroke-width="1.2"/><circle cx="${cx+2.4}" cy="${cy}" r="2.4" fill="${ink}"/>`;
+      case 'half':    return `<path d="M ${cx-5} ${cy-1.5} L ${cx+5} ${cy-3}" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/><path d="M ${cx-4} ${cy} Q ${cx} ${cy+2.5} ${cx+4} ${cy-0.5}" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`;
+      case 'sad':     return `<path d="M ${cx-4.5} ${cy-2} Q ${cx} ${cy+2.5} ${cx+4.5} ${cy-2}" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>${side<0?`<circle cx="${cx-4}" cy="${cy+5}" r="1.8" fill="#9ad0e6"/>`:''}`;
+      case 'worried': return `<ellipse cx="${cx}" cy="${cy+0.5}" rx="3.6" ry="4.4" fill="${ink}"/><path d="M ${cx-side*4} ${cy-5} L ${cx+side*5} ${cy-3}" fill="none" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>`;
+      default:        return `<ellipse cx="${cx}" cy="${cy}" rx="${5*sc}" ry="${6*sc}" fill="${ink}"/>${hl}`;
+    }
+  }
+  function mouth(type){
+    switch(type){
+      case 'smile_s':    return `<path d="M 44 80 Q 50 85 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
+      case 'smile_open': return `<path d="M 43 79 Q 50 89 57 79 Z" fill="#9c4a4a"/><path d="M 45 82 Q 50 86 55 82 Z" fill="#ef7d8e"/>`;
+      case 'o':          return `<ellipse cx="50" cy="81" rx="3.2" ry="3.8" fill="#9c4a4a"/>`;
+      case 'open_big':   return `<ellipse cx="50" cy="82" rx="5" ry="6" fill="#9c4a4a"/><ellipse cx="50" cy="84.5" rx="3.2" ry="2.6" fill="#ef7d8e"/>`;
+      case 'chew':       return `<path d="M 44 80 Q 50 84 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/><circle cx="61" cy="78" r="1.8" fill="#8fbf6a"/>`;
+      case 'pout':       return `<path d="M 45 83 Q 50 79 55 83" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
+      case 'tongue':     return `<path d="M 44 80 Q 50 84 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/><path d="M 48 81 Q 50 87 53 81 Z" fill="#ef7d8e"/>`;
+      case 'small':      return `<line x1="47" y1="80" x2="53" y2="80" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>`;
+      case 'frown':      return `<path d="M 44 84 Q 50 78 56 84" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
+      default:           return `<path d="M 44 80 Q 50 84 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
+    }
+  }
+
+  let lt=art.eye, rt=art.eye;
+  if(art.eye==='wink'){ lt='happy'; rt='round'; }   // 한쪽 눈 윙크
+  const eyes = eye(lt,35,50,-1) + eye(rt,65,50,1);
+  const accSvg = acc ? (isGlasses
+      ? `<text x="50" y="55" font-size="22" text-anchor="middle">${acc}</text>`
+      : `<text x="50" y="14" font-size="20" text-anchor="middle">${acc}</text>`) : '';
+  const extraSvg = (status==='healthy' && art.extra) ? (EXTRA_ART[art.extra]||'') : '';
+
   return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
   ${sparkle?`<div style="position:absolute;top:-0.05em;right:-0.05em;font-size:0.46em;animation:capySpark 1.6s ease-in-out infinite;pointer-events:none;z-index:9;">✨</div>`:''}
   <div style="position:relative;width:2em;height:2.35em;transform-origin:50% 95%;animation:${anim};">
-    <div style="position:absolute;top:2.0em;left:0.16em;width:0.46em;height:0.3em;border-radius:50%;background:${fc};border:0.06em solid ${oc};z-index:1;"></div>
-    <div style="position:absolute;top:2.0em;right:0.16em;width:0.46em;height:0.3em;border-radius:50%;background:${fc};border:0.06em solid ${oc};z-index:1;"></div>
-    <div style="position:absolute;top:0.04em;left:0.34em;width:0.4em;height:0.42em;border-radius:50%;background:${bc};border:0.06em solid ${oc};z-index:1;"><div style="position:absolute;top:0.08em;left:50%;transform:translateX(-50%);width:0.17em;height:0.18em;border-radius:50%;background:${ie};"></div></div>
-    <div style="position:absolute;top:0.04em;right:0.34em;width:0.4em;height:0.42em;border-radius:50%;background:${bc};border:0.06em solid ${oc};z-index:1;"><div style="position:absolute;top:0.08em;left:50%;transform:translateX(-50%);width:0.17em;height:0.18em;border-radius:50%;background:${ie};"></div></div>
-    <div style="position:absolute;left:0.2em;top:0.2em;width:1.6em;height:2.0em;border-radius:50% 50% 47% 47%/43% 43% 53% 53%;background:${bc};border:0.06em solid ${oc};box-shadow:inset 0 -0.26em 0 rgba(0,0,0,0.04),inset 0 0.2em 0 rgba(255,255,255,0.15);z-index:2;"></div>
-    <div style="position:absolute;top:1.5em;left:0.6em;width:0.36em;height:0.46em;border-radius:48% 48% 50% 50%;background:${pc};border:0.06em solid ${oc};z-index:3;"></div>
-    <div style="position:absolute;top:1.5em;right:0.6em;width:0.36em;height:0.46em;border-radius:48% 48% 50% 50%;background:${pc};border:0.06em solid ${oc};z-index:3;"></div>
-    <div style="position:absolute;top:1.04em;left:0.32em;width:0.3em;height:0.18em;border-radius:50%;background:#ef9bb0;opacity:0.5;z-index:4;"></div>
-    <div style="position:absolute;top:1.04em;right:0.32em;width:0.3em;height:0.18em;border-radius:50%;background:#ef9bb0;opacity:0.5;z-index:4;"></div>
-    <div style="position:absolute;top:0.98em;left:50%;transform:translateX(-50%);width:0.78em;height:0.56em;border-radius:48% 48% 52% 52%;background:${bc};box-shadow:inset 0 0.07em 0 rgba(255,255,255,0.2),inset 0 -0.04em 0.06em rgba(0,0,0,0.05);z-index:4;"></div>
-    <div style="position:absolute;top:1.0em;left:50%;transform:translateX(-50%);width:0.36em;height:0.24em;border-radius:46% 46% 50% 50%;background:${oc};z-index:5;"></div>
-    <div style="position:absolute;top:1.22em;left:50%;transform:translateX(-50%);width:0.06em;height:0.12em;border-radius:0 0 0.05em 0.05em;background:${ml};z-index:5;"></div>
-    ${eyesOpen ? `<div style="position:absolute;top:0.72em;left:0.56em;width:0.21em;height:0.28em;border-radius:50%;background:#3a2a1d;z-index:5;"><div style="position:absolute;top:0.035em;left:0.035em;width:0.08em;height:0.08em;border-radius:50%;background:#fff;opacity:0.9;"></div></div><div style="position:absolute;top:0.72em;right:0.56em;width:0.21em;height:0.28em;border-radius:50%;background:#3a2a1d;z-index:5;"><div style="position:absolute;top:0.035em;left:0.035em;width:0.08em;height:0.08em;border-radius:50%;background:#fff;opacity:0.9;"></div></div>` : `<div style="position:absolute;top:0.82em;left:0.52em;width:0.28em;height:0.15em;border-bottom:0.055em solid #3a2a1d;border-radius:0 0 0.28em 0.28em;z-index:5;"></div><div style="position:absolute;top:0.82em;right:0.52em;width:0.28em;height:0.15em;border-bottom:0.055em solid #3a2a1d;border-radius:0 0 0.28em 0.28em;z-index:5;"></div>`}
-    ${acc ? `<div style="position:absolute;font-size:0.56em;z-index:6;pointer-events:none;left:50%;top:${accTop};transform:translateX(-50%);">${acc}</div>` : ''}
+    <svg viewBox="0 0 100 120" width="100%" height="100%" style="display:block;overflow:visible;">
+      <g transform="${pose}">
+        <ellipse cx="30" cy="15" rx="10" ry="9" fill="${base}" stroke="${oc}" stroke-width="2"/><ellipse cx="30" cy="16" rx="4.5" ry="4.5" fill="${earIn}"/>
+        <ellipse cx="70" cy="15" rx="10" ry="9" fill="${base}" stroke="${oc}" stroke-width="2"/><ellipse cx="70" cy="16" rx="4.5" ry="4.5" fill="${earIn}"/>
+        <ellipse cx="40" cy="103" rx="8" ry="5.5" fill="${foot}" stroke="${oc}" stroke-width="1.6"/>
+        <ellipse cx="60" cy="103" rx="8" ry="5.5" fill="${foot}" stroke="${oc}" stroke-width="1.6"/>
+        <path d="M50 12 C72 12 85 25 85 52 C85 87 70 109 50 109 C30 109 15 87 15 52 C15 25 28 12 50 12 Z" fill="${base}" stroke="${oc}" stroke-width="2"/>
+        <ellipse cx="50" cy="60" rx="25" ry="33" fill="#ffffff" opacity="0.06"/>
+        <ellipse cx="50" cy="72" rx="23" ry="16" fill="${muz}"/>
+        <ellipse cx="28" cy="74" rx="7" ry="4.2" fill="#ef9bb0" opacity="${art.blush}"/>
+        <ellipse cx="72" cy="74" rx="7" ry="4.2" fill="#ef9bb0" opacity="${art.blush}"/>
+        <ellipse cx="50" cy="66" rx="11" ry="7" fill="${nz}"/>
+        <ellipse cx="50" cy="63.5" rx="6" ry="2" fill="#ffffff" opacity="0.15"/>
+        <ellipse cx="46" cy="66" rx="1.4" ry="2.2" fill="${nzd}"/><ellipse cx="54" cy="66" rx="1.4" ry="2.2" fill="${nzd}"/>
+        <line x1="50" y1="73" x2="50" y2="78" stroke="${oc}" stroke-width="1.2" stroke-linecap="round"/>
+        ${mouth(art.mouth)}
+        ${eyes}
+        ${accSvg}
+        ${extraSvg}
+      </g>
+    </svg>
   </div>
   ${sm.e ? `<div style="position:absolute;top:0.1em;left:-0.05em;font-size:0.44em;z-index:8;pointer-events:none;">${sm.e}</div>` : ''}
 </div>`;
@@ -562,7 +649,7 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
   const lilies=lilyPads.map(p=>`<div style="position:absolute;left:${p.l}%;top:${p.t}%;width:${p.s}px;height:${p.h}px;background:${p.c};border-radius:50%;opacity:0.5;animation:lilyDrift ${p.d}s ease-in-out infinite;"></div>`).join('');
   const pond=ST.pond.map((c,i)=>{
     const s=sp(c.speciesId), slot=POND_SLOTS[i%POND_SLOTS.length], sz=Math.round(64+(slot[1]/100)*30);
-    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity})}</div>`;
+    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality})}</div>`;
   }).join('');
   const progPct=planned>0?Math.round((done/planned)*100):(planned===0?100:0);
   const progLabel=planned===0?'푹 쉬는 날':(done+' / '+planned+'쪽 완료');
@@ -676,7 +763,7 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
   const volDoneToday=vcToday?doneOnDate(todayWk,dstr(new Date())):0;
   const napCard=`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:36px 22px;text-align:center;"><div style="display:flex;justify-content:center;margin-bottom:8px;">${capy({size:82,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div><div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;">오늘은 숙제가 없는 날이에요</div><div style="font-size:14px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요. 다른 요일을 눌러 미리 둘러볼 수도 있어요!</div></div>`;
   const restCard=vcToday?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:26px 22px;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:78,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity})}</div>
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:78,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null})}</div>
     <div style="font-family:'Gaegu',cursive;font-size:23px;font-weight:700;">오늘은 쉬는 날이에요 🌿</div>
     <div style="font-size:13.5px;color:${T.sub};margin-top:4px;line-height:1.5;">그래도 미리 풀고 싶다면 <b style="color:${T.accentDark};">${vcToday.cy.label}</b>를 당겨서 할 수 있어요.<br>미리 하면 친밀도가 오르고 즐거운 일이 생겨요!</div>
     <div style="margin:14px 0 4px;font-size:13px;color:${T.sub};font-weight:700;">오늘 미리 푼 양 <span style="color:${T.accent};">${volDoneToday}쪽</span> · 사이클 남은 <span style="color:${T.accent};">${Math.max(0,vcToday.cs.T-vcToday.cs.cycleDone)}쪽</span></div>
@@ -684,7 +771,7 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
   </div>`:napCard;
   const body=planned>0?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:22px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
     <div style="display:flex;align-items:flex-start;gap:14px;">
-      <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity})}</div>
+      <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null})}</div>
       <div style="flex:1;background:${T.soft};border-radius:16px;padding:13px 16px;font-weight:600;font-size:15px;line-height:1.5;">${allDone?'인우야, 오늘 다 해냈어! 새 친구를 데려가자 🎉':h(cheerSp.line)}</div>
     </div>
     <div style="text-align:center;margin:22px 0 6px;">
@@ -722,7 +809,7 @@ function renderCaught(T) {
   return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">${confetti}
   <div style="position:relative;background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
     <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;color:${T.accentDark};">${ST.caughtNew?'✨ 새로운 친구를 만났어! ✨':'🎉 다시 만나서 반가워!'}</div>
-    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:112,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity})}</div>
+    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:112,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ce?ce.mood:null})}</div>
     <div style="font-weight:900;font-size:22px;">${h(cs.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
     <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
@@ -746,7 +833,7 @@ function renderEvent(T) {
   <div style="background:${T.card};border-radius:30px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
     <div style="font-size:52px;line-height:1;margin-bottom:4px;">${ev.emoji}</div>
     <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:${T.accentDark};">${h(ev.title)}</div>
-    <div style="display:flex;justify-content:center;margin:10px 0 4px;"><div style="position:relative;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity})}${moodBadge}</div></div>
+    <div style="display:flex;justify-content:center;margin:10px 0 4px;"><div style="position:relative;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ev.mood})}${moodBadge}</div></div>
     <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(ev.line)}</div>
     ${guestHtml}
     <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;line-height:1.7;">${bits.map(h).join('<br>')}</div>
@@ -782,7 +869,7 @@ function renderCrisis(T) {
 }
 
 function renderDex(T,seen,total,pct) {
-  const cards=SPECIES.map(s=>{ const found=!!ST.dexSeen[s.id],rm=RARITY[s.rarity]; return `<div onclick="openDexDetail('${s.id}')" class="tapbtn" style="cursor:${found?'pointer':'default'};background:${found?T.card:T.soft};border:2px solid ${found?T.line:'transparent'};border-radius:18px;padding:12px 8px 10px;text-align:center;position:relative;"><div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:${found?rm.c:T.sub};">${found?s.rarity:'?'}</div><div style="display:flex;justify-content:center;height:96px;align-items:center;">${capy({size:40,color:s.color,accessory:s.accessory,idle:'bob',status:found?'healthy':'locked',rarity:s.rarity})}</div><div style="margin-top:6px;font-weight:700;font-size:12.5px;color:${found?T.ink:T.sub};">${found?h(s.name):'???'}</div><div style="font-size:10.5px;color:${T.sub};">${found?s.biome:'미발견'}</div></div>`; }).join('');
+  const cards=SPECIES.map(s=>{ const found=!!ST.dexSeen[s.id],rm=RARITY[s.rarity]; return `<div onclick="openDexDetail('${s.id}')" class="tapbtn" style="cursor:${found?'pointer':'default'};background:${found?T.card:T.soft};border:2px solid ${found?T.line:'transparent'};border-radius:18px;padding:12px 8px 10px;text-align:center;position:relative;"><div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:${found?rm.c:T.sub};">${found?s.rarity:'?'}</div><div style="display:flex;justify-content:center;height:96px;align-items:center;">${capy({size:40,color:s.color,accessory:s.accessory,idle:'bob',status:found?'healthy':'locked',rarity:s.rarity,personality:s.personality})}</div><div style="margin-top:6px;font-weight:700;font-size:12.5px;color:${found?T.ink:T.sub};">${found?h(s.name):'???'}</div><div style="font-size:10.5px;color:${T.sub};">${found?s.biome:'미발견'}</div></div>`; }).join('');
   return `<div style="position:absolute;inset:0;z-index:55;background:${T.bg};display:flex;flex-direction:column;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
     <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">📚 카피바라 도감</div>
@@ -805,7 +892,7 @@ function renderDetail(T) {
   else statusLabel='아직 데려오지 못한 친구예요';
   return `<div onclick="closeOverlay()" style="position:absolute;inset:0;z-index:62;background:rgba(40,30,25,0.45);display:flex;align-items:center;justify-content:center;padding:24px;">
   <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity})}</div>
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null})}</div>
     <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${(PERSONALITY[s.personality]||{}).emoji||''}${s.personality}</div>
     <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
