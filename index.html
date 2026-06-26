@@ -69,7 +69,7 @@ const EXTRA_ART = {
   sigh: '<text x="69" y="73" font-size="12">💨</text>'
 };
 
-function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반', mood=null, personality=null, decor=null}) {
+function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반', mood=null, personality=null, decor=null, img=null}) {
   const animMap = { bob:'capyBob 2.8s ease-in-out infinite', float:'capyFloat 4.2s ease-in-out infinite', nap:'capyNap 3.4s ease-in-out infinite', none:'none' };
   const sm = { healthy:{f:'none',o:1,e:''}, weak:{f:'saturate(0.7) brightness(0.99)',o:0.95,e:'😟'}, leaving:{f:'grayscale(0.45) brightness(0.98)',o:0.9,e:'😢'}, gone:{f:'grayscale(0.9) brightness(1.02)',o:0.4,e:'💨'}, locked:{f:'grayscale(1) brightness(0.5) contrast(0.7)',o:0.85,e:''} }[status] || {f:'none',o:1,e:''};
   const base = status==='locked' ? '#9aa0a6' : color;
@@ -138,6 +138,20 @@ function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healt
       side:  `<text x="85" y="32" font-size="14" text-anchor="middle">${dec.emoji}</text>`
     }[dec.slot] || `<text x="50" y="15" font-size="18" text-anchor="middle">${dec.emoji}</text>`) : '';
   const extraSvg = (status==='healthy' && art.extra) ? (EXTRA_ART[art.extra]||'') : '';
+
+  // ── 커스텀 이미지가 있으면 SVG 대신 그림 사용 (위기 필터·꾸미기 이모지는 유지) ──
+  if(img){
+    const decPos={hat:'top:1%;left:50%;transform:translateX(-50%);',neck:'bottom:13%;left:50%;transform:translateX(-50%);',badge:'bottom:17%;left:30%;',side:'top:7%;right:3%;'}[dec&&dec.slot]||'top:1%;left:50%;transform:translateX(-50%);';
+    const decHtml = dec?`<div style="position:absolute;${decPos}font-size:0.5em;pointer-events:none;z-index:7;">${dec.emoji}</div>`:'';
+    return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
+  ${sparkle?`<div style="position:absolute;top:-0.05em;right:-0.05em;font-size:0.46em;animation:capySpark 1.6s ease-in-out infinite;pointer-events:none;z-index:9;">✨</div>`:''}
+  <div style="position:relative;width:2.7em;height:2.7em;transform-origin:50% 92%;animation:${anim};">
+    <img src="${img}" alt="" draggable="false" style="width:100%;height:100%;object-fit:contain;display:block;-webkit-user-drag:none;user-select:none;" />
+    ${decHtml}
+  </div>
+  ${sm.e ? `<div style="position:absolute;top:0.1em;left:-0.05em;font-size:0.44em;z-index:8;pointer-events:none;">${sm.e}</div>` : ''}
+</div>`;
+  }
 
   return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
   ${sparkle?`<div style="position:absolute;top:-0.05em;right:-0.05em;font-size:0.46em;animation:capySpark 1.6s ease-in-out infinite;pointer-events:none;z-index:9;">✨</div>`:''}
@@ -275,6 +289,17 @@ function availableDecor(){ return DECOR.filter(d=>d.unlocked(ST)); }
 // 카피바라(uid)가 착용 중인 장식을 capy()용 {emoji,slot}로. 해금이 풀린 경우만 반영.
 function decorFor(uid){ const id=(ST.equip||{})[uid]; const d=decorById(id); return (d&&d.unlocked(ST))?{emoji:d.emoji,slot:d.slot}:null; }
 
+// 4-3) 커스텀 카피바라 이미지 — assets/capy/<id>.png 가 있으면 그림을, 없으면 SVG를 쓴다.
+//   앱 시작 시 각 종 이미지를 비동기로 탐지하고, 로드된 것만 IMG_OK에 표시 → 자동 반영.
+const CAPY_IMG_BASE='assets/capy/';
+let IMG_OK={};
+function imgFor(id){ return IMG_OK[id]?(CAPY_IMG_BASE+id+'.png'):null; }
+let _imgRzT; function _imgReRender(){ clearTimeout(_imgRzT); _imgRzT=setTimeout(()=>{ try{render();}catch(e){} },120); }
+function probeCapyImages(){
+  if(typeof Image==='undefined') return;
+  SPECIES.forEach(s=>{ const im=new Image(); im.onload=()=>{ IMG_OK[s.id]=true; _imgReRender(); }; im.onerror=()=>{}; im.src=CAPY_IMG_BASE+s.id+'.png'; });
+}
+
 // 5) 이벤트 — 부류 4종. reward 키: intimacy, item(수집), guest(깜짝친구 id),
 //    unlock(꾸미기 해금), 비우면 순수 연출. weight=같은 부류 내 랜덤 가중치.
 //    ▸ 네 부류 모두 연결됨: voluntary(자발숙제)·catch(포획)·
@@ -355,9 +380,9 @@ const DEFAULT_STATE = {
   workbooks:[{id:'w1',name:'수학 익힘책',color:'#c47a4e'},{id:'w2',name:'국어 독해',color:'#3f9b94'}],
   assignments:{tue:[{workbookId:'w1',from:10,to:15},{workbookId:'w2',from:20,to:24}],thu:[{workbookId:'w1',from:16,to:22},{workbookId:'w2',from:25,to:28}]},
   settings:{minsPerPage:10,dayMin:{mon:75,tue:20,wed:30,thu:70,fri:40,sat:20,sun:0},difficulty:'normal',guardianPin:''},
-  pond:[{uid:'c1',speciesId:'s1',status:'healthy',intimacy:0},{uid:'c2',speciesId:'s9',status:'healthy',intimacy:0},{uid:'c3',speciesId:'s3',status:'healthy',intimacy:1}],
-  dexSeen:{s1:true,s9:true,s3:true},
-  streak:3, dayLog:{}, setupDay:'tue',
+  pond:[],                 // 신규 시작: 연못 비어 있음(첫 숙제로 첫 친구 획득)
+  dexSeen:{},              // 도감 0/16
+  streak:0, dayLog:{}, setupDay:'tue',
   newWbName:'', rowEdit:{},
   todayKey:'tue', timerSec:0, timerRunning:false,
   lastDate:null, streakDate:null,
@@ -789,7 +814,7 @@ function pondScene(T, dexPct, heightCss, showChips) {
   const lilies=lilyPads.map(p=>`<div style="position:absolute;left:${p.l}%;top:${p.t}%;width:${p.s}px;height:${p.h}px;background:${p.c};border-radius:50%;opacity:0.5;animation:lilyDrift ${p.d}s ease-in-out infinite;"></div>`).join('');
   const pond=ST.pond.map((c,i)=>{
     const s=sp(c.speciesId), slot=POND_SLOTS[i%POND_SLOTS.length], sz=Math.round(64+(slot[1]/100)*30);
-    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality,decor:decorFor(c.uid)})}</div>`;
+    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality,decor:decorFor(c.uid),img:imgFor(s.id)})}</div>`;
   }).join('');
   const chips=showChips?`<div style="position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;flex-wrap:wrap;z-index:90;">
       <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🦫 채집 ${ST.pond.length}마리</div>
@@ -997,7 +1022,7 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
   const volDoneToday=vcToday?doneOnDate(todayWk,dstr(new Date())):0;
   const napCard=`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:36px 22px;text-align:center;"><div style="display:flex;justify-content:center;margin-bottom:8px;">${capy({size:82,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div><div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;">오늘은 숙제가 없는 날이에요</div><div style="font-size:14px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요. 다른 요일을 눌러 미리 둘러볼 수도 있어요!</div></div>`;
   const restCard=vcToday?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:26px 22px;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:78,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null})}</div>
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:78,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null,img:imgFor(cheerSp.id)})}</div>
     <div style="font-family:'Gaegu',cursive;font-size:23px;font-weight:700;">오늘은 쉬는 날이에요 🌿</div>
     <div style="font-size:13.5px;color:${T.sub};margin-top:4px;line-height:1.5;">그래도 미리 풀고 싶다면 <b style="color:${T.accentDark};">${vcToday.cy.label}</b>를 당겨서 할 수 있어요.<br>미리 하면 친밀도가 오르고 즐거운 일이 생겨요!</div>
     <div style="margin:14px 0 4px;font-size:13px;color:${T.sub};font-weight:700;">오늘 미리 푼 양 <span style="color:${T.accent};">${volDoneToday}쪽</span> · 사이클 남은 <span style="color:${T.accent};">${Math.max(0,vcToday.cs.T-vcToday.cs.cycleDone)}쪽</span></div>
@@ -1005,7 +1030,7 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
   </div>`:napCard;
   const body=planned>0?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:22px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
     <div style="display:flex;align-items:flex-start;gap:14px;">
-      <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null})}</div>
+      <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null,img:imgFor(cheerSp.id)})}</div>
       <div style="flex:1;background:${T.soft};border-radius:16px;padding:13px 16px;font-weight:600;font-size:15px;line-height:1.5;">${allDone?'인우야, 오늘 다 해냈어! 새 친구를 데려가자 🎉':h(cheerSp.line)}</div>
     </div>
     <div style="text-align:center;margin:22px 0 6px;">
@@ -1054,7 +1079,7 @@ function renderCaught(T) {
   return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">${confetti}
   <div style="position:relative;background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
     <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;color:${T.accentDark};">${ST.caughtNew?'✨ 새로운 친구를 만났어! ✨':'🎉 다시 만나서 반가워!'}</div>
-    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:112,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ce?ce.mood:null})}</div>
+    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:112,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ce?ce.mood:null,img:imgFor(cs.id)})}</div>
     <div style="font-weight:900;font-size:22px;">${h(cs.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
     <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
@@ -1078,7 +1103,7 @@ function renderEvent(T) {
   <div style="background:${T.card};border-radius:30px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
     <div style="font-size:52px;line-height:1;margin-bottom:4px;">${ev.emoji}</div>
     <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:${T.accentDark};">${h(ev.title)}</div>
-    <div style="display:flex;justify-content:center;margin:10px 0 4px;"><div style="position:relative;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ev.mood})}${moodBadge}</div></div>
+    <div style="display:flex;justify-content:center;margin:10px 0 4px;"><div style="position:relative;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ev.mood,img:imgFor(cs.id)})}${moodBadge}</div></div>
     <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(ev.line)}</div>
     ${guestHtml}
     <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;line-height:1.7;">${bits.map(h).join('<br>')}</div>
@@ -1104,7 +1129,7 @@ function renderCrisis(T) {
   return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.5);display:flex;align-items:center;justify-content:center;padding:24px;">
   <div style="background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
     <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:#c0503a;">앗, 친구가 위기에 빠졌어!</div>
-    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:104,color:s.color,accessory:s.accessory,idle:'bob',status,rarity:s.rarity})}</div>
+    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:104,color:s.color,accessory:s.accessory,idle:'bob',status,rarity:s.rarity,img:imgFor(s.id)})}</div>
     <div style="font-weight:900;font-size:20px;">${h(ci.name)}</div>
     <div style="margin-top:10px;font-size:14.5px;color:${T.ink};line-height:1.5;background:#fff1ec;border-radius:14px;padding:12px 14px;">${h(ci.story)}<br><b style="color:#c0503a;">${stageLabel}</b></div>
     <div style="margin-top:12px;font-size:14px;color:${T.accentDark};font-weight:700;">걱정 마! 지금 숙제하면 다시 데려올 수 있어 🌱</div>
@@ -1114,7 +1139,7 @@ function renderCrisis(T) {
 }
 
 function renderDex(T,seen,total,pct) {
-  const cards=SPECIES.map(s=>{ const found=!!ST.dexSeen[s.id],rm=RARITY[s.rarity]; return `<div onclick="openDexDetail('${s.id}')" class="tapbtn" style="cursor:${found?'pointer':'default'};background:${found?T.card:T.soft};border:2px solid ${found?T.line:'transparent'};border-radius:18px;padding:12px 8px 10px;text-align:center;position:relative;"><div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:${found?rm.c:T.sub};">${found?s.rarity:'?'}</div><div style="display:flex;justify-content:center;height:96px;align-items:center;">${capy({size:40,color:s.color,accessory:s.accessory,idle:'bob',status:found?'healthy':'locked',rarity:s.rarity,personality:s.personality})}</div><div style="margin-top:6px;font-weight:700;font-size:12.5px;color:${found?T.ink:T.sub};">${found?h(s.name):'???'}</div><div style="font-size:10.5px;color:${T.sub};">${found?s.biome:'미발견'}</div></div>`; }).join('');
+  const cards=SPECIES.map(s=>{ const found=!!ST.dexSeen[s.id],rm=RARITY[s.rarity]; return `<div onclick="openDexDetail('${s.id}')" class="tapbtn" style="cursor:${found?'pointer':'default'};background:${found?T.card:T.soft};border:2px solid ${found?T.line:'transparent'};border-radius:18px;padding:12px 8px 10px;text-align:center;position:relative;"><div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:${found?rm.c:T.sub};">${found?s.rarity:'?'}</div><div style="display:flex;justify-content:center;height:96px;align-items:center;">${capy({size:40,color:s.color,accessory:s.accessory,idle:'bob',status:found?'healthy':'locked',rarity:s.rarity,personality:s.personality,img:found?imgFor(s.id):null})}</div><div style="margin-top:6px;font-weight:700;font-size:12.5px;color:${found?T.ink:T.sub};">${found?h(s.name):'???'}</div><div style="font-size:10.5px;color:${T.sub};">${found?s.biome:'미발견'}</div></div>`; }).join('');
   return `<div style="position:absolute;inset:0;z-index:55;background:${T.bg};display:flex;flex-direction:column;">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
     <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">📚 카피바라 도감</div>
@@ -1137,7 +1162,7 @@ function renderDetail(T) {
   else statusLabel='아직 데려오지 못한 친구예요';
   return `<div onclick="closeOverlay()" style="position:absolute;inset:0;z-index:62;background:rgba(40,30,25,0.45);display:flex;align-items:center;justify-content:center;padding:24px;">
   <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null,decor:owned?decorFor(owned.uid):null})}</div>
+    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null,decor:owned?decorFor(owned.uid):null,img:imgFor(s.id)})}</div>
     <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${(PERSONALITY[s.personality]||{}).emoji||''}${s.personality}</div>
     <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
@@ -1285,6 +1310,7 @@ function attachInputs() {
 let _rzT; window.addEventListener('resize',()=>{ clearTimeout(_rzT); _rzT=setTimeout(render,150); }); // 세로↔가로 레이아웃 전환
 load();
 render();
+probeCapyImages(); // 커스텀 이미지가 있으면 로드되는 대로 SVG를 그림으로 교체
 startTick();
 </script>
 </body>
