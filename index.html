@@ -739,31 +739,8 @@ function render() {
   const showCrisisBanner=anyCrisis()&&ST.overlay===null;
   const showPendingBanner=!!ST.pendingReward&&ST.overlay===null;
 
-  document.getElementById('app').innerHTML = `
-<div style="min-height:100dvh;display:flex;justify-content:center;background:${T.bg};font-family:'Noto Sans KR',sans-serif;color:${T.ink};">
-<div style="position:relative;width:100%;max-width:480px;height:100dvh;display:flex;flex-direction:column;background:${T.bg};overflow:hidden;margin:0 auto;">
-
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px 12px;flex-shrink:0;">
-    <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};line-height:1;">🌿 인우의 카피바라 연못</div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
-      <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
-    </div>
-  </div>
-
-  ${showCrisisBanner?`<div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;animation:tapPop 1.4s ease-in-out infinite;">😢</div><div style="flex:1;"><div style="font-weight:800;color:#c0503a;font-size:15px;">${crisisBannerText()}</div><div style="font-size:13px;color:#b06a5c;margin-top:1px;">지금 숙제하면 구할 수 있어! 탭해서 구출하러 가자 →</div></div></div>`:''}
-  ${showPendingBanner?`<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff7e8,#ffeecb);border:2px solid #f0d49a;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;">🔒</div><div style="flex:1;"><div style="font-weight:800;color:${T.accentDark};font-size:15px;">숙제 끝! 보호자 확인을 기다리고 있어요</div><div style="font-size:13px;color:${T.sub};margin-top:1px;">보호자가 PIN을 입력하면 친구를 데려올 수 있어요 →</div></div></div>`:''}
-
-  <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;">
-    ${ST.screen==='home'  ? renderHome(T,sch,dexPct,dateLabel,plannedToday,doneToday,allDone):''}
-    ${ST.screen==='setup' ? renderSetup(T,sch):''}
-    ${ST.screen==='today' ? renderToday(T,sch,tk,plannedToday,doneToday,allDone,cheerSp,timerMin,timerSec):''}
-  </div>
-
-  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:10px 16px 16px;background:linear-gradient(180deg,transparent,${T.bg} 38%);">
-    ${renderNav(T)}
-  </div>
-
+  const wide=isWide();
+  const overlays=`
   ${ST.overlay==='caught'    ? renderCaught(T):''}
   ${ST.overlay==='event'     ? renderEvent(T):''}
   ${ST.overlay==='break'     ? renderBreak(T,cheerSp):''}
@@ -772,33 +749,62 @@ function render() {
   ${ST.overlay==='capyDetail'? renderDetail(T):''}
   ${ST.overlay==='settings'  ? renderSettings(T):''}
   ${ST.overlay==='verify'    ? renderVerify(T):''}
+  ${(wide&&ST.screen==='setup')?`<div style="position:absolute;inset:0;z-index:57;background:${T.bg};overflow-y:auto;"><div style="max-width:780px;margin:0 auto;padding:16px 24px 50px;"><div style="display:flex;justify-content:flex-end;margin-bottom:4px;"><div onclick="setState({screen:'home'})" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div></div>${renderSetup(T,sch)}</div></div>`:''}`;
 
-</div>
+  const portrait=`
+<div style="position:relative;width:100%;max-width:480px;height:100dvh;display:flex;flex-direction:column;background:${T.bg};overflow:hidden;margin:0 auto;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px 12px;flex-shrink:0;">
+    <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};line-height:1;">🌿 인우의 카피바라 연못</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
+      <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
+    </div>
+  </div>
+  ${showCrisisBanner?`<div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;animation:tapPop 1.4s ease-in-out infinite;">😢</div><div style="flex:1;"><div style="font-weight:800;color:#c0503a;font-size:15px;">${crisisBannerText()}</div><div style="font-size:13px;color:#b06a5c;margin-top:1px;">지금 숙제하면 구할 수 있어! 탭해서 구출하러 가자 →</div></div></div>`:''}
+  ${showPendingBanner?`<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff7e8,#ffeecb);border:2px solid #f0d49a;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;">🔒</div><div style="flex:1;"><div style="font-weight:800;color:${T.accentDark};font-size:15px;">숙제 끝! 보호자 확인을 기다리고 있어요</div><div style="font-size:13px;color:${T.sub};margin-top:1px;">보호자가 PIN을 입력하면 친구를 데려올 수 있어요 →</div></div></div>`:''}
+  <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;">
+    ${ST.screen==='home'  ? renderHome(T,sch,dexPct,dateLabel,plannedToday,doneToday,allDone):''}
+    ${ST.screen==='setup' ? renderSetup(T,sch):''}
+    ${ST.screen==='today' ? renderToday(T,sch,tk,plannedToday,doneToday,allDone,cheerSp,timerMin,timerSec):''}
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:10px 16px 16px;background:linear-gradient(180deg,transparent,${T.bg} 38%);">
+    ${renderNav(T)}
+  </div>
+</div>`;
+
+  document.getElementById('app').innerHTML = `
+<div style="position:relative;min-height:100dvh;display:flex;justify-content:center;background:${T.bg};font-family:'Noto Sans KR',sans-serif;color:${T.ink};">
+  ${wide ? renderDashboard(T,sch,tk,plannedToday,doneToday,allDone,cheerSp,dexSeenCount,dexTotal,dexPct,dateLabel,timerMin,timerSec) : portrait}
+  ${overlays}
 </div>`;
   attachInputs();
 }
 
 // ── Screen renderers ─────────────────────────────────────────
-function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
+// 연못 장면(물·연잎·카피바라). height로 영역 크기 조절, 세로/가로 레이아웃 공용.
+function pondScene(T, dexPct, heightCss, showChips) {
   const lilyPads=[{l:8,t:24,s:54,h:30,c:'#86b89f',d:5},{l:60,t:16,s:70,h:38,c:'#7fae97',d:6},{l:78,t:78,s:60,h:34,c:'#8cbfa4',d:5.5},{l:30,t:86,s:48,h:26,c:'#79a890',d:4.5}];
   const lilies=lilyPads.map(p=>`<div style="position:absolute;left:${p.l}%;top:${p.t}%;width:${p.s}px;height:${p.h}px;background:${p.c};border-radius:50%;opacity:0.5;animation:lilyDrift ${p.d}s ease-in-out infinite;"></div>`).join('');
   const pond=ST.pond.map((c,i)=>{
     const s=sp(c.speciesId), slot=POND_SLOTS[i%POND_SLOTS.length], sz=Math.round(64+(slot[1]/100)*30);
     return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality,decor:decorFor(c.uid)})}</div>`;
   }).join('');
+  const chips=showChips?`<div style="position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;flex-wrap:wrap;z-index:90;">
+      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🦫 채집 ${ST.pond.length}마리</div>
+      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">📚 도감 ${dexPct}%</div>
+      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🔥 ${ST.streak}일 연속</div>
+    </div>`:'';
+  return `<div style="position:relative;isolation:isolate;height:${heightCss};min-height:300px;border-radius:30px;background:${T.water};overflow:hidden;box-shadow:inset 0 -10px 30px rgba(0,0,0,0.05),0 8px 22px rgba(0,0,0,0.06);">
+    ${chips}${lilies}${pond}
+    ${!ST.pond.length?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${T.sub};font-weight:600;"><div style="font-family:'Gaegu',cursive;font-size:24px;color:${T.ink};">아직 연못이 조용해요</div><div style="font-size:14px;margin-top:4px;">오늘 숙제를 끝내고 첫 친구를 데려오자!</div></div>`:''}
+  </div>`;
+}
+function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
   const progPct=planned>0?Math.round((done/planned)*100):(planned===0?100:0);
   const progLabel=planned===0?'푹 쉬는 날':(done+' / '+planned+'쪽 완료');
   const headline=planned===0?'오늘은 숙제가 없어요 🌿':(allDone?'오늘 숙제 끝! 잘했어 🎉':'오늘 '+planned+'쪽이 있어요');
   return `<div>
-  <div style="position:relative;isolation:isolate;height:46dvh;min-height:340px;border-radius:30px;background:${T.water};overflow:hidden;box-shadow:inset 0 -10px 30px rgba(0,0,0,0.05),0 8px 22px rgba(0,0,0,0.06);">
-    <div style="position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;flex-wrap:wrap;z-index:90;">
-      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🦫 채집 ${ST.pond.length}마리</div>
-      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">📚 도감 ${dexPct}%</div>
-      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🔥 ${ST.streak}일 연속</div>
-    </div>
-    ${lilies}${pond}
-    ${!ST.pond.length?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${T.sub};font-weight:600;"><div style="font-family:'Gaegu',cursive;font-size:24px;color:${T.ink};">아직 연못이 조용해요</div><div style="font-size:14px;margin-top:4px;">오늘 숙제를 끝내고 첫 친구를 데려오자!</div></div>`:''}
-  </div>
+  ${pondScene(T,dexPct,'46dvh',true)}
   <div style="margin-top:16px;background:${T.card};border:2px solid ${T.line};border-radius:24px;padding:18px 20px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
       <div>
@@ -813,6 +819,71 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
     <div style="margin-top:8px;font-size:13px;color:${T.sub};font-weight:600;">${progLabel}</div>
   </div>
 </div>`;
+}
+// ── 가로 태블릿 대시보드 (한 화면에 연못+오늘숙제+도감) ──────────
+function isWide(){ return window.innerWidth>=820 && window.innerWidth>=window.innerHeight; }
+function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCount, dexTotal, dexPct, dateLabel, timerMin, timerSec) {
+  const card='background:'+T.card+';border:2px solid '+T.line+';border-radius:22px;padding:16px 18px;box-shadow:0 6px 16px rgba(0,0,0,0.04);';
+  // 오늘 숙제 패널
+  const todayWk=dwk(new Date()), vcToday=(tk===todayWk)?voluntaryCycle(new Date()):null;
+  let todayPanel;
+  if(planned>0){
+    const progPct=Math.round(done/planned*100);
+    const tokens=[];for(let i=0;i<planned;i++){const d=i<done;tokens.push(`<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};">${d?'✓':(i+1)}</div>`);}
+    const totSec=mpp()*60, barPct=totSec>0?Math.min(100,Math.max(0,Math.round(ST.timerSec/totSec*100))):0;
+    const cta = allDone
+      ? (ST.pendingReward
+          ? `<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;text-align:center;background:linear-gradient(180deg,#f3b24e,#e09a36);color:#fff;font-weight:800;font-size:15px;padding:14px;border-radius:16px;box-shadow:0 5px 0 #c07f24;line-height:1.4;">🔒 보호자 확인을 받고<br>오늘의 리워드 받기</div>`
+          : `<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`)
+      : `<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`;
+    todayPanel=`<div style="${card}">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;"><div style="font-weight:800;font-size:17px;">📖 오늘의 숙제</div><div style="font-size:13px;color:${T.sub};font-weight:600;">${dateLabel}</div></div>
+      <div style="font-size:13.5px;color:${T.sub};font-weight:600;margin-bottom:8px;">${allDone?'오늘 분량 완료!':(planned+'쪽 중 '+(done+1)+'쪽째')}</div>
+      <div style="height:14px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${progPct}%;background:${T.accent};border-radius:999px;transition:width .4s;"></div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:12px 0;">${tokens.join('')}</div>
+      <div style="text-align:center;margin-bottom:6px;"><span id="timer-display" style="font-family:'Gaegu',cursive;font-size:40px;font-weight:700;color:${T.accent};">${timerMin}:${timerSec}</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="font-size:15px;">⏳</span><div style="flex:1;height:11px;background:${T.soft};border-radius:999px;overflow:hidden;border:1px solid ${T.line};"><div id="timer-bar" style="height:100%;width:${barPct}%;background:linear-gradient(90deg,${T.accent},${lighten(T.accent,0.25)});border-radius:999px;transition:width 1s linear;"></div></div>
+        <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:8px 14px;border-radius:12px;font-weight:800;font-size:13px;background:${T.soft};border:2px solid ${T.line};color:${T.ink};white-space:nowrap;">${ST.timerRunning?'⏸':'▶'}</div></div>
+      ${cta}
+    </div>`;
+  } else if(vcToday){
+    const volDoneToday=doneOnDate(todayWk,dstr(new Date()));
+    todayPanel=`<div style="${card}text-align:center;">
+      <div style="font-weight:800;font-size:17px;margin-bottom:2px;">🌿 오늘은 쉬는 날</div>
+      <div style="font-size:13px;color:${T.sub};line-height:1.5;margin-bottom:8px;">미리 풀면 친밀도가 오르고 즐거운 일이 생겨요!<br>오늘 미리 푼 양 <b style="color:${T.accent};">${volDoneToday}쪽</b> · 남은 <b style="color:${T.accent};">${Math.max(0,vcToday.cs.T-vcToday.cs.cycleDone)}쪽</b></div>
+      <div onclick="doVoluntary()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">한 쪽 미리 풀기 ✏️</div>
+    </div>`;
+  } else {
+    todayPanel=`<div style="${card}text-align:center;"><div style="font-weight:800;font-size:17px;">😴 오늘은 숙제가 없는 날</div><div style="font-size:13px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요!</div></div>`;
+  }
+  // 도감 & 수집 패널
+  const its=Object.keys(ST.items||{}).filter(k=>ST.items[k]>0);
+  const itemChips=its.length?its.map(k=>`<span style="font-size:12.5px;font-weight:700;color:${T.ink};background:${T.soft};border:2px solid ${T.line};border-radius:999px;padding:3px 9px;">${itemEmoji(k)} ${ST.items[k]}</span>`).join(''):`<span style="font-size:12px;color:${T.sub};">아직 모은 간식이 없어요</span>`;
+  const dexPanel=`<div style="${card}">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:800;font-size:17px;">📚 도감</div><div onclick="setState({overlay:'dex'})" class="tapbtn" style="cursor:pointer;font-size:12.5px;font-weight:800;color:${T.accent};background:${T.soft};border:2px solid ${T.line};border-radius:999px;padding:5px 12px;">열기 →</div></div>
+    <div style="font-size:13.5px;color:${T.sub};font-weight:700;margin-bottom:6px;">${dexSeenCount} / ${dexTotal}종 발견 · ${dexPct}%</div>
+    <div style="height:12px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${dexPct}%;background:${T.accent};border-radius:999px;"></div></div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:12px;font-weight:700;color:${T.sub};">🧺</span>${itemChips}</div>
+  </div>`;
+
+  return `<div style="width:100%;max-width:1500px;height:100dvh;display:flex;flex-direction:column;padding:14px 20px;gap:12px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};">🌿 인우의 카피바라 연못</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
+        <div onclick="setState({screen:'setup'})" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:14px;">✏️ 숙제설정</div>
+        <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
+      </div>
+    </div>
+    ${(anyCrisis()&&ST.overlay===null)?`<div class="tapbtn" style="background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:16px;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;"><div style="font-size:22px;">😢</div><div style="font-weight:800;color:#c0503a;font-size:14px;">${crisisBannerText()} — 지금 숙제하면 구할 수 있어!</div></div>`:''}
+    <div style="flex:1;min-height:0;display:flex;gap:16px;">
+      <div style="flex:1.45;min-width:0;">${pondScene(T,dexPct,'100%',false)}</div>
+      <div style="flex:1;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
+        ${todayPanel}
+        ${dexPanel}
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderSetup(T,sch) {
@@ -1190,6 +1261,7 @@ function attachInputs() {
 }
 
 // ── Init ─────────────────────────────────────────────────────
+let _rzT; window.addEventListener('resize',()=>{ clearTimeout(_rzT); _rzT=setTimeout(render,150); }); // 세로↔가로 레이아웃 전환
 load();
 render();
 startTick();
