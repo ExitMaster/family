@@ -576,6 +576,8 @@ function toggleTimer() {
   if(ST.timerRunning){setState({timerRunning:false});}
   else{setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60}));}
 }
+// 오늘 숙제 시작: 타이머 가동 + 집중 모드 동시 진입(연못·도감 잠금).
+function startHomework() { setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60})); }
 function completePage() {
   const k=ST.todayKey, planned=schedule().days[k].pages; if(!planned)return;
   const todayS=dstr(new Date()), cur=doneOnDate(k,todayS);
@@ -832,20 +834,29 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
     const progPct=Math.round(done/planned*100);
     const tokens=[];for(let i=0;i<planned;i++){const d=i<done;tokens.push(`<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};">${d?'✓':(i+1)}</div>`);}
     const totSec=mpp()*60, barPct=totSec>0?Math.min(100,Math.max(0,Math.round(ST.timerSec/totSec*100))):0;
-    const cta = allDone
-      ? (ST.pendingReward
-          ? `<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;text-align:center;background:linear-gradient(180deg,#f3b24e,#e09a36);color:#fff;font-weight:800;font-size:15px;padding:14px;border-radius:16px;box-shadow:0 5px 0 #c07f24;line-height:1.4;">🔒 보호자 확인을 받고<br>오늘의 리워드 받기</div>`
-          : `<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`)
-      : `<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`;
+    const running=ST.timerRunning, startLabel=(ST.timerSec>0&&ST.timerSec<totSec)?'이어서 집중하기 ▶':'오늘 숙제 시작 ▶';
+    const big=(bg,sh,extra,txt,on)=>`<div ${on?`onclick="${on}"`:''} class="tapbtn" style="${on?'cursor:pointer;':''}text-align:center;background:${bg};color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${sh};${extra||''}">${txt}</div>`;
+    // 숙제 시작 전: '오늘 숙제 시작' 버튼만 → 누르면 타이머+집중모드 동시 시작
+    // 집중 중: 타이머·게이지·잠깐멈춤 + '이 쪽 다 풀었어요'
+    let actions;
+    if(allDone){
+      actions = ST.pendingReward
+        ? big('linear-gradient(180deg,#f3b24e,#e09a36)','#c07f24','font-size:15px;line-height:1.4;','🔒 보호자 확인을 받고<br>오늘의 리워드 받기','reopenReward()')
+        : big('#6aa05a','#558044','','오늘 숙제 끝! 잘했어요 🎉');
+    } else if(running){
+      actions = `<div style="text-align:center;margin-bottom:6px;"><span id="timer-display" style="font-family:'Gaegu',cursive;font-size:40px;font-weight:700;color:${T.accent};">${timerMin}:${timerSec}</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="font-size:15px;">⏳</span><div style="flex:1;height:11px;background:${T.soft};border-radius:999px;overflow:hidden;border:1px solid ${T.line};"><div id="timer-bar" style="height:100%;width:${barPct}%;background:linear-gradient(90deg,${T.accent},${lighten(T.accent,0.25)});border-radius:999px;transition:width 1s linear;"></div></div>
+        <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:8px 14px;border-radius:12px;font-weight:800;font-size:13px;background:${T.soft};border:2px solid ${T.line};color:${T.ink};white-space:nowrap;">⏸ 멈춤</div></div>
+      ${big(T.accent,T.accentDark,'','이 쪽 다 풀었어요 ✓','completePage()')}`;
+    } else {
+      actions = big(T.accent,T.accentDark,'font-size:18px;padding:17px;',startLabel,'startHomework()');
+    }
     todayPanel=`<div style="${card}">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;"><div style="font-weight:800;font-size:17px;">📖 오늘의 숙제</div><div style="font-size:13px;color:${T.sub};font-weight:600;">${dateLabel}</div></div>
       <div style="font-size:13.5px;color:${T.sub};font-weight:600;margin-bottom:8px;">${allDone?'오늘 분량 완료!':(planned+'쪽 중 '+(done+1)+'쪽째')}</div>
       <div style="height:14px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${progPct}%;background:${T.accent};border-radius:999px;transition:width .4s;"></div></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:12px 0;">${tokens.join('')}</div>
-      <div style="text-align:center;margin-bottom:6px;"><span id="timer-display" style="font-family:'Gaegu',cursive;font-size:40px;font-weight:700;color:${T.accent};">${timerMin}:${timerSec}</span></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="font-size:15px;">⏳</span><div style="flex:1;height:11px;background:${T.soft};border-radius:999px;overflow:hidden;border:1px solid ${T.line};"><div id="timer-bar" style="height:100%;width:${barPct}%;background:linear-gradient(90deg,${T.accent},${lighten(T.accent,0.25)});border-radius:999px;transition:width 1s linear;"></div></div>
-        <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:8px 14px;border-radius:12px;font-weight:800;font-size:13px;background:${T.soft};border:2px solid ${T.line};color:${T.ink};white-space:nowrap;">${ST.timerRunning?'⏸':'▶'}</div></div>
-      ${cta}
+      ${actions}
     </div>`;
   } else if(vcToday){
     const volDoneToday=doneOnDate(todayWk,dstr(new Date()));
@@ -887,8 +898,9 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
         </div>
       </div>`:pondScene(T,dexPct,'100%',false)}</div>
       <div style="flex:1;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
-        ${todayPanel}
         ${dexPanel}
+        <div style="flex:1;min-height:8px;"></div>
+        ${todayPanel}
       </div>
     </div>
   </div>`;
@@ -1007,15 +1019,15 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
       </div>
       <div style="font-size:13px;color:${T.sub};margin-top:6px;">이 쪽 집중 타이머 (1쪽 ≈ ${mpp()}분) · ${ST.timerRunning?'집중 중':'대기'}</div>
     </div>
-    <div style="display:flex;gap:10px;justify-content:center;margin:14px 0 18px;">
-      <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:12px 24px;border-radius:14px;font-weight:800;font-size:15px;background:${T.soft};color:${T.ink};border:2px solid ${T.line};">${ST.timerRunning?'⏸ 잠깐 멈춤':'▶ 타이머 시작'}</div>
-    </div>
-    <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:18px;">${tokens.join('')}</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin:8px 0 18px;">${tokens.join('')}</div>
     ${allDone
       ? (ST.pendingReward
           ? `<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;text-align:center;background:linear-gradient(180deg,#f3b24e,#e09a36);color:#fff;font-weight:800;font-size:16.5px;padding:16px;border-radius:18px;box-shadow:0 5px 0 #c07f24;line-height:1.45;">🔒 보호자 확인을 받고<br>오늘의 리워드를 받으세요<br><span style="font-size:12.5px;font-weight:700;opacity:0.95;">탭하면 PIN 입력창이 열려요</span></div>`
           : `<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>`)
-      : `<div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`}
+      : (ST.timerRunning
+          ? `<div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.soft};color:${T.ink};border:2px solid ${T.line};font-weight:800;font-size:15px;padding:13px;border-radius:14px;margin-bottom:10px;">⏸ 잠깐 멈춤</div>
+             <div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`
+          : `<div onclick="startHomework()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:19px;padding:18px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">${(ST.timerSec>0&&ST.timerSec<mpp()*60)?'이어서 집중하기 ▶':'오늘 숙제 시작 ▶'}</div>`)}
   </div>`:restCard;
 
   return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}</div>`;
