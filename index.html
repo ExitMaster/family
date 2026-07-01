@@ -294,7 +294,8 @@ function decorFor(uid){ const id=(ST.equip||{})[uid]; const d=decorById(id); ret
 const CAPY_IMG_BASE='assets/capy/';
 let IMG_OK={};
 function imgFor(id){ return IMG_OK[id]?(CAPY_IMG_BASE+id+'.png'):null; }
-let _imgRzT; function _imgReRender(){ clearTimeout(_imgRzT); _imgRzT=setTimeout(()=>{ try{render();}catch(e){} },120); }
+function _inputFocused(){ const a=document.activeElement; return !!(a && (a.tagName==='INPUT'||a.tagName==='TEXTAREA')); }
+let _imgRzT; function _imgReRender(){ clearTimeout(_imgRzT); _imgRzT=setTimeout(()=>{ if(_inputFocused())return; try{render();}catch(e){} },120); }
 function probeCapyImages(){
   if(typeof Image==='undefined') return;
   SPECIES.forEach(s=>{ const im=new Image(); im.onload=()=>{ IMG_OK[s.id]=true; _imgReRender(); }; im.onerror=()=>{}; im.src=CAPY_IMG_BASE+s.id+'.png'; });
@@ -1307,7 +1308,13 @@ function attachInputs() {
 }
 
 // ── Init ─────────────────────────────────────────────────────
-let _rzT; window.addEventListener('resize',()=>{ clearTimeout(_rzT); _rzT=setTimeout(render,150); }); // 세로↔가로 레이아웃 전환
+// 세로↔가로 레이아웃이 '실제로 바뀔 때만' 다시 그린다.
+// (키보드가 올라오며 생기는 resize에 render하면 포커스가 풀려 입력이 막히는 문제 방지)
+let _rzT, _lastWide=isWide();
+window.addEventListener('resize',()=>{
+  clearTimeout(_rzT);
+  _rzT=setTimeout(()=>{ if(_inputFocused())return; const w=isWide(); if(w!==_lastWide){ _lastWide=w; render(); } },200);
+});
 load();
 render();
 probeCapyImages(); // 커스텀 이미지가 있으면 로드되는 대로 SVG를 그림으로 교체
