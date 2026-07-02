@@ -389,7 +389,7 @@ const DEFAULT_STATE = {
   lastDate:null, streakDate:null,
   caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
   items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
-  milestonesFired:[], eventQueue:[], equip:{},
+  milestonesFired:[], eventQueue:[], equip:{}, voluntaryRescueDate:null,
   pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:'', pinDraft2:'', pinSaveErr:'',
   assignDraft:null
 };
@@ -567,7 +567,7 @@ function setState(upd) {
   save(); render();
 }
 function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip,pendingReward:ST.pendingReward})); } catch(e){}
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip,pendingReward:ST.pendingReward,voluntaryRescueDate:ST.voluntaryRescueDate})); } catch(e){}
 }
 function load() {
   const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
@@ -693,6 +693,13 @@ function savePin(){
 function clearPin(){ setState(s=>({settings:{...s.settings,guardianPin:''},pinDraft:'',pinDraft2:'',pinSaveErr:''})); }
 // 이벤트 보상 적용: ctx(pond/items/unlocks)를 직접 갱신하고 표시용 eventInfo를 반환.
 //  targetUid 지정 시 그 카피바라에게, 아니면 건강한 카피바라 중 랜덤으로 친밀도를 준다.
+// 위기 카피바라 한 마리를 한 단계 회복(gone→leaving→weak→healthy). finishDay/doVoluntary 공용.
+// 대상 있으면 {pond, rescued:{uid,prior}}, 없으면 {pond, rescued:null}.
+function rescueOne(pond){
+  const order=['gone','leaving','weak','healthy']; let rescued=null;
+  const next=pond.map(c=>{ if(!rescued&&c.status!=='healthy'){rescued={uid:c.uid,prior:c.status};const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
+  return {pond:next, rescued};
+}
 function applyEventReward(ev, ctx, targetUid) {
   const rw=ev.reward||{}; let who='카피바라';
   if(rw.intimacy){
@@ -707,6 +714,7 @@ function applyEventReward(ev, ctx, targetUid) {
   return {ev,who,guest,itemGot:rw.item||null,itemCount:rw.item?ctx.items[rw.item]:0,intimacy:rw.intimacy||0,unlock:rw.unlock||null};
 }
 // 휴식일 자발 숙제: 한 쪽 미리 풀기 → 사이클 분량 차감(재계산) + 친밀도↑ + 랜덤 이벤트(포획 없음).
+//  위기 중이면 하루 1회 한해 위기 회복도 함께 도와준다(포획은 여전히 없음 — 완료일 몫으로 남겨둠).
 function doVoluntary() {
   const today=new Date(), vc=voluntaryCycle(today); if(!vc) return;
   const wk=dwk(today), todayS=dstr(today);
@@ -714,7 +722,18 @@ function doVoluntary() {
   const ev=pickWeighted(eventsBy('voluntary'));
   const ctx={pond:ST.pond,items:ST.items||{},unlocks:ST.unlocks||[]};
   const ei=applyEventReward(ev,ctx);
-  ST={...ST,dayLog,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,eventInfo:ei,eventQueue:[],overlay:'event'};
+  const queue=[]; let voluntaryRescueDate=ST.voluntaryRescueDate;
+  if(anyCrisis(ctx.pond) && ST.voluntaryRescueDate!==todayS){
+    const rr=rescueOne(ctx.pond);
+    if(rr.rescued){
+      ctx.pond=rr.pond; voluntaryRescueDate=todayS;
+      const rEv=EVENTS.find(e=>e.id===(rr.rescued.prior==='weak'?'ev_r_heal':'ev_r_back'));
+      if(rEv) queue.push(applyEventReward(rEv,ctx,rr.rescued.uid));
+    }
+  }
+  ST={...ST,dayLog,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,voluntaryRescueDate,
+      eventInfo:ei,eventQueue:queue,overlay:'event',
+      crisisInfo:anyCrisis(ctx.pond)?ST.crisisInfo:null};
   save(); render();
 }
 // 오늘(완료일) 분량을 다 끝냈고 사이클에 남은 분량이 있으면 '내일 숙제 당겨하기' 가능.
@@ -754,8 +773,7 @@ function equipDecor(uid, decorId) {
 function finishDay() {
   const today=new Date();
   // 위기 회복: 건강하지 않은 한 마리를 한 단계 끌어올린다(이전 상태를 기억해 rescue 이벤트 분기).
-  const order=['gone','leaving','weak','healthy']; let rescued=null;
-  let pond=ST.pond.map(c=>{ if(!rescued&&c.status!=='healthy'){rescued={uid:c.uid,prior:c.status};const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
+  const rr=rescueOne(ST.pond); let pond=rr.pond, rescued=rr.rescued;
   const unseen=SPECIES.filter(s=>!ST.dexSeen[s.id]);
   let species,isNew;
   if(unseen.length){species=unseen[Math.floor(Math.random()*unseen.length)];isNew=true;}
