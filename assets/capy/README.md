@@ -24,3 +24,10 @@
 ## 팁
 - 카피바라를 화면 가운데에, 비슷한 크기/여백으로 (연못에 나란히 놓일 때 일관성)
 - 투명 배경(transparent), 바닥 장식은 최소화하면 물 위에 깔끔하게 올라갑니다
+
+## 이미지 전처리 스크립트
+`scripts/process_capy_image.py` — AI 생성 이미지(가짜 체크무늬 배경이 픽셀로 박제된 경우 포함)를
+자동으로 투명 처리 + 여백 트리밍 + 리사이즈(최대 700px)한다.
+
+사용법: `python3 scripts/process_capy_image.py <입력.png> <출력.png>`
+(numpy, scipy, Pillow 필요: `pip install pillow numpy scipy`)
