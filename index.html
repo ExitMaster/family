@@ -473,6 +473,46 @@ function planForWeekday(wk,today){
   for(let i=0;i<CYCLES.length;i++){ const cs=cycleSchedule(CYCLES[i],today), r=cs.rows.find(x=>x.wk===wk); if(r) return {cy:CYCLES[i],cs,row:r}; }
   return null;
 }
+// 문제집별 축약 라벨(예: '디딤돌'→'디'). 이름이 겹치면 필요한 만큼 글자를 늘려 서로 구분한다.
+function workbookShortLabels(){
+  const wbs=ST.workbooks, lens={}; wbs.forEach(w=>{lens[w.id]=1;});
+  for(let guard=0; guard<10; guard++){
+    const seen={}; let changed=false;
+    wbs.forEach(w=>{ const lab=w.name.slice(0,lens[w.id])||w.id; (seen[lab]=seen[lab]||[]).push(w.id); });
+    Object.values(seen).forEach(ids=>{ if(ids.length>1) ids.forEach(id=>{ const w=wbs.find(x=>x.id===id); if(lens[id]<w.name.length){lens[id]++; changed=true;} }); });
+    if(!changed) break;
+  }
+  const labels={}; wbs.forEach(w=>{ labels[w.id]=w.name.slice(0,lens[w.id])||w.name||'문'; });
+  return labels;
+}
+// 한 사이클(받는 요일)의 문제집·쪽 배정을 순서대로 풀어놓은 가상 페이지 목록.
+function flatPages(cy,asg){
+  const list=[];
+  ((asg||ST.assignments)[cy.key]||[]).forEach(it=>{
+    const w=ST.workbooks.find(x=>x.id===it.workbookId);
+    for(let p=it.from;p<=it.to;p++) list.push({wbId:it.workbookId, page:p});
+  });
+  return list;
+}
+// 특정 완료일(wk) 슬롯이 실제로 '어느 문제집 몇 쪽'인지 라벨 배열로 반환. 조건이 안 맞으면 null(순번 폴백).
+//  ▸ 오프셋은 '원 분배량(base)의 누적'에서 오늘 required를 뺀 값으로 계산한다.
+//    당겨풀기로 초과분을 미리 소진했으면 그만큼 이후 날짜의 시작 페이지가 밀려야 하므로,
+//    단순히 이전 날짜들의 required를 더하는 방식(당겨쓴 몫을 반영 못함)은 쓰지 않는다.
+function todayPageLabels(wk,today){
+  const pf=planForWeekday(wk,today); if(!pf) return null;
+  const idx=pf.cs.rows.findIndex(r=>r===pf.row); if(idx<0) return null;
+  if(pf.row.required<=0) return [];
+  const pool=Math.max(0,pf.cs.T-pf.cs.voluntaryDone);
+  const dist=distribute(pool,pf.cy.days.map(x=>x.d));
+  let baseSum=0; for(let i=0;i<=idx;i++) baseSum+=dist[pf.cy.days[i].d]||0;
+  const offset=pf.cs.voluntaryDone+baseSum-pf.row.required;
+  if(offset<0) return null;
+  const flat=flatPages(pf.cy);
+  if(pf.row.required<=0) return [];
+  if(offset+pf.row.required>flat.length) return null; // 배정 변경 등으로 수가 안 맞으면 안전하게 폴백
+  const labels=workbookShortLabels();
+  return flat.slice(offset,offset+pf.row.required).map(p=>labels[p.wbId]+'-'+p.page);
+}
 // today가 자유일이면, 미리 풀 수 있는 (남은 분량이 있는) 사이클을 반환.
 function voluntaryCycle(today){
   if(!isFreeWk(dwk(today))) return null;
@@ -884,7 +924,9 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
   let todayPanel;
   if(planned>0){
     const progPct=Math.min(100,Math.round(done/planned*100));
-    const tokens=[];for(let i=0;i<planned;i++){const d=i<done;tokens.push(`<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};">${d?'✓':(i+1)}</div>`);}
+    const pageLabels=todayPageLabels(tk,new Date());
+    const tokens=[];for(let i=0;i<planned;i++){const d=i<done; const lab=d?'✓':h((pageLabels&&pageLabels[i])||String(i+1));
+      tokens.push(`<div style="min-width:28px;height:28px;padding:0 7px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11.5px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};white-space:nowrap;">${lab}</div>`);}
     const totSec=mpp()*60, barPct=totSec>0?Math.min(100,Math.max(0,Math.round(ST.timerSec/totSec*100))):0;
     const running=ST.timerRunning, startLabel=(ST.timerSec>0&&ST.timerSec<totSec)?'이어서 집중하기 ▶':'오늘 숙제 시작 ▶';
     const big=(bg,sh,extra,txt,on)=>`<div ${on?`onclick="${on}"`:''} class="tapbtn" style="${on?'cursor:pointer;':''}text-align:center;background:${bg};color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${sh};${extra||''}">${txt}</div>`;
@@ -1046,8 +1088,10 @@ function renderSetup(T,sch) {
 function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
   const daySel=['mon','tue','wed','thu','fri','sat'].map(d=>{ const sel=d===tk,pg=sch.days[d].pages; return `<div onclick="setState({todayKey:'${d}',timerRunning:false,timerSec:0})" class="tapbtn" style="cursor:pointer;flex:1;min-width:48px;text-align:center;font-weight:800;font-size:15px;padding:11px 0;border-radius:13px;background:${sel?T.accent:T.card};color:${sel?'#fff':(pg>0?T.ink:T.sub)};border:2px solid ${sel?T.accent:T.line};">${DL[d]}<div style="font-size:11px;font-weight:600;margin-top:2px;opacity:0.85;">${pg>0?pg+'쪽':'휴식'}</div></div>`; }).join('');
 
+  const pageLabels=todayPageLabels(tk,new Date());
   const tokens=[];
-  for(let i=0;i<planned;i++){ const d=i<done; tokens.push(`<div style="width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};">${d?'✓':(i+1)}</div>`); }
+  for(let i=0;i<planned;i++){ const d=i<done; const lab=d?'✓':h((pageLabels&&pageLabels[i])||String(i+1));
+    tokens.push(`<div style="min-width:38px;height:38px;padding:0 10px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};white-space:nowrap;">${lab}</div>`); }
 
   const todayWk=dwk(new Date()), vcToday=(tk===todayWk)?voluntaryCycle(new Date()):null;
   const volDoneToday=vcToday?doneOnDate(todayWk,dstr(new Date())):0;
