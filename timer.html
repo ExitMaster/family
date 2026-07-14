@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>남은 시간 타이머</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; height:100%; overscroll-behavior:none; }
+body { font-family:'Noto Sans KR',sans-serif; user-select:none; -webkit-user-select:none; }
+@keyframes pulseSoft { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+@keyframes pulseHard { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
+@keyframes bgFlash   { 0%,100%{opacity:0} 50%{opacity:0.35} }
+@keyframes tapPop    { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
+@keyframes popIn     { 0%{transform:scale(0.6); opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1); opacity:1} }
+@keyframes confettiFall { 0%{transform:translateY(-40px) rotate(0deg); opacity:1} 100%{transform:translateY(105vh) rotate(560deg); opacity:0} }
+@keyframes wobble { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(4deg)} }
+.tapbtn:active { animation:tapPop 0.22s ease; }
+.pulse-soft { animation:pulseSoft 1.6s ease-in-out infinite; }
+.pulse-hard { animation:pulseHard 0.75s ease-in-out infinite; }
+::-webkit-scrollbar { width:0; height:0; }
+input[type=time] { font-family:inherit; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── Constants ────────────────────────────────────────────────
+const K_STORE = 'family-timer-v1';
+const MAX_HOURS = 12;                       // 타겟은 최대 12시간 뒤까지
+const URG = {
+  calm:     { c:'#2fb673', soft:'#dff7ea', bg:'linear-gradient(180deg,#eafff3,#d3f3e2)', msg:'아직 여유가 있어요 😊',            pulse:'' },
+  aware:    { c:'#e8a800', soft:'#fdf3d1', bg:'linear-gradient(180deg,#fffbe8,#fdeec4)', msg:'슬슬 시작해 볼까요? 🙂',          pulse:'' },
+  hurry:    { c:'#f07f24', soft:'#ffe8d3', bg:'linear-gradient(180deg,#fff3e6,#ffe0c2)', msg:'조금 서둘러요! 🏃',               pulse:'pulse-soft' },
+  critical: { c:'#f04f58', soft:'#ffdfe1', bg:'linear-gradient(180deg,#fff0f0,#ffd9da)', msg:'거의 다 됐어요! 힘내요!! 🔥',      pulse:'pulse-hard' }
+};
+const QUICK_MINS = [5, 10, 15, 30, 45, 60];
+const EMOJIS = ['🪥','🎒','📚','🍚','🧸','🛏️','🚿','👕','✏️','🎹','⚽','🧹','💊','🚗','⏰','🌙'];
+const INK = '#3b4256', SUB = '#8a90a5', ACCENT = '#5b7cfa', ACCENT_D = '#4462d8';
+
+const DEFAULT_STATE = {
+  session: null,   // { targetAt, startedAt, taskId, done }
+  presets: [
+    { id:'t1', emoji:'🪥', label:'양치하고 세수하기' },
+    { id:'t2', emoji:'🎒', label:'가방 싸고 나갈 준비' },
+    { id:'t3', emoji:'📚', label:'숙제 한 장 하기' }
+  ],
+  _seq: 4,
+  settings: { sound:true }
+};
+
+// ── State ────────────────────────────────────────────────────
+let ST = null;
+let UI = { overlay:null, pickTarget:null, pickTaskId:null, newEmoji:'🪥', celebrated:false };
+
+function save() {
+  try { localStorage.setItem(K_STORE, JSON.stringify({session:ST.session, presets:ST.presets, _seq:ST._seq, settings:ST.settings})); } catch(e){}
+}
+function load() {
+  try {
+    const r = localStorage.getItem(K_STORE);
+    ST = r ? {...DEFAULT_STATE, ...JSON.parse(r)} : {...DEFAULT_STATE};
+  } catch(e) { ST = {...DEFAULT_STATE}; }
+}
+function setState(patch) { Object.assign(UI, patch); render(); }
+
+// ── Utils ────────────────────────────────────────────────────
+function h(s) { if(s==null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n) { return String(n).padStart(2,'0'); }
+function fmtClock(d) { return pad(d.getHours())+':'+pad(d.getMinutes()); }
+function fmtKorean(d) {
+  const hh = d.getHours(), ap = hh < 12 ? '오전' : '오후';
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return `${ap} ${h12}시 ${d.getMinutes() ? d.getMinutes()+'분' : '정각'}`;
+}
+function fmtRemain(ms) {
+  const s = Math.max(0, Math.ceil(ms/1000));
+  const hh = Math.floor(s/3600), mm = Math.floor((s%3600)/60), ss = s%60;
+  return hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${mm}:${pad(ss)}`;
+}
+function task() { return ST.session && ST.session.taskId ? ST.presets.find(p=>p.id===ST.session.taskId) : null; }
+
+function calc(now) {
+  const se = ST.session;
+  if (!se) return null;
+  const remainMs = Math.max(0, se.targetAt - now);
+  const totalMs  = Math.max(1, se.targetAt - se.startedAt);
+  const ratio    = remainMs / totalMs;
+  const urgency  = remainMs === 0 ? 'critical' : ratio > .5 ? 'calm' : ratio > .25 ? 'aware' : ratio > .1 ? 'hurry' : 'critical';
+  return { remainMs, totalMs, ratio, urgency };
+}
+
+// ── Sound (Web Audio 합성음 — 파일 불필요) ───────────────────
+let AC = null;
+function unlockAudio() { try { if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); } catch(e){} }
+function tone(freq, at, dur, vol) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g).connect(AC.destination);
+  o.start(at); o.stop(at + dur + 0.05);
+}
+function chime() {
+  if (!ST.settings.sound) return;
+  unlockAudio(); if (!AC) return;
+  const t = AC.currentTime;
+  [[659,0],[784,0.18],[988,0.36],[1319,0.54],[988,0.9],[1319,1.08]].forEach(([f,d]) => tone(f, t+d, 0.5, 0.25));
+}
+
+// ── Wake Lock (미러링 중 화면 꺼짐 방지) ─────────────────────
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+    else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch(e){}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState==='visible' && ST && ST.session && !ST.session.done) keepAwake(true); });
+
+// ── Clock geometry ───────────────────────────────────────────
+function polar(deg, r) { const rad = (deg-90)*Math.PI/180; return [100 + r*Math.cos(rad), 100 + r*Math.sin(rad)]; }
+function minuteAngle(ms) { const d = new Date(ms); return (d.getMinutes() + d.getSeconds()/60 + d.getMilliseconds()/60000) * 6; }
+function wedgePath(now) {
+  const c = calc(now);
+  if (!c || c.remainMs <= 0) return '';
+  const R = 88;
+  if (c.remainMs >= 3600000) // 60분 이상 남음 → 전체 원판
+    return `M100,${100-R} A${R},${R} 0 1 1 ${100-0.01},${100-R} Z`;
+  const a1 = minuteAngle(now), sweep = c.remainMs/60000*6, a2 = a1 + sweep;
+  const [x1,y1] = polar(a1,R), [x2,y2] = polar(a2,R);
+  return `M100,100 L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 ${sweep>180?1:0} 1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`;
+}
+function handAngles(now) {
+  const d = new Date(now);
+  const m = d.getMinutes() + d.getSeconds()/60;
+  return {
+    h: (d.getHours()%12 + m/60) * 30,
+    m: m * 6,
+    s: d.getSeconds() * 6
+  };
+}
+
+// ── Clock SVG (숫자가 선명한 대형 아날로그 시계) ─────────────
+function clockSVG(now, urgColor) {
+  const nums = [];
+  for (let i=1; i<=12; i++) {
+    const [x,y] = polar(i*30, 74);
+    nums.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="17" font-weight="900" font-family="'Noto Sans KR',sans-serif" fill="${INK}">${i}</text>`);
+  }
+  const ticks = [];
+  for (let i=0; i<60; i++) {
+    const big = i%5===0, r1 = big?90:92, r2 = 95;
+    const [x1,y1] = polar(i*6,r1), [x2,y2] = polar(i*6,r2);
+    ticks.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${big?INK:'#c9cdda'}" stroke-width="${big?2.4:1}" stroke-linecap="round"/>`);
+  }
+  const a = handAngles(now);
+  return `<svg id="clockSvg" viewBox="0 0 200 200" style="width:100%;height:100%;display:block;">
+    <circle cx="100" cy="100" r="98" fill="#ffffff" stroke="#e3e6f0" stroke-width="3"/>
+    <path id="wedge" d="${wedgePath(now)}" fill="${urgColor}" opacity="0.32"/>
+    ${ticks.join('')}
+    ${nums.join('')}
+    <line id="handH" x1="100" y1="100" x2="100" y2="54"  stroke="${INK}" stroke-width="7" stroke-linecap="round" transform="rotate(${a.h} 100 100)"/>
+    <line id="handM" x1="100" y1="100" x2="100" y2="30"  stroke="${INK}" stroke-width="4.5" stroke-linecap="round" transform="rotate(${a.m} 100 100)"/>
+    <line id="handS" x1="100" y1="112" x2="100" y2="24"  stroke="#f04f58" stroke-width="1.8" stroke-linecap="round" transform="rotate(${a.s} 100 100)"/>
+    <circle cx="100" cy="100" r="5.5" fill="${INK}"/>
+    <circle cx="100" cy="100" r="2.4" fill="#f04f58"/>
+  </svg>`;
+}
+
+// ── Render ───────────────────────────────────────────────────
+function render() {
+  const now = Date.now();
+  const c = calc(now);
+  const u = c ? URG[c.urgency] : null;
+  const running = ST.session && !ST.session.done;
+  const bg = u && running ? u.bg : 'linear-gradient(180deg,#eef2ff,#e2e9fb)';
+  const tk = task();
+
+  document.getElementById('app').innerHTML = `
+  <div id="stage" style="height:100dvh;display:flex;flex-direction:column;background:${bg};transition:background 1s;position:relative;overflow:hidden;">
+    ${c && c.urgency==='critical' && running ? `<div style="position:absolute;inset:0;background:#f04f58;animation:bgFlash 1s ease-in-out infinite;pointer-events:none;"></div>` : ''}
+
+    <!-- 상단 바 -->
+    <div style="display:flex;align-items:center;gap:8px;padding:14px 18px 4px;position:relative;z-index:2;">
+      <div style="font-family:Gaegu,sans-serif;font-size:24px;font-weight:700;color:${INK};">⏰ 남은 시간 타이머</div>
+      <div style="flex:1;"></div>
+      <div onclick="toggleSound()" class="tapbtn" style="cursor:pointer;font-size:21px;background:#fff;border-radius:12px;padding:7px 11px;box-shadow:0 2px 6px rgba(60,70,120,0.10);">${ST.settings.sound?'🔔':'🔕'}</div>
+      <div onclick="toggleFull()" class="tapbtn" style="cursor:pointer;font-size:21px;background:#fff;border-radius:12px;padding:7px 11px;box-shadow:0 2px 6px rgba(60,70,120,0.10);">⛶</div>
+    </div>
+
+    <!-- 본문: 세로=위아래, 가로(TV)=좌우 -->
+    <div id="mainRow" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4vmin;padding:10px 16px 18px;position:relative;z-index:2;min-height:0;
+        flex-direction:${window.innerWidth > window.innerHeight ? 'row' : 'column'};">
+
+      <div style="flex-shrink:0;width:min(62vmin,560px);height:min(62vmin,560px);filter:drop-shadow(0 10px 26px rgba(60,70,120,0.16));">
+        ${clockSVG(now, u ? u.c : ACCENT)}
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2vmin;min-width:0;max-width:92vw;">
+        ${running ? `
+          ${tk ? `<div style="background:#fff;border-radius:24px;padding:2.2vmin 4vmin;display:flex;align-items:center;gap:2.4vmin;box-shadow:0 6px 18px rgba(60,70,120,0.14);border:3px solid ${u.c};">
+            <div style="font-size:min(9vmin,64px);animation:wobble 2.6s ease-in-out infinite;">${tk.emoji}</div>
+            <div style="font-size:min(4.6vmin,34px);font-weight:900;color:${INK};word-break:keep-all;">${h(tk.label)}</div>
+          </div>` : ''}
+          <div id="remainBig" class="${u.pulse}" style="font-size:min(17vmin,150px);font-weight:900;line-height:1.05;color:${u.c};font-variant-numeric:tabular-nums;text-shadow:0 3px 0 rgba(255,255,255,0.6);">${fmtRemain(c.remainMs)}</div>
+          <div id="urgMsg" style="font-family:Gaegu,sans-serif;font-size:min(5vmin,32px);font-weight:700;color:${INK};">${u.msg}</div>
+          <div style="font-size:min(3.4vmin,20px);color:${SUB};font-weight:700;">🏁 ${fmtKorean(new Date(ST.session.targetAt))}까지</div>
+          <div onclick="stopTimer()" class="tapbtn" style="cursor:pointer;margin-top:1vmin;font-size:15px;font-weight:700;color:${SUB};background:rgba(255,255,255,0.75);padding:9px 20px;border-radius:14px;">그만하기</div>
+        ` : `
+          <div id="nowBig" style="font-size:min(13vmin,110px);font-weight:900;color:${INK};font-variant-numeric:tabular-nums;">${fmtClock(new Date(now))}</div>
+          <div style="font-family:Gaegu,sans-serif;font-size:min(5vmin,30px);font-weight:700;color:${SUB};">몇 시까지 해볼까요?</div>
+          <div onclick="openSetup()" class="tapbtn" style="cursor:pointer;background:${ACCENT};color:#fff;font-weight:900;font-size:min(5.4vmin,30px);padding:2.4vmin 6vmin;border-radius:22px;box-shadow:0 6px 0 ${ACCENT_D};">타이머 시작 🚀</div>
+          <div onclick="setState({overlay:'edit'})" class="tapbtn" style="cursor:pointer;font-size:15px;font-weight:700;color:${SUB};background:rgba(255,255,255,0.75);padding:9px 20px;border-radius:14px;">할 일 목록 고치기 ✏️</div>
+        `}
+      </div>
+    </div>
+
+    ${UI.overlay==='setup' ? renderSetup(now) : ''}
+    ${UI.overlay==='task'  ? renderTaskPick() : ''}
+    ${UI.overlay==='edit'  ? renderEdit() : ''}
+    ${ST.session && ST.session.done && !UI.overlay ? renderDone() : ''}
+  </div>`;
+}
+
+function overlayShell(inner) {
+  return `<div style="position:absolute;inset:0;background:rgba(45,52,80,0.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:10;padding:16px;">
+    <div style="background:#fff;border-radius:28px;padding:26px 22px;width:min(480px,94vw);max-height:88dvh;overflow-y:auto;animation:popIn 0.3s ease;box-shadow:0 20px 60px rgba(30,40,80,0.35);">${inner}</div>
+  </div>`;
+}
+
+// ── 1단계: 타겟 시각 고르기 ──────────────────────────────────
+function renderSetup(now) {
+  const t = UI.pickTarget;
+  const custom = new Date(now + 30*60000);
+  return overlayShell(`
+    <div style="font-family:Gaegu,sans-serif;font-size:26px;font-weight:700;color:${INK};text-align:center;">🏁 몇 시까지?</div>
+    <div style="font-size:14px;color:${SUB};text-align:center;margin:4px 0 16px;">지금은 ${fmtClock(new Date(now))}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+      ${QUICK_MINS.map(m => {
+        const at = now + m*60000, on = t===at || (t && Math.abs(t-at)<1500);
+        return `<div onclick="pickQuick(${m})" class="tapbtn" style="cursor:pointer;text-align:center;padding:14px 4px;border-radius:16px;font-weight:900;border:2.5px solid ${on?ACCENT:'#e3e6f0'};background:${on?'#eef2ff':'#fff'};color:${on?ACCENT:INK};">
+          <div style="font-size:20px;">+${m}분</div>
+          <div style="font-size:12px;color:${SUB};font-weight:700;">${fmtClock(new Date(at))}까지</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px;background:#f4f6fc;border-radius:16px;padding:12px 14px;">
+      <div style="font-size:14px;font-weight:700;color:${INK};flex-shrink:0;">직접 고르기</div>
+      <input type="time" id="customTime" value="${pad(custom.getHours())}:${pad(custom.getMinutes())}" onchange="pickCustom(this.value)"
+        style="flex:1;font-size:22px;font-weight:900;color:${INK};border:2.5px solid #e3e6f0;border-radius:12px;padding:8px 10px;background:#fff;min-width:0;">
+    </div>
+    ${t ? `<div style="text-align:center;margin-top:12px;font-weight:900;color:${ACCENT};font-size:17px;">🏁 ${fmtKorean(new Date(t))}까지! (${fmtRemain(t-now)} 동안)</div>` : ''}
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <div onclick="setState({overlay:null,pickTarget:null})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;padding:14px;border-radius:16px;font-weight:800;color:${SUB};background:#f0f2f8;">닫기</div>
+      <div onclick="${t?`setState({overlay:'task'})`:''}" class="tapbtn" style="cursor:${t?'pointer':'default'};flex:2;text-align:center;padding:14px;border-radius:16px;font-weight:900;font-size:17px;color:#fff;background:${t?ACCENT:'#c5cad9'};box-shadow:0 4px 0 ${t?ACCENT_D:'#b0b6c8'};">다음 →</div>
+    </div>`);
+}
+
+// ── 2단계: 할 일 고르기 ──────────────────────────────────────
+function renderTaskPick() {
+  return overlayShell(`
+    <div style="font-family:Gaegu,sans-serif;font-size:26px;font-weight:700;color:${INK};text-align:center;margin-bottom:14px;">✨ 그때까지 뭘 할까요?</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${ST.presets.map(p => {
+        const on = UI.pickTaskId===p.id;
+        return `<div onclick="setState({pickTaskId:'${p.id}'})" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:16px;border:2.5px solid ${on?ACCENT:'#e3e6f0'};background:${on?'#eef2ff':'#fff'};">
+          <div style="font-size:30px;">${p.emoji}</div>
+          <div style="font-size:17px;font-weight:800;color:${INK};">${h(p.label)}</div>
+          ${on?`<div style="margin-left:auto;color:${ACCENT};font-size:20px;font-weight:900;">✓</div>`:''}
+        </div>`;
+      }).join('')}
+      ${ST.presets.length===0?`<div style="text-align:center;color:${SUB};padding:14px;">할 일 목록이 비어 있어요</div>`:''}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <div onclick="setState({overlay:'setup'})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;padding:14px;border-radius:16px;font-weight:800;color:${SUB};background:#f0f2f8;">← 뒤로</div>
+      <div onclick="startTimer(false)" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;padding:14px;border-radius:16px;font-weight:800;color:${SUB};background:#f0f2f8;">건너뛰기</div>
+      <div onclick="${UI.pickTaskId?'startTimer(true)':''}" class="tapbtn" style="cursor:${UI.pickTaskId?'pointer':'default'};flex:2;text-align:center;padding:14px;border-radius:16px;font-weight:900;font-size:17px;color:#fff;background:${UI.pickTaskId?ACCENT:'#c5cad9'};box-shadow:0 4px 0 ${UI.pickTaskId?ACCENT_D:'#b0b6c8'};">시작! 🚀</div>
+    </div>`);
+}
+
+// ── 할 일 목록 편집 (부모용) ─────────────────────────────────
+function renderEdit() {
+  return overlayShell(`
+    <div style="font-family:Gaegu,sans-serif;font-size:26px;font-weight:700;color:${INK};text-align:center;margin-bottom:14px;">✏️ 할 일 목록</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${ST.presets.map(p => `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;background:#f4f6fc;">
+        <div style="font-size:26px;">${p.emoji}</div>
+        <div style="flex:1;font-size:16px;font-weight:700;color:${INK};">${h(p.label)}</div>
+        <div onclick="delPreset('${p.id}')" class="tapbtn" style="cursor:pointer;font-size:17px;color:#f04f58;font-weight:900;padding:4px 8px;">✕</div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:16px;background:#f4f6fc;border-radius:16px;padding:14px;">
+      <div style="font-size:13px;font-weight:800;color:${SUB};margin-bottom:8px;">새 할 일 추가</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        ${EMOJIS.map(e => `<div onclick="setState({newEmoji:'${e}'})" class="tapbtn" style="cursor:pointer;font-size:22px;padding:5px 7px;border-radius:10px;border:2px solid ${UI.newEmoji===e?ACCENT:'transparent'};background:${UI.newEmoji===e?'#eef2ff':'#fff'};">${e}</div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input id="newLabel" type="text" maxlength="20" placeholder="예: 양치하고 세수하기"
+          style="flex:1;font-size:16px;font-weight:700;color:${INK};border:2.5px solid #e3e6f0;border-radius:12px;padding:10px 12px;font-family:inherit;min-width:0;">
+        <div onclick="addPreset()" class="tapbtn" style="cursor:pointer;background:${ACCENT};color:#fff;font-weight:900;font-size:16px;padding:10px 18px;border-radius:12px;box-shadow:0 3px 0 ${ACCENT_D};flex-shrink:0;display:flex;align-items:center;">추가</div>
+      </div>
+    </div>
+    <div onclick="setState({overlay:null})" class="tapbtn" style="cursor:pointer;margin-top:16px;text-align:center;padding:14px;border-radius:16px;font-weight:900;font-size:17px;color:#fff;background:${ACCENT};box-shadow:0 4px 0 ${ACCENT_D};">완료</div>`);
+}
+
+// ── 완료 축하 ────────────────────────────────────────────────
+function renderDone() {
+  const tk = task();
+  const confetti = Array.from({length:26}, (_,i) => {
+    const e = ['🎉','⭐','🎊','💛','✨','🩵'][i%6];
+    return `<div style="position:absolute;left:${(i*37+13)%100}%;top:-40px;font-size:${18+(i*7)%20}px;animation:confettiFall ${2.4+(i%5)*0.5}s linear ${(i%8)*0.35}s infinite;">${e}</div>`;
+  }).join('');
+  return `<div style="position:absolute;inset:0;background:linear-gradient(180deg,#fff8e6,#ffedd6);display:flex;align-items:center;justify-content:center;z-index:20;overflow:hidden;">
+    ${confetti}
+    <div style="text-align:center;animation:popIn 0.4s ease;padding:20px;">
+      <div style="font-size:min(20vmin,110px);">⏰</div>
+      <div style="font-family:Gaegu,sans-serif;font-size:min(9vmin,52px);font-weight:700;color:#d8730f;">시간이 됐어요!</div>
+      ${tk ? `<div style="margin-top:8px;font-size:min(5vmin,26px);font-weight:900;color:${INK};">${tk.emoji} ${h(tk.label)} — 다 했나요?</div>` : ''}
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:26px;flex-wrap:wrap;">
+        <div onclick="finish()" class="tapbtn" style="cursor:pointer;background:#2fb673;color:#fff;font-weight:900;font-size:min(5.4vmin,26px);padding:16px 34px;border-radius:20px;box-shadow:0 5px 0 #23935c;">다 했어요! 🙌</div>
+        <div onclick="extend(5)" class="tapbtn" style="cursor:pointer;background:#fff;color:${INK};font-weight:900;font-size:min(4.6vmin,20px);padding:16px 24px;border-radius:20px;box-shadow:0 5px 0 #e0d5c2;">5분만 더 ⏳</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Actions ──────────────────────────────────────────────────
+function openSetup()   { unlockAudio(); setState({overlay:'setup', pickTarget:null, pickTaskId:null}); }
+function pickQuick(m)  { setState({pickTarget: Date.now() + m*60000}); }
+function pickCustom(v) {
+  const [hh,mm] = v.split(':').map(Number);
+  if (isNaN(hh)) return;
+  const t = new Date(); t.setHours(hh, mm, 0, 0);
+  const wasPast = t.getTime() <= Date.now();
+  if (wasPast) t.setDate(t.getDate()+1);                              // 이미 지난 시각 → 내일
+  if (t.getTime() - Date.now() > MAX_HOURS*3600000) {
+    alert(wasPast ? '이미 지난 시각이에요. 다른 시각을 골라주세요 🙂' : `최대 ${MAX_HOURS}시간 뒤까지만 정할 수 있어요`);
+    return;
+  }
+  setState({pickTarget: t.getTime()});
+}
+function startTimer(withTask) {
+  if (!UI.pickTarget) return;
+  ST.session = { targetAt:UI.pickTarget, startedAt:Date.now(), taskId: withTask?UI.pickTaskId:null, done:false };
+  UI.celebrated = false;
+  save(); keepAwake(true);
+  setState({overlay:null, pickTarget:null, pickTaskId:null});
+}
+function stopTimer() {
+  if (!confirm('타이머를 그만할까요?')) return;
+  ST.session = null; save(); keepAwake(false); render();
+}
+function finish() { ST.session = null; save(); keepAwake(false); render(); }
+function extend(min) {
+  const now = Date.now();
+  ST.session = { targetAt: now + min*60000, startedAt: now, taskId: ST.session.taskId, done:false };
+  UI.celebrated = false;
+  save(); keepAwake(true); render();
+}
+function toggleSound() { unlockAudio(); ST.settings.sound = !ST.settings.sound; save(); render(); }
+function toggleFull() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+}
+function addPreset() {
+  const el = document.getElementById('newLabel');
+  const label = (el && el.value || '').trim();
+  if (!label) return;
+  ST.presets.push({ id:'t'+(ST._seq++), emoji:UI.newEmoji, label });
+  save(); render();
+}
+function delPreset(id) { ST.presets = ST.presets.filter(p=>p.id!==id); save(); render(); }
+
+// ── Tick loop: 매초 동적 부분만 갱신, 상태 전환 시 전체 render ─
+let lastUrg = null, lastSec = -1;
+function tick() {
+  requestAnimationFrame(tick);
+  const now = Date.now();
+  const sec = Math.floor(now/1000);
+  if (sec === lastSec) return;
+  lastSec = sec;
+
+  const se = ST.session;
+  if (se && !se.done && se.targetAt <= now) {           // 타겟 도달!
+    se.done = true; save();
+    if (!UI.celebrated) { UI.celebrated = true; chime(); }
+    lastUrg = null; render(); return;
+  }
+
+  const c = calc(now);
+  if (c && !se.done && c.urgency !== lastUrg) { lastUrg = c.urgency; render(); return; }  // 단계 전환 → 색/문구 갱신
+
+  // 부분 갱신 (재렌더 없이)
+  const a = handAngles(now);
+  const hH=document.getElementById('handH'), hM=document.getElementById('handM'), hS=document.getElementById('handS');
+  if (hH) hH.setAttribute('transform',`rotate(${a.h} 100 100)`);
+  if (hM) hM.setAttribute('transform',`rotate(${a.m} 100 100)`);
+  if (hS) hS.setAttribute('transform',`rotate(${a.s} 100 100)`);
+  const w = document.getElementById('wedge');
+  if (w) w.setAttribute('d', wedgePath(now));
+  const rb = document.getElementById('remainBig');
+  if (rb && c) rb.textContent = fmtRemain(c.remainMs);
+  const nb = document.getElementById('nowBig');
+  if (nb) nb.textContent = fmtClock(new Date(now));
+}
+
+// ── Boot ─────────────────────────────────────────────────────
+load();
+if (ST.session && !ST.session.done && ST.session.targetAt <= Date.now()) { ST.session.done = true; save(); }  // 자리 비운 사이 도달
+if (ST.session && !ST.session.done) keepAwake(true);
+window.addEventListener('resize', render);
+render();
+tick();
+</script>
+</body>
+</html>
