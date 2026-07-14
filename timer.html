@@ -21,6 +21,8 @@ body { font-family:'Noto Sans KR',sans-serif; user-select:none; -webkit-user-sel
 .tapbtn:active { animation:tapPop 0.22s ease; }
 .pulse-soft { animation:pulseSoft 1.6s ease-in-out infinite; }
 .pulse-hard { animation:pulseHard 0.75s ease-in-out infinite; }
+#mainRow { flex-direction:column; }
+@media (orientation: landscape) { #mainRow { flex-direction:row; } }
 ::-webkit-scrollbar { width:0; height:0; }
 input[type=time] { font-family:inherit; }
 </style>
@@ -194,8 +196,7 @@ function render() {
     </div>
 
     <!-- 본문: 세로=위아래, 가로(TV)=좌우 -->
-    <div id="mainRow" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4vmin;padding:10px 16px 18px;position:relative;z-index:2;min-height:0;
-        flex-direction:${window.innerWidth > window.innerHeight ? 'row' : 'column'};">
+    <div id="mainRow" style="flex:1;display:flex;align-items:center;justify-content:center;gap:4vmin;padding:10px 16px 18px;position:relative;z-index:2;min-height:0;">
 
       <div style="flex-shrink:0;width:min(62vmin,560px);height:min(62vmin,560px);filter:drop-shadow(0 10px 26px rgba(60,70,120,0.16));">
         ${clockSVG(now, u ? u.c : ACCENT)}
@@ -413,7 +414,6 @@ function tick() {
 load();
 if (ST.session && !ST.session.done && ST.session.targetAt <= Date.now()) { ST.session.done = true; save(); }  // 자리 비운 사이 도달
 if (ST.session && !ST.session.done) keepAwake(true);
-window.addEventListener('resize', render);
 render();
 tick();
 </script>
