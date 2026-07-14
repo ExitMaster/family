@@ -1,10 +1,12 @@
-// 정리 화면 — 카테고리 필터 / 클라이언트 검색 / "정리하기" 우선순위 재계산 (SPEC 4.2)
+// 정리 화면 — 필터/검색 + 표시 시점 오버레이 + "정리하기" 하이브리드 엔진 (SPEC 4.2)
 import React, { useMemo, useState } from 'react';
 import { CATEGORIES, CATEGORY_MAP, INBOX, SKIP_LIMIT, MIGRATION_LIMIT } from '../config';
-import { updateEntry } from '../lib/db';
+import { updateEntry, loadArchived } from '../lib/db';
+import { orderByOverlay } from '../lib/dates';
 import { prioritize } from '../lib/api';
+import ProjectDetail from './ProjectDetail';
 
-const FILTERS = [{ key: 'all', label: '전체' }, ...CATEGORIES, INBOX, { key: 'done', label: '완료' }];
+const FILTERS = [{ key: 'all', label: '전체' }, ...CATEGORIES, INBOX];
 
 function fmtDue(ts) {
   if (!ts) return null;
@@ -12,19 +14,48 @@ function fmtDue(ts) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-export default function Organize({ entries, projects, onOpenEvening, onOpenSettings }) {
+// 필터별 정렬 (SPEC 4.2). 할일은 표시 시점 오버레이, 그 외는 카테고리 관례.
+function sortFor(filter, items, deepWorkSchedule) {
+  const byNew = (a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0);
+  const byOld = (a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0);
+  const byPrioDue = (a, b) => {
+    const pa = a.priority ?? 9999;
+    const pb = b.priority ?? 9999;
+    if (pa !== pb) return pa - pb;
+    const da = a.dueDate?.toMillis?.() ?? Infinity;
+    const db_ = b.dueDate?.toMillis?.() ?? Infinity;
+    return da - db_;
+  };
+  if (filter === 'task') return orderByOverlay(items, { deepWorkSchedule });
+  if (filter === 'project') return [...items].sort(byPrioDue);
+  if (filter === 'shopping') return [...items].sort(byOld);
+  if (filter === 'idea' || filter === 'note' || filter === 'inbox')
+    return [...items].sort(byNew);
+  // all: 할일 대기열 우선(오버레이) → 프로젝트 → 나머지 최신
+  const tasks = orderByOverlay(items.filter((e) => e.category === 'task'), { deepWorkSchedule });
+  const projects = items.filter((e) => e.category === 'project').sort(byPrioDue);
+  const rest = items
+    .filter((e) => !['task', 'project'].includes(e.category))
+    .sort(byNew);
+  return [...tasks, ...projects, ...rest];
+}
+
+export default function Organize({ entries, projects, settings, onOpenEvening, onOpenSettings }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [openProject, setOpenProject] = useState(null);
+  // 완료/보관 토글 (SPEC 4.2 로드 범위) — 기본 off, 페이지네이션 로드
+  const [showArchived, setShowArchived] = useState(false);
+  const [archived, setArchived] = useState([]);
+  const [cursor, setCursor] = useState(null);
+  const [archDone, setArchDone] = useState(false);
+  const [loadingArch, setLoadingArch] = useState(false);
 
   const list = useMemo(() => {
-    let l = entries.filter((e) => e.status !== 'discarded' && e.status !== 'archived');
-    if (filter === 'done') l = l.filter((e) => e.status === 'done');
-    else {
-      l = l.filter((e) => e.status === 'open');
-      if (filter !== 'all') l = l.filter((e) => e.category === filter);
-    }
+    let l = entries.filter((e) => e.status === 'open');
+    if (filter !== 'all') l = l.filter((e) => e.category === filter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       l = l.filter(
@@ -33,27 +64,48 @@ export default function Organize({ entries, projects, onOpenEvening, onOpenSetti
           (e.tags || []).some((t) => t.toLowerCase().includes(q))
       );
     }
-    // 우선순위 있는 항목 우선, 나머지는 최신순 (구독 쿼리가 최신순)
-    return [...l].sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
-  }, [entries, filter, search]);
+    return sortFor(filter, l, settings?.deepWorkSchedule);
+  }, [entries, filter, search, settings]);
 
   const inboxCount = entries.filter((e) => e.category === 'inbox' && e.status === 'open').length;
 
-  // "정리하기" — 미완료 항목 전체를 AI로 재정렬 (버튼 클릭 시에만 호출)
+  async function toggleArchived() {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next && archived.length === 0) await loadMoreArchived();
+  }
+  async function loadMoreArchived() {
+    setLoadingArch(true);
+    try {
+      const { items, cursor: c, done } = await loadArchived(cursor);
+      setArchived((prev) => [...prev, ...items]);
+      setCursor(c);
+      setArchDone(done);
+    } catch (e) {
+      setError(String(e.message || e));
+    } finally {
+      setLoadingArch(false);
+    }
+  }
+
+  // "정리하기" — 미완료 할일 + 기한 있는 프로젝트만 평가 (SPEC 4.2)
   async function organize() {
     setBusy(true);
     setError('');
     try {
-      const open = entries.filter(
-        (e) => e.status === 'open' && ['task', 'project', 'idea'].includes(e.category)
+      const targets = entries.filter(
+        (e) =>
+          e.status === 'open' &&
+          (e.category === 'task' || (e.category === 'project' && e.dueDate))
       );
-      if (open.length === 0) return;
-      const { results } = await prioritize(open);
+      if (targets.length === 0) return;
+      const { results } = await prioritize(targets, settings, projects);
       await Promise.all(
         results.map((r) =>
           updateEntry(r.id, {
             priority: r.priority ?? null,
             priorityReason: r.reason ?? null,
+            suggest: r.suggest ?? null,
           })
         )
       );
@@ -62,6 +114,57 @@ export default function Organize({ entries, projects, onOpenEvening, onOpenSetti
     } finally {
       setBusy(false);
     }
+  }
+
+  function renderEntry(e, { archivedRow = false } = {}) {
+    const cat = CATEGORY_MAP[e.category] || INBOX;
+    const proj = e.category === 'project' && projects.find((p) => p.tagName && (e.tags || []).includes(p.tagName));
+    const needsAttention =
+      e.suggest || (e.skipCount || 0) >= SKIP_LIMIT || (e.migratedCount || 0) > MIGRATION_LIMIT;
+    const unsorted = e.category === 'task' && e.priority == null && !e.pinned;
+    return (
+      <div key={e.id} className={`entry ${e.status !== 'open' ? 'done' : ''}`}>
+        <div className="content">
+          <span className="sign">{cat.sign}</span>
+          {e.content}
+          {unsorted && <span className="dot" title="미정렬">·</span>}
+        </div>
+        {e.priorityReason && e.status === 'open' && <div className="reason">{e.priorityReason}</div>}
+        <div className="meta">
+          {e.priority != null && <span>#{e.priority}</span>}
+          {e.dueDate && <span>~{fmtDue(e.dueDate)}</span>}
+          {(e.tags || []).map((t) => (
+            <span key={t}>{t}</span>
+          ))}
+          {(e.migratedCount || 0) > 0 && <span>{'>'.repeat(Math.min(e.migratedCount, 3))}</span>}
+          {e.suggest === 'split' && <span className="suggest">쪼갤까요?</span>}
+          {e.suggest === 'discard' && <span className="suggest">보낼까요?</span>}
+          {!e.suggest && needsAttention && <span className="suggest">쪼개거나 보내줄까요?</span>}
+          {archivedRow ? (
+            <button className="ghost" onClick={() => updateEntry(e.id, { status: 'open' })}>
+              되돌리기
+            </button>
+          ) : (
+            <>
+              {proj && (
+                <button className="ghost" onClick={() => setOpenProject(proj)}>
+                  열기
+                </button>
+              )}
+              <button className="ghost" onClick={() => updateEntry(e.id, { pinned: !e.pinned })}>
+                {e.pinned ? '고정됨 ◉' : '고정'}
+              </button>
+              <button className="ghost" onClick={() => updateEntry(e.id, { status: 'done' })}>
+                완료
+              </button>
+              <button className="ghost" onClick={() => updateEntry(e.id, { status: 'discarded' })}>
+                폐기
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -99,53 +202,36 @@ export default function Organize({ entries, projects, onOpenEvening, onOpenSetti
       </div>
       {error && <div className="sub">{error}</div>}
 
-      {list.map((e) => {
-        const cat = CATEGORY_MAP[e.category] || INBOX;
-        const needsAttention =
-          (e.skipCount || 0) >= SKIP_LIMIT || (e.migratedCount || 0) > MIGRATION_LIMIT;
-        return (
-          <div key={e.id} className={`entry ${e.status === 'done' ? 'done' : ''}`}>
-            <div className="content">
-              <span className="sign">{cat.sign}</span>
-              {e.content}
-            </div>
-            {e.priorityReason && <div className="reason">{e.priorityReason}</div>}
-            <div className="meta">
-              {e.priority != null && <span>#{e.priority}</span>}
-              {e.dueDate && <span>~{fmtDue(e.dueDate)}</span>}
-              {(e.tags || []).map((t) => (
-                <span key={t}>{t}</span>
-              ))}
-              {(e.migratedCount || 0) > 0 && <span>{'>'.repeat(Math.min(e.migratedCount, 3))}</span>}
-              {needsAttention && <span>쪼개거나 보내줄까요?</span>}
-              {e.status === 'open' ? (
-                <>
-                  <button
-                    className="ghost"
-                    onClick={() => updateEntry(e.id, { pinned: !e.pinned })}
-                  >
-                    {e.pinned ? '고정됨 ◉' : '고정'}
-                  </button>
-                  <button className="ghost" onClick={() => updateEntry(e.id, { status: 'done' })}>
-                    완료
-                  </button>
-                  <button
-                    className="ghost"
-                    onClick={() => updateEntry(e.id, { status: 'discarded' })}
-                  >
-                    폐기
-                  </button>
-                </>
-              ) : (
-                <button className="ghost" onClick={() => updateEntry(e.id, { status: 'open' })}>
-                  되돌리기
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {list.map((e) => renderEntry(e))}
       {list.length === 0 && <div className="sub" style={{ marginTop: 24 }}>비어 있어요.</div>}
+
+      <div className="section" style={{ marginTop: 20 }}>
+        <button className="ghost" onClick={toggleArchived}>
+          {showArchived ? '완료·보관 숨기기' : '완료·보관 보기'}
+        </button>
+        {showArchived && (
+          <div style={{ marginTop: 10 }}>
+            {archived.map((e) => renderEntry(e, { archivedRow: true }))}
+            {archived.length === 0 && !loadingArch && (
+              <div className="sub">보관된 항목이 없어요.</div>
+            )}
+            {!archDone && (
+              <button className="ghost" onClick={loadMoreArchived} disabled={loadingArch}>
+                {loadingArch ? '불러오는 중…' : '더 불러오기'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {openProject && (
+        <ProjectDetail
+          project={openProject}
+          entries={entries}
+          settings={settings}
+          onClose={() => setOpenProject(null)}
+        />
+      )}
     </div>
   );
 }

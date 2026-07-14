@@ -1,35 +1,26 @@
 // 포커스 모드 — 단 하나의 카드 + 뽀모도로 비주얼 타이머 (SPEC 4.4, 4.5)
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Timestamp, increment } from 'firebase/firestore';
 import { POMODORO_PHASES } from '../config';
-import { updateEntry, addEntry } from '../lib/db';
+import { updateEntry, addEntry, increment, Timestamp } from '../lib/db';
+import { orderByOverlay } from '../lib/dates';
 import { splitTask } from '../lib/api';
-
-function pickQueue(entries) {
-  // 우선순위: pinned 먼저 → priority 오름차순 → 기한 임박 → 최신
-  return entries
-    .filter((e) => e.status === 'open' && e.category === 'task')
-    .sort((a, b) => {
-      if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
-      const pa = a.priority ?? 9999;
-      const pb = b.priority ?? 9999;
-      if (pa !== pb) return pa - pb;
-      const da = a.dueDate ? a.dueDate.toMillis() : Infinity;
-      const db_ = b.dueDate ? b.dueDate.toMillis() : Infinity;
-      return da - db_;
-    });
-}
 
 export default function Focus({ entries, settings }) {
   const [cursor, setCursor] = useState(0);
   const [splitting, setSplitting] = useState(false);
-  const [steps, setSteps] = useState(null); // 쪼개기 결과 확인용
+  const [steps, setSteps] = useState(null);
   const [error, setError] = useState('');
 
-  const queue = useMemo(() => pickQueue(entries), [entries]);
-  const current = queue[Math.min(cursor, Math.max(queue.length - 1, 0))];
+  // 대기열은 할일만 (SPEC 4.4) — 표시 시점 오버레이 적용
+  const queue = useMemo(() => {
+    const tasks = entries.filter((e) => e.status === 'open' && e.category === 'task');
+    return orderByOverlay(tasks, { deepWorkSchedule: settings?.deepWorkSchedule });
+  }, [entries, settings]);
 
-  // 이월 리뷰 대상 (b): 포커스에 노출됐으나 미완료 — 노출 기록 (SPEC 4.3)
+  const current = queue[Math.min(cursor, Math.max(queue.length - 1, 0))];
+  const weeklyStatus = settings?.contextProfile?.weeklyStatus;
+
+  // 포커스에 노출됐으나 미완료 = 이월 리뷰 대상 (b) — 노출 기록 (SPEC 4.3)
   const markedRef = useRef(new Set());
   useEffect(() => {
     if (current && !markedRef.current.has(current.id)) {
@@ -43,7 +34,7 @@ export default function Focus({ entries, settings }) {
     setSplitting(true);
     setError('');
     try {
-      const { steps } = await splitTask(current.content);
+      const { steps } = await splitTask(current.content, settings);
       setSteps(steps);
     } catch (e) {
       setError(String(e.message || e));
@@ -51,9 +42,7 @@ export default function Focus({ entries, settings }) {
       setSplitting(false);
     }
   }
-
   async function confirmSplit() {
-    // 하위 체크리스트를 개별 할일로 생성 — 원본은 완료 처리
     for (const s of steps) {
       await addEntry({ content: s, category: 'task', tags: current.tags || [] });
     }
@@ -65,16 +54,14 @@ export default function Focus({ entries, settings }) {
     <div>
       {current ? (
         <div className="focus-card">
+          {weeklyStatus && <div className="anchor">{weeklyStatus}</div>}
           <div className="sub">지금은 이것만</div>
           <div className="content">{current.content}</div>
           <div className="meta">
             {current.dueDate && `기한 ${current.dueDate.toDate().toLocaleDateString('ko-KR')}`}
           </div>
           <div className="focus-actions">
-            <button
-              className="primary"
-              onClick={() => updateEntry(current.id, { status: 'done' })}
-            >
+            <button className="primary" onClick={() => updateEntry(current.id, { status: 'done' })}>
               완료
             </button>
             <button
@@ -93,6 +80,7 @@ export default function Focus({ entries, settings }) {
         </div>
       ) : (
         <div className="focus-card">
+          {weeklyStatus && <div className="anchor">{weeklyStatus}</div>}
           <div className="content">지금 할 일이 없어요</div>
           <div className="meta">덤프에 던져두거나, 정리 탭에서 우선순위를 매겨보세요</div>
         </div>
@@ -123,7 +111,7 @@ export default function Focus({ entries, settings }) {
   );
 }
 
-// 뽀모도로 — 고정 패턴 25-5-25-5-25-15, 색이 줄어드는 비주얼 타이머
+// 뽀모도로 — 고정 패턴 25-5-25-5-25-15, 색이 줄어드는 비주얼 타이머 (SPEC 4.5)
 function Pomodoro({ dopamineMenu }) {
   const [phaseIdx, setPhaseIdx] = useState(0);
   const [remaining, setRemaining] = useState(POMODORO_PHASES[0].min * 60);
@@ -138,7 +126,6 @@ function Pomodoro({ dopamineMenu }) {
     const t = setInterval(() => {
       setRemaining((r) => {
         if (r > 1) return r - 1;
-        // 다음 단계로 — 휴식 시작 시 도파민 메뉴 랜덤 추천 (SPEC 4.5)
         const next = (phaseIdx + 1) % POMODORO_PHASES.length;
         setPhaseIdx(next);
         if (POMODORO_PHASES[next].kind === 'break' && dopamineMenu.length > 0) {

@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, signIn, configured } from './firebase';
-import { subscribeEntries, subscribeProjects, subscribeSettings } from './lib/db';
+import {
+  subscribeOpenEntries,
+  subscribeProjects,
+  subscribeSettings,
+  ensureSettings,
+} from './lib/db';
+import { daysLeftOf } from './lib/dates';
 import Dump from './screens/Dump';
 import Organize from './screens/Organize';
 import Focus from './screens/Focus';
@@ -24,18 +30,21 @@ function needsEvening(entries, settings) {
     (e) =>
       e.status === 'open' &&
       e.category === 'task' &&
-      ((e.dueDate && e.dueDate.toDate() < today) ||
+      ((e.dueDate && daysLeftOf(e.dueDate) < 0) ||
         (e.lastFocusedAt && e.lastFocusedAt.toDate() >= today))
   );
   const last = settings.lastIdeaReviewAt?.toDate?.();
   const ideaDue =
     entries.some((e) => e.category === 'idea' && e.status === 'open') &&
     (!last || (Date.now() - last.getTime()) / 86400000 >= 7);
-  return hasInbox || hasOverdue || ideaDue;
+  // weeklyStatus 갱신 안내 노출 조건 (SPEC 4.3 4단계): null이거나 7일 초과
+  const wsAt = settings.contextProfile?.weeklyStatusUpdatedAt?.toDate?.();
+  const profileDue = !wsAt || (Date.now() - wsAt.getTime()) / 86400000 >= 7;
+  return hasInbox || hasOverdue || ideaDue || profileDue;
 }
 
 export default function App() {
-  const [user, setUser] = useState(undefined); // undefined=로딩중, null=미로그인
+  const [user, setUser] = useState(undefined);
   const [tab, setTab] = useState('dump');
   const [entries, setEntries] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -52,7 +61,8 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    const un1 = subscribeEntries(setEntries);
+    ensureSettings().catch(() => {});
+    const un1 = subscribeOpenEntries(setEntries);
     const un2 = subscribeProjects(setProjects);
     const un3 = subscribeSettings(setSettings);
     return () => {
@@ -62,7 +72,6 @@ export default function App() {
     };
   }, [user]);
 
-  // 저녁 정리 자동 노출 — 데이터 로드 후 1회만 판정
   useEffect(() => {
     if (!user || !settings || eveningChecked || entries.length === 0) return;
     setEveningChecked(true);
@@ -118,6 +127,7 @@ export default function App() {
           <Organize
             entries={entries}
             projects={projects}
+            settings={settings}
             onOpenEvening={() => setShowEvening(true)}
             onOpenSettings={() => setShowSettings(true)}
           />
@@ -139,7 +149,12 @@ export default function App() {
       </nav>
 
       {showEvening && settings && (
-        <Evening entries={entries} settings={settings} onClose={() => setShowEvening(false)} />
+        <Evening
+          entries={entries}
+          projects={projects}
+          settings={settings}
+          onClose={() => setShowEvening(false)}
+        />
       )}
       {showSettings && settings && (
         <Settings settings={settings} onClose={() => setShowSettings(false)} />

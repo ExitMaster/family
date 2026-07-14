@@ -21,6 +21,7 @@ npm run dev
 1. **Firebase 콘솔** (기존 프로젝트 재사용 가능)
    - Authentication → Google 로그인 활성화, 승인된 도메인에 Vercel 도메인 추가
    - Firestore 생성 → `firestore.rules` 내용 배포 (허용 이메일 확인)
+   - `firestore.indexes.json` 배포 (entries status+createdAt 복합 인덱스 — open-only 구독/아카이브 페이지네이션용). `firebase deploy --only firestore:indexes` 또는 첫 실행 시 콘솔이 안내하는 링크로 생성
    - 프로젝트 설정에서 웹 앱 등록 → 구성값을 `.env`와 Vercel 환경변수에 입력
 2. **Vercel**
    - GitHub 레포 연결, **Root Directory를 `salmon`으로 지정**
@@ -50,8 +51,18 @@ salmon/
     └── screens/         # Dump / Organize / Focus / Evening / ProjectSetup / Settings
 ```
 
-## 아직 안 만든 것 (SPEC 개발 순서 15~17)
+## 구현 상태 (SPEC v2.1 개발 순서 기준)
 
-- 레퍼런스 탭 (사진 OCR / 유튜브 / 기사 요약 — 부기능)
-- 카운슬러 탭 (심리 마스터 요약 — 부기능)
+구현 완료: 1~16단계 — 컨텍스트 프로필(시드/주입/편집), 덤프·인박스, 정리 화면
+(표시 시점 오버레이 + 완료/보관 페이지네이션), 프로젝트·마일스톤(제안 포함),
+저녁 정리 4단계(인박스 분류·이월·아이디어 리뷰·프로필 갱신), 하이브리드 우선순위
+엔진(LLM 항목평가 + 코드 결정론 정렬), 포커스 모드, 쪼개기, 뽀모도로, 설정.
+
+아직 안 만든 것 (17~19단계, 부기능):
+- 레퍼런스 탭 (사진 OCR / 유튜브 / 기사 요약)
+- 카운슬러 탭 (심리 마스터 요약)
 - 생체인증(WebAuthn) 옵션
+
+핵심 로직 참고:
+- `src/lib/dates.js` — 표시 시점 오버레이(pinned > D-1 이하 > 딥워크 > priority), 딥워크 요일 판정. 모두 코드 담당(LLM 없음).
+- `api/claude.js` — 하이브리드 엔진: LLM은 항목별 평가만, 서버 코드가 점수 가중합산 + pinned 보호 + 안정성 앵커로 최종 정렬. 날짜 근거 문구는 코드 생성(D-1 이하만).
