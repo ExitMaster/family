@@ -1,0 +1,169 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, signIn, configured } from './firebase';
+import {
+  subscribeOpenEntries,
+  subscribeProjects,
+  subscribeSettings,
+  ensureSettings,
+} from './lib/db';
+import { daysLeftOf } from './lib/dates';
+import { checkAIHealth } from './lib/api';
+import Dump from './screens/Dump';
+import Organize from './screens/Organize';
+import Focus from './screens/Focus';
+import Evening from './screens/Evening';
+import Settings from './screens/Settings';
+
+const TABS = [
+  { key: 'dump', label: '덤프' },
+  { key: 'organize', label: '정리' },
+  { key: 'focus', label: '포커스' },
+];
+
+// 저녁 정리 노출 조건 (SPEC 4.3) — 로컬 트리거, 세션당 1회
+function needsEvening(entries, settings) {
+  if (new Date().getHours() < (settings.eveningReviewHour ?? 20)) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const hasInbox = entries.some((e) => e.category === 'inbox' && e.status === 'open');
+  const hasOverdue = entries.some(
+    (e) =>
+      e.status === 'open' &&
+      e.category === 'task' &&
+      ((e.dueDate && daysLeftOf(e.dueDate) < 0) ||
+        (e.lastFocusedAt && e.lastFocusedAt.toDate() >= today))
+  );
+  const last = settings.lastIdeaReviewAt?.toDate?.();
+  const ideaDue =
+    entries.some((e) => e.category === 'idea' && e.status === 'open') &&
+    (!last || (Date.now() - last.getTime()) / 86400000 >= 7);
+  // weeklyStatus 갱신 안내 노출 조건 (SPEC 4.3 4단계): null이거나 7일 초과
+  const wsAt = settings.contextProfile?.weeklyStatusUpdatedAt?.toDate?.();
+  const profileDue = !wsAt || (Date.now() - wsAt.getTime()) / 86400000 >= 7;
+  return hasInbox || hasOverdue || ideaDue || profileDue;
+}
+
+export default function App() {
+  const [user, setUser] = useState(undefined);
+  const [tab, setTab] = useState('dump');
+  const [entries, setEntries] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [showEvening, setShowEvening] = useState(false);
+  const [eveningChecked, setEveningChecked] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [aiEnabled, setAiEnabled] = useState(false); // AI 키 미설정 시 수동 모드
+
+  useEffect(() => {
+    if (!configured) return;
+    return onAuthStateChanged(auth, (u) => setUser(u ?? null));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    ensureSettings().catch(() => {});
+    checkAIHealth().then(setAiEnabled);
+    const un1 = subscribeOpenEntries(setEntries);
+    const un2 = subscribeProjects(setProjects);
+    const un3 = subscribeSettings(setSettings);
+    return () => {
+      un1();
+      un2();
+      un3();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !settings || eveningChecked || entries.length === 0) return;
+    setEveningChecked(true);
+    if (needsEvening(entries, settings)) setShowEvening(true);
+  }, [user, settings, entries, eveningChecked]);
+
+  const inboxCount = useMemo(
+    () => entries.filter((e) => e.category === 'inbox' && e.status === 'open').length,
+    [entries]
+  );
+
+  if (!configured) {
+    return (
+      <div className="app">
+        <div className="login">
+          <div className="logo">🐟</div>
+          <div>연어항해일지</div>
+          <div className="sub" style={{ padding: '0 24px', textAlign: 'center' }}>
+            Firebase 환경변수가 아직 설정되지 않았어요.
+            <br />
+            .env.example을 참고해 .env를 만들어주세요.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user === undefined) return null;
+
+  if (!user) {
+    return (
+      <div className="app">
+        <div className="login">
+          <div className="logo">🐟</div>
+          <div>연어항해일지</div>
+          <button
+            className="primary"
+            onClick={() => signIn().catch((e) => setAuthError(String(e.message || e)))}
+          >
+            Google 계정으로 로그인
+          </button>
+          {authError && <div className="sub">{authError}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <div className="screen">
+        {tab === 'dump' && <Dump projects={projects} />}
+        {tab === 'organize' && (
+          <Organize
+            entries={entries}
+            projects={projects}
+            settings={settings}
+            aiEnabled={aiEnabled}
+            onOpenEvening={() => setShowEvening(true)}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        )}
+        {tab === 'focus' && <Focus entries={entries} settings={settings} aiEnabled={aiEnabled} />}
+      </div>
+
+      <nav className="tabbar">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            className={tab === t.key ? 'active' : ''}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            {t.key === 'organize' && inboxCount > 0 && <span className="badge">{inboxCount}</span>}
+          </button>
+        ))}
+      </nav>
+
+      {showEvening && settings && (
+        <Evening
+          entries={entries}
+          projects={projects}
+          settings={settings}
+          aiEnabled={aiEnabled}
+          onClose={() => setShowEvening(false)}
+        />
+      )}
+      {showSettings && settings && (
+        <Settings settings={settings} onClose={() => setShowSettings(false)} />
+      )}
+    </div>
+  );
+}
