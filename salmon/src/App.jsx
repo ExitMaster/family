@@ -8,6 +8,7 @@ import {
   ensureSettings,
 } from './lib/db';
 import { daysLeftOf } from './lib/dates';
+import { checkAIHealth } from './lib/api';
 import Dump from './screens/Dump';
 import Organize from './screens/Organize';
 import Focus from './screens/Focus';
@@ -53,6 +54,7 @@ export default function App() {
   const [eveningChecked, setEveningChecked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [aiEnabled, setAiEnabled] = useState(false); // AI 키 미설정 시 수동 모드
 
   useEffect(() => {
     if (!configured) return;
@@ -62,6 +64,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     ensureSettings().catch(() => {});
+    checkAIHealth().then(setAiEnabled);
     const un1 = subscribeOpenEntries(setEntries);
     const un2 = subscribeProjects(setProjects);
     const un3 = subscribeSettings(setSettings);
@@ -128,11 +131,12 @@ export default function App() {
             entries={entries}
             projects={projects}
             settings={settings}
+            aiEnabled={aiEnabled}
             onOpenEvening={() => setShowEvening(true)}
             onOpenSettings={() => setShowSettings(true)}
           />
         )}
-        {tab === 'focus' && <Focus entries={entries} settings={settings} />}
+        {tab === 'focus' && <Focus entries={entries} settings={settings} aiEnabled={aiEnabled} />}
       </div>
 
       <nav className="tabbar">
@@ -153,6 +157,7 @@ export default function App() {
           entries={entries}
           projects={projects}
           settings={settings}
+          aiEnabled={aiEnabled}
           onClose={() => setShowEvening(false)}
         />
       )}

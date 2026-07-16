@@ -4,7 +4,7 @@ import { CATEGORY_MAP } from '../config';
 import { updateProject, newMilestone } from '../lib/db';
 import { suggestMilestones } from '../lib/api';
 
-export default function ProjectDetail({ project, entries, settings, onClose }) {
+export default function ProjectDetail({ project, entries, settings, aiEnabled, onClose }) {
   const [newMs, setNewMs] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -112,9 +112,11 @@ export default function ProjectDetail({ project, entries, settings, onClose }) {
             />
             <button onClick={addMs}>추가</button>
           </div>
-          <button style={{ marginTop: 8 }} onClick={propose} disabled={busy}>
-            {busy ? '제안 중…' : 'AI 마일스톤 제안'}
-          </button>
+          {aiEnabled && (
+            <button style={{ marginTop: 8 }} onClick={propose} disabled={busy}>
+              {busy ? '제안 중…' : 'AI 마일스톤 제안'}
+            </button>
+          )}
           {error && <div className="sub">{error}</div>}
         </div>
 

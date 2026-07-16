@@ -19,6 +19,16 @@ async function callAI(action, payload) {
   return res.json();
 }
 
+// 서버에 AI 키가 설정됐는지 확인 (미설정 시 앱은 수동 모드로 동작)
+export async function checkAIHealth() {
+  try {
+    const r = await callAI('health', {});
+    return !!r.aiEnabled;
+  } catch {
+    return false;
+  }
+}
+
 const profileOf = (settings) => settings?.contextProfile || null;
 
 // active 프로젝트 요약 (goal + 미완료 마일스톤 제목) — 프롬프트 주입용

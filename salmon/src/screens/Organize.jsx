@@ -40,7 +40,7 @@ function sortFor(filter, items, deepWorkSchedule) {
   return [...tasks, ...projects, ...rest];
 }
 
-export default function Organize({ entries, projects, settings, onOpenEvening, onOpenSettings }) {
+export default function Organize({ entries, projects, settings, aiEnabled, onOpenEvening, onOpenSettings }) {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -195,9 +195,15 @@ export default function Organize({ entries, projects, settings, onOpenEvening, o
       </div>
 
       <div className="row" style={{ margin: '10px 0' }}>
-        <button className="primary" style={{ flex: 1 }} onClick={organize} disabled={busy}>
-          {busy ? '정리 중…' : '정리하기 (우선순위 재계산)'}
-        </button>
+        {aiEnabled ? (
+          <button className="primary" style={{ flex: 1 }} onClick={organize} disabled={busy}>
+            {busy ? '정리 중…' : '정리하기 (우선순위 재계산)'}
+          </button>
+        ) : (
+          <button style={{ flex: 1 }} disabled title="AI 기능은 아직 준비 중이에요">
+            정리하기 (AI 준비 중 — 고정으로 수동 정렬)
+          </button>
+        )}
         {inboxCount > 0 && <button onClick={onOpenEvening}>인박스 정리</button>}
       </div>
       {error && <div className="sub">{error}</div>}
@@ -229,6 +235,7 @@ export default function Organize({ entries, projects, settings, onOpenEvening, o
           project={openProject}
           entries={entries}
           settings={settings}
+          aiEnabled={aiEnabled}
           onClose={() => setOpenProject(null)}
         />
       )}

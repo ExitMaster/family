@@ -7,7 +7,7 @@ import { classifyInbox, reviewIdeas } from '../lib/api';
 
 const IDEA_ACTION_LABEL = { task: '할일로', project: '프로젝트로', discard: '폐기', hold: '보류' };
 
-export default function Evening({ entries, projects, settings, onClose }) {
+export default function Evening({ entries, projects, settings, aiEnabled, onClose }) {
   const [suggestions, setSuggestions] = useState({});
   const [ideaSuggestions, setIdeaSuggestions] = useState({});
   const [loading, setLoading] = useState(false);
@@ -46,6 +46,7 @@ export default function Evening({ entries, projects, settings, onClose }) {
     const seeded = {};
     for (const e of inbox) if (e.suggestedCategory) seeded[e.id] = e.suggestedCategory;
     setSuggestions(seeded);
+    if (!aiEnabled) return; // AI 미설정 — 수동 분류만
     const unclassified = inbox.filter((e) => !e.suggestedCategory);
     if (unclassified.length === 0) return;
     classifyInbox(unclassified, settings)
@@ -114,6 +115,7 @@ export default function Evening({ entries, projects, settings, onClose }) {
         {inbox.length > 0 && (
           <div className="section">
             <h2>◇ 인박스</h2>
+            {!aiEnabled && <div className="sub">직접 분류를 골라주세요 (AI 제안은 준비 중).</div>}
             {inbox.map((e) => (
               <div key={e.id} className="entry">
                 <div className="content">{e.content}</div>
@@ -163,7 +165,7 @@ export default function Evening({ entries, projects, settings, onClose }) {
         {ideas.length > 0 && (
           <div className="section">
             <h2>! 아이디어 리뷰 (주간)</h2>
-            {Object.keys(ideaSuggestions).length === 0 && (
+            {aiEnabled && Object.keys(ideaSuggestions).length === 0 && (
               <button className="primary" onClick={runIdeaReview} disabled={loading}>
                 {loading ? '검토 중…' : 'AI 제안 받기'}
               </button>

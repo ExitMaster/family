@@ -5,7 +5,7 @@ import { updateEntry, addEntry, increment, Timestamp } from '../lib/db';
 import { orderByOverlay } from '../lib/dates';
 import { splitTask } from '../lib/api';
 
-export default function Focus({ entries, settings }) {
+export default function Focus({ entries, settings, aiEnabled }) {
   const [cursor, setCursor] = useState(0);
   const [splitting, setSplitting] = useState(false);
   const [steps, setSteps] = useState(null);
@@ -72,9 +72,11 @@ export default function Focus({ entries, settings }) {
             >
               건너뛰기
             </button>
-            <button onClick={doSplit} disabled={splitting}>
-              {splitting ? '쪼개는 중…' : '쪼개기'}
-            </button>
+            {aiEnabled && (
+              <button onClick={doSplit} disabled={splitting}>
+                {splitting ? '쪼개는 중…' : '쪼개기'}
+              </button>
+            )}
           </div>
           {error && <div className="sub" style={{ marginTop: 10 }}>{error}</div>}
         </div>

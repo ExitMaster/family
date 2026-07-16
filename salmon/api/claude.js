@@ -26,6 +26,7 @@ async function verifyUser(req) {
 }
 
 async function askClaude(system, userText, maxTokens = 2048) {
+  if (!process.env.CLAUDE_API_KEY) throw new Error('AI가 아직 설정되지 않았어요');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -85,7 +86,15 @@ function dueReason(d) {
   return '내일까지예요';
 }
 
+// AI 프로바이더가 아직 미정이므로 Claude/Gemini 키 중 하나라도 있으면 활성으로 본다.
+const aiConfigured = () => !!(process.env.CLAUDE_API_KEY || process.env.GEMINI_API_KEY);
+
 const ACTIONS = {
+  // 헬스체크 — 클라이언트가 AI 기능 노출 여부를 판단 (키 미설정 시 수동 모드로 안내)
+  async health() {
+    return { aiEnabled: aiConfigured() };
+  },
+
   // 인박스 일괄 분류 — { items:[{id,content}], profile } → { results:[{id,category}] }
   async classify({ items, profile }) {
     const system =
