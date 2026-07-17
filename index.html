@@ -685,7 +685,11 @@ function applyHanwooriDraft(){
 }
 function commitHanwooriDraft(){
   if(!ST.hwDraft){ setState({overlay:null,verifyFor:null}); return; }
-  setState({hanwoori:{anchor:hanwooriAnchor(),tasks:ST.hwDraft},hwDraft:null,overlay:null,verifyFor:null,pinEntry:'',pinError:false});
+  // 초안이 열려 있는 동안 아이가 완료한 task의 done 상태를 라이브에서 병합.
+  // (초안의 낡은 done:false가 완료를 덮어써 코인을 이중 획득하는 것 방지)
+  const live=hwCurrent();
+  const tasks=ST.hwDraft.map(t=>{ const lv=live&&live.tasks.find(x=>x.id===t.id); return (lv&&lv.done)?{...t,done:true,doneDate:lv.doneDate}:t; });
+  setState({hanwoori:{anchor:hanwooriAnchor(),tasks},hwDraft:null,overlay:null,verifyFor:null,pinEntry:'',pinError:false});
 }
 function discardHanwooriDraft(){ setState({hwDraft:null,hwNewTask:''}); }
 // task 완료: 코인 +1 (PIN 불필요). 이번 주 전부 완료하면 보너스 +2와 축하 카드가 이어진다.
@@ -713,6 +717,7 @@ function buyShop(id){
     return;
   }
   // 이벤트형: 구매 즉시 연못 이벤트 발동(이벤트 카드로 전환)
+  if(it.id==='sh_party'&&!ST.pond.some(c=>c.status==='healthy')){ setState({shopMsg:'연못에 건강한 친구가 있어야 파티를 열 수 있어요!'}); return; }
   let pond=ST.pond, guest=null, ev;
   if(it.id==='sh_party'){
     pond=ST.pond.map(c=>c.status==='healthy'?{...c,intimacy:(c.intimacy||0)+1}:c);
@@ -1134,7 +1139,7 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
       <div style="display:flex;align-items:center;gap:8px;">
         <div ${focus?'':'onclick="openShop()"'} class="tapbtn" style="${focus?'':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;color:${T.accentDark};">${coinIcon(18)} ${ST.coins||0}</div>
         <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
-        <div onclick="setState({screen:'setup'})" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:14px;">✏️ 숙제설정</div>
+        <div ${focus?'':`onclick="setState({screen:'setup'})"`} class="tapbtn" style="${focus?'opacity:.4;':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:14px;">${focus?'🔒':'✏️'} 숙제설정</div>
         <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
       </div>
     </div>
