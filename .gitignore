@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# Claude Code agent worktrees (ephemeral, per-session isolation)
+.claude/worktrees/
