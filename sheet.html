@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>우리집 악보</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; height:100%; overscroll-behavior:none; background:#f4f1ea; }
+body { font-family:'Noto Sans KR',sans-serif; }
+#app { display:flex; flex-direction:column; height:100%; }
+
+.topbar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#fff; border-bottom:1px solid #e5e1d6; flex-wrap:wrap; }
+.topbar h1 { font-size:16px; margin:0; font-weight:700; color:#3a3226; margin-right:auto; }
+
+.profile-toggle { display:flex; gap:6px; background:#efece2; padding:4px; border-radius:999px; }
+.profile-btn { border:none; background:transparent; padding:7px 14px; border-radius:999px; font-size:14px; font-weight:700; font-family:inherit; color:#8a8272; cursor:pointer; }
+.profile-btn.active { background:#fff; color:#3a3226; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+
+.upload-btn { display:inline-flex; align-items:center; gap:6px; background:#4a7a68; color:#fff; border:none; padding:8px 14px; border-radius:10px; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
+.upload-btn input { display:none; }
+
+.infobar { display:flex; gap:16px; flex-wrap:wrap; padding:8px 14px; background:#fbf9f3; border-bottom:1px solid #e5e1d6; font-size:13px; color:#655c4c; }
+.infobar b { color:#3a3226; }
+
+.error-banner { margin:10px 14px 0; padding:10px 14px; background:#fde8e8; border:1px solid #f2b8b8; color:#8a2c2c; border-radius:10px; font-size:13px; line-height:1.5; white-space:pre-wrap; }
+
+.stage { flex:1; overflow:auto; padding:10px; }
+#osmd-container { background:#fff; border-radius:12px; min-height:300px; padding:10px; }
+
+.placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:300px; color:#8a8272; text-align:center; gap:10px; padding:20px; }
+.placeholder .big { font-size:40px; }
+
+::-webkit-scrollbar { width:0; height:0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/osmd/opensheetmusicdisplay.min.js"></script>
+<script>
+// ===ENGINE:START===
+// 단순화 엔진 — 순수 함수만 둔다. (musicXml: string, opts) => musicXml
+// 부수효과 없음. 입력 문자열/Profile을 변형하지 않고, 항상 새로 파싱한 Document에서 작업한다.
+// scripts/test-engine.mjs 가 이 블록을 그대로 추출해 헤드리스 브라우저에서 단위 테스트한다.
+// 마커(===ENGINE:START/END===) 밖으로 코드를 옮기지 말 것.
+
+const NOTE_BASE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const SHARP_SPELL = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT_SPELL  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const KO_TONIC = ['다', '올림다', '라', '올림라', '마', '바', '올림바', '사', '올림사', '가', '올림가', '나'];
+
+// 목표 조성 이름 -> fifths (부록 B + 확장)
+const KEY_NAME_TO_FIFTHS = {
+  C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7,
+  F: -1, Bb: -2, Eb: -3, Ab: -4, Db: -5, Gb: -6, Cb: -7,
+};
+
+// 악기별 이조 반음수 (실음 -> 기보음). trumpet(Bb관)은 장2도 위로 적는다.
+const INSTRUMENT_SEMITONES = { piano: 0, recorder: 0, trumpet: 2 };
+
+function majorTonicPitchClass(fifths) {
+  return ((7 * fifths) % 12 + 12) % 12;
+}
+
+function minorTonicPitchClass(fifths) {
+  // 관계단조 = 관계장조의 단3도 아래
+  return ((majorTonicPitchClass(fifths) - 3) % 12 + 12) % 12;
+}
+
+function tonicPitchClass(fifths, mode) {
+  return mode === 'minor' ? minorTonicPitchClass(fifths) : majorTonicPitchClass(fifths);
+}
+
+function keyLabel(fifths, mode) {
+  const pc = tonicPitchClass(fifths, mode);
+  return KO_TONIC[pc] + (mode === 'minor' ? '단조' : '장조');
+}
+
+// 조표가 ♯/♭ 5개를 넘으면(사실상 ±7) 이명동조로 정리한다. 부록 B: fifths=-7 → +5
+function normalizeFifths(fifths) {
+  let f = fifths;
+  while (f > 6) f -= 12;
+  while (f < -6) f += 12;
+  return f;
+}
+
+// 반음 이동 s에 대응하는 fifths 변화량(절댓값이 가장 작은 것)을 찾는다.
+// 오선에서 fifths 한 칸은 7반음에 대응(mod 12) — 예: +2반음 = fifths +2 (7*2=14≡2 mod12)
+function semitonesToFifthsDelta(semitones) {
+  const target = ((semitones % 12) + 12) % 12;
+  let best = 0;
+  let bestAbs = Infinity;
+  for (let df = -11; df <= 11; df++) {
+    const m = ((7 * df) % 12 + 12) % 12;
+    if (m === target && Math.abs(df) < bestAbs) {
+      best = df;
+      bestAbs = Math.abs(df);
+    }
+  }
+  return best;
+}
+
+function assertNoParseError(doc, ctx) {
+  const err = doc.querySelector('parsererror');
+  if (err) {
+    throw new Error(`MusicXML 파싱 실패 (${ctx}): ${err.textContent.slice(0, 200)}`);
+  }
+}
+
+function parseFirstKey(doc) {
+  const keyEl = doc.querySelector('key');
+  if (!keyEl) return { fifths: 0, mode: 'major' };
+  const fifthsEl = keyEl.querySelector('fifths');
+  const modeEl = keyEl.querySelector('mode');
+  const fifths = fifthsEl ? parseInt(fifthsEl.textContent, 10) : 0;
+  const mode = modeEl && modeEl.textContent.trim() === 'minor' ? 'minor' : 'major';
+  return { fifths, mode };
+}
+
+// 원본 MusicXML의 조성을 감지한다. (읽기 전용, 변형 없음)
+function detectKey(musicXml) {
+  const doc = new DOMParser().parseFromString(musicXml, 'application/xml');
+  assertNoParseError(doc, '조성 감지');
+  return parseFirstKey(doc);
+}
+
+function pitchToAbsolute(pitchEl) {
+  const stepEl = pitchEl.querySelector('step');
+  const octaveEl = pitchEl.querySelector('octave');
+  if (!stepEl || !octaveEl) throw new Error('<pitch>에 step/octave가 없습니다.');
+  const step = stepEl.textContent.trim();
+  if (!(step in NOTE_BASE_PC)) throw new Error(`알 수 없는 음이름: ${step}`);
+  const alterEl = pitchEl.querySelector('alter');
+  const alter = alterEl ? parseInt(alterEl.textContent, 10) : 0;
+  const octave = parseInt(octaveEl.textContent, 10);
+  return octave * 12 + NOTE_BASE_PC[step] + alter;
+}
+
+// abs(절대 반음값)를 다시 <pitch>에 기록한다. step/octave 사이에 alter가 오는
+// MusicXML 순서를 지킨다.
+function writeAbsoluteToPitch(doc, pitchEl, abs, useFlats) {
+  const pc = ((abs % 12) + 12) % 12;
+  const octave = Math.floor(abs / 12);
+  const spell = (useFlats ? FLAT_SPELL : SHARP_SPELL)[pc];
+  const step = spell[0];
+  const alter = spell.length > 1 ? (spell[1] === '#' ? 1 : -1) : 0;
+
+  const stepEl = pitchEl.querySelector('step');
+  const octaveEl = pitchEl.querySelector('octave');
+  let alterEl = pitchEl.querySelector('alter');
+
+  stepEl.textContent = step;
+  octaveEl.textContent = String(octave);
+
+  if (alter === 0) {
+    if (alterEl) alterEl.remove();
+  } else {
+    if (!alterEl) {
+      alterEl = doc.createElement('alter');
+      pitchEl.insertBefore(alterEl, octaveEl); // <step> 다음, <octave> 앞
+    }
+    alterEl.textContent = String(alter);
+  }
+}
+
+// 이조. mode:'none'|'toKey'|'instrument'
+function transposeMusicXml(musicXml, opts) {
+  const mode = (opts && opts.transposeMode) || 'none';
+  if (mode === 'none') return musicXml;
+
+  const doc = new DOMParser().parseFromString(musicXml, 'application/xml');
+  assertNoParseError(doc, '이조');
+
+  const { fifths: sourceFifths, mode: keyMode } = parseFirstKey(doc);
+
+  let semitones;
+  let targetFifths;
+
+  if (mode === 'toKey') {
+    const targetKey = opts.targetKey || 'C';
+    if (!(targetKey in KEY_NAME_TO_FIFTHS)) {
+      throw new Error(`알 수 없는 목표 조성: ${targetKey}`);
+    }
+    const rawTargetFifths = KEY_NAME_TO_FIFTHS[targetKey];
+    const sourceTonic = tonicPitchClass(sourceFifths, keyMode);
+    const targetTonic = tonicPitchClass(rawTargetFifths, keyMode);
+    const raw = ((targetTonic - sourceTonic) % 12 + 12) % 12; // 0..11
+    semitones = raw > 6 ? raw - 12 : raw; // 최단 경로(동률이면 아래쪽 = 음역이 낮아지는 쪽)
+    targetFifths = rawTargetFifths;
+  } else if (mode === 'instrument') {
+    const instrument = opts.instrument || 'piano';
+    if (!(instrument in INSTRUMENT_SEMITONES)) {
+      throw new Error(`알 수 없는 악기: ${instrument}`);
+    }
+    semitones = INSTRUMENT_SEMITONES[instrument];
+    targetFifths = sourceFifths + semitonesToFifthsDelta(semitones);
+  } else {
+    throw new Error(`알 수 없는 이조 모드: ${mode}`);
+  }
+
+  targetFifths = normalizeFifths(targetFifths);
+  const useFlats = targetFifths < 0;
+
+  if (semitones !== 0) {
+    const pitches = doc.querySelectorAll('pitch');
+    pitches.forEach((p) => {
+      const abs = pitchToAbsolute(p);
+      writeAbsoluteToPitch(doc, p, abs + semitones, useFlats);
+    });
+  }
+
+  doc.querySelectorAll('key fifths').forEach((el) => {
+    el.textContent = String(targetFifths);
+  });
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
+const SheetEngine = {
+  detectKey,
+  keyLabel,
+  normalizeFifths,
+  semitonesToFifthsDelta,
+  transposeMusicXml,
+};
+window.SheetEngine = SheetEngine;
+// ===ENGINE:END===
+</script>
+
+<script>
+// ── 데이터: 프로필 (§2.2 초기값) ─────────────────────────────
+const PROFILES = {
+  first: {
+    id: 'first', name: '첫째', color: '#e07a5f',
+    transposeMode: 'toKey', targetKey: 'C', instrument: 'piano',
+    leftHand: 'rootOnly', noteNames: 'solfege', fingering: true,
+    octaveFold: true, tempoScale: 0.7,
+    staffScale: 2.0, measuresPerLine: 2,
+  },
+  second: {
+    id: 'second', name: '둘째', color: '#3d5a80',
+    transposeMode: 'instrument', instrument: 'recorder',
+    leftHand: 'hidden', noteNames: 'none', fingering: false,
+    octaveFold: true, tempoScale: 1.0,
+    staffScale: 1.3, measuresPerLine: 4,
+  },
+};
+
+const STORE_KEY = 'sheet-app-v1';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return { musicXml: null, fileName: null, profileId: 'first' };
+    const parsed = JSON.parse(raw);
+    return {
+      musicXml: parsed.musicXml || null,
+      fileName: parsed.fileName || null,
+      profileId: PROFILES[parsed.profileId] ? parsed.profileId : 'first',
+    };
+  } catch (e) {
+    return { musicXml: null, fileName: null, profileId: 'first' };
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORE_KEY, JSON.stringify({
+    musicXml: state.musicXml,
+    fileName: state.fileName,
+    profileId: state.profileId,
+  }));
+}
+
+const state = loadState();
+let osmd = null;
+
+const app = document.getElementById('app');
+app.innerHTML = `
+  <div class="topbar">
+    <h1>🎼 우리집 악보</h1>
+    <div class="profile-toggle" id="profileToggle"></div>
+    <label class="upload-btn">
+      📂 악보 불러오기
+      <input type="file" id="fileInput" accept=".musicxml,.xml,text/xml,application/xml">
+    </label>
+  </div>
+  <div class="infobar" id="infobar" style="display:none"></div>
+  <div id="errorBanner"></div>
+  <div class="stage">
+    <div id="placeholder" class="placeholder">
+      <div class="big">🎵</div>
+      <div>악보 파일(.musicxml / .xml)을 불러오면<br>여기에 표시됩니다.</div>
+      <div style="font-size:12px">※ 압축된 .mxl은 v1에서 지원하지 않습니다. MuseScore에서 "압축 안 함"으로 내보내세요.</div>
+    </div>
+    <div id="osmd-container" style="display:none"></div>
+  </div>
+`;
+
+const profileToggleEl = document.getElementById('profileToggle');
+const fileInputEl = document.getElementById('fileInput');
+const infobarEl = document.getElementById('infobar');
+const errorBannerEl = document.getElementById('errorBanner');
+const placeholderEl = document.getElementById('placeholder');
+const osmdContainerEl = document.getElementById('osmd-container');
+
+function renderProfileToggle() {
+  profileToggleEl.innerHTML = Object.values(PROFILES).map((p) => `
+    <button class="profile-btn ${p.id === state.profileId ? 'active' : ''}" data-id="${p.id}">${p.name}</button>
+  `).join('');
+  profileToggleEl.querySelectorAll('button').forEach((btn) => {
+    btn.onclick = () => {
+      state.profileId = btn.dataset.id;
+      saveState();
+      renderProfileToggle();
+      renderScore();
+    };
+  });
+}
+
+function showError(message) {
+  errorBannerEl.innerHTML = message
+    ? `<div class="error-banner">⚠️ ${message}</div>`
+    : '';
+}
+
+function ensureOsmd() {
+  if (osmd) return osmd;
+  osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(osmdContainerEl, {
+    autoResize: true,
+    drawTitle: true,
+    drawComposer: false,
+    drawLyricist: false,
+    drawPartNames: false,
+    drawMeasureNumbers: true,
+    followCursor: true,
+  });
+  return osmd;
+}
+
+async function renderScore() {
+  showError('');
+
+  if (!state.musicXml) {
+    placeholderEl.style.display = 'flex';
+    osmdContainerEl.style.display = 'none';
+    infobarEl.style.display = 'none';
+    return;
+  }
+
+  const profile = PROFILES[state.profileId];
+
+  let sourceInfo;
+  try {
+    sourceInfo = window.SheetEngine.detectKey(state.musicXml);
+  } catch (e) {
+    showError(`원본 악보를 읽을 수 없습니다: ${e.message}`);
+    return;
+  }
+
+  let transformed;
+  try {
+    transformed = window.SheetEngine.transposeMusicXml(state.musicXml, {
+      transposeMode: profile.transposeMode,
+      targetKey: profile.targetKey,
+      instrument: profile.instrument,
+    });
+  } catch (e) {
+    showError(`이조에 실패했습니다 (${profile.name} 프로필): ${e.message}`);
+    return;
+  }
+
+  const targetInfo = window.SheetEngine.detectKey(transformed);
+
+  infobarEl.style.display = 'flex';
+  infobarEl.innerHTML = `
+    <span>원곡: <b>${window.SheetEngine.keyLabel(sourceInfo.fifths, sourceInfo.mode)}</b></span>
+    <span>→ ${profile.name} 출력: <b>${window.SheetEngine.keyLabel(targetInfo.fifths, targetInfo.mode)}</b></span>
+    <span>악기: <b>${profile.instrument}</b></span>
+  `;
+
+  placeholderEl.style.display = 'none';
+  osmdContainerEl.style.display = 'block';
+
+  try {
+    const instance = ensureOsmd();
+    instance.EngravingRules.RenderXMeasuresPerLineAkaSystem = profile.measuresPerLine;
+    instance.zoom = profile.staffScale;
+    await instance.load(transformed);
+    instance.render();
+  } catch (e) {
+    showError(`악보를 그리지 못했습니다: ${e.message}`);
+  }
+}
+
+fileInputEl.addEventListener('change', (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  if (/\.mxl$/i.test(file.name)) {
+    showError('압축된 .mxl 파일은 아직 지원하지 않습니다. MuseScore에서 "MusicXML (압축 안 함)"으로 다시 내보내 주세요.');
+    ev.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.musicXml = String(reader.result);
+    state.fileName = file.name;
+    saveState();
+    renderScore();
+  };
+  reader.onerror = () => showError('파일을 읽는 중 오류가 발생했습니다.');
+  reader.readAsText(file);
+  ev.target.value = '';
+});
+
+renderProfileToggle();
+renderScore();
+</script>
+</body>
+</html>
