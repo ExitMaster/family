@@ -51,7 +51,7 @@ body { font-family:'Noto Sans KR',sans-serif; }
 const NOTE_BASE_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const SHARP_SPELL = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT_SPELL  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-const KO_TONIC = ['다', '올림다', '라', '올림라', '마', '바', '올림바', '사', '올림사', '가', '올림가', '나'];
+const KO_LETTER = { C: '다', D: '라', E: '마', F: '바', G: '사', A: '가', B: '나' };
 
 // 목표 조성 이름 -> fifths (부록 B + 확장)
 const KEY_NAME_TO_FIFTHS = {
@@ -75,9 +75,12 @@ function tonicPitchClass(fifths, mode) {
   return mode === 'minor' ? minorTonicPitchClass(fifths) : majorTonicPitchClass(fifths);
 }
 
+// 플랫 조성(fifths<0)은 내림 표기를 쓴다. 예: fifths=-2 장조 = 내림나장조(Bb), 올림가(A#) 아님.
 function keyLabel(fifths, mode) {
   const pc = tonicPitchClass(fifths, mode);
-  return KO_TONIC[pc] + (mode === 'minor' ? '단조' : '장조');
+  const spell = (fifths < 0 ? FLAT_SPELL : SHARP_SPELL)[pc];
+  const prefix = spell.length > 1 ? (spell[1] === 'b' ? '내림' : '올림') : '';
+  return prefix + KO_LETTER[spell[0]] + (mode === 'minor' ? '단조' : '장조');
 }
 
 // 조표가 ♯/♭ 5개를 넘으면(사실상 ±7) 이명동조로 정리한다. 부록 B: fifths=-7 → +5
@@ -117,6 +120,9 @@ function parseFirstKey(doc) {
   const fifthsEl = keyEl.querySelector('fifths');
   const modeEl = keyEl.querySelector('mode');
   const fifths = fifthsEl ? parseInt(fifthsEl.textContent, 10) : 0;
+  if (Number.isNaN(fifths)) {
+    throw new Error(`<key><fifths> 값을 읽을 수 없습니다: "${fifthsEl.textContent.trim()}"`);
+  }
   const mode = modeEl && modeEl.textContent.trim() === 'minor' ? 'minor' : 'major';
   return { fifths, mode };
 }
@@ -189,7 +195,7 @@ function transposeMusicXml(musicXml, opts) {
     const sourceTonic = tonicPitchClass(sourceFifths, keyMode);
     const targetTonic = tonicPitchClass(rawTargetFifths, keyMode);
     const raw = ((targetTonic - sourceTonic) % 12 + 12) % 12; // 0..11
-    semitones = raw > 6 ? raw - 12 : raw; // 최단 경로(동률이면 아래쪽 = 음역이 낮아지는 쪽)
+    semitones = raw >= 6 ? raw - 12 : raw; // 최단 경로(동률이면 아래쪽 = 음역이 낮아지는 쪽)
     targetFifths = rawTargetFifths;
   } else if (mode === 'instrument') {
     const instrument = opts.instrument || 'piano';
@@ -267,12 +273,19 @@ function loadState() {
   }
 }
 
+// 저장 실패(용량 초과 등)가 업로드/렌더링까지 막으면 안 된다.
+// 실패하면 false를 돌려주고, 호출부가 필요 시 경고만 띄운다.
 function saveState() {
-  localStorage.setItem(STORE_KEY, JSON.stringify({
-    musicXml: state.musicXml,
-    fileName: state.fileName,
-    profileId: state.profileId,
-  }));
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      musicXml: state.musicXml,
+      fileName: state.fileName,
+      profileId: state.profileId,
+    }));
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 const state = loadState();
@@ -410,8 +423,12 @@ fileInputEl.addEventListener('change', (ev) => {
   reader.onload = () => {
     state.musicXml = String(reader.result);
     state.fileName = file.name;
-    saveState();
-    renderScore();
+    const saved = saveState();
+    renderScore().then(() => {
+      if (!saved && !errorBannerEl.textContent.trim()) {
+        showError('저장 공간이 부족해 이 악보는 새로고침하면 사라집니다. (표시는 정상)');
+      }
+    });
   };
   reader.onerror = () => showError('파일을 읽는 중 오류가 발생했습니다.');
   reader.readAsText(file);

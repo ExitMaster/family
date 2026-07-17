@@ -17,6 +17,8 @@
 - `scripts/test-engine.mjs` — 엔진 단위 테스트. `.claude/skills/verify`와 같은 방식으로
   사전 설치된 헤드리스 Chromium을 빌려 써서 `DOMParser`/`XMLSerializer`를 진짜 브라우저에서
   검증한다 (Node 자체엔 DOMParser가 없음). `node scripts/test-engine.mjs`로 실행.
+- `scripts/test-sheet-e2e.mjs` — UI 배선 E2E (업로드→렌더→프로필 전환→새로고침 복원).
+  픽스처는 `scripts/fixtures/sample.musicxml`.
 
 ## 스펙과 다르게 결정한 부분
 

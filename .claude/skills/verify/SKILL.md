@@ -27,11 +27,10 @@ await page.goto('file:///home/user/family/timer.html');
 
 - **timer.html**: 시작 🚀 → +10분 칩 → 다음 → 할 일 선택 → 시작 → `#remainBig` 카운트다운 확인 → 새로고침 후 세션 복원 확인. 시간 의존 상태(임박/완료)는 `page.evaluate`로 `ST.session.targetAt`을 조작한 뒤 `save(); lastUrg=null; render();`. `confirm`/`alert`은 `page.once('dialog', ...)`로 처리.
 - **index.html**(카피바라): 상태는 localStorage `capy-v2-state`.
-- **sheet.html**(악보): 상태는 localStorage `sheet-app-v1`.
-  - `page.setInputFiles('#fileInput', '<musicxml 경로>')` 로 파일 업로드 → `#osmd-container svg`가 그려지는지, `#errorBanner`가 비어 있는지 확인.
-  - 프로필 토글(`.profile-btn[data-id=first|second]`) 클릭 → `#infobar` 텍스트로 이조 결과(원곡/출력 조성) 확인.
-  - `.mxl` 파일을 넣으면 명시적 에러 배너가 떠야 정상(v1은 압축 MusicXML 미지원).
-  - 엔진(순수 함수) 자체는 UI 없이 `node scripts/test-engine.mjs`로 별도 단위 테스트한다 (같은 헤드리스 Chromium을 빌려 `sheet.html`에서 `// ===ENGINE:START/END===` 블록만 추출해 검증).
+- **sheet.html**(악보): 상태는 localStorage `sheet-app-v1`. 테스트 두 개가 이미 준비돼 있다 — 직접 스크립트를 새로 짜기 전에 이걸 먼저 돌릴 것:
+  - `node scripts/test-engine.mjs` — 이조 엔진 단위 테스트 (`sheet.html`의 `// ===ENGINE:START/END===` 블록만 추출해 헤드리스 Chromium에서 검증).
+  - `node scripts/test-sheet-e2e.mjs` — 업로드→렌더→프로필 전환→새로고침 복원 E2E (픽스처: `scripts/fixtures/sample.musicxml`).
+  - 수동 확인 포인트: `#errorBanner` 비어 있는지, `#infobar`에 이조 결과(원곡/출력 조성), `.mxl` 업로드 시 명시적 에러 배너(v1은 압축 MusicXML 미지원).
 - 가로(844×390)와 세로(390×844) 두 뷰포트 모두 스크린샷.
 
 ## 주의

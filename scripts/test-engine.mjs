@@ -90,11 +90,6 @@ async function main() {
   await page.setContent('<!DOCTYPE html><html><body></body></html>');
   await page.addScriptTag({ content: engineCode });
 
-  const results = [];
-  function check(name, fn) {
-    results.push({ name, fn });
-  }
-
   // 순수 계산 함수는 evaluate 안에서 직접 값을 비교하고 결과만 돌려받는다.
   const out = await page.evaluate(({ dMinor, cMajor, broken }) => {
     const E = window.SheetEngine;
@@ -117,9 +112,13 @@ async function main() {
     eq('normalizeFifths(7) === -5', E.normalizeFifths(7), -5);
     eq('normalizeFifths(3) === 3 (그대로)', E.normalizeFifths(3), 3);
 
-    // 2. 한국어 조성 라벨
+    // 2. 한국어 조성 라벨 — 플랫 조성은 내림 표기 (올림가장조 아님)
     eq("keyLabel(-1,'minor') === '라단조'", E.keyLabel(-1, 'minor'), '라단조');
     eq("keyLabel(0,'major') === '다장조'", E.keyLabel(0, 'major'), '다장조');
+    eq("keyLabel(-2,'major') === '내림나장조'", E.keyLabel(-2, 'major'), '내림나장조');
+    eq("keyLabel(-3,'major') === '내림마장조'", E.keyLabel(-3, 'major'), '내림마장조');
+    eq("keyLabel(2,'major') === '라장조'", E.keyLabel(2, 'major'), '라장조');
+    eq("keyLabel(6,'major') === '올림바장조'", E.keyLabel(6, 'major'), '올림바장조');
 
     // 3. 반음->fifths 변화량
     eq('semitonesToFifthsDelta(2) === 2 (트럼펫)', E.semitonesToFifthsDelta(2), 2);
@@ -166,6 +165,17 @@ async function main() {
       eq('recorder: 결과 fifths === 0 (무변화)', key3.fifths, 0);
     }
 
+    // 7.5. 동률(±6반음) 이조는 아래쪽을 택한다: C장조 → F#장조, C4는 F#4가 아니라 F#3
+    {
+      const out = E.transposeMusicXml(cMajor, { transposeMode: 'toKey', targetKey: 'F#' });
+      const doc = new DOMParser().parseFromString(out, 'application/xml');
+      const p = doc.querySelector('pitch');
+      const alterEl = p.querySelector('alter');
+      eq('동률 이조: C4 -> F#3 (step)', p.querySelector('step').textContent, 'F');
+      eq('동률 이조: C4 -> F#3 (alter)', alterEl ? alterEl.textContent : null, '1');
+      eq('동률 이조: C4 -> F#3 (아래 옥타브)', p.querySelector('octave').textContent, '3');
+    }
+
     // 8. mode:'none'은 원본 그대로 반환 (문자열 동일)
     eq("transposeMusicXml(mode:'none') === 원본", E.transposeMusicXml(cMajor, { transposeMode: 'none' }), cMajor);
 
@@ -173,6 +183,8 @@ async function main() {
     throws('알 수 없는 악기 -> throw', () => E.transposeMusicXml(cMajor, { transposeMode: 'instrument', instrument: 'tuba' }));
     throws('알 수 없는 목표 조성 -> throw', () => E.transposeMusicXml(cMajor, { transposeMode: 'toKey', targetKey: 'Zb' }));
     throws('깨진 XML -> throw', () => E.detectKey(broken));
+    throws('깨진 <fifths> 값 -> throw (NaN 전파 금지)', () =>
+      E.detectKey(cMajor.replace('<fifths>0</fifths>', '<fifths>abc</fifths>')));
 
     return r;
   }, { dMinor: fixtureDMinor(), cMajor: fixtureCMajor(), broken: fixtureBroken() });
