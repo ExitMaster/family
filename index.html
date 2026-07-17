@@ -282,7 +282,12 @@ const DECOR = [
   {id:'star',   name:'반짝별 장식',   emoji:'🌟', slot:'hat',   src:'반짝별 수집',       unlocked:s=>((s.items||{})['반짝별']||0)>0},
   {id:'melon',  name:'수박 모자',     emoji:'🍉', slot:'hat',   src:'수박 수집',         unlocked:s=>((s.items||{})['수박']||0)>0},
   {id:'corn',   name:'옥수수',        emoji:'🌽', slot:'side',  src:'옥수수 수집',       unlocked:s=>((s.items||{})['옥수수']||0)>0},
-  {id:'yuzu',   name:'유자',          emoji:'🍊', slot:'side',  src:'유자 수집',         unlocked:s=>((s.items||{})['유자']||0)>0}
+  {id:'yuzu',   name:'유자',          emoji:'🍊', slot:'side',  src:'유자 수집',         unlocked:s=>((s.items||{})['유자']||0)>0},
+  // 리워드샵(한우리 코인)으로 구매하는 장식
+  {id:'tophat', name:'신사 모자',     emoji:'🎩', slot:'hat',   src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('신사 모자')},
+  {id:'scarf',  name:'포근 목도리',   emoji:'🧣', slot:'neck',  src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('포근 목도리')},
+  {id:'balloon',name:'풍선',          emoji:'🎈', slot:'side',  src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('풍선')},
+  {id:'flower', name:'꽃다발',        emoji:'💐', slot:'badge', src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('꽃다발')}
 ];
 function decorById(id){ return DECOR.find(d=>d.id===id)||null; }
 function availableDecor(){ return DECOR.filter(d=>d.unlocked(ST)); }
@@ -300,6 +305,39 @@ function probeCapyImages(){
   if(typeof Image==='undefined') return;
   SPECIES.forEach(s=>{ const im=new Image(); im.onload=()=>{ IMG_OK[s.id]=true; _imgReRender(); }; im.onerror=()=>{}; im.src=CAPY_IMG_BASE+s.id+'.png'; });
 }
+
+// ============================================================
+//  한우리 숙제 — 과업(task) 단위의 주간 숙제 + 한우리 코인
+//  ▸ 금요일 저녁 부여 → 다음 주 목요일까지 자유롭게 수행(요일 강제 배분 없음).
+//  ▸ task 하나 완료 = 코인 1개(PIN 불필요). 주간 전부 완료 시 보너스 +2.
+//  ▸ 목요일 자정까지 미완료 task가 남으면 rollover에서 카피바라 위기 1회.
+//  ▸ task 목록의 입력/수정은 문제집과 동일하게 초안→보호자 PIN 승인.
+// ============================================================
+const COIN_IMG='assets/coin/hanwoori.png';
+let COIN_OK=false;
+function probeCoinImage(){
+  if(typeof Image==='undefined') return;
+  const im=new Image(); im.onload=()=>{ COIN_OK=true; _imgReRender(); }; im.onerror=()=>{}; im.src=COIN_IMG;
+}
+// 코인 아이콘: 로고 이미지가 있으면 이미지, 없으면 🪙. (h()로 이스케이프되는 자리엔 쓰지 말 것)
+function coinIcon(px){ return COIN_OK?`<img src="${COIN_IMG}" alt="코인" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:-${Math.round(px*0.14)}px;">`:'🪙'; }
+// 이번 주 한우리 앵커 = 가장 최근 금요일(당일 포함). 마감은 앵커+6(목요일)까지.
+function hanwooriAnchor(today){ return dstr(dmostRecentDow(today||new Date(),5)); }
+function hwCurrent(){ const hw=ST.hanwoori; return (hw&&hw.anchor===hanwooriAnchor())?hw:null; }   // 이번 주 것만
+function hwEff(){ if(ST.hwDraft) return ST.hwDraft; const cur=hwCurrent(); return cur?cur.tasks:[]; } // 설정 화면 표시용(초안 우선)
+function hwDirty(){ const cur=hwCurrent(); return !!ST.hwDraft && JSON.stringify(ST.hwDraft)!==JSON.stringify(cur?cur.tasks:[]); }
+function hwDday(){ const end=dadd(dparse(hanwooriAnchor()),6); const t=new Date(); return Math.round((new Date(end.getFullYear(),end.getMonth(),end.getDate())-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/86400000); }
+
+// 리워드샵 — 코인으로 장식을 사거나 연못에 특별 이벤트를 일으킨다.
+const SHOP=[
+  {id:'sh_tophat', type:'decor', price:8,  emoji:'🎩', name:'신사 모자',   desc:'머리에 쓰는 멋쟁이 모자',        unlock:'신사 모자'},
+  {id:'sh_scarf',  type:'decor', price:8,  emoji:'🧣', name:'포근 목도리', desc:'목에 두르는 포근한 목도리',      unlock:'포근 목도리'},
+  {id:'sh_balloon',type:'decor', price:6,  emoji:'🎈', name:'풍선',        desc:'옆에 둥둥 떠다니는 풍선',        unlock:'풍선'},
+  {id:'sh_flower', type:'decor', price:10, emoji:'💐', name:'꽃다발',      desc:'가슴에 안는 예쁜 꽃다발',        unlock:'꽃다발'},
+  {id:'sh_party',  type:'event', price:4,  emoji:'🍉', name:'수박 파티',   desc:'연못 친구들 모두 친밀도 +1'},
+  {id:'sh_guest',  type:'event', price:3,  emoji:'🐾', name:'깜짝 친구 초대', desc:'특별한 손님이 연못에 놀러와요'},
+  {id:'sh_rainbow',type:'event', price:6,  emoji:'🌈', name:'무지개 축제', desc:'연못 하늘에 무지개가 떠요'}
+];
 
 // 5) 이벤트 — 부류 4종. reward 키: intimacy, item(수집), guest(깜짝친구 id),
 //    unlock(꾸미기 해금), 비우면 순수 연출. weight=같은 부류 내 랜덤 가중치.
@@ -390,6 +428,7 @@ const DEFAULT_STATE = {
   caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
   items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
   milestonesFired:[], eventQueue:[], equip:{}, voluntaryRescueDate:null,
+  hanwoori:{anchor:null,tasks:[]}, coins:0, hwDraft:null, hwNewTask:'', shopMsg:'',
   pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:'', pinDraft2:'', pinSaveErr:'',
   assignDraft:null
 };
@@ -555,6 +594,11 @@ function rollover() {
       const a=cycleAnchor(cy,cur), lastOff=Math.max.apply(null,cy.days.map(x=>x.off));
       if(dstr(dadd(a,lastOff))===dstr(cur)){ const cs=cycleSchedule(cy,cur); if(cs.cycleDone<cs.T) miss++; }
     });
+    // 한우리: 주간 마감일(앵커+6=목요일)이 그날이었는데 미완료 task가 남았으면 위기 1회.
+    if(ST.hanwoori&&ST.hanwoori.anchor&&ST.hanwoori.tasks.length){
+      const hwEnd=dadd(dparse(ST.hanwoori.anchor),6);
+      if(dstr(hwEnd)===dstr(cur)&&ST.hanwoori.tasks.some(t=>!t.done)) miss++;
+    }
     cur=dadd(cur,1);
   }
   applyMiss(miss);
@@ -567,7 +611,7 @@ function setState(upd) {
   save(); render();
 }
 function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip,pendingReward:ST.pendingReward,voluntaryRescueDate:ST.voluntaryRescueDate})); } catch(e){}
+  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip,pendingReward:ST.pendingReward,voluntaryRescueDate:ST.voluntaryRescueDate,hanwoori:ST.hanwoori,coins:ST.coins})); } catch(e){}
 }
 function load() {
   const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
@@ -625,6 +669,64 @@ function commitAssignDraft(){
   setState({assignments:ST.assignDraft,assignDraft:null,rowEdit:{},overlay:null,verifyFor:null,pinEntry:'',pinError:false});
 }
 function discardAssignDraft(){ setState({assignDraft:null,rowEdit:{}}); }
+
+// ── 한우리 숙제 mutations ────────────────────────────────────
+// task 목록 입력은 초안에 쌓고, '확인받기'(PIN)로 확정 — 아이가 임의로 task를 만들거나 지우는 것 방지.
+function addHanwooriTask(){
+  const t=(ST.hwNewTask||'').trim(); if(!t) return;
+  const draft=[...hwEff().map(x=>({...x})), {id:'t'+Date.now().toString(36)+Math.floor(Math.random()*99), title:t, done:false, doneDate:null}];
+  setState({hwDraft:draft, hwNewTask:''});
+}
+function delHanwooriTask(id){ setState({hwDraft:hwEff().filter(x=>x.id!==id).map(x=>({...x}))}); }
+function applyHanwooriDraft(){
+  if(!hwDirty()){ setState({hwDraft:null}); return; }
+  if(pinSet()) setState({verifyFor:'hanwoori',pinEntry:'',pinError:false,overlay:'verify'});
+  else commitHanwooriDraft();
+}
+function commitHanwooriDraft(){
+  if(!ST.hwDraft){ setState({overlay:null,verifyFor:null}); return; }
+  setState({hanwoori:{anchor:hanwooriAnchor(),tasks:ST.hwDraft},hwDraft:null,overlay:null,verifyFor:null,pinEntry:'',pinError:false});
+}
+function discardHanwooriDraft(){ setState({hwDraft:null,hwNewTask:''}); }
+// task 완료: 코인 +1 (PIN 불필요). 이번 주 전부 완료하면 보너스 +2와 축하 카드가 이어진다.
+function completeHanwooriTask(id){
+  const cur=hwCurrent(); if(!cur) return;
+  const t=cur.tasks.find(x=>x.id===id); if(!t||t.done) return;
+  const tasks=cur.tasks.map(x=>x.id===id?{...x,done:true,doneDate:dstr(new Date())}:x);
+  let coins=(ST.coins||0)+1;
+  const queue=[];
+  const allDone=tasks.every(x=>x.done);
+  if(allDone){ coins+=2; queue.push({ev:{id:'hw_week',emoji:'🎉',title:'이번 주 한우리 완주!',line:'일주일 치 한우리 숙제를 모두 해냈어! 보너스 코인 +2!',mood:'신남'},who:null,guest:null,itemGot:null,intimacy:0,unlock:null,coins:2}); }
+  const ei={ev:{id:'hw_coin',emoji:'🪙',title:'한우리 코인 획득!',line:'"'+t.title+'" 완료! 코인이 짤랑— 들어왔어.',mood:'뿌듯'},who:null,guest:null,itemGot:null,intimacy:0,unlock:null,coins:1};
+  ST={...ST,hanwoori:{...cur,tasks},coins,eventInfo:ei,eventQueue:queue,overlay:'event'};
+  save(); render();
+}
+// ── 리워드샵 ────────────────────────────────────────────────
+function openShop(){ setState({overlay:'shop',shopMsg:''}); }
+function buyShop(id){
+  const it=SHOP.find(x=>x.id===id); if(!it) return;
+  const coins=ST.coins||0;
+  if(it.type==='decor'&&(ST.unlocks||[]).includes(it.unlock)){ setState({shopMsg:'이미 가지고 있는 장식이에요!'}); return; }
+  if(coins<it.price){ setState({shopMsg:'코인이 부족해요. 한우리 숙제로 더 모아보자!'}); return; }
+  if(it.type==='decor'){
+    setState({coins:coins-it.price,unlocks:[...(ST.unlocks||[]),it.unlock],shopMsg:it.emoji+' '+it.name+' 구매 완료! 도감에서 카피바라를 눌러 입혀보세요.'});
+    return;
+  }
+  // 이벤트형: 구매 즉시 연못 이벤트 발동(이벤트 카드로 전환)
+  let pond=ST.pond, guest=null, ev;
+  if(it.id==='sh_party'){
+    pond=ST.pond.map(c=>c.status==='healthy'?{...c,intimacy:(c.intimacy||0)+1}:c);
+    ev={id:'shop_party',emoji:'🍉',title:'수박 파티!',line:'코인으로 수박 파티를 열었어! 연못 친구들이 모두 신나게 나눠 먹어.',mood:'먹는중'};
+  } else if(it.id==='sh_guest'){
+    guest=GUESTS[Math.floor(Math.random()*GUESTS.length)];
+    ev={id:'shop_guest',emoji:'🐾',title:'깜짝 손님 도착!',line:'코인으로 초대장을 보냈더니 특별한 손님이 찾아왔어!',mood:'두근'};
+  } else {
+    ev={id:'shop_rainbow',emoji:'🌈',title:'무지개 축제!',line:'연못 하늘에 커다란 무지개가 떴어! 카피바라들이 폴짝폴짝 뛰어.',mood:'신남'};
+  }
+  const intimacy=it.id==='sh_party'?1:0;
+  ST={...ST,coins:coins-it.price,pond,eventInfo:{ev,who:it.id==='sh_party'?'연못 친구들':null,guest,itemGot:null,intimacy,unlock:null},eventQueue:[],overlay:'event'};
+  save(); render();
+}
 function setMpp(v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}})); }
 function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,dayMin:{...s.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}})); }
 function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
@@ -678,6 +780,7 @@ function pinPress(d){
     const purpose=ST.verifyFor;
     if(purpose==='reward'){ ST={...ST,pinEntry:'',pinError:false,verifyFor:null,pendingReward:null,overlay:null}; finishDay(); }
     else if(purpose==='assignments'){ commitAssignDraft(); }
+    else if(purpose==='hanwoori'){ commitHanwooriDraft(); }
     else { setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings'}); }
   } else {
     setState({pinEntry:'',pinError:true});
@@ -860,6 +963,7 @@ function render() {
   ${ST.overlay==='dex'       ? renderDex(T,dexSeenCount,dexTotal,dexPct):''}
   ${ST.overlay==='capyDetail'? renderDetail(T):''}
   ${ST.overlay==='settings'  ? renderSettings(T):''}
+  ${ST.overlay==='shop'      ? renderShop(T):''}
   ${ST.overlay==='verify'    ? renderVerify(T):''}
   ${(wide&&ST.screen==='setup')?`<div style="position:absolute;inset:0;z-index:57;background:${T.bg};overflow-y:auto;"><div style="max-width:780px;margin:0 auto;padding:16px 24px 50px;"><div style="display:flex;justify-content:flex-end;margin-bottom:4px;"><div onclick="setState({screen:'home'})" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div></div>${renderSetup(T,sch)}</div></div>`:''}`;
 
@@ -868,6 +972,7 @@ function render() {
   <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px 12px;flex-shrink:0;">
     <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};line-height:1;">🌿 인우의 카피바라 연못</div>
     <div style="display:flex;align-items:center;gap:8px;">
+      <div ${ST.timerRunning?'':'onclick="openShop()"'} class="tapbtn" style="${ST.timerRunning?'':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;color:${T.accentDark};">${coinIcon(18)} ${ST.coins||0}</div>
       <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
       <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
     </div>
@@ -934,6 +1039,35 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
 }
 // ── 가로 태블릿 대시보드 (한 화면에 연못+오늘숙제+도감) ──────────
 function isWide(){ return window.innerWidth>=820 && window.innerWidth>=window.innerHeight; }
+// 한우리 숙제 카드 — 대시보드·세로 공용. task 체크리스트 + 코인 + 마감 안내.
+function renderHanwooriCard(T, focus){
+  const card='background:'+T.card+';border:2px solid '+T.line+';border-radius:22px;padding:15px 17px;box-shadow:0 6px 16px rgba(0,0,0,0.04);';
+  const dim=focus?'opacity:.45;filter:grayscale(.5);pointer-events:none;':'';
+  const cur=hwCurrent(), wk=dwk(new Date());
+  const coinChip=`<div ${focus?'':'onclick="openShop()"'} class="tapbtn" style="${focus?'':'cursor:pointer;'}display:flex;align-items:center;gap:5px;background:${T.soft};border:2px solid ${T.line};border-radius:999px;padding:4px 11px;font-weight:800;font-size:13px;color:${T.accentDark};">${coinIcon(16)} ${ST.coins||0} <span style="font-size:11px;color:${T.sub};">샵 →</span></div>`;
+  const head=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:800;font-size:17px;">🟠 한우리 숙제 ${focus?'<span style=\"font-size:12px;color:'+T.sub+';\">🔒 집중 중</span>':''}</div>${coinChip}</div>`;
+  if(!cur||!cur.tasks.length){
+    return `<div style="${card}${dim}">${head}
+      <div style="font-size:13px;color:${T.sub};line-height:1.55;">이번 주 한우리 숙제가 아직 없어요.<br>금요일에 받아오면 <b>✏️ 숙제설정</b>에서 입력해 주세요.</div>
+    </div>`;
+  }
+  const doneN=cur.tasks.filter(t=>t.done).length, total=cur.tasks.length, allDone=doneN===total;
+  const dday=hwDday();
+  const ddayChip = allDone?`<span style="color:#6aa05a;font-weight:800;">이번 주 완주! 🎉</span>`
+    : dday<=1?`<span style="color:#c0503a;font-weight:800;">⏰ 마감 ${dday===0?'오늘':'내일'}!</span>`
+    : `<span style="color:${T.sub};font-weight:700;">마감까지 ${dday}일</span>`;
+  const hint=(wk==='sat'||wk==='sun')?' · 📖 책 읽기 좋은 주말':(wk==='mon'||wk==='tue'||wk==='thu')?' · ✨ 한우리 하는 날':'';
+  const rows=cur.tasks.map(t=>t.done
+    ? `<div style="display:flex;align-items:center;gap:9px;padding:8px 4px;border-bottom:1px dashed ${T.line};"><div style="width:26px;height:26px;border-radius:50%;background:${T.accent};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">✓</div><div style="flex:1;font-size:13.5px;font-weight:600;color:${T.sub};text-decoration:line-through;">${h(t.title)}</div><div style="flex:none;font-size:14px;">${coinIcon(15)}</div></div>`
+    : `<div style="display:flex;align-items:center;gap:9px;padding:8px 4px;border-bottom:1px dashed ${T.line};"><div style="width:26px;height:26px;border-radius:50%;background:${T.soft};border:2px solid ${T.line};flex:none;"></div><div style="flex:1;font-size:13.5px;font-weight:700;color:${T.ink};">${h(t.title)}</div><div onclick="completeHanwooriTask('${t.id}')" class="tapbtn" style="cursor:pointer;flex:none;background:${T.accent};color:#fff;font-weight:800;font-size:12px;padding:7px 13px;border-radius:999px;box-shadow:0 3px 0 ${T.accentDark};">다 했어요 ✓</div></div>`
+  ).join('');
+  return `<div style="${card}${dim}">${head}
+    <div style="font-size:12.5px;margin-bottom:4px;">${ddayChip}<span style="color:${T.sub};font-weight:600;font-size:12px;">${hint}</span></div>
+    <div style="height:11px;background:${T.soft};border-radius:999px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${Math.round(doneN/total*100)}%;background:linear-gradient(90deg,#e8a33d,#f3c04e);border-radius:999px;transition:width .4s;"></div></div>
+    <div style="font-size:11.5px;color:${T.sub};font-weight:700;margin-bottom:2px;">${doneN} / ${total} 완료</div>
+    ${rows}
+  </div>`;
+}
 function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCount, dexTotal, dexPct, dateLabel, timerMin, timerSec) {
   const card='background:'+T.card+';border:2px solid '+T.line+';border-radius:22px;padding:16px 18px;box-shadow:0 6px 16px rgba(0,0,0,0.04);';
   const focus=ST.timerRunning; // 집중 모드: 타이머가 돌면 연못·도감을 잠가 주의 분산을 막는다
@@ -998,6 +1132,7 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
     <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
       <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};">🌿 인우의 카피바라 연못</div>
       <div style="display:flex;align-items:center;gap:8px;">
+        <div ${focus?'':'onclick="openShop()"'} class="tapbtn" style="${focus?'':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;color:${T.accentDark};">${coinIcon(18)} ${ST.coins||0}</div>
         <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
         <div onclick="setState({screen:'setup'})" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:14px;">✏️ 숙제설정</div>
         <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
@@ -1015,6 +1150,7 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
       </div>`:pondScene(T,dexPct,'100%',false)}</div>
       <div style="flex:1;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
         ${dexPanel}
+        ${renderHanwooriCard(T,focus)}
         <div style="flex:1;min-height:8px;"></div>
         ${todayPanel}
       </div>
@@ -1092,6 +1228,26 @@ function renderSetup(T,sch) {
       </div>
     </div>`:''}
   </div>
+  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
+    <div style="font-weight:800;font-size:16px;margin-bottom:4px;">🟠 한우리 숙제 <span style="font-size:11.5px;color:${T.sub};font-weight:600;">(금요일 부여 · 다음 목요일까지)</span></div>
+    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">과업 하나씩 입력해요 (예: 미션 책 읽기, 과학탐탐 12~20쪽). task 하나 완료마다 코인 1개!</div>
+    ${hwEff().map(t=>`<div style="display:flex;align-items:center;gap:10px;background:${T.soft};border-radius:13px;padding:10px 13px;margin-bottom:8px;">
+      <span style="flex:none;font-size:15px;">📝</span>
+      <span style="flex:1;font-weight:700;font-size:14px;color:${t.done?T.sub:T.ink};${t.done?'text-decoration:line-through;':''}">${h(t.title)}${t.done?' ✓':''}</span>
+      <div onclick="delHanwooriTask('${t.id}')" class="tapbtn" style="cursor:pointer;width:36px;height:36px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:11px;font-size:16px;color:${T.sub};">✕</div>
+    </div>`).join('')||`<div style="font-size:13px;color:${T.sub};padding:4px 2px 10px;">이번 주 task가 없어요. 아래에 추가해 주세요.</div>`}
+    <div style="display:flex;gap:8px;margin-top:6px;">
+      <input data-hw-new="1" value="${h(ST.hwNewTask)}" placeholder="새 task (예: 원고지 작성하기)" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;background:#fff;border:2px dashed ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
+      <div onclick="addHanwooriTask()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">+ 추가</div>
+    </div>
+    ${hwDirty()?`<div style="margin-top:10px;background:${lighten(T.accent,0.8)};border:2px dashed ${T.accent};border-radius:14px;padding:12px 13px;">
+      <div style="font-size:12.5px;color:${T.accentDark};font-weight:700;margin-bottom:9px;line-height:1.5;">✏️ 변경한 task가 아직 적용되지 않았어요.<br>${pinSet()?'보호자 PIN 확인을 받아야 반영돼요.':'아래 버튼으로 적용하세요.'}</div>
+      <div style="display:flex;gap:8px;">
+        <div onclick="applyHanwooriDraft()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:14.5px;padding:12px;border-radius:12px;">${pinSet()?'🔒 변경 내용 확인받기':'변경 내용 적용'}</div>
+        <div onclick="discardHanwooriDraft()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.soft};color:${T.sub};font-weight:800;font-size:14.5px;padding:12px 16px;border-radius:12px;">취소</div>
+      </div>
+    </div>`:''}
+  </div>
   <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:8px;">
     <div style="display:flex;align-items:baseline;justify-content:space-between;">
       <div style="font-weight:800;font-size:16px;">📊 주간 배분 미리보기${assignDirty()?` <span style="font-size:11px;color:${T.accentDark};">· 미적용 변경 포함</span>`:''}</div>
@@ -1148,7 +1304,7 @@ function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
           : `<div onclick="startHomework()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:19px;padding:18px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">${(ST.timerSec>0&&ST.timerSec<mpp()*60)?'이어서 집중하기 ▶':'오늘 숙제 시작 ▶'}</div>`)}
   </div>`:restCard;
 
-  return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}</div>`;
+  return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}<div style="margin-top:14px;">${renderHanwooriCard(T,ST.timerRunning)}</div></div>`;
 }
 
 function renderNav(T) {
@@ -1190,6 +1346,7 @@ function renderEvent(T) {
   if(ei.intimacy) bits.push(`💗 ${h(ei.who)} 친밀도 +${ei.intimacy}`);
   if(ei.itemGot) bits.push(`${ev.emoji} ${h(ei.itemGot)} 수집 (총 ${ei.itemCount}개)`);
   if(ei.unlock) bits.push(`🎀 ${h(ei.unlock)} 해금`);
+  if(ei.coins) bits.push(`🪙 한우리 코인 +${ei.coins} (모은 코인 ${ST.coins||0}개)`);
   if(!bits.length) bits.push('포근한 순간을 함께했어요 🌿');
   const moodBadge=ev.mood?`<div style="position:absolute;top:-6px;right:-6px;font-size:26px;">${moodEmoji(ev.mood)}</div>`:'';
   return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
@@ -1280,14 +1437,47 @@ function assignReviewRows(T){
     return `<div style="padding:6px 0;border-bottom:1px solid ${T.line};"><b>${o.l} · ${total}쪽</b><div style="font-size:11.5px;color:${T.sub};margin-top:2px;line-height:1.5;">${detail}</div></div>`;
   }).join('');
 }
+// 리워드샵 — 한우리 코인으로 장식 구매·연못 이벤트 발동.
+function renderShop(T) {
+  const coins=ST.coins||0;
+  const cards=SHOP.map(it=>{
+    const owned=it.type==='decor'&&(ST.unlocks||[]).includes(it.unlock);
+    const afford=coins>=it.price;
+    const btn=owned?`<div style="text-align:center;background:${T.soft};color:#6aa05a;font-weight:800;font-size:12.5px;padding:9px;border-radius:12px;">보유중 ✓</div>`
+      :`<div ${afford?`onclick="buyShop('${it.id}')"`:''} class="tapbtn" style="${afford?'cursor:pointer;':'opacity:.45;'}text-align:center;background:${afford?T.accent:T.soft};color:${afford?'#fff':T.sub};font-weight:800;font-size:12.5px;padding:9px;border-radius:12px;${afford?`box-shadow:0 3px 0 ${T.accentDark};`:''}">${coinIcon(14)} ${it.price}로 ${it.type==='decor'?'구매':'열기'}</div>`;
+    return `<div style="background:${T.card};border:2px solid ${T.line};border-radius:18px;padding:14px 12px;text-align:center;display:flex;flex-direction:column;gap:6px;">
+      <div style="font-size:38px;line-height:1;">${it.emoji}</div>
+      <div style="font-weight:800;font-size:14px;">${h(it.name)}</div>
+      <div style="font-size:11.5px;color:${T.sub};line-height:1.4;flex:1;">${h(it.desc)}</div>
+      <div style="font-size:10.5px;font-weight:800;color:${it.type==='decor'?'#8a6fc9':'#3f9b94'};">${it.type==='decor'?'🎀 꾸미기 장식':'✨ 연못 이벤트'}</div>
+      ${btn}
+    </div>`;
+  }).join('');
+  return `<div style="position:absolute;inset:0;z-index:55;background:${T.bg};display:flex;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
+    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">🛍️ 한우리 리워드샵</div>
+    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
+  </div>
+  <div style="padding:0 22px 8px;flex-shrink:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:7px;background:${T.card};border:2px solid ${T.line};border-radius:999px;padding:8px 16px;font-weight:800;font-size:16px;color:${T.accentDark};">${coinIcon(20)} ${coins}개</div>
+    <div style="font-size:12.5px;color:${T.sub};font-weight:600;">한우리 숙제를 하면 코인이 모여요!</div>
+  </div>
+  ${ST.shopMsg?`<div style="margin:0 22px 8px;background:${lighten(T.accent,0.84)};border:2px solid ${lighten(T.accent,0.5)};border-radius:14px;padding:10px 14px;font-size:13px;font-weight:700;color:${T.accentDark};flex-shrink:0;">${h(ST.shopMsg)}</div>`:''}
+  <div style="flex:1;overflow-y:auto;padding:10px 18px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;align-content:start;">${cards}</div>
+</div>`;
+}
+
 // 보호자 확인 / 설정 잠금 / 숙제 변경 확인 — 6자리 PIN 키패드.
 function renderVerify(T) {
-  const purpose=ST.verifyFor, reward=purpose==='reward', isAssign=purpose==='assignments';
-  const title=reward?'보호자 확인':isAssign?'숙제 변경 확인':'부모님 설정 잠금';
+  const purpose=ST.verifyFor, reward=purpose==='reward', isAssign=purpose==='assignments', isHw=purpose==='hanwoori';
+  const title=reward?'보호자 확인':isAssign?'숙제 변경 확인':isHw?'한우리 숙제 확인':'부모님 설정 잠금';
   const sub=reward?'오늘 숙제를 정말 다 했나요?<br>보호자가 확인하면 친구가 찾아와요 🌿'
           :isAssign?'아래 내용으로 숙제를 바꿀까요?<br>보호자 PIN으로 확인해 주세요.'
+          :isHw?'이번 주 한우리 숙제를 아래 목록으로 정할까요?<br>보호자 PIN으로 확인해 주세요.'
           :'보호자 PIN을 입력하면 설정을 열 수 있어요.';
-  const review=isAssign?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;">${assignReviewRows(T)}</div>`:'';
+  const hwReview=isHw?(ST.hwDraft||[]).map(t=>`<div style="padding:6px 0;border-bottom:1px solid ${T.line};font-size:13px;font-weight:700;">📝 ${h(t.title)}${t.done?' <span style="color:#6aa05a;">✓완료</span>':''}</div>`).join('')||`<div style="padding:8px 0;font-size:13px;color:${T.sub};">task 없음 (전체 삭제)</div>`:'';
+  const review=isAssign?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;">${assignReviewRows(T)}</div>`
+            :isHw?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;max-height:180px;overflow-y:auto;">${hwReview}</div>`:'';
   const entry=ST.pinEntry||'';
   const dots=Array.from({length:6}).map((_,i)=>`<div style="width:15px;height:15px;border-radius:50%;background:${i<entry.length?T.accent:'transparent'};border:2px solid ${i<entry.length?T.accent:T.line};"></div>`).join('');
   const kStyle=`cursor:pointer;display:flex;align-items:center;justify-content:center;height:56px;border-radius:16px;background:${T.soft};border:2px solid ${T.line};font-size:23px;font-weight:800;color:${T.ink};`;
@@ -1378,6 +1568,8 @@ function attachInputs() {
   });
   const nwb=document.querySelector('[data-new-wb]');
   if(nwb) nwb.addEventListener('input',e=>{ST.newWbName=e.target.value;});
+  const hwn=document.querySelector('[data-hw-new]');
+  if(hwn) hwn.addEventListener('input',e=>{ST.hwNewTask=e.target.value;});
   const pinD=document.querySelector('[data-pin-draft]');
   if(pinD) pinD.addEventListener('input',e=>{ST.pinDraft=e.target.value.replace(/[^0-9]/g,'');});
   const pinD2=document.querySelector('[data-pin-draft2]');
@@ -1410,6 +1602,7 @@ window.addEventListener('resize',()=>{
 load();
 render();
 probeCapyImages(); // 커스텀 이미지가 있으면 로드되는 대로 SVG를 그림으로 교체
+probeCoinImage();  // 한우리 코인 로고(assets/coin/hanwoori.png)가 있으면 🪙 대신 사용
 startTick();
 </script>
 </body>
