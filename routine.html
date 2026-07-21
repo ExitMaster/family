@@ -77,8 +77,26 @@ const STAGES = [
   { min: 25, name: '전설',   scale: 1.08, glow: 4,  crown: '👑' },
 ];
 
+/* 아이별 여름방학 기간 (start=방학 첫날, schoolStart=개학일) */
+const VACATION = {
+  big:   { start: '2026-07-27', schoolStart: '2026-08-21' }, // 이누
+  small: { start: '2026-07-22', schoolStart: '2026-08-11' }, // 든든이
+};
+
 function todayKey(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function weekDates(){ const out=[],d=new Date(); for(let i=6;i>=0;i--){const x=new Date(d);x.setDate(d.getDate()-i);out.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`);} return out; }
+/* 'YYYY-MM-DD' → 일수(정수). UTC 기준이라 시간대·서머타임 영향 없음 */
+function ymdToDays(s){ const [y,m,d]=s.split('-').map(Number); return Math.floor(Date.UTC(y,m-1,d)/86400000); }
+/* 아이별 방학 진행 상황 문구 */
+function vacationInfo(kidId){
+  const v=VACATION[kidId]; if(!v) return '';
+  const t=ymdToDays(todayKey()), s=ymdToDays(v.start), sc=ymdToDays(v.schoolStart);
+  let label, cls='';
+  if(t<s){ label=`방학까지 ${s-t}일`; cls='before'; }
+  else if(t>=sc){ label='개학했어요 🎒'; cls='ended'; }
+  else { label=`방학 ${t-s+1}일째 · 개학까지 ${sc-t}일`; }
+  return `<div class="vacation ${cls}">🏖️ ${label}</div>`;
+}
 
 let state=null, parentMode=false, editingKid=null;
 
@@ -149,6 +167,7 @@ function panel(kidId){
       </div>
       ${parentMode?`<button class="edit-btn" onclick="openEdit('${kidId}')">편집</button>`:''}
     </div>
+    ${vacationInfo(kidId)}
     <div class="progress-wrap">
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
       <span class="progress-text">오늘 ${done}/${total}</span>
@@ -278,6 +297,11 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
   .stage-star { font-size:15px; }
   .edit-btn { position:absolute; top:10px; right:10px; background:var(--accent); color:#fff; border:none; padding:6px 12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; }
 
+  .vacation { margin:12px 4px 0; padding:9px 12px; border-radius:12px; text-align:center; font-size:14px; font-weight:800;
+    background:color-mix(in srgb, var(--accent) 12%, #fff); border:2px solid color-mix(in srgb, var(--accent) 30%, #fff);
+    color:color-mix(in srgb, var(--accent) 80%, #2b2733); }
+  .vacation.before { opacity:.9; }
+  .vacation.ended { background:#f4eef2; border-color:#e6dde6; color:#8a7f90; }
   .progress-wrap { display:flex; align-items:center; gap:10px; margin:16px 4px 12px; }
   .progress-bar { flex:1; height:12px; background:#f2eef1; border-radius:99px; overflow:hidden; }
   .progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:99px; transition:width .35s ease; }
