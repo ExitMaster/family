@@ -27,13 +27,12 @@ window.storage = {
 })();
 </script>
 <script>
-/* ===== 방학 데일리 루틴 앱 v2 =====
+/* ===== 방학 데일리 루틴 앱 =====
    좌: 이누(큰아이) / 우: 든든이(작은아이)
    실제 이미지 아이콘 + 비비드 색감
+   이미지 데이터(window.IMG_INU / IMG_DEUNDEUN)는 문서 상단 스크립트에서 주입됨
 */
 const STORAGE_KEY = 'holiday_routine_v3';
-
-/* 이미지 데이터는 아래 IMG_DATA 스크립트에서 주입됨 */
 
 const DEFAULT_KIDS = {
   big: {
@@ -184,7 +183,7 @@ function taskRow(kidId,t,prog){
   return `
   <div class="task ${checked?'checked':''} ${confirmed?'confirmed':''}">
     <button class="check" onclick="toggleCheck('${kidId}','${t.id}')" aria-label="완료">${confirmed?'⭐':(checked?'✔':'')}</button>
-    <span class="task-icon">${t.icon}</span>
+    <span class="task-icon">${escapeHtml(t.icon)}</span>
     <span class="task-label">${escapeHtml(t.label)}</span>
     ${parentMode&&checked&&!confirmed?`<button class="confirm" onclick="confirmTask('${kidId}','${t.id}')">확인 ✓</button>`:''}
     ${confirmed?'<span class="badge">확인됨</span>':''}
@@ -219,7 +218,7 @@ function editModal(kidId){
               <button class="mv" onclick="moveTask('${kidId}','${t.id}',-1)" ${i===0?'disabled':''} aria-label="위로 이동">▲</button>
               <button class="mv" onclick="moveTask('${kidId}','${t.id}',1)" ${i===kid.tasks.length-1?'disabled':''} aria-label="아래로 이동">▼</button>
             </div>
-            <input class="ei-icon" id="ic_${t.id}" value="${t.icon}" maxlength="2"/>
+            <input class="ei-icon" id="ic_${t.id}" value="${escapeHtml(t.icon)}" maxlength="2"/>
             <input class="ei-label" id="lb_${t.id}" value="${escapeHtml(t.label)}"/>
             <button class="save-task" onclick="saveTask('${kidId}','${t.id}',this)">✓</button>
             <button class="del-task" onclick="deleteTask('${kidId}','${t.id}')">🗑</button>
