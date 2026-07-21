@@ -145,7 +145,7 @@ function panel(kidId){
       </div>
       <div class="creature-info">
         <div class="kid-name">${escapeHtml(kid.name)}</div>
-        <div class="stage">${stage.name} · ⭐ ${state.stars[kidId]||0}</div>
+        <div class="stage-badge"><span class="stage-name">${stage.name}</span><span class="stage-star">⭐ ${state.stars[kidId]||0}</span></div>
       </div>
       ${parentMode?`<button class="edit-btn" onclick="openEdit('${kidId}')">편집</button>`:''}
     </div>
@@ -272,8 +272,10 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
   .avatar-wrap.glow-4 { box-shadow:0 0 0 4px var(--accent), 0 0 28px var(--accent), 0 0 46px color-mix(in srgb, var(--accent2) 60%, transparent); animation:pulse 1.8s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.12)} }
   .crown { position:absolute; top:-14px; left:50%; transform:translateX(-50%); font-size:22px; z-index:2; filter:drop-shadow(0 2px 2px rgba(0,0,0,.2)); }
+  .creature-info { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
   .kid-name { font-size:22px; font-weight:900; letter-spacing:-.5px; color:color-mix(in srgb, var(--accent) 75%, #2b2733); }
-  .stage { font-size:13px; color:#8a7f90; margin-top:3px; font-weight:700; }
+  .stage-badge { display:flex; align-items:center; gap:6px; background:var(--accent); color:#fff; padding:5px 12px; border-radius:99px; font-size:15px; font-weight:800; box-shadow:0 2px 6px color-mix(in srgb, var(--accent) 45%, transparent); white-space:nowrap; }
+  .stage-star { font-size:15px; }
   .edit-btn { position:absolute; top:10px; right:10px; background:var(--accent); color:#fff; border:none; padding:6px 12px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; }
 
   .progress-wrap { display:flex; align-items:center; gap:10px; margin:16px 4px 12px; }
