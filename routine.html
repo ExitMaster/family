@@ -191,8 +191,12 @@ function editModal(kidId){
         <div class="row"><input id="kname" value="${escapeHtml(kid.name)}" maxlength="10"/><button onclick="saveKidMeta('${kidId}',this)">저장</button></div>
       </div>
       <div class="edit-list">
-        ${kid.tasks.map(t=>`
+        ${kid.tasks.map((t,i)=>`
           <div class="edit-row">
+            <div class="move">
+              <button class="mv" onclick="moveTask('${kidId}','${t.id}',-1)" ${i===0?'disabled':''} aria-label="위로 이동">▲</button>
+              <button class="mv" onclick="moveTask('${kidId}','${t.id}',1)" ${i===kid.tasks.length-1?'disabled':''} aria-label="아래로 이동">▼</button>
+            </div>
             <input class="ei-icon" id="ic_${t.id}" value="${t.icon}" maxlength="2"/>
             <input class="ei-label" id="lb_${t.id}" value="${escapeHtml(t.label)}"/>
             <button class="save-task" onclick="saveTask('${kidId}','${t.id}',this)">✓</button>
@@ -224,6 +228,8 @@ function flashSaved(btn){ if(!btn)return; const o=btn.textContent; btn.textConte
 async function saveKidMeta(kidId,btn){ const n=document.getElementById('kname').value.trim(); if(n)state.kids[kidId].name=n; await saveState(); flashSaved(btn); }
 async function saveTask(kidId,taskId,btn){ const icon=document.getElementById('ic_'+taskId).value.trim(); const label=document.getElementById('lb_'+taskId).value.trim(); const t=state.kids[kidId].tasks.find(x=>x.id===taskId); if(t){if(icon)t.icon=icon; if(label)t.label=label;} await saveState(); flashSaved(btn); }
 async function deleteTask(kidId,taskId){ state.kids[kidId].tasks=state.kids[kidId].tasks.filter(x=>x.id!==taskId); await saveState(); rerenderModal(); }
+/* 할 일 순서 이동: dir=-1 위로, dir=+1 아래로 */
+async function moveTask(kidId,taskId,dir){ const tasks=state.kids[kidId].tasks; const i=tasks.findIndex(x=>x.id===taskId); const j=i+dir; if(i<0||j<0||j>=tasks.length)return; [tasks[i],tasks[j]]=[tasks[j],tasks[i]]; await saveState(); rerenderModal(); }
 async function addTask(kidId){ const icon=document.getElementById('new_icon').value.trim()||'📌'; const label=document.getElementById('new_label').value.trim(); if(!label)return; state.kids[kidId].tasks.push({id:'x'+Date.now(),icon,label}); await saveState(); rerenderModal(); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -317,6 +323,10 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
   .ei-label { flex:1; padding:9px 11px; border:2px solid #eee2ec; border-radius:10px; font-size:14px; }
   .save-task { width:38px; height:38px; font-size:15px; }
   .del-task { width:38px; height:38px; background:#FBEAEA; border:none; border-radius:10px; font-size:15px; cursor:pointer; }
+  .move { display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+  .mv { width:26px; height:18px; padding:0; border:2px solid #eee2ec; background:#faf8fa; border-radius:7px; font-size:9px; line-height:1; color:#8a7f90; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .mv:hover:not(:disabled) { background:#FFF0F6; border-color:#FFB3CE; color:#D6357A; }
+  .mv:disabled { opacity:.3; cursor:default; }
   .add-row { padding-top:12px; border-top:1.5px dashed #eee2ec; }
   .add-task { padding:9px 14px; white-space:nowrap; }
   input:focus { outline:2px solid #FFB3CE; }
