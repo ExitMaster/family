@@ -98,7 +98,7 @@ function vacationInfo(kidId){
   return `<div class="vacation ${cls}">🏖️ ${label}</div>`;
 }
 
-let state=null, parentMode=false, editingKid=null;
+let state=null, parentMode=false, editingKid=null, darkMode=false;
 
 async function loadState(){
   try{ const r=await window.storage.get(STORAGE_KEY); if(r&&r.value){
@@ -137,9 +137,12 @@ function render(){
           <span class="logo">🏕️</span>
           <div><h1>우리집 방학 루틴</h1><p class="date">${prettyDate()}</p></div>
         </div>
-        <button class="parent-toggle ${parentMode?'on':''}" onclick="toggleParent()">
-          ${parentMode?'👀 아이 화면으로':'🔧 부모 모드'}
-        </button>
+        <div class="top-actions">
+          <button class="theme-toggle" onclick="toggleDark()" aria-label="${darkMode?'라이트 모드로':'다크 모드로'}">${darkMode?'☀️':'🌙'}</button>
+          <button class="parent-toggle ${parentMode?'on':''}" onclick="toggleParent()">
+            ${parentMode?'👀 아이 화면으로':'🔧 부모 모드'}
+          </button>
+        </div>
       </header>
       <div class="split">${panel('big')}${panel('small')}</div>
       <footer class="foot">아이가 체크하면 부모가 확인해 별을 줍니다 · 매일 초기화되고 한 주 기록은 남아요</footer>
@@ -231,6 +234,8 @@ function editModal(kidId){
   </div>`;
 }
 function toggleParent(){ parentMode=!parentMode; render(); }
+function applyTheme(){ document.documentElement.setAttribute('data-theme', darkMode?'dark':'light'); }
+async function toggleDark(){ darkMode=!darkMode; state.dark=darkMode; applyTheme(); await saveState(); render(); }
 async function toggleCheck(kidId,taskId){ if(parentMode)return; const p=dayProgress(kidId); if(p.confirmed[taskId])return; p.checked[taskId]=!p.checked[taskId]; await saveState(); render(); }
 async function confirmTask(kidId,taskId){ const p=dayProgress(kidId); if(p.checked[taskId]&&!p.confirmed[taskId]){ p.confirmed[taskId]=true; state.stars[kidId]=(state.stars[kidId]||0)+1; await saveState(); render(); } }
 function openEdit(kidId){ editingKid=kidId; render(); }
@@ -252,7 +257,14 @@ async function moveTask(kidId,taskId,dir){ const tasks=state.kids[kidId].tasks; 
 async function addTask(kidId){ const icon=document.getElementById('new_icon').value.trim()||'📌'; const label=document.getElementById('new_label').value.trim(); if(!label)return; state.kids[kidId].tasks.push({id:'x'+Date.now(),icon,label}); await saveState(); rerenderModal(); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-(async function init(){ state=await loadState(); pruneOldProgress(); render(); await saveState(); })();
+(async function init(){
+  state=await loadState(); pruneOldProgress();
+  /* 저장된 테마 우선, 없으면 시스템 설정을 따름 */
+  if(typeof state.dark==='boolean') darkMode=state.dark;
+  else darkMode = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  applyTheme();
+  render(); await saveState();
+})();
 </script>
 
 <style>
@@ -269,6 +281,9 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
   .logo { font-size:34px; }
   .top h1 { font-size:20px; font-weight:800; letter-spacing:-.5px; }
   .date { font-size:13px; color:#9a8fa0; margin-top:2px; }
+  .top-actions { display:flex; align-items:center; gap:8px; }
+  .theme-toggle { width:42px; height:42px; flex-shrink:0; border:2px solid #FFB3CE; background:#fff; border-radius:14px; font-size:18px; line-height:1; cursor:pointer; transition:.15s; }
+  .theme-toggle:hover { background:#FFF0F6; }
   .parent-toggle { border:2px solid #FFB3CE; background:#fff; color:#D6357A; padding:9px 15px; border-radius:14px; font-size:14px; font-weight:700; cursor:pointer; transition:.15s; }
   .parent-toggle:hover { background:#FFF0F6; }
   .parent-toggle.on { background:#2b2733; color:#fff; border-color:#2b2733; }
@@ -356,6 +371,52 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<'
   .add-row { padding-top:12px; border-top:1.5px dashed #eee2ec; }
   .add-task { padding:9px 14px; white-space:nowrap; }
   input:focus { outline:2px solid #FFB3CE; }
+
+  /* ===== 다크 모드 ===== */
+  [data-theme="dark"] body { background:#17151c; }
+  [data-theme="dark"] #root { color:#e8e4ee; }
+  [data-theme="dark"] .top { background:linear-gradient(120deg,#3a2230,#173330); border-color:#4a2f3e; }
+  [data-theme="dark"] .top h1 { color:#f3eef5; }
+  [data-theme="dark"] .date { color:#a99fb0; }
+  [data-theme="dark"] .theme-toggle,
+  [data-theme="dark"] .parent-toggle { background:#241f2b; color:#FF9BC4; border-color:#5a3b4c; }
+  [data-theme="dark"] .theme-toggle:hover,
+  [data-theme="dark"] .parent-toggle:hover { background:#2e2733; }
+  [data-theme="dark"] .parent-toggle.on { background:#e8e4ee; color:#17151c; border-color:#e8e4ee; }
+  [data-theme="dark"] .panel { background:#211d28; border-color:#312a3a; box-shadow:0 6px 22px rgba(0,0,0,.4); }
+  [data-theme="dark"] .creature-card { background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, #211d28), color-mix(in srgb, var(--accent2) 20%, #211d28)); border-color:color-mix(in srgb, var(--accent) 45%, #211d28); }
+  [data-theme="dark"] .kid-name { color:color-mix(in srgb, var(--accent) 50%, #f3eef5); }
+  [data-theme="dark"] .vacation { background:color-mix(in srgb, var(--accent) 22%, #211d28); border-color:color-mix(in srgb, var(--accent) 42%, #211d28); color:color-mix(in srgb, var(--accent) 45%, #f3eef5); }
+  [data-theme="dark"] .vacation.ended { background:#2a2532; border-color:#3a3342; color:#a99fb0; }
+  [data-theme="dark"] .progress-bar { background:#312a3a; }
+  [data-theme="dark"] .progress-text { color:#a99fb0; }
+  [data-theme="dark"] .task { background:#2a2532; border-color:#332c3d; }
+  [data-theme="dark"] .task-label { color:#e8e4ee; }
+  [data-theme="dark"] .task.checked { background:color-mix(in srgb, var(--accent) 20%, #211d28); border-color:color-mix(in srgb, var(--accent) 45%, #211d28); }
+  [data-theme="dark"] .task.confirmed { background:color-mix(in srgb, var(--accent) 26%, #211d28); }
+  [data-theme="dark"] .task.confirmed .task-label { color:#c9bfd0; }
+  [data-theme="dark"] .check { background:#211d28; border-color:#4a4356; }
+  [data-theme="dark"] .badge { background:#3a3320; color:#F5C518; }
+  [data-theme="dark"] .week { border-top-color:#332c3d; }
+  [data-theme="dark"] .week-label { color:#a99fb0; }
+  [data-theme="dark"] .wcell { background:#2a2532; color:#8a8092; }
+  [data-theme="dark"] .wcell.w-today { border-color:#e8e4ee; }
+  [data-theme="dark"] .foot { color:#8a8092; }
+  [data-theme="dark"] .modal { background:#211d28; color:#e8e4ee; }
+  [data-theme="dark"] .modal-head h2 { color:#f3eef5; }
+  [data-theme="dark"] .x { background:#2e2733; color:#e8e4ee; }
+  [data-theme="dark"] .name-edit label { color:#a99fb0; }
+  [data-theme="dark"] .name-edit input,
+  [data-theme="dark"] .ei-icon,
+  [data-theme="dark"] .ei-label { background:#2a2532; border-color:#3a3342; color:#e8e4ee; }
+  [data-theme="dark"] .name-edit button,
+  [data-theme="dark"] .add-task,
+  [data-theme="dark"] .save-task { background:var(--accent); }
+  [data-theme="dark"] .mv { background:#2a2532; border-color:#3a3342; color:#a99fb0; }
+  [data-theme="dark"] .mv:hover:not(:disabled) { background:#3a2f38; border-color:#5a3b4c; color:#FF9BC4; }
+  [data-theme="dark"] .del-task { background:#3a2529; }
+  [data-theme="dark"] .add-row { border-top-color:#3a3342; }
+
   @media (prefers-reduced-motion: reduce) {
     *, .avatar, .progress-fill { transition:none !important; animation:none !important; }
   }
