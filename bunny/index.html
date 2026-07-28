@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>토끼 점프 — 온라인</title>
+<style>
+  :root {
+    --sky-top: #AEE7FF; --sky-bottom: #FFFCEB;
+    --night-top: #0D1333; --night-bottom: #3A2465;
+    --grass: #7CC576; --dirt: #A1887F;
+    --ink: #3A2E4D; --pink: #FF6F91; --block: #FFD166;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: #EAFFEA;
+    font-family: "Trebuchet MS", Verdana, sans-serif; color: var(--ink);
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  h1 { margin: 0; font-size: 26px; color: var(--pink); }
+  #stage {
+    position: relative; width: 100%; max-width: 720px;
+    border: 6px solid var(--ink); border-radius: 18px; overflow: hidden;
+    box-shadow: 0 8px 0 rgba(58,46,77,.25); touch-action: manipulation;
+  }
+  canvas { display: block; width: 100%; height: auto; background: var(--ink); }
+  #panel {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 12px; padding: 18px;
+    background: rgba(58,46,77,.84); color: #fff; text-align: center;
+  }
+  #panel.hidden { display: none; }
+  #panel h2 { margin: 0; font-size: clamp(19px,4.2vw,30px); }
+  #panel p { margin: 0; font-size: clamp(13px,2.6vw,16px); line-height: 1.5; }
+  input {
+    font-family: inherit; font-size: 17px; text-align: center;
+    border: 3px solid var(--ink); border-radius: 12px; padding: 9px 12px;
+    width: 190px; text-transform: none;
+  }
+  #room { text-transform: uppercase; letter-spacing: 3px; font-weight: bold; }
+  button {
+    font-family: inherit; font-size: 18px; font-weight: bold; color: #fff;
+    background: var(--pink); border: 4px solid var(--ink); border-radius: 14px;
+    padding: 10px 24px; cursor: pointer; box-shadow: 0 5px 0 var(--ink);
+  }
+  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.ghost { background: #fff; color: var(--ink); }
+  .rowbtns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #lobbyList { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .tag {
+    display: flex; align-items: center; gap: 7px; background: #fff; color: var(--ink);
+    border: 3px solid var(--ink); border-radius: 999px; padding: 5px 13px;
+    font-weight: bold; font-size: 15px;
+  }
+  .cdot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink); }
+  #board {
+    width: 100%; max-width: 720px; background: #fff; border: 5px solid var(--ink);
+    border-radius: 16px; box-shadow: 0 6px 0 rgba(58,46,77,.25); padding: 14px 18px;
+  }
+  #board h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: .6; }
+  .brow { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; }
+  .brow + .brow { margin-top: 5px; }
+  .brow.me { background: #FFF0F4; }
+  .brow.out { opacity: .45; }
+  .dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--ink); flex: none; }
+  .who { font-weight: bold; font-size: 17px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .hp { font-size: 13px; letter-spacing: 1px; flex: none; }
+  .sc { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .note { font-size: 12.5px; opacity: .65; margin: 10px 0 0; line-height: 1.5; text-align: center; max-width: 700px; }
+  .err { background: #FFE2E2; border: 4px solid #C0392B; color: #7B241C;
+         border-radius: 14px; padding: 14px 18px; max-width: 720px; font-size: 15px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>🐰 토끼 점프 — 온라인 🐰</h1>
+
+<div id="stage">
+  <canvas id="game" width="720" height="320"></canvas>
+  <div id="panel">
+    <h2 id="ptitle">방에 들어가기</h2>
+    <p id="pmsg">별명과 방 코드를 넣으세요. 같은 방 코드를 넣은 사람끼리 같이 달립니다.</p>
+    <input id="nick" maxlength="14" placeholder="별명">
+    <input id="room" maxlength="6" placeholder="방 코드">
+    <div class="rowbtns">
+      <button id="joinBtn">방 들어가기</button>
+      <button id="startBtn" class="ghost" style="display:none">경주 시작</button>
+      <button id="leaveBtn" class="ghost" style="display:none">나가기</button>
+    </div>
+    <div id="lobbyList"></div>
+  </div>
+</div>
+
+<p class="note" id="hint">스페이스바 · ↑ · W 또는 화면 터치로 점프! ⭐ 별 모으기, 🚀 점프 UP, 👻 유령한테 잡히지 않게 조심!</p>
+
+<div id="board">
+  <h3>점수판</h3>
+  <div id="rows"></div>
+</div>
+
+<p class="note">
+  별명만 쓰세요 — 실명·학교·주소는 절대 안 됩니다.
+  방 코드를 아는 사람은 누구나 들어올 수 있습니다.
+</p>
+
+<script type="module">
+// ============================================================
+//  Firebase 설정 (Unimai Game Hub 프로젝트)
+//
+//  부모님께: 이 값들은 비밀번호가 아니라 "주소표"입니다. 웹 앱에 공개적으로
+//  포함되도록 설계된 값이라 저장소가 public이어도 안전합니다. 실제 보안은
+//  Realtime Database → 규칙(rules)에서 걸려 있습니다:
+//    - 로그인(익명)한 사람만 읽고 쓸 수 있음
+//    - rooms/{방코드} 아래에서만 가능, 그 밖의 경로는 아무도 못 건드림
+//
+//  제트팩 점프(/jump/)와 같은 프로젝트·같은 규칙을 그대로 씁니다.
+//  다시 확인하려면: Firebase 콘솔 → ⚙️ 설정 → 프로젝트 설정 → 내 앱 → 구성
+// ============================================================
+const firebaseConfig = {
+  apiKey:      "AIzaSyDNETb44pue8Kg9tYWqna7y6N7MlCoMpU0",
+  authDomain:  "unimai-game-hub.firebaseapp.com",
+  databaseURL: "https://unimai-game-hub-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:   "unimai-game-hub",
+  appId:       "1:527407328515:web:751f851d2a00e0a2980d36"
+};
+
+// ============================================================
+//  게임 설정 — 바꿔도 되지만, 한 방에 있는 모두가 반드시 같은 숫자여야
+//  똑같은 코스가 만들어집니다. 한 명만 옛날 버전이면 코스가 어긋납니다.
+//
+//  단위는 "초"와 "픽셀" 기준입니다. 원본 게임은 프레임 단위였는데,
+//  기기마다 프레임 수가 달라서 코스가 어긋나므로 초 단위로 바꿨습니다.
+// ============================================================
+const JUMP_POWER  = 780;    // 보통 점프 (원본 -13/프레임)
+const JUMP_BOOST  = 1080;   // 🚀 먹었을 때 (원본 -18/프레임)
+const GRAVITY     = 2520;   // 중력 (원본 0.7/프레임²)
+const SPEED0      = 360;    // 시작 속도
+const ACCEL       = 8;      // 1초마다 빨라지는 양
+const COUNTDOWN   = 3;      // "3, 2, 1, GO!"
+const LIVES       = 3;      // 목숨
+const INVIN_TIME  = 1.5;    // 부딪힌 뒤 무적 시간(초)
+const BOOST_TIME  = 5;      // 🚀 지속 시간(초)
+const STAR_BONUS  = 5;      // ⭐ 점수
+// 유령은 "목숨"과 다른 종류의 압박입니다. 목숨은 실수 3번이면 끝이고,
+// 유령은 아무 실수를 안 해도 40초쯤 뒤에는 따라잡아서 경주가 무한정
+// 늘어지지 않게 합니다. 유령이 목숨보다 먼저 잡아버리면 목숨이 있으나
+// 마나가 되므로, 부딪힘 벌점(GHOST_HIT)은 일부러 작게 잡았습니다.
+const GHOST_SPEED = 4;      // 유령이 다가오는 기본 속도(초당 픽셀)
+const GHOST_RUSH  = 0.005;  // 점수가 오를수록 더 빨라지는 정도
+const GHOST_HIT   = 35;     // 부딪힐 때마다 유령이 확 다가오는 거리
+const GHOST_START = -240;   // 유령 시작 위치(토끼 뒤쪽)
+const GHOST_W     = 34;
+const NIGHT_EVERY = 2000;   // 이만큼 갈 때마다 낮↔밤
+
+const LH = 320;             // 한 사람 화면(레인)의 기준 높이
+const GROUND = 268;         // 땅 표면
+const PX = 90;              // 토끼가 서 있는 가로 위치
+const BY0 = GROUND - 21;    // 땅에 있을 때 토끼 몸통 중심 y
+
+const COLORS = [
+  ["#FF6F91","#C42E6C"], ["#2E7BE8","#1B4FA0"], ["#35C46A","#1E8347"],
+  ["#A96BFF","#6E37C4"], ["#FFA726","#C77800"], ["#17BEBB","#0C7F7D"],
+  ["#E2445C","#9B1F33"], ["#3DDC97","#1B7A52"]
+];
+const LANE_H = {1:320,2:210,3:165,4:135,5:190,6:190,7:150,8:150};
+
+// ---------- page bits ----------
+const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
+const panel  = document.getElementById("panel");
+const ptitle = document.getElementById("ptitle"), pmsg = document.getElementById("pmsg");
+const nickEl = document.getElementById("nick"),   roomEl = document.getElementById("room");
+const joinBtn = document.getElementById("joinBtn"), startBtn = document.getElementById("startBtn");
+const leaveBtn = document.getElementById("leaveBtn"), lobbyList = document.getElementById("lobbyList");
+const rowsEl = document.getElementById("rows");
+
+function fail(text) {
+  const d = document.createElement("div");
+  d.className = "err"; d.innerHTML = text;
+  document.body.insertBefore(d, document.getElementById("board"));
+}
+
+// ---------- connect to Firebase ----------
+// import를 try 안에서(동적으로) 한다. 맨 위에 고정 import로 두면 인터넷이
+// 잠깐 끊겼을 때 스크립트 전체가 조용히 죽어서, 화면에 아무 설명도 못 띄운다.
+const SDK = "https://www.gstatic.com/firebasejs/10.12.5/";
+let initializeApp, getAuth, signInAnonymously,
+    getDatabase, ref, set, update, remove, onValue, onDisconnect, serverTimestamp;
+
+let db, uid = null, offset = 0, ready = false;
+try {
+  const [appMod, authMod, dbMod] = await Promise.all([
+    import(SDK + "firebase-app.js"),
+    import(SDK + "firebase-auth.js"),
+    import(SDK + "firebase-database.js")
+  ]);
+  ({ initializeApp } = appMod);
+  ({ getAuth, signInAnonymously } = authMod);
+  ({ getDatabase, ref, set, update, remove, onValue, onDisconnect, serverTimestamp } = dbMod);
+
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  onValue(ref(db, ".info/serverTimeOffset"), s => { offset = s.val() || 0; });
+  const cred = await signInAnonymously(getAuth(app));
+  uid = cred.user.uid;
+  ready = true;
+} catch (e) {
+  fail("<b>Firebase에 연결하지 못했어요.</b><br>" +
+       "1) 인터넷 연결을 확인해 보세요.<br>" +
+       "2) Firebase 콘솔 → Authentication → Sign-in method 에서 <b>익명(Anonymous)</b>이 켜져 있는지 확인해 주세요.<br>" +
+       "3) Realtime Database가 만들어져 있고, 규칙이 게시되었는지 확인해 주세요." +
+       "<br><small>" + e.message + "</small>");
+  joinBtn.disabled = true;
+}
+
+const now = () => Date.now() + offset;   // 모든 기기에서 거의 같은 시계
+
+// ---------- game state ----------
+let room = null, players = {}, game = { state: "lobby" };
+let me = null, lanes = [], running = false, startedAt = 0;
+// 다른 플레이어를 화면에 부드럽게 그리기 위한 값(높이·유령 위치).
+// players 객체는 Firebase 소식이 올 때마다 통째로 새로 바뀌기 때문에,
+// 화면용 값은 반드시 여기 따로 보관해야 초기화되지 않는다.
+let views = {};
+let cols = 1, rows = 1, laneH = 320, laneW = 720, scale = 1, LW = 720;
+let obstacles = [], obsEnd = 0, obsRng = null, obsId = 0;
+let items = [], itemEnd = 0, itemRng = null, itemId = 0;
+let taken = {};              // 레인별로 이미 먹은 아이템 id 모음
+let bgStars = [], lastPush = 0, raf = 0;
+
+// 같은 seed면 어디서든 똑같은 숫자를 내주는 작은 난수기 —
+// 그래야 모든 기기가 똑같은 코스를 만든다
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const distanceAt  = t => SPEED0 * t + ACCEL * t * t / 2;
+const speedAtDist = d => Math.sqrt(SPEED0 * SPEED0 + 2 * ACCEL * d);
+// 그 지점 속도로 한 번 점프했을 때 날아가는 가로 거리
+const reachAt     = d => speedAtDist(d) * (2 * JUMP_POWER / GRAVITY);
+
+function buildTrackUpTo(d) {
+  while (obsEnd < d) {
+    const reach = reachAt(obsEnd);
+    // 장애물 사이 간격은 "그 지점에서 한 번 점프하는 거리"의 배수로 잡는다.
+    // 그래야 속도가 빨라져도 난이도가 그대로 유지된다. 1.3배 아래로 내리면
+    // 아이들이 반응할 시간이 없어진다.
+    const gap = reach * (1.3 + obsRng() * 0.85);
+    const x = obsEnd + gap;
+    const kind = obsRng();
+    let o;
+    if (kind < 0.20) {                                   // 구덩이
+      // 반드시 한 번에 건널 수 있는 너비로만 만든다
+      const w = Math.min(reach * 0.5, 55 + obsRng() * 35);
+      o = { id: obsId++, type: "pit", x, w, y: GROUND, h: 12 };
+    } else if (kind < 0.40) {                            // 새 (서서 지나가야 함)
+      o = { id: obsId++, type: "bird", x, w: 26, h: 26, y: GROUND - 70 - obsRng() * 30 };
+    } else if (kind < 0.58) {                            // 바위
+      const s = 24 + obsRng() * 14;
+      o = { id: obsId++, type: "rock", x, w: s, h: s, y: GROUND - s };
+    } else if (kind < 0.76) {                            // 나무
+      const h = 46 + obsRng() * 10;
+      o = { id: obsId++, type: "tree", x, w: 22, h, y: GROUND - h };
+    } else {                                             // 선인장
+      const s = 28 + obsRng() * 18;
+      o = { id: obsId++, type: "cactus", x, w: s, h: s, y: GROUND - s };
+    }
+    obstacles.push(o);
+    obsEnd = x + o.w;
+  }
+  while (obstacles.length && obstacles[0].x + obstacles[0].w < d - LW - PX) obstacles.shift();
+
+  while (itemEnd < d) {
+    const x = itemEnd + 260 + itemRng() * 320;
+    const isRocket = itemRng() < 0.25;
+    // 높은 별은 🚀 없이는 못 닿는다 — 그게 🚀의 쓸모
+    items.push({ id: itemId++, x, y: BY0 - 20 - itemRng() * 110, size: 22,
+                 type: isRocket ? "rocket" : "star" });
+    itemEnd = x;
+  }
+  while (items.length && items[0].x + items[0].size < d - LW - PX) {
+    const gone = items.shift();
+    for (const id in taken) taken[id].delete(gone.id);
+  }
+}
+
+// ---------- joining ----------
+joinBtn.addEventListener("click", () => {
+  const nick = (nickEl.value || "토끼").trim().slice(0, 14) || "토끼";
+  const code = (roomEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length < 3) { pmsg.textContent = "방 코드는 영문·숫자 3글자 이상이어야 해요."; return; }
+
+  room = code;
+  const myRef = ref(db, `rooms/${room}/players/${uid}`);
+  set(myRef, { name: nick, joinedAt: serverTimestamp(),
+               y: BY0, alive: false, score: 0, lives: LIVES, gx: GHOST_START });
+  onDisconnect(myRef).remove();          // 탭이 닫히면 알아서 정리
+
+  onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; refreshLobby(); });
+  onValue(ref(db, `rooms/${room}/game`),    s => { game = s.val() || { state: "lobby" }; onGameChange(); });
+
+  joinBtn.style.display = "none";
+  nickEl.disabled = roomEl.disabled = true;
+  leaveBtn.style.display = "";
+  ptitle.textContent = room + " 방";
+  pmsg.textContent = "친구를 기다리는 중. 여기 있는 누구나 시작을 누를 수 있어요.";
+});
+
+leaveBtn.addEventListener("click", () => {
+  if (room) remove(ref(db, `rooms/${room}/players/${uid}`));
+  location.reload();
+});
+
+startBtn.addEventListener("click", () => {
+  set(ref(db, `rooms/${room}/game`), {
+    state: "running",
+    seed: Math.floor(Math.random() * 2000000000),
+    startAt: serverTimestamp()
+  });
+});
+
+// 레인 순서는 모든 기기에서 똑같아야 하므로 플레이어 id로 정렬한다
+function laneOrder() { return Object.keys(players).sort(); }
+
+function refreshLobby() {
+  lanes = laneOrder();
+  lobbyList.innerHTML = lanes.map((id, i) =>
+    '<span class="tag"><span class="cdot" style="background:' + COLORS[i % 8][0] + '"></span>' +
+    esc(players[id].name) + (id === uid ? " (나)" : "") + "</span>"
+  ).join("");
+  startBtn.style.display = (room && game.state !== "running") ? "" : "none";
+  drawBoard();
+}
+
+function onGameChange() {
+  if (game.state === "running" && game.startAt) {
+    startedAt = game.startAt;
+    beginRace();
+  } else if (running) {
+    // 다른 사람 기기가 먼저 "경주 끝"을 알아챈 경우.
+    // 여기서도 똑같이 결과 화면을 띄워야 나만 "대기 중" 화면에 남지 않는다.
+    // (이미 누군가 lobby로 바꿔놨으니 다시 쓰지는 않는다)
+    endRace(false);
+  } else {
+    panel.classList.remove("hidden");
+    startBtn.style.display = room ? "" : "none";
+  }
+}
+
+// ---------- a race ----------
+function beginRace() {
+  lanes = laneOrder();
+  const n = Math.max(1, lanes.length);
+  cols = n <= 4 ? 1 : 2;
+  rows = Math.ceil(n / cols);
+  laneH = LANE_H[n] || 150;
+  laneW = canvas.width / cols;
+  scale = laneH / LH;
+  LW = laneW / scale;
+  canvas.height = laneH * rows;
+
+  // 장애물과 아이템은 각각 다른 난수기를 쓴다. 그래야 한쪽 규칙을 손봐도
+  // 다른 쪽 배치가 통째로 흔들리지 않는다.
+  obsRng  = makeRng(game.seed);
+  itemRng = makeRng(game.seed ^ 0x9E3779B9);
+  const starRng = makeRng(game.seed ^ 0x5BF03635);
+  obstacles = []; obsEnd = 620; obsId = 0;
+  items = []; itemEnd = 500; itemId = 0;
+  taken = {};
+  for (const id of lanes) taken[id] = new Set();
+  bgStars = Array.from({ length: 18 }, () => ({ x: starRng() * 720, y: starRng() * 150 }));
+  buildTrackUpTo(LW + PX);
+
+  const iAmIn = lanes.includes(uid);
+  me = { y: BY0, vy: 0, onGround: true, alive: iAmIn, score: 0, bonus: 0,
+         lives: LIVES, invin: 0, boost: 0, gx: GHOST_START, hop: 0 };
+  views = {};
+  for (const id of lanes) views[id] = { y: BY0, gx: GHOST_START, hop: 0 };
+
+  update(ref(db, `rooms/${room}/players/${uid}`),
+         { alive: iAmIn, score: 0, y: BY0, lives: LIVES, gx: GHOST_START });
+
+  panel.classList.add("hidden");
+  running = true;
+  lastPush = 0;
+  cancelAnimationFrame(raf);
+  let prev = performance.now();
+  const loop = ts => {
+    const dt = Math.min((ts - prev) / 1000, 0.05); prev = ts;
+    if (!running) return;
+    step(dt); render(); drawBoard();
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+
+function raceTime() { return (now() - startedAt) / 1000 - COUNTDOWN; }
+
+function step(dt) {
+  const t = raceTime();
+  if (t < 0) return;                       // 아직 카운트다운 중
+  const dist = distanceAt(t);
+  buildTrackUpTo(dist + LW);
+
+  // 내 토끼 — 여기서 바로 계산하니까 점프가 절대 밀리지 않는다
+  if (me.alive) {
+    me.vy += GRAVITY * dt;
+    me.y  += me.vy * dt;
+    if (me.y >= BY0) { me.y = BY0; me.vy = 0; me.onGround = true; }
+    if (me.onGround) me.hop += dt;
+    if (me.invin > 0) me.invin -= dt;
+    if (me.boost > 0) me.boost -= dt;
+    me.score = Math.floor(dist / 10) + me.bonus;
+
+    if (me.invin <= 0) {
+      for (const o of obstacles) {
+        if (!hitsObstacle(o, dist, me.y)) continue;
+        me.lives--;
+        me.invin = INVIN_TIME;
+        me.gx += GHOST_HIT;                // 실수하면 유령이 훅 가까워진다
+        if (me.lives <= 0) knockOut();
+        break;
+      }
+    }
+
+    // 유령이 서서히 접근 — 점수가 오를수록 더 빨리
+    me.gx += (GHOST_SPEED + me.score * GHOST_RUSH) * dt;
+    if (me.alive && me.gx + GHOST_W > PX - 18) knockOut();
+  }
+
+  // 아이템 먹기 — 내 것만 점수에 반영하고, 남의 것은 화면 표시용으로만 표시
+  for (const lane of lanes) {
+    const set = taken[lane] || (taken[lane] = new Set());
+    const mine = lane === uid;
+    if (mine && !me.alive) continue;
+    const py = mine ? me.y : (views[lane] ? views[lane].y : BY0);
+    if (!mine && !(players[lane] && players[lane].alive)) continue;
+    for (const c of items) {
+      if (set.has(c.id) || !hitsItem(c, dist, py)) continue;
+      set.add(c.id);
+      if (!mine) continue;
+      if (c.type === "star") me.bonus += STAR_BONUS;
+      else me.boost = BOOST_TIME;
+    }
+  }
+
+  // 다른 사람들 — 보내온 위치로 부드럽게 미끄러지듯 따라간다
+  for (const id of lanes) {
+    if (id === uid) continue;
+    const p = players[id]; if (!p) continue;
+    const v = views[id] || (views[id] = { y: BY0, gx: GHOST_START, hop: 0 });
+    v.y  += ((p.y ?? BY0) - v.y) * Math.min(1, dt * 12);
+    v.gx += ((p.gx ?? GHOST_START) - v.gx) * Math.min(1, dt * 6);
+    if (p.alive) v.hop += dt;
+  }
+
+  // 내 위치를 초당 12번쯤 모두에게 알린다
+  if (me.alive && now() - lastPush > 80) {
+    lastPush = now();
+    update(ref(db, `rooms/${room}/players/${uid}`),
+           { y: Math.round(me.y), score: me.score, lives: me.lives, gx: Math.round(me.gx) });
+  }
+
+  // 아무도 안 남으면 경주 끝
+  const anyAlive = lanes.some(id => id === uid ? me.alive : players[id] && players[id].alive);
+  if (!anyAlive && t > 0.5) endRace();
+}
+
+function knockOut() {
+  me.alive = false;
+  update(ref(db, `rooms/${room}/players/${uid}`),
+         { alive: false, score: me.score, lives: Math.max(0, me.lives), y: me.y, gx: Math.round(me.gx) });
+}
+
+// 구덩이는 "땅에 발이 닿아 있으면" 빠진다. 나머지는 네모끼리 겹치는지 본다.
+function hitsObstacle(o, dist, by) {
+  const ox = PX + (o.x - dist);
+  if (PX + 16 <= ox || PX - 16 >= ox + o.w) return false;
+  if (o.type === "pit") return by >= BY0 - 6;
+  return by - 14 < o.y + o.h && by + 18 > o.y;
+}
+
+function hitsItem(c, dist, by) {
+  const cx = PX + (c.x - dist);
+  return PX + 16 > cx && PX - 16 < cx + c.size &&
+         by + 18 > c.y && by - 14 < c.y + c.size;
+}
+
+function endRace(publish = true) {
+  running = false;
+  const scores = lanes.map(id => ({
+    name: players[id] ? players[id].name : "?",
+    score: id === uid ? me.score : (players[id] ? players[id].score || 0 : 0)
+  })).sort((a, b) => b.score - a.score);
+
+  const tied = scores.filter(s => s.score === scores[0].score).length > 1;
+  ptitle.textContent = scores.length < 2 ? "끝!"
+                     : tied ? "비겼어요!"
+                     : scores[0].name + " 승리! 🎉";
+  pmsg.textContent = scores.map(s => s.name + ": " + s.score).join("   •   ");
+  panel.classList.remove("hidden");
+  startBtn.textContent = "다시 경주";
+  startBtn.style.display = "";
+  if (publish && room) set(ref(db, `rooms/${room}/game`), { state: "lobby" });
+}
+
+// ---------- controls ----------
+function jump() {
+  if (!running || !me || !me.alive || raceTime() < 0) return;
+  if (me.onGround) {
+    me.vy = -(me.boost > 0 ? JUMP_BOOST : JUMP_POWER);
+    me.onGround = false;
+  }
+}
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") { e.preventDefault(); jump(); }
+});
+canvas.addEventListener("pointerdown", jump);
+
+// ---------- drawing ----------
+function laneLeft(i) { return (i % cols) * laneW; }
+function laneTop(i)  { return Math.floor(i / cols) * laneH; }
+
+function render() {
+  ctx.fillStyle = css("--ink");
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const t = raceTime(), dist = t > 0 ? distanceAt(t) : 0;
+  const night = Math.floor(dist / NIGHT_EVERY) % 2 === 1;
+  lanes.forEach((id, i) => drawLane(id, i, dist, night));
+
+  ctx.fillStyle = css("--ink");
+  for (let i = 1; i < rows; i++) ctx.fillRect(0, laneH * i - 3, canvas.width, 6);
+  for (let i = 1; i < cols; i++) ctx.fillRect(laneW * i - 3, 0, 6, canvas.height);
+
+  if (t < 0) {
+    const n = Math.ceil(-t);
+    ctx.fillStyle = "rgba(58,46,77,.55)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 90px Trebuchet MS, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(n > 0 ? n : "GO!", canvas.width / 2, canvas.height / 2);
+    ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  }
+}
+
+function drawLane(id, i, dist, night) {
+  const p = players[id]; if (!p) return;
+  const mine  = id === uid;
+  const v     = views[id];
+  const alive = mine ? me.alive : !!p.alive;
+  const y     = mine ? me.y  : (v ? v.y  : BY0);
+  const gx    = mine ? me.gx : (v ? v.gx : GHOST_START);
+  const hop   = mine ? me.hop : (v ? v.hop : 0);
+  const [suit, dark] = COLORS[i % 8];
+  const left = laneLeft(i), top = laneTop(i);
+  const set = taken[id] || new Set();
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(left, top, laneW, laneH); ctx.clip();
+  ctx.translate(left, top); ctx.scale(scale, scale);
+
+  drawSky(night);
+  drawGround(dist);
+  drawGhost(gx, hop, alive);
+  for (const o of obstacles) drawObstacle(o, dist, hop);
+  for (const c of items) { if (!set.has(c.id)) drawItem(c, dist, hop); }
+  drawBunny(y, alive, suit, dark, hop, mine ? me.invin : 0, mine ? me.boost : 0);
+  ctx.restore();
+
+  // 레인 위쪽 이름표
+  ctx.fillStyle = suit;
+  ctx.beginPath(); ctx.arc(left + 18, top + 19, 7, 0, 7); ctx.fill();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = night ? "#fff" : css("--ink");
+  ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.textAlign = "left";
+  const sc = mine ? me.score : (p.score || 0);
+  const lv = mine ? me.lives : (p.lives ?? LIVES);
+  const hearts = "♥".repeat(Math.max(0, lv)) + "♡".repeat(Math.max(0, LIVES - Math.max(0, lv)));
+  ctx.fillText(p.name + (mine ? " (나)" : "") + "  " + sc + "  " + hearts + (alive ? "" : "  — 아웃!"),
+               left + 31, top + 24);
+}
+
+function drawSky(night) {
+  const sky = ctx.createLinearGradient(0, 0, 0, LH);
+  if (night) { sky.addColorStop(0, css("--night-top")); sky.addColorStop(1, css("--night-bottom")); }
+  else       { sky.addColorStop(0, css("--sky-top"));   sky.addColorStop(1, css("--sky-bottom")); }
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, LW, LH);
+
+  if (night) {
+    ctx.fillStyle = "#FFF9C4";
+    ctx.beginPath(); ctx.arc(LW - 70, 48, 20, 0, 7); ctx.fill();
+    ctx.fillStyle = "#fff";
+    for (const s of bgStars) {
+      if (s.x > LW) continue;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 1.6, 0, 7); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = "#FFF59D";
+    ctx.beginPath(); ctx.arc(LW - 60, 48, 22, 0, 7); ctx.fill();
+  }
+}
+
+// 땅은 구덩이에서 끊어 그리고, 그 자리에 검은 구멍을 넣는다
+function drawGround(dist) {
+  const pits = obstacles.filter(o => o.type === "pit")
+                        .map(o => ({ x: PX + (o.x - dist), w: o.w }))
+                        .sort((a, b) => a.x - b.x);
+  let x = 0;
+  const seg = (a, b) => {
+    if (b <= a) return;
+    ctx.fillStyle = css("--dirt");  ctx.fillRect(a, GROUND, b - a, LH - GROUND);
+    ctx.fillStyle = css("--grass"); ctx.fillRect(a, GROUND, b - a, 9);
+  };
+  for (const p of pits) { seg(x, Math.min(p.x, LW)); x = Math.max(x, p.x + p.w); }
+  seg(x, LW);
+
+  ctx.fillStyle = "#3E2723";
+  for (const p of pits) ctx.fillRect(p.x, GROUND, p.w, LH - GROUND);
+
+  // 달려가는 느낌을 주는 땅 위 점선
+  ctx.fillStyle = "rgba(255,255,255,.35)";
+  const off = dist % 60;
+  for (let bx = -60; bx < LW + 60; bx += 60) {
+    const sx = bx - off;
+    if (pits.some(p => sx + 22 > p.x && sx < p.x + p.w)) continue;
+    ctx.fillRect(sx, GROUND + 20, 22, 4);
+  }
+}
+
+function drawObstacle(o, dist, hop) {
+  const x = PX + (o.x - dist), y = o.y, w = o.w, h = o.h;
+  if (x > LW + 40 || x + w < -40) return;
+  ctx.lineWidth = 2; ctx.strokeStyle = "#33691E";
+
+  if (o.type === "pit") {
+    return;                                   // 구덩이는 drawGround가 그린다
+  } else if (o.type === "rock") {
+    ctx.fillStyle = "#9E9E9E"; ctx.strokeStyle = "#616161";
+    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 7);
+    ctx.fill(); ctx.stroke();
+  } else if (o.type === "tree") {
+    ctx.fillStyle = "#8D6E63"; ctx.fillRect(x + w / 2 - 4, y + h - 16, 8, 16);
+    ctx.fillStyle = "#43A047"; ctx.strokeStyle = "#2E7D32";
+    ctx.beginPath(); ctx.arc(x + w / 2, y + h - 24, w / 2 + 4, 0, 7);
+    ctx.fill(); ctx.stroke();
+  } else if (o.type === "bird") {
+    ctx.fillStyle = "#5C6BC0"; ctx.strokeStyle = "#283593";
+    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 3, 0, 0, 7);
+    ctx.fill(); ctx.stroke();
+    const up = Math.floor(hop * 8) % 2 === 0;     // 날갯짓
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y + h / 2);
+    ctx.lineTo(x + w / 2 - 10, up ? y - 6 : y + h + 4);
+    ctx.lineTo(x + w / 2 + 4, y + h / 2);
+    ctx.closePath(); ctx.fillStyle = "#3949AB"; ctx.fill();
+    ctx.fillStyle = "#FFA726";
+    ctx.beginPath();
+    ctx.moveTo(x + w, y + h / 2 - 3); ctx.lineTo(x + w + 8, y + h / 2);
+    ctx.lineTo(x + w, y + h / 2 + 3); ctx.closePath(); ctx.fill();
+  } else {                                       // 선인장
+    ctx.fillStyle = "#7CB342";
+    ctx.beginPath();
+    ctx.moveTo(x, y + h); ctx.lineTo(x + w / 2, y); ctx.lineTo(x + w, y + h);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.2, y + h * 0.5); ctx.lineTo(x + w * 0.05, y + h * 0.35);
+    ctx.lineTo(x + w * 0.3, y + h * 0.55);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+}
+
+function drawItem(c, dist, hop) {
+  const x = PX + (c.x - dist);
+  if (x > LW + 40 || x + c.size < -40) return;
+  const bob = Math.sin(hop * 6 + c.id) * 4;      // 둥실둥실
+  ctx.font = c.size + "px serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(c.type === "rocket" ? "🚀" : "⭐", x + c.size / 2, c.y + c.size / 2 + bob);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+}
+
+function drawGhost(gx, hop, alive) {
+  if (gx + GHOST_W < -20) return;
+  const cx = gx + GHOST_W / 2;
+  const cy = BY0 + 6 + Math.sin(hop * 5) * 6;
+  const near = Math.min(1, Math.max(0, (gx + 150) / 190));
+  ctx.globalAlpha = (alive ? 1 : .4) * (0.55 + near * 0.35);
+
+  ctx.fillStyle = "#E8EAF6"; ctx.strokeStyle = "#7986CB"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy - 8, GHOST_W / 2, Math.PI, 0);
+  ctx.lineTo(cx + GHOST_W / 2, cy + 12);
+  const waves = 4, ww = GHOST_W / waves;
+  for (let i = waves; i >= 1; i--) {
+    const wx = cx - GHOST_W / 2 + (i - 0.5) * ww;
+    const wy = i % 2 === 0 ? cy + 12 : cy + 20;
+    ctx.quadraticCurveTo(cx - GHOST_W / 2 + i * ww, cy + 20, wx, wy);
+  }
+  ctx.lineTo(cx - GHOST_W / 2, cy + 12);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  ctx.globalAlpha = alive ? 1 : .4;
+  ctx.fillStyle = "#3949AB";
+  ctx.beginPath(); ctx.arc(cx - 6, cy - 8, 2.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 6, cy - 8, 2.5, 0, 7); ctx.fill();
+  ctx.fillStyle = "rgba(255,138,178,.5)";
+  ctx.beginPath(); ctx.arc(cx - 11, cy - 3, 3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 11, cy - 3, 3, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawBunny(y, alive, suit, dark, hop, invin, boost) {
+  // 무적일 때 깜빡임 — 아웃된 사람은 흐리게
+  if (invin > 0 && Math.floor(hop * 12) % 2 === 0) return;
+  ctx.globalAlpha = alive ? 1 : .35;
+  const x = PX;
+
+  if (boost > 0) {
+    ctx.fillStyle = "rgba(255,167,38,.5)";
+    ctx.beginPath(); ctx.ellipse(x, y + 12, 22, 10, 0, 0, 7); ctx.fill();
+  }
+
+  const onGround = y >= BY0 - 2;
+  const squish = onGround ? Math.sin(hop * 14) * 1.5 : 0;   // 뛰는 느낌
+
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+
+  // 귀 (점프 중이면 뒤로 눕는다)
+  const tilt = onGround ? 0 : 0.35;
+  ctx.beginPath(); ctx.ellipse(x - 8, y - 26, 5, 16, -0.2 - tilt, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(x + 8, y - 26, 5, 16,  0.2 - tilt, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#FFB6C1";
+  ctx.beginPath(); ctx.ellipse(x - 8, y - 26, 2, 11, -0.2 - tilt, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 8, y - 26, 2, 11,  0.2 - tilt, 0, 7); ctx.fill();
+
+  // 몸통
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = css("--ink");
+  ctx.beginPath(); ctx.ellipse(x, y, 20, 16 + squish, 0, 0, 7); ctx.fill(); ctx.stroke();
+
+  // 목도리 — 플레이어 색깔로 누가 누군지 구분
+  ctx.fillStyle = suit; ctx.strokeStyle = dark;
+  ctx.beginPath(); ctx.ellipse(x + 7, y - 8, 9, 5, -0.3, 0, 7); ctx.fill(); ctx.stroke();
+
+  // 눈·코
+  ctx.fillStyle = css("--ink");
+  ctx.beginPath(); ctx.arc(x + 8, y - 4, 2, 0, 7); ctx.fill();
+  ctx.fillStyle = "#FF6F91";
+  ctx.beginPath(); ctx.arc(x + 16, y + 2, 2, 0, 7); ctx.fill();
+
+  // 발 (땅에 있을 때만 움직인다)
+  const step = onGround && alive ? Math.sin(hop * 14) * 4 : 3;
+  ctx.fillStyle = "#fff"; ctx.strokeStyle = css("--ink");
+  ctx.beginPath(); ctx.ellipse(x - 6 - step, y + 16, 8, 5, 0, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(x + 10 + step, y + 16, 8, 5, 0, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawBoard() {
+  rowsEl.innerHTML = lanes.map((id, i) => {
+    const p = players[id]; if (!p) return "";
+    const mine = id === uid;
+    const sc = mine && me ? me.score : (p.score || 0);
+    const lv = mine && me ? me.lives : (p.lives ?? LIVES);
+    const alive = mine && me ? me.alive : !!p.alive;
+    const hearts = "❤️".repeat(Math.max(0, lv)) + "🤍".repeat(Math.max(0, LIVES - Math.max(0, lv)));
+    return '<div class="brow' + (mine ? " me" : "") + (alive ? "" : " out") + '">' +
+      '<div class="dot" style="background:' + COLORS[i % 8][0] + '"></div>' +
+      '<div class="who">' + esc(p.name) + (mine ? " (나)" : "") + "</div>" +
+      '<div class="hp">' + hearts + "</div>" +
+      '<div class="sc">' + sc + "</div></div>";
+  }).join("");
+}
+
+function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function esc(t) { return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+render();
+</script>
+</body>
+</html>

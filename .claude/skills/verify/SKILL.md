@@ -1,14 +1,14 @@
 ---
 name: verify
-description: 이 리포의 단일 파일 HTML 앱(index.html, routine.html, timer.html, jump/)을 헤드리스 Chromium으로 구동해 검증하는 방법
+description: 이 리포의 단일 파일 HTML 앱(index.html, routine.html, timer.html, jump/, bunny/)을 헤드리스 Chromium으로 구동해 검증하는 방법
 ---
 
 # 검증 방법
 
 이 리포의 앱은 전부 빌드 없는 단일 HTML 파일이다. 서버 불필요 — `file://` URL로 바로 연다.
 
-예외: `jump/index.html`은 Firebase에 붙는 온라인 멀티플레이라 `file://`만으로는
-검증되지 않는다. 아래 "jump/index.html" 절 참고.
+예외: `jump/index.html`과 `bunny/index.html`은 Firebase에 붙는 온라인 멀티플레이라
+`file://`만으로는 검증되지 않는다. 아래 "온라인 멀티플레이" 절 참고.
 
 ## 구동 (원격 실행 환경 기준)
 
@@ -33,7 +33,7 @@ await page.goto('file:///home/user/family/timer.html');
 - **jump/local.html**: 칩으로 플레이어 선택 → Start race → `runners` 길이·점수 확인.
 - 가로(844×390)와 세로(390×844) 두 뷰포트 모두 스크린샷.
 
-## jump/index.html (온라인 멀티플레이)
+## 온라인 멀티플레이 (jump/index.html, bunny/index.html)
 
 이 환경은 네트워크 정책상 `www.gstatic.com`(Firebase SDK)과 Firebase 서버에
 접속할 수 없다. 실서버 검증은 불가능하므로 **가짜 Firebase를 주입해서** 검증한다.
@@ -60,6 +60,23 @@ Object.defineProperty(window, "T", { get: () => ({
 확인할 것: 로비 인원 일치 / 기기별 `laneOrder()` 동일 / `game.seed` 동일 /
 `obstacles` 배치 동일 / 카운트다운 후 `raceTime() > 0` / 상대 `views[id].y`가
 계속 갱신되는지 / 종료 시 **전원**이 같은 결과 문구를 보는지.
+
+`bunny/index.html`은 훅에 `items`, `taken`도 함께 노출하면 아이템까지 볼 수 있다.
+
+### 클리어 가능한 코스인지 확인 (bunny)
+
+동기화만 맞고 코스가 사람이 못 깰 난이도면 소용없다. 브라우저 안에
+"잘하는 플레이어" 루프를 심어서 `keydown`을 직접 쏘고, 몇 초나 버티는지 본다.
+
+```js
+// 앞쪽 장애물이 "점프 사거리의 55% 안"에 들어오면 뛴다.
+// 새는 서서 지나가고, 구덩이는 끝까지 넘어가야 하니 조금 늦게 뛴다.
+const rel = o.x - dist;                       // 토끼와의 거리 (PX를 빼면 안 된다)
+const want = o.type === 'pit' ? Math.min(reach*0.55, reach - o.w - 30) : reach*0.55;
+```
+
+기준: 무실수로 **30~40초** 버티고 마지막엔 유령에게 잡혀야 정상. 10초 안에
+끝나면 유령이 너무 빠르거나 장애물 간격(`gap`)이 좁은 것.
 
 ## 주의
 
