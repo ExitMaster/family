@@ -12,7 +12,22 @@
 
 ## 배포
 
-빌드 없는 정적 HTML이라 저장소에 push하면 Vercel이 그대로 배포합니다. 별도 설정 불필요.
+이 저장소는 **GitHub Pages**로 배포됩니다 (`main` 브랜치 / 루트).
+빌드 없는 정적 HTML이라 `main`에 머지되면 1~2분 뒤 자동 반영됩니다.
+
+- 온라인 버전: <https://exitmaster.github.io/family/jump/>
+- 한 기기 버전: <https://exitmaster.github.io/family/jump/local.html>
+
+### 승인된 도메인 (최초 1회)
+
+게임 페이지는 `exitmaster.github.io`에서 열리고 데이터는 `Unimai Game Hub`
+프로젝트에 있습니다. 서로 다른 도메인이므로, 로그인 오류가 나지 않도록
+아래를 등록해 둡니다.
+
+> Unimai Game Hub 콘솔 → Authentication → 설정 → 승인된 도메인 → 도메인 추가
+> ```
+> exitmaster.github.io
+> ```
 
 ## Firebase (온라인 버전 전용)
 
@@ -53,7 +68,11 @@
 
 ## 문제가 생기면
 
-**빨간 오류 상자가 뜬다** — 인터넷 연결, Authentication의 익명 로그인 활성화, Realtime Database 존재 여부를 순서대로 확인.
+**빨간 오류 상자가 뜬다** — 순서대로 확인:
+1. 승인된 도메인에 `exitmaster.github.io`가 들어 있는지 (위 "배포" 항목)
+2. Authentication → Sign-in method → 익명(Anonymous)이 켜져 있는지
+3. Realtime Database가 만들어져 있고 규칙이 게시되었는지
+4. 인터넷 연결
 
 **사람마다 장애물이 다르게 보인다** — 누군가 옛날 버전을 열고 있는 것. 새로고침하면 해결. `JUMP_POWER` · `GRAVITY` · `SPEED0` · `ACCEL` 값은 모두가 같아야 합니다.
 
