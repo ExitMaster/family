@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>제트팩 점프 — 한 기기에서 같이</title>
+<style>
+  :root {
+    --sky-top:    #5FC9F3;
+    --sky-bottom: #BEEDFF;
+    --grass:      #57C777;
+    --dirt:       #A9714B;
+    --skin:       #F7C59F;
+    --glass:      #9BE8FF;
+    --flame:      #FF9A2E;
+    --block:      #FFB020;
+    --ink:        #23324D;
+
+    --p1-suit: #2E7BE8;  --p1-dark: #1B4FA0;
+    --p2-suit: #35C46A;  --p2-dark: #1E8347;
+    --p3-suit: #FF5FA2;  --p3-dark: #C42E6C;
+    --p4-suit: #A96BFF;  --p4-dark: #6E37C4;
+    --p5-suit: #17BEBB;  --p5-dark: #0C7F7D;
+    --p6-suit: #E2445C;  --p6-dark: #9B1F33;
+    --p7-suit: #FF7A1A;  --p7-dark: #B94D00;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; padding: 16px;
+    background: var(--sky-bottom);
+    font-family: "Trebuchet MS", "Verdana", sans-serif;
+    color: var(--ink);
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+
+  h1 { margin: 0; font-size: 26px; letter-spacing: -0.5px; text-align: center; }
+
+  #stage {
+    position: relative; width: 100%; max-width: 720px;
+    border: 6px solid var(--ink); border-radius: 18px; overflow: hidden;
+    box-shadow: 0 8px 0 rgba(35,50,77,0.25);
+    touch-action: manipulation;
+  }
+  canvas { display: block; width: 100%; height: auto; }
+
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; background: rgba(35,50,77,0.72); color: white;
+    text-align: center; padding: 18px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h2 { margin: 0; font-size: clamp(19px, 4.2vw, 30px); }
+  #overlay p  { margin: 0; font-size: clamp(13px, 2.6vw, 16px); line-height: 1.5; }
+  .label { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; }
+
+  /* ---- WHO'S PLAYING picker ---- */
+  #picker { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    font-family: inherit; font-size: 15px; font-weight: bold;
+    background: rgba(255,255,255,0.18); color: white;
+    border: 3px solid rgba(255,255,255,0.55); border-radius: 999px;
+    padding: 7px 15px; cursor: pointer; box-shadow: none;
+  }
+  .chip .tick { width: 15px; opacity: 0; }
+  .chip.on { background: white; color: var(--ink); border-color: white; }
+  .chip.on .tick { opacity: 1; }
+  .chip .cdot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); flex: none; }
+  .chip .kbd { font-size: 12px; font-weight: normal; opacity: 0.75; }
+  .chip:active { transform: translateY(2px); }
+
+  button {
+    font-family: inherit; font-size: 19px; font-weight: bold; color: var(--ink);
+    background: var(--block); border: 4px solid var(--ink); border-radius: 14px;
+    padding: 10px 26px; cursor: pointer; box-shadow: 0 5px 0 var(--ink);
+  }
+  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button:focus-visible, .chip:focus-visible { outline: 4px solid white; outline-offset: 3px; }
+
+  #board, #world {
+    width: 100%; max-width: 720px;
+    background: white; border: 5px solid var(--ink); border-radius: 16px;
+    box-shadow: 0 6px 0 rgba(35,50,77,0.25); padding: 14px 18px;
+  }
+  #board h3, #world h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; }
+  .row + .row { margin-top: 5px; }
+  .row.leader { background: #FFF3D6; }
+  .row.out { opacity: 0.45; }
+  .row.sitting { opacity: 0.4; background: #F2F4F8; }
+  .row.sitting .now { font-size: 20px; }
+  .dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--ink); flex: none; }
+  .who { font-weight: bold; font-size: 17px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .crown { font-size: 18px; width: 22px; }
+  .now { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .best { font-size: 13px; opacity: 0.65; width: 74px; text-align: right; }
+
+  .note { font-size: 12.5px; opacity: 0.6; margin: 10px 0 0; line-height: 1.5; }
+  .rank { width: 30px; font-weight: bold; font-size: 16px; opacity: 0.7; }
+  .small {
+    font-size: 14px; padding: 6px 14px; box-shadow: 0 3px 0 var(--ink);
+    background: white; margin-top: 10px;
+  }
+  #worldStatus { font-size: 12px; letter-spacing: 0; text-transform: none; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<h1>Jetpack Jump</h1>
+
+<div id="stage">
+  <canvas id="game" width="720" height="320"></canvas>
+  <div id="overlay">
+    <h2 id="title">Who's playing?</h2>
+    <p id="msg">Tap a name to add them to the race.</p>
+    <div id="picker"></div>
+    <button id="startBtn">Start race</button>
+  </div>
+</div>
+
+<p class="label" style="opacity:.6">On a tablet, tap your own strip of the screen to jump.</p>
+
+<div id="board">
+  <h3>Scoreboard</h3>
+  <div id="rows"></div>
+</div>
+
+<div id="world">
+  <h3>🌍 World board <span id="worldStatus">loading…</span></h3>
+  <div id="worldRows"></div>
+  <button id="refreshBtn" class="small">Refresh</button>
+  <p class="note">
+    Best scores from everyone playing this game, on any device. Anyone who plays can
+    see these names, so use nicknames only — never your real full name, school or address.
+  </p>
+</div>
+
+<script>
+// ============================================================
+//  JETPACK JUMP  —  pick any 1 to 4 heroes
+// ============================================================
+
+const NAMES = ["unimai17", "aidooony2020", "ys", "hykim88", "guest", "guest 2", "guest 3"];
+const KEYS  = ["W / SPACE", "↑", "T", "I", "B", "N", "M"];
+const KEYCODES = [["KeyW", "Space"], ["ArrowUp"], ["KeyT"], ["KeyI"], ["KeyB"], ["KeyN"], ["KeyM"]];
+
+const JUMP_POWER  = 760;   // bigger = jump higher
+const GRAVITY     = 2000;  // bigger = fall faster
+const START_SPEED = 330;   // how fast the world moves at the start
+const SPEED_UP    = 9;     // how much faster it gets every second
+
+const LH = 320;            // each player's screen, measured inside the game
+const GY = LH - 50;        // where the ground is
+
+const canvas   = document.getElementById("game");
+const ctx      = canvas.getContext("2d");
+const overlay  = document.getElementById("overlay");
+const title    = document.getElementById("title");
+const msg      = document.getElementById("msg");
+const picker   = document.getElementById("picker");
+const startBtn = document.getElementById("startBtn");
+const rowsEl   = document.getElementById("rows");
+
+// how tall each player's screen is, and how many columns to use
+const LANE_HEIGHT = { 1: 320, 2: 210, 3: 165, 4: 135, 5: 190, 6: 190, 7: 150 };
+const COLUMNS     = { 1: 1,   2: 1,   3: 1,   4: 1,   5: 2,   6: 2,   7: 2 };
+
+let chosen = [true, false, false, false, false, false, false];   // who is in the race right now
+let runners = [], blocks = [], clouds = [], speed = 0, worldX = 0;
+let running = false, lastTime = 0, laneH = 320, laneW = 720, scale = 1, LW = 720;
+let cols = 1, rows = 1;
+let bests = [0, 0, 0, 0, 0, 0, 0];
+let boardRows = [];
+
+function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function heroColor(i) { return css("--p" + (i + 1) + "-suit"); }
+
+// ---------- the "who's playing" picker ----------
+function buildPicker() {
+  picker.innerHTML = "";
+  NAMES.forEach((name, i) => {
+    const chip = document.createElement("button");
+    chip.className = "chip" + (chosen[i] ? " on" : "");
+    chip.innerHTML =
+      '<span class="tick">✓</span>' +
+      '<span class="cdot" style="background:' + heroColor(i) + '"></span>' +
+      '<span>' + name + '</span>' +
+      '<span class="kbd">' + KEYS[i] + '</span>';
+    chip.addEventListener("click", () => {
+      chosen[i] = !chosen[i];
+      chip.classList.toggle("on", chosen[i]);
+      refreshStart();
+    });
+    picker.appendChild(chip);
+  });
+  refreshStart();
+}
+
+function refreshStart() {
+  const n = chosen.filter(Boolean).length;
+  startBtn.disabled = (n === 0);
+  startBtn.textContent = n === 0 ? "Pick someone!" : (n === 1 ? "Start" : "Start race");
+}
+
+// ---------- start a game ----------
+function newGame() {
+  const picked = NAMES.map((_, i) => i).filter(i => chosen[i]);
+  if (picked.length === 0) return;
+
+  const n = picked.length;
+  cols  = COLUMNS[n];
+  rows  = Math.ceil(n / cols);
+  laneH = LANE_HEIGHT[n];
+  laneW = canvas.width / cols;
+  scale = laneH / LH;
+  LW    = laneW / scale;
+  canvas.height = laneH * rows;
+
+  runners = picked.map((hero, lane) => ({
+    hero: hero, lane: lane, name: NAMES[hero],
+    suit: "--p" + (hero + 1) + "-suit", dark: "--p" + (hero + 1) + "-dark",
+    x: 90, y: GY - 54, w: 34, h: 54, vy: 0, onGround: true, step: 0,
+    puffs: [], puffTimer: 0,
+    alive: true, score: 0
+  }));
+
+  blocks = [];
+  clouds = [];
+  for (let i = 0; i < 5; i++) {
+    clouds.push({ x: Math.random() * LW, y: 30 + Math.random() * 90, s: 0.6 + Math.random() * 0.7 });
+  }
+
+  speed = START_SPEED;
+  worldX = 0;
+  running = true;
+  overlay.classList.add("hidden");
+  updateBoard();
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function jump(hero) {
+  if (!running) return;
+  const r = runners.find(r => r.hero === hero);
+  if (r && r.alive && r.onGround) { r.vy = -JUMP_POWER; r.onGround = false; }
+}
+
+function gameOver() {
+  running = false;
+  for (const r of runners) bests[r.hero] = Math.max(bests[r.hero], r.score);
+
+  const top = Math.max(...runners.map(r => r.score));
+  const winners = runners.filter(r => r.score === top);
+
+  if (runners.length === 1) {
+    title.textContent = "Crash!";
+    msg.textContent = "Score: " + runners[0].score + "   •   Best: " + bests[runners[0].hero];
+  } else {
+    title.textContent = winners.length > 1 ? "It's a tie!" : winners[0].name + " wins!";
+    msg.textContent = runners.map(r => r.name + ": " + r.score).join("   •   ");
+  }
+  startBtn.textContent = "Play again";
+  overlay.classList.remove("hidden");
+  updateBoard();
+  postWorld();
+}
+
+// ---------- scoreboard (everyone always has a row) ----------
+function buildBoard() {
+  rowsEl.innerHTML = "";
+  boardRows = [];
+  NAMES.forEach((name, i) => {
+    const row = document.createElement("div");
+    row.className = "row sitting";
+    row.innerHTML =
+      '<div class="dot" style="background:' + heroColor(i) + '"></div>' +
+      '<div class="who">' + name + '</div>' +
+      '<div class="crown"></div>' +
+      '<div class="now">—</div>' +
+      '<div class="best">best 0</div>';
+    rowsEl.appendChild(row);
+    boardRows.push({
+      row: row, crown: row.querySelector(".crown"),
+      nowEl: row.querySelector(".now"), bestEl: row.querySelector(".best")
+    });
+  });
+}
+
+function updateBoard() {
+  const top = runners.length ? Math.max(...runners.map(r => r.score)) : 0;
+
+  boardRows.forEach((el, i) => {
+    const r = runners.find(r => r.hero === i);
+
+    if (!r) {                       // sitting out, but their best score stays
+      el.nowEl.textContent  = "—";
+      el.bestEl.textContent = "best " + bests[i];
+      el.crown.textContent  = "";
+      el.row.className = "row sitting";
+      return;
+    }
+
+    const lead = runners.length > 1 && r.score === top && top > 0;
+    el.nowEl.textContent  = r.score;
+    el.bestEl.textContent = "best " + Math.max(bests[i], r.score);
+    el.crown.textContent  = lead ? "👑" : "";
+    el.row.className = "row" + (r.alive ? "" : " out") + (lead ? " leader" : "");
+  });
+}
+
+// ---------- main loop ----------
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  if (running) { update(dt); draw(); updateBoard(); requestAnimationFrame(loop); }
+  else draw();
+}
+
+function update(dt) {
+  speed  += SPEED_UP * dt;
+  worldX += speed * dt;
+  const move = (speed / scale) * dt;
+
+  for (const c of clouds) {
+    c.x -= move * 0.15;
+    if (c.x < -90) { c.x = LW + 60; c.y = 25 + Math.random() * 95; }
+  }
+
+  for (const b of blocks) b.x -= move;
+  blocks = blocks.filter(b => b.x + b.w > -30);
+
+  const last = blocks[blocks.length - 1];
+  const jumpDist  = (speed / scale) * (2 * JUMP_POWER / GRAVITY);
+  const gapNeeded = jumpDist * (1.25 + Math.random() * 0.85);
+  if (!last || LW - (last.x + last.w) > gapNeeded) {
+    blocks.push({ x: LW + 20, h: 30 + Math.random() * 28, w: 28 + Math.random() * 18 });
+  }
+
+  // ---- SMOKE TRAIL ----
+  // A new puff pops out of the jetpack while you're in the air,
+  // then it slowly grows, drifts backwards, and fades away.
+  for (const r of runners) {
+    if (!r.onGround && r.alive) {
+      r.puffTimer -= dt;
+      if (r.puffTimer <= 0) {
+        r.puffTimer = 0.025;                  // smaller = thicker smoke
+        r.puffs.push({
+          x: r.x + 2 + Math.random() * 5,
+          y: r.y + 34 + Math.random() * 4,
+          size: 4 + Math.random() * 3,
+          vx: -30 - Math.random() * 50,
+          vy: 8 + Math.random() * 22,
+          life: 1
+        });
+      }
+    }
+    for (const s of r.puffs) {
+      s.x   += s.vx * dt - move;   // drifts back as the world slides by
+      s.y   += s.vy * dt;
+      s.size += 20 * dt;           // puffs get bigger as they spread out
+      s.life -= dt / 0.8;          // and fade after about 0.8 seconds
+    }
+    r.puffs = r.puffs.filter(s => s.life > 0 && s.x > -80);
+    if (r.puffs.length > 140) r.puffs.splice(0, r.puffs.length - 140);
+  }
+
+  for (const r of runners) {
+    if (!r.alive) continue;
+    r.score += Math.round(speed * dt * 0.1);
+    r.vy += GRAVITY * dt;
+    r.y  += r.vy * dt;
+    if (r.y >= GY - r.h) { r.y = GY - r.h; r.vy = 0; r.onGround = true; }
+    if (r.onGround) r.step += move;
+
+    for (const b of blocks) {
+      const by = GY - b.h;
+      if (r.x + 6 < b.x + b.w && r.x + r.w - 6 > b.x &&
+          r.y + 8 < by + b.h  && r.y + r.h > by) { r.alive = false; }
+    }
+  }
+
+  if (runners.every(r => !r.alive)) gameOver();
+}
+
+// ---------- drawing ----------
+function draw() {
+  ctx.fillStyle = css("--ink");            // fills any empty grid square
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (const r of runners) drawLane(r);
+
+  ctx.fillStyle = css("--ink");            // lines between the screens
+  for (let i = 1; i < rows; i++) ctx.fillRect(0, laneH * i - 3, canvas.width, 6);
+  for (let i = 1; i < cols; i++) ctx.fillRect(laneW * i - 3, 0, 6, canvas.height);
+}
+
+// where on the canvas does this player's screen sit?
+function laneLeft(lane) { return (lane % cols) * laneW; }
+function laneTop(lane)  { return Math.floor(lane / cols) * laneH; }
+
+function drawLane(r) {
+  const left = laneLeft(r.lane), top = laneTop(r.lane);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(left, top, laneW, laneH); ctx.clip();
+  ctx.translate(left, top);
+  ctx.scale(scale, scale);
+
+  const sky = ctx.createLinearGradient(0, 0, 0, GY);
+  sky.addColorStop(0, css("--sky-top"));
+  sky.addColorStop(1, css("--sky-bottom"));
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, LW, LH);
+
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  for (const c of clouds) {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 20 * c.s, 0, 7);
+    ctx.arc(c.x + 24 * c.s, c.y + 6 * c.s, 15 * c.s, 0, 7);
+    ctx.arc(c.x - 22 * c.s, c.y + 8 * c.s, 13 * c.s, 0, 7);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = css("--dirt");  ctx.fillRect(0, GY, LW, LH - GY);
+  ctx.fillStyle = css("--grass"); ctx.fillRect(0, GY, LW, 13);
+
+  ctx.fillStyle = "rgba(255,255,255,0.35)";
+  const off = (worldX / scale) % 60;
+  for (let x = -60; x < LW + 60; x += 60) ctx.fillRect(x - off, GY + 22, 22, 4);
+
+  for (const b of blocks) {
+    ctx.fillStyle = css("--block");
+    ctx.fillRect(b.x, GY - b.h, b.w, b.h);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
+    ctx.strokeRect(b.x, GY - b.h, b.w, b.h);
+  }
+
+  // smoke first, so the hero is drawn on top of it
+  for (const s of r.puffs) {
+    ctx.globalAlpha = Math.max(0, s.life) * 0.5;
+    ctx.fillStyle = "#EDF2F8";
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  drawHero(r);
+  ctx.restore();
+
+  ctx.fillStyle = css(r.suit);
+  ctx.beginPath(); ctx.arc(left + 18, top + 19, 7, 0, 7); ctx.fill();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = css("--ink");
+  ctx.font = "bold 14px Trebuchet MS, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(r.name + "  " + r.score + (r.alive ? "" : "  — out!"), left + 31, top + 24);
+}
+
+function drawHero(p) {
+  ctx.globalAlpha = p.alive ? 1 : 0.35;
+  const swing = p.onGround && p.alive ? Math.sin(p.step / 22) * 8 : 5;
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
+
+  if (!p.onGround && p.alive) {
+    const flick = 10 + Math.random() * 14;
+    ctx.fillStyle = css("--flame");
+    ctx.beginPath();
+    ctx.moveTo(p.x - 2, p.y + 34); ctx.lineTo(p.x + 8, p.y + 34);
+    ctx.lineTo(p.x + 3, p.y + 34 + flick); ctx.fill();
+    ctx.fillStyle = "#FFE066";
+    ctx.beginPath();
+    ctx.moveTo(p.x + 1, p.y + 34); ctx.lineTo(p.x + 6, p.y + 34);
+    ctx.lineTo(p.x + 3, p.y + 34 + flick * 0.6); ctx.fill();
+  }
+
+  ctx.fillStyle = css(p.dark);
+  ctx.fillRect(p.x - 3, p.y + 16, 10, 20);
+  ctx.strokeRect(p.x - 3, p.y + 16, 10, 20);
+  ctx.fillRect(p.x + 7,  p.y + 36 + Math.max(0, swing),  9, 18 - Math.max(0, swing));
+  ctx.fillRect(p.x + 20, p.y + 36 + Math.max(0, -swing), 9, 18 - Math.max(0, -swing));
+
+  ctx.fillStyle = css(p.suit);
+  ctx.fillRect(p.x + 6, p.y + 20, p.w - 10, 18);
+  ctx.strokeRect(p.x + 6, p.y + 20, p.w - 10, 18);
+
+  ctx.fillStyle = css("--skin");
+  ctx.fillRect(p.x + p.w - 5, p.y + 22, 8, 11);
+  ctx.beginPath(); ctx.arc(p.x + p.w / 2 + 1, p.y + 12, 11, 0, 7); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = css(p.suit);
+  ctx.beginPath(); ctx.arc(p.x + p.w / 2 + 1, p.y + 10, 12, Math.PI, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = css("--glass");
+  ctx.fillRect(p.x + 12, p.y + 8, 16, 7);
+  ctx.strokeRect(p.x + 12, p.y + 8, 16, 7);
+
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
+//  WORLD BOARD  —  one shared list of best scores, for every device
+// ============================================================
+const WORLD_KEY  = "jetpack_world_board";
+const worldRows  = document.getElementById("worldRows");
+const worldState = document.getElementById("worldStatus");
+const refreshBtn = document.getElementById("refreshBtn");
+
+// is the shared storage actually available here?
+const CLOUD = (typeof window !== "undefined" && window.storage) ? window.storage : null;
+let world = {};
+
+async function readWorld() {
+  const res = await CLOUD.get(WORLD_KEY, true);   // true = shared with everybody
+  return res && res.value ? JSON.parse(res.value) : {};
+}
+
+async function loadWorld() {
+  // window.storage(공용 저장소)는 Claude 앱 안에서만 제공된다.
+  // 웹에 올려서 열면 없으므로, 위쪽 스코어보드만 쓰도록 안내하고 조용히 넘어간다.
+  if (!CLOUD) {
+    worldState.textContent = "(이 페이지에서는 꺼져 있어요)";
+    worldRows.innerHTML = "<p class='note'>세계 랭킹은 여기서는 안 나와요. 위쪽 스코어보드는 그대로 잘 돌아가요! " +
+                          "친구들이랑 각자 기기에서 같이 하려면 <a href='./'>온라인 버전</a>으로 가면 돼요.</p>";
+    return;
+  }
+  worldState.textContent = "loading…";
+  try {
+    world = await readWorld();
+  } catch (e) {
+    world = {};                 // an empty board just means nobody has played yet
+  }
+  worldState.textContent = "";
+  renderWorld();
+}
+
+// send this game's scores up, but only if they beat what's already there
+async function postWorld() {
+  if (!CLOUD) return;
+  worldState.textContent = "saving…";
+  try {
+    let latest = {};
+    try { latest = await readWorld(); } catch (e) { latest = {}; }
+
+    let changed = false;
+    for (const r of runners) {
+      const name = String(r.name).slice(0, 24);
+      if (!latest[name] || r.score > latest[name]) { latest[name] = r.score; changed = true; }
+    }
+    if (changed) await CLOUD.set(WORLD_KEY, JSON.stringify(latest), true);
+    world = latest;
+    worldState.textContent = "";
+    renderWorld();
+  } catch (e) {
+    worldState.textContent = "(couldn't save — try Refresh)";
+  }
+}
+
+function renderWorld() {
+  const list = Object.entries(world)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  if (!list.length) {
+    worldRows.innerHTML = "<p class='note'>Nobody has posted a score yet. Play a round and you'll be first!</p>";
+    return;
+  }
+
+  const medal = ["🥇", "🥈", "🥉"];
+  worldRows.innerHTML = list.map((entry, i) => {
+    const mine = runners.some(r => r.name === entry[0]);
+    return '<div class="row' + (mine ? ' leader' : '') + '">' +
+             '<div class="rank">' + (medal[i] || (i + 1)) + '</div>' +
+             '<div class="who">' + escapeName(entry[0]) + '</div>' +
+             '<div class="now">' + entry[1] + '</div>' +
+           '</div>';
+  }).join("");
+}
+
+function escapeName(t) {
+  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+refreshBtn.addEventListener("click", loadWorld);
+
+// ---------- controls ----------
+startBtn.addEventListener("click", newGame);
+
+document.addEventListener("keydown", e => {
+  for (let i = 0; i < KEYCODES.length; i++) {
+    if (KEYCODES[i].includes(e.code)) { e.preventDefault(); jump(i); }
+  }
+});
+
+canvas.addEventListener("pointerdown", e => {
+  if (!running || !runners.length) return;
+  const box = canvas.getBoundingClientRect();
+  const col = Math.min(cols - 1, Math.floor((e.clientX - box.left) / box.width  * cols));
+  const row = Math.min(rows - 1, Math.floor((e.clientY - box.top)  / box.height * rows));
+  const lane = row * cols + col;
+  if (lane < runners.length) jump(runners[lane].hero);
+});
+
+// ---------- first screen ----------
+buildPicker();
+buildBoard();
+newGame();          // draw one frame so it isn't blank
+running = false;
+title.textContent = "Who's playing?";
+msg.textContent = "Tap a name to add them to the race.";
+startBtn.textContent = "Start race";
+overlay.classList.remove("hidden");
+updateBoard();
+draw();
+loadWorld();
+</script>
+</body>
+</html>
