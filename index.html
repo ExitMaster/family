@@ -429,7 +429,7 @@ const DEFAULT_STATE = {
   items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
   milestonesFired:[], eventQueue:[], equip:{}, voluntaryRescueDate:null,
   hanwoori:{anchor:null,tasks:[]}, coins:0, hwDraft:null, hwNewTask:'', shopMsg:'',
-  pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:'', pinDraft2:'', pinSaveErr:'',
+  pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:'', pinDraft2:'', pinSaveErr:'', pinChangeMode:false,
   assignDraft:null
 };
 
@@ -737,7 +737,7 @@ function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.sett
 function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
 function openDetail(id) { setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
 function openDexDetail(id) { if(ST.dexSeen[id]) setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
-function closeOverlay() { setState({overlay:null,eventInfo:null,detailReaction:null}); }
+function closeOverlay() { setState({overlay:null,eventInfo:null,detailReaction:null,pinChangeMode:false,pinDraft:'',pinDraft2:'',pinSaveErr:''}); }
 // 포획 오버레이 닫기: 대기 중인 milestone/rescue 이벤트가 있으면 이어서 보여준다.
 function closeCaught() {
   const q=ST.eventQueue||[];
@@ -772,10 +772,10 @@ function completePage() {
 // ── 보호자 PIN(보상 확인) ────────────────────────────────────
 function pinSet(){ const p=ST.settings.guardianPin; return !!(p&&p.length===6); }
 // 부모님 설정 진입: PIN이 있으면 잠금 화면을 먼저 띄운다(PIN 자체 변조 방지).
-function openSettings(){ if(pinSet()) setState({verifyFor:'settings',pinEntry:'',pinError:false,overlay:'verify'}); else setState({overlay:'settings'}); }
+function openSettings(){ if(pinSet()) setState({verifyFor:'settings',pinEntry:'',pinError:false,overlay:'verify',pinChangeMode:false}); else setState({overlay:'settings',pinChangeMode:false}); }
 // 대기 중인 보상 확인 다시 열기(배너에서).
 function reopenReward(){ if(ST.pendingReward) setState({verifyFor:'reward',pinEntry:'',pinError:false,overlay:'verify'}); }
-function closeVerify(){ setState({overlay:null,verifyFor:null,pinEntry:'',pinError:false}); }
+function closeVerify(){ const back=(ST.verifyFor==='pinchange'||ST.verifyFor==='pinclear')?'settings':null; setState({overlay:back,verifyFor:null,pinEntry:'',pinError:false}); }
 function pinDel(){ setState({pinEntry:(ST.pinEntry||'').slice(0,-1),pinError:false}); }
 function pinPress(d){
   const e=((ST.pinEntry||'')+d).slice(0,6);
@@ -786,7 +786,9 @@ function pinPress(d){
     if(purpose==='reward'){ ST={...ST,pinEntry:'',pinError:false,verifyFor:null,pendingReward:null,overlay:null}; finishDay(); }
     else if(purpose==='assignments'){ commitAssignDraft(); }
     else if(purpose==='hanwoori'){ commitHanwooriDraft(); }
-    else { setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings'}); }
+    else if(purpose==='pinchange'){ setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings',pinChangeMode:true,pinDraft:'',pinDraft2:'',pinSaveErr:''}); }
+    else if(purpose==='pinclear'){ setState(s=>({settings:{...s.settings,guardianPin:''},pinEntry:'',pinError:false,verifyFor:null,overlay:'settings',pinChangeMode:false,pinDraft:'',pinDraft2:'',pinSaveErr:''})); }
+    else { setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings',pinChangeMode:false}); }
   } else {
     setState({pinEntry:'',pinError:true});
   }
@@ -796,9 +798,12 @@ function savePin(){
   const a=(ST.pinDraft||'').trim(), b=(ST.pinDraft2||'').trim();
   if(!/^[0-9]{6}$/.test(a)){ setState({pinSaveErr:'len'}); return; }
   if(a!==b){ setState({pinSaveErr:'mismatch'}); return; }
-  setState(s=>({settings:{...s.settings,guardianPin:a},pinDraft:'',pinDraft2:'',pinSaveErr:''}));
+  setState(s=>({settings:{...s.settings,guardianPin:a},pinDraft:'',pinDraft2:'',pinSaveErr:'',pinChangeMode:false}));
 }
-function clearPin(){ setState(s=>({settings:{...s.settings,guardianPin:''},pinDraft:'',pinDraft2:'',pinSaveErr:''})); }
+// PIN이 이미 설정돼 있으면, 변경·해제 전에 현재 PIN 확인을 먼저 받는다(아이의 임의 변경 차단).
+function openPinChange(){ setState({verifyFor:'pinchange',pinEntry:'',pinError:false,overlay:'verify'}); }
+function openPinClear(){ setState({verifyFor:'pinclear',pinEntry:'',pinError:false,overlay:'verify'}); }
+function cancelPinChange(){ setState({pinChangeMode:false,pinDraft:'',pinDraft2:'',pinSaveErr:''}); }
 // 이벤트 보상 적용: ctx(pond/items/unlocks)를 직접 갱신하고 표시용 eventInfo를 반환.
 //  targetUid 지정 시 그 카피바라에게, 아니면 건강한 카피바라 중 랜덤으로 친밀도를 준다.
 // 위기 카피바라 한 마리를 한 단계 회복(gone→leaving→weak→healthy). finishDay/doVoluntary 공용.
@@ -868,9 +873,18 @@ function doPullForward(){
 // 도감 상세에서 카피바라에게 직접 해보는 상호작용: 친밀도↑ + 개성별 반응.
 function interact(uid, id) {
   const c=ST.pond.find(x=>x.uid===uid), it=INTERACTIONS.find(x=>x.id===id); if(!c||!it) return;
-  const personality=sp(c.speciesId).personality;
+  const s=sp(c.speciesId), personality=s.personality;
   const pond=ST.pond.map(x=>x.uid===uid?{...x,intimacy:(x.intimacy||0)+(it.intimacy||1)}:x);
-  setState({pond,detailReaction:{emoji:it.emoji,mood:it.mood,line:interactReact(personality,it)}});
+  ST={...ST,pond,detailReaction:{emoji:it.emoji,mood:it.mood,line:interactReact(personality,it)}};
+  save();
+  // 상세 팝업을 통째로 다시 그리면 창이 껌뻑이므로, 바뀐 부분(친밀도·반응·표정)만 제자리 갱신.
+  const st=document.getElementById('detail-status');
+  if(st){
+    const owned=pond.find(x=>x.uid===uid), T=THEMES[ST.theme]||THEMES.onsen;
+    st.textContent=detailStatusLabel(owned);
+    const rb=document.getElementById('detail-react'); if(rb) rb.innerHTML=detailReactInner(T,s);
+    const cp=document.getElementById('detail-capy'); if(cp) cp.innerHTML=capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction.mood,decor:owned?decorFor(owned.uid):null,img:imgFor(s.id)});
+  } else { render(); }
 }
 // 꾸미기: 같은 장식을 다시 누르면 벗고, 다른 장식이면 갈아 끼운다(카피바라당 1개).
 function equipDecor(uid, decorId) {
@@ -944,6 +958,21 @@ function startTick() {
 
 // ── Render ───────────────────────────────────────────────────
 function render() {
+  // 입력창에 포커스가 있을 때 전체 재렌더로 포커스·커서·스크롤이 날아가
+  // 모바일 키보드가 닫히고 화면이 껌뻑이는 문제 방지: 재빌드 전에 상태를 기억했다가 복원.
+  let _fx=null;
+  try{
+    const a=document.activeElement;
+    if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')){
+      const da=Array.prototype.slice.call(a.attributes).find(x=>x.name.indexOf('data-')===0);
+      if(da){
+        let ss=null,se=null; try{ ss=a.selectionStart; se=a.selectionEnd; }catch(e){}
+        let n=a.parentElement,scTop=null;
+        while(n){ if(n.scrollHeight-n.clientHeight>2){ scTop=n.scrollTop; break; } n=n.parentElement; }
+        _fx={sel:'['+da.name+(da.value!==''?'="'+da.value+'"':'')+']',ss:ss,se:se,scTop:scTop};
+      }
+    }
+  }catch(e){}
   const T=THEMES[ST.theme]||THEMES.onsen;
   const sch=schedule(), tk=ST.todayKey;
   const plannedToday=sch.days[tk]?sch.days[tk].pages:0;
@@ -1000,6 +1029,14 @@ function render() {
   ${overlays}
 </div>`;
   attachInputs();
+  if(_fx){ try{
+    const el=document.querySelector(_fx.sel);
+    if(el){
+      el.focus();
+      if(_fx.ss!=null){ try{ el.setSelectionRange(_fx.ss,_fx.se); }catch(e){} }
+      if(_fx.scTop!=null){ let n=el.parentElement; while(n){ if(n.scrollHeight-n.clientHeight>2){ n.scrollTop=_fx.scTop; break; } n=n.parentElement; } }
+    }
+  }catch(e){} }
 }
 
 // ── Screen renderers ─────────────────────────────────────────
@@ -1409,20 +1446,30 @@ function renderDex(T,seen,total,pct) {
 </div>`;
 }
 
+// 상세창 하단 상태줄 텍스트(친밀도 포함). interact()가 제자리 갱신에도 재사용.
+function detailStatusLabel(owned){
+  if(!owned) return '아직 데려오지 못한 친구예요';
+  const sl={healthy:'😊 건강하게 연못에 살고 있어요',weak:'😟 기운이 없어요',leaving:'😢 떠나려 해요',gone:'💨 잠시 사라졌어요 (숙제로 복귀)'};
+  return (sl[owned.status]||'')+' · 친밀도 '+((owned.intimacy||0)+1);
+}
+// 상세창 반응 말풍선(놀아주기 결과). detailReaction 유무에 따라 안내/말풍선.
+function detailReactInner(T,s){
+  return ST.detailReaction
+    ? `<div style="margin-top:12px;font-size:14px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:11px 13px;line-height:1.5;">${ST.detailReaction.emoji} ${moodEmoji(ST.detailReaction.mood)} ${h(ST.detailReaction.line)}</div>`
+    : `<div style="margin-top:12px;font-size:12.5px;color:${T.sub};">아래 버튼으로 ${h(s.name)}와 놀아줄 수 있어요</div>`;
+}
 function renderDetail(T) {
   const s=ST.detailSpeciesId?sp(ST.detailSpeciesId):null; if(!s)return'';
   const owned=ST.pond.find(c=>c.speciesId===s.id), rm=RARITY[s.rarity]||RARITY['일반'];
-  let statusLabel='';
-  if(owned){ const sl={healthy:'😊 건강하게 연못에 살고 있어요',weak:'😟 기운이 없어요',leaving:'😢 떠나려 해요',gone:'💨 잠시 사라졌어요 (숙제로 복귀)'}; statusLabel=(sl[owned.status]||'')+' · 친밀도 '+((owned.intimacy||0)+1); }
-  else statusLabel='아직 데려오지 못한 친구예요';
+  const statusLabel=detailStatusLabel(owned);
   return `<div onclick="closeOverlay()" style="position:absolute;inset:0;z-index:62;background:rgba(40,30,25,0.45);display:flex;align-items:center;justify-content:center;padding:24px;">
   <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null,decor:owned?decorFor(owned.uid):null,img:imgFor(s.id)})}</div>
+    <div id="detail-capy" style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null,decor:owned?decorFor(owned.uid):null,img:imgFor(s.id)})}</div>
     <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
     <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${(PERSONALITY[s.personality]||{}).emoji||''}${s.personality}</div>
     <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
-    <div style="margin-top:10px;font-size:13px;color:${T.sub};font-weight:600;">${statusLabel}</div>
-    ${owned?`${ST.detailReaction?`<div style="margin-top:12px;font-size:14px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:11px 13px;line-height:1.5;">${ST.detailReaction.emoji} ${moodEmoji(ST.detailReaction.mood)} ${h(ST.detailReaction.line)}</div>`:`<div style="margin-top:12px;font-size:12.5px;color:${T.sub};">아래 버튼으로 ${h(s.name)}와 놀아줄 수 있어요</div>`}
+    <div id="detail-status" style="margin-top:10px;font-size:13px;color:${T.sub};font-weight:600;">${statusLabel}</div>
+    ${owned?`<div id="detail-react">${detailReactInner(T,s)}</div>
     <div style="display:flex;gap:7px;margin-top:11px;">${INTERACTIONS.map(it=>`<div onclick="interact('${owned.uid}','${it.id}')" class="tapbtn" style="cursor:pointer;flex:1;background:${T.soft};border:2px solid ${T.line};border-radius:14px;padding:10px 4px;font-weight:800;font-size:11.5px;color:${T.ink};line-height:1.3;"><div style="font-size:20px;margin-bottom:2px;">${it.emoji}</div>${h(it.label)}</div>`).join('')}</div>
     <div style="margin-top:13px;border-top:1px dashed ${T.line};padding-top:11px;">
       <div style="font-size:12.5px;font-weight:800;color:${T.sub};margin-bottom:7px;text-align:left;">🎀 꾸미기 ${(ST.equip||{})[owned.uid]?`<span style="color:${T.accentDark};">(${h((decorById((ST.equip||{})[owned.uid])||{}).name||'')} 착용중 · 다시 누르면 벗기)</span>`:''}</div>
@@ -1475,10 +1522,13 @@ function renderShop(T) {
 // 보호자 확인 / 설정 잠금 / 숙제 변경 확인 — 6자리 PIN 키패드.
 function renderVerify(T) {
   const purpose=ST.verifyFor, reward=purpose==='reward', isAssign=purpose==='assignments', isHw=purpose==='hanwoori';
-  const title=reward?'보호자 확인':isAssign?'숙제 변경 확인':isHw?'한우리 숙제 확인':'부모님 설정 잠금';
+  const isPinChg=purpose==='pinchange', isPinClr=purpose==='pinclear';
+  const title=reward?'보호자 확인':isAssign?'숙제 변경 확인':isHw?'한우리 숙제 확인':(isPinChg||isPinClr)?'현재 PIN 확인':'부모님 설정 잠금';
   const sub=reward?'오늘 숙제를 정말 다 했나요?<br>보호자가 확인하면 친구가 찾아와요 🌿'
           :isAssign?'아래 내용으로 숙제를 바꿀까요?<br>보호자 PIN으로 확인해 주세요.'
           :isHw?'이번 주 한우리 숙제를 아래 목록으로 정할까요?<br>보호자 PIN으로 확인해 주세요.'
+          :isPinChg?'PIN을 바꾸려면 현재 PIN을 먼저 입력해 주세요.'
+          :isPinClr?'PIN을 해제하려면 현재 PIN을 먼저 입력해 주세요.'
           :'보호자 PIN을 입력하면 설정을 열 수 있어요.';
   const hwReview=isHw?(ST.hwDraft||[]).map(t=>`<div style="padding:6px 0;border-bottom:1px solid ${T.line};font-size:13px;font-weight:700;">📝 ${h(t.title)}${t.done?' <span style="color:#6aa05a;">✓완료</span>':''}</div>`).join('')||`<div style="padding:8px 0;font-size:13px;color:${T.sub};">task 없음 (전체 삭제)</div>`:'';
   const review=isAssign?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;">${assignReviewRows(T)}</div>`
@@ -1523,14 +1573,22 @@ function renderSettings(T) {
     <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🔒 보호자 확인 PIN ${pinSet()?'<span style="font-size:12px;color:#3f9b94;">· 설정됨</span>':`<span style="font-size:12px;color:${T.sub};">· 미설정</span>`}</div>
       <div style="font-size:12.5px;color:${T.sub};line-height:1.5;margin-bottom:10px;">숙제를 끝내면 보호자가 PIN을 입력해야 보상(친구 데려오기)이 주어져요. 설정 진입과 숙제 변경 승인에도 같은 PIN을 사용합니다.</div>
-      <input data-pin-draft="1" type="password" inputmode="numeric" maxlength="6" placeholder="${pinSet()?'새 PIN 6자리':'PIN 6자리 숫자'}" value="" style="width:100%;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};margin-bottom:8px;" />
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input data-pin-draft2="1" type="password" inputmode="numeric" maxlength="6" placeholder="PIN 다시 입력" value="" style="flex:1;min-width:0;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
-        <div onclick="savePin()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">${pinSet()?'변경':'저장'}</div>
-      </div>
-      ${ST.pinSaveErr==='len'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">6자리 숫자를 입력해 주세요.</div>`:''}
-      ${ST.pinSaveErr==='mismatch'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">두 번 입력한 PIN이 서로 달라요. 다시 확인해 주세요.</div>`:''}
-      ${pinSet()?`<div onclick="clearPin()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:9px;margin-top:6px;">PIN 해제 (확인 없이 보상 지급)</div>`:''}
+      ${(!pinSet()||ST.pinChangeMode)?`
+        <input data-pin-draft="1" type="password" inputmode="numeric" maxlength="6" placeholder="${pinSet()?'새 PIN 6자리':'PIN 6자리 숫자'}" value="" style="width:100%;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};margin-bottom:8px;" />
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input data-pin-draft2="1" type="password" inputmode="numeric" maxlength="6" placeholder="PIN 다시 입력" value="" style="flex:1;min-width:0;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
+          <div onclick="savePin()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">${pinSet()?'변경':'저장'}</div>
+        </div>
+        ${ST.pinSaveErr==='len'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">6자리 숫자를 입력해 주세요.</div>`:''}
+        ${ST.pinSaveErr==='mismatch'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">두 번 입력한 PIN이 서로 달라요. 다시 확인해 주세요.</div>`:''}
+        ${ST.pinChangeMode?`<div onclick="cancelPinChange()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:9px;margin-top:6px;">취소</div>`:''}
+      `:`
+        <div style="display:flex;gap:8px;">
+          <div onclick="openPinChange()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.soft};color:${T.ink};font-weight:800;font-size:14px;padding:12px;border-radius:12px;border:2px solid ${T.line};">🔑 PIN 변경</div>
+          <div onclick="openPinClear()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.soft};color:${T.sub};font-weight:800;font-size:14px;padding:12px;border-radius:12px;border:2px solid ${T.line};">PIN 해제</div>
+        </div>
+        <div style="font-size:11.5px;color:${T.sub};margin-top:8px;line-height:1.5;">변경·해제하려면 현재 PIN을 먼저 입력해야 해요.</div>
+      `}
     </div>
     <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
       <div style="font-weight:800;font-size:15px;margin-bottom:10px;">📒 문제집 관리</div>
@@ -1588,11 +1646,13 @@ function attachInputs() {
     el.addEventListener('input',e=>{ const key=el.getAttribute('data-row-to'); ST.rowEdit={...ST.rowEdit,[key]:{...(ST.rowEdit[key]||{}),to:e.target.value}}; updateRowPg(key); });
   });
 
+  // 숫자 입력창은 타이핑마다 전체 재렌더를 하면 모바일 키보드가 닫히고 두 자리 입력이 깨진다.
+  // (number 입력은 커서 위치를 복원할 수 없음) → 상태만 갱신·저장하고 재렌더는 하지 않는다.
   const mppEl=document.querySelector('[data-mpp]');
-  if(mppEl)mppEl.addEventListener('input',e=>setMpp(e.target.value));
+  if(mppEl)mppEl.addEventListener('input',e=>{ const n=parseInt(e.target.value); ST.settings={...ST.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}; save(); });
 
   document.querySelectorAll('[data-daymin]').forEach(el=>{
-    el.addEventListener('input',e=>setDayMin(el.getAttribute('data-daymin'),e.target.value));
+    el.addEventListener('input',e=>{ const d=el.getAttribute('data-daymin'); const n=parseInt(e.target.value); ST.settings={...ST.settings,dayMin:{...ST.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}; save(); });
   });
 }
 
