@@ -54,6 +54,11 @@
     font-weight: bold; font-size: 15px;
   }
   .cdot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink); }
+  #vwarn {
+    background: #FFE2E2; color: #7B241C; border: 3px solid #C0392B; border-radius: 12px;
+    padding: 8px 12px; font-size: 13px; font-weight: bold; max-width: 460px;
+  }
+  #vwarn.hidden { display: none; }
   #board {
     width: 100%; max-width: 720px; background: #fff; border: 5px solid var(--ink);
     border-radius: 16px; box-shadow: 0 6px 0 rgba(58,46,77,.25); padding: 14px 18px;
@@ -88,6 +93,7 @@
       <button id="startBtn" class="ghost" style="display:none">경주 시작</button>
       <button id="leaveBtn" class="ghost" style="display:none">나가기</button>
     </div>
+    <div id="vwarn" class="hidden"></div>
     <div id="lobbyList"></div>
   </div>
 </div>
@@ -131,7 +137,12 @@ const firebaseConfig = {
 //
 //  단위는 "초"와 "픽셀" 기준입니다. 원본 게임은 프레임 단위였는데,
 //  기기마다 프레임 수가 달라서 코스가 어긋나므로 초 단위로 바꿨습니다.
+//
+//  아래 값을 하나라도 바꾸면 GAME_VERSION도 함께 올리세요. 그래야 옛날
+//  화면을 열어둔 사람이 로비에서 경고를 받습니다. (jump/ 와 같은 방식)
 // ============================================================
+const GAME_VERSION = 1;
+
 const JUMP_POWER  = 780;    // 보통 점프 (원본 -13/프레임)
 const JUMP_BOOST  = 1080;   // 🚀 먹었을 때 (원본 -18/프레임)
 const GRAVITY     = 2520;   // 중력 (원본 0.7/프레임²)
@@ -172,7 +183,7 @@ const ptitle = document.getElementById("ptitle"), pmsg = document.getElementById
 const nickEl = document.getElementById("nick"),   roomEl = document.getElementById("room");
 const joinBtn = document.getElementById("joinBtn"), startBtn = document.getElementById("startBtn");
 const leaveBtn = document.getElementById("leaveBtn"), lobbyList = document.getElementById("lobbyList");
-const rowsEl = document.getElementById("rows");
+const rowsEl = document.getElementById("rows"), vwarn = document.getElementById("vwarn");
 
 function fail(text) {
   const d = document.createElement("div");
@@ -298,7 +309,7 @@ joinBtn.addEventListener("click", () => {
 
   room = code;
   const myRef = ref(db, `rooms/${room}/players/${uid}`);
-  set(myRef, { name: nick, joinedAt: serverTimestamp(),
+  set(myRef, { name: nick, v: GAME_VERSION, joinedAt: serverTimestamp(),
                y: BY0, alive: false, score: 0, lives: LIVES, gx: GHOST_START });
   onDisconnect(myRef).remove();          // 탭이 닫히면 알아서 정리
 
@@ -334,6 +345,16 @@ function refreshLobby() {
     '<span class="tag"><span class="cdot" style="background:' + COLORS[i % 8][0] + '"></span>' +
     esc(players[id].name) + (id === uid ? " (나)" : "") + "</span>"
   ).join("");
+
+  // 물리나 코스 규칙이 바뀌었으니, 옛날 화면을 열어둔 사람이 있으면 경주가 어긋난다.
+  const odd = lanes.filter(id => (players[id].v || 1) !== GAME_VERSION).map(id => players[id].name);
+  if (odd.length) {
+    vwarn.textContent = "⚠️ " + odd.join(", ") + " 님이 옛날 버전이에요. 모두 새로고침(Ctrl+Shift+R) 해주세요!";
+    vwarn.classList.remove("hidden");
+  } else {
+    vwarn.classList.add("hidden");
+  }
+
   startBtn.style.display = (room && game.state !== "running") ? "" : "none";
   drawBoard();
 }
