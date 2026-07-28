@@ -24,10 +24,25 @@
     box-shadow: 0 8px 0 rgba(35,50,77,.25); touch-action: manipulation;
   }
   canvas { display: block; width: 100%; height: auto; background: var(--ink); }
+
+  /* ---- FULL SCREEN ---- */
+  #stage.big {
+    position: fixed; inset: 0; z-index: 100; max-width: none;
+    border: 0; border-radius: 0; box-shadow: none; background: var(--ink);
+  }
+  #stage.big canvas { width: 100%; height: 100%; object-fit: contain; }
+  #stage.big #fsBtn { top: 14px; right: 14px; }
+
+  #fsBtn {
+    position: absolute; top: 9px; right: 9px; z-index: 6;
+    font-size: 14px; padding: 5px 11px; border-width: 3px; border-radius: 10px;
+    background: #fff; box-shadow: 0 3px 0 var(--ink);
+  }
+
   #panel {
     position: absolute; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 12px; padding: 18px;
-    background: rgba(35,50,77,.82); color: #fff; text-align: center;
+    background: rgba(35,50,77,.82); color: #fff; text-align: center; overflow: auto;
   }
   #panel.hidden { display: none; }
   #panel h2 { margin: 0; font-size: clamp(19px,4.2vw,30px); }
@@ -54,21 +69,72 @@
     font-weight: bold; font-size: 15px;
   }
   .cdot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--ink); }
-  #board {
+  #vwarn {
+    background: #FFE2E2; color: #7B241C; border: 3px solid #C0392B; border-radius: 12px;
+    padding: 8px 12px; font-size: 13px; font-weight: bold; max-width: 460px;
+  }
+  #vwarn.hidden { display: none; }
+
+  /* ---- HOW TO PLAY ---- */
+  #howto {
+    position: absolute; inset: 0; z-index: 7; padding: 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(35,50,77,.93); overflow: auto;
+  }
+  #howto.hidden { display: none; }
+  #howto .card {
+    background: #fff; color: var(--ink); border: 5px solid var(--ink);
+    border-radius: 18px; padding: 14px 18px; max-width: 470px; width: 100%;
+    text-align: left; box-shadow: 0 8px 0 rgba(0,0,0,.3);
+  }
+  #howto h2 { margin: 0 0 8px; font-size: 21px; text-align: center; }
+  #howto .rule { display: flex; gap: 9px; align-items: flex-start; margin: 5px 0; font-size: 14px; }
+  #howto .rule .em { font-size: 17px; width: 24px; text-align: center; flex: none; }
+  #closeHow { display: block; width: 100%; margin-top: 12px; font-size: 19px; }
+
+  /* ---- SHOP ---- */
+  #shop, #board {
     width: 100%; max-width: 720px; background: #fff; border: 5px solid var(--ink);
     border-radius: 16px; box-shadow: 0 6px 0 rgba(35,50,77,.25); padding: 14px 18px;
   }
-  #board h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: .6; }
+  #shop h3, #board h3 {
+    margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: .6;
+  }
+  #shop h3 { cursor: pointer; user-select: none; margin-bottom: 6px; }
+  #shop h3:hover { opacity: .9; }
+  .fold { display: inline-block; transition: transform .15s; }
+  #shop:not(.folded) .fold { transform: rotate(90deg); }
+  #shop.folded #shopBody { display: none; }
+  #starBank { float: right; letter-spacing: 0; font-size: 16px; opacity: 1; color: #C58B00; }
+  #shopItems { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 9px; }
+  .item {
+    font-family: inherit; cursor: pointer; text-align: center; line-height: 1.35;
+    background: #F7F9FC; color: var(--ink); border: 3px solid #DDE3EC;
+    border-radius: 13px; padding: 9px 6px; box-shadow: none; font-size: 13px;
+  }
+  .item .ico { font-size: 24px; display: block; }
+  .item .nm { font-weight: bold; }
+  .item .pr { font-size: 12px; opacity: .7; }
+  .item.owned { border-color: #9CC6F5; background: #F0F7FF; }
+  .item.worn  { border-color: var(--ink); background: #FFF3D6; }
+  .item.locked { opacity: .5; }
+
   .brow { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; }
   .brow + .brow { margin-top: 5px; }
   .brow.me { background: #FFF3D6; }
   .brow.out { opacity: .45; }
   .dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--ink); flex: none; }
   .who { font-weight: bold; font-size: 17px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .stars { font-size: 14px; width: 56px; text-align: right; }
   .sc { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
   .note { font-size: 12.5px; opacity: .65; margin: 10px 0 0; line-height: 1.5; text-align: center; max-width: 700px; }
   .err { background: #FFE2E2; border: 4px solid #C0392B; color: #7B241C;
          border-radius: 14px; padding: 14px 18px; max-width: 720px; font-size: 15px; line-height: 1.6; }
+  #oops {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999; cursor: pointer;
+    background: #E2445C; color: #fff; font-family: monospace; font-size: 13px;
+    padding: 8px 12px; line-height: 1.4; border-bottom: 4px solid #9B1F33;
+  }
 </style>
 </head>
 <body>
@@ -85,13 +151,42 @@
     <div class="rowbtns">
       <button id="joinBtn">Join room</button>
       <button id="startBtn" class="ghost" style="display:none">Start race</button>
+      <button id="howBtn" class="ghost" style="display:none">How to play</button>
       <button id="leaveBtn" class="ghost" style="display:none">Leave</button>
     </div>
+    <div id="vwarn" class="hidden"></div>
     <div id="lobbyList"></div>
   </div>
+  <div id="howto" class="hidden">
+    <div class="card">
+      <h2>🚀 How to play</h2>
+      <div class="rule"><span class="em">👆</span><span><b>Press SPACE</b> (or tap the screen) to blast off.</span></div>
+      <div class="rule"><span class="em">⏱️</span><span><b>Hold it down to fly higher.</b> Let go early and you only do a little hop.</span></div>
+      <div class="rule"><span class="em">🔥</span><span><b>Tap again in mid-air for a jetpack boost</b> — it shoves you further. You get <b>3 per flight</b> (the orange dots). They refill the moment you touch down.</span></div>
+      <div class="rule"><span class="em">📦</span><span>Clear a box safely: <b>+1 point</b>.</span></div>
+      <div class="rule"><span class="em">⭐</span><span>Land neatly <b>on top</b> of a box: <b>+3 stars</b> — spend them in the shop below.</span></div>
+      <div class="rule"><span class="em">💥</span><span>Smack into the <b>side</b> of a box and you're out. Everyone else keeps flying.</span></div>
+      <div class="rule"><span class="em">⛶</span><span>Press <b>F</b> or the ⛶ button for full screen.</span></div>
+      <button id="closeHow">Got it! 🚀</button>
+    </div>
+  </div>
+  <button id="fsBtn" title="Full screen (F)">⛶ Full</button>
 </div>
 
-<p class="note" id="hint">Press SPACE, tap the screen, or click to fire your jetpack.</p>
+<p class="note" id="hint">
+  <b>Hold</b> SPACE (or the screen) to jump higher &nbsp;·&nbsp; tap again in mid-air for a
+  jetpack <b>boost</b> (3 per flight) &nbsp;·&nbsp; <b>F</b> for full screen
+</p>
+
+<div id="shop">
+  <h3 id="shopHead"><span class="fold">▶</span> ✨ Avatar shop <span id="starBank">⭐ 0</span></h3>
+  <div id="shopBody">
+    <p class="note" id="shopNote" style="margin:0 0 12px; text-align:left">
+      Land on top of boxes to earn stars, then spend them here.
+    </p>
+    <div id="shopItems"></div>
+  </div>
+</div>
 
 <div id="board">
   <h3>Race scores</h3>
@@ -104,6 +199,21 @@
 </p>
 
 <script type="module">
+// ---------- if anything breaks, say so on screen (not hidden in the console) ----------
+function showOops(text) {
+  let box = document.getElementById("oops");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "oops";
+    box.title = "tap to hide";
+    box.addEventListener("click", () => box.remove());
+    document.body.appendChild(box);
+  }
+  box.textContent = "⚠️ " + text + "   (tap to hide)";
+}
+window.addEventListener("error", e => showOops((e.message || "something broke") + "  — line " + (e.lineno || "?")));
+window.addEventListener("unhandledrejection", e => showOops("waiting-job broke: " + ((e.reason && e.reason.message) || e.reason)));
+
 // ============================================================
 //  Firebase 설정 (Unimai Game Hub 프로젝트)
 //
@@ -111,7 +221,7 @@
 //  포함되도록 설계된 값이라 저장소가 public이어도 안전합니다. 실제 보안은
 //  Realtime Database → 규칙(rules)에서 걸려 있습니다:
 //    - 로그인(익명)한 사람만 읽고 쓸 수 있음
-//    - rooms/{방코드} 아래에서만 가능, 그 밖의 경로는 아무도 못 건드림
+//    - rooms/{방코드} 와 banks/{닉네임} 아래에서만 가능
 //
 //  다시 확인하려면: Firebase 콘솔 → ⚙️ 설정 → 프로젝트 설정 → 내 앱 → 구성
 // ============================================================
@@ -124,22 +234,65 @@ const firebaseConfig = {
 };
 
 // ============================================================
-//  Game settings — safe to play with, but everyone in a room
-//  MUST be running the same numbers or the track won't match.
+//  Game settings — everyone in a room MUST be running the same
+//  numbers, or the track and the scores won't match. If you change
+//  any of these, bump GAME_VERSION so old tabs get warned.
 // ============================================================
-const JUMP_POWER = 760;
-const GRAVITY    = 2000;
-const SPEED0     = 430;   // starting speed
-const ACCEL      = 12;    // how much faster each second
-const COUNTDOWN  = 3;     // seconds of "3, 2, 1, GO!"
-const LH = 320, GY = LH - 50, PX = 90;   // lane height, ground, player x
+const GAME_VERSION = 2;
 
+const JUMP_POWER  = 620;   // the pop you get the instant you press
+const HOLD_EASE   = 0.35;  // gravity while you keep holding (smaller = floatier)
+const HOLD_MAX    = 0.30;  // holding only helps for this long (seconds)
+const CUT         = 0.45;  // let go early and the jump gets chopped this much
+const BOOST_POWER = 400;   // mid-air jetpack tap
+const BOOSTS_MAX  = 3;     // boosts per trip through the air
+const MAX_AIR     = 1.3;   // measured longest flight: hold + 3 boosts ≈ 1.27s
+const GRAVITY     = 2000;  // bigger = fall faster
+const SPEED0      = 430;   // starting speed
+const ACCEL       = 12;    // how much faster each second
+const STAR_BONUS  = 3;     // stars for landing on a box
+const COUNTDOWN   = 3;     // seconds of "3, 2, 1, GO!"
+const LH = 320, GY = LH - 50, PX = 90;   // lane height, ground, player x
+const PW = 34, PH = 54;                  // player size
+
+// lane colours — used when a player hasn't bought a colour of their own
 const COLORS = [
   ["#2E7BE8","#1B4FA0"], ["#35C46A","#1E8347"], ["#FF5FA2","#C42E6C"],
   ["#A96BFF","#6E37C4"], ["#17BEBB","#0C7F7D"], ["#E2445C","#9B1F33"],
   ["#FF7A1A","#B94D00"], ["#3DDC97","#1B7A52"]
 ];
 const LANE_H = {1:320,2:210,3:165,4:135,5:190,6:190,7:150,8:150};
+
+// ---------- the paint box ----------
+const SHOP_COLORS = [
+  { id: "own",    name: "Own colour", cost: 0,  suit: null,      dark: null      },
+  { id: "sky",    name: "Sky",        cost: 4,  suit: "#38BDF8", dark: "#0369A1" },
+  { id: "lime",   name: "Lime",       cost: 4,  suit: "#7CD62B", dark: "#4A8A0C" },
+  { id: "cherry", name: "Cherry",     cost: 5,  suit: "#E2445C", dark: "#9B1F33" },
+  { id: "grape",  name: "Grape",      cost: 6,  suit: "#A96BFF", dark: "#6E37C4" },
+  { id: "mango",  name: "Mango",      cost: 6,  suit: "#FF7A1A", dark: "#B94D00" },
+  { id: "bubble", name: "Bubblegum",  cost: 8,  suit: "#FF5FA2", dark: "#C42E6C" },
+  { id: "gold",   name: "Gold",       cost: 9,  suit: "#FFC53D", dark: "#B57F00" },
+  { id: "mint",   name: "Mint",       cost: 9,  suit: "#17BEBB", dark: "#0C7F7D" },
+  { id: "ninja",  name: "Ninja",      cost: 12, suit: "#3A3F4B", dark: "#15181F" },
+  { id: "ghost",  name: "Ghost",      cost: 12, suit: "#EDF2F7", dark: "#9AA6B4" }
+];
+const ITEMS = [
+  { id: "none",    name: "Plain",       icon: "🙂", cost: 0,  slot: "hat"  },
+  { id: "cap",     name: "Cap",         icon: "🧢", cost: 4,  slot: "hat"  },
+  { id: "crown",   name: "Crown",       icon: "👑", cost: 12, slot: "hat"  },
+  { id: "horns",   name: "Horns",       icon: "😈", cost: 9,  slot: "hat"  },
+  { id: "antenna", name: "Antenna",     icon: "📡", cost: 6,  slot: "hat"  },
+  { id: "plainc",  name: "No cape",     icon: "🚫", cost: 0,  slot: "cape" },
+  { id: "cape",    name: "Cape",        icon: "🦸", cost: 7,  slot: "cape" },
+  { id: "wings",   name: "Wings",       icon: "🪽", cost: 15, slot: "cape" },
+  { id: "white",   name: "White smoke", icon: "☁️", cost: 0,  slot: "trail" },
+  { id: "fire",    name: "Fire trail",  icon: "🔥", cost: 5,  slot: "trail" },
+  { id: "rainbow", name: "Rainbow",     icon: "🌈", cost: 14, slot: "trail" },
+  { id: "sparkle", name: "Sparkle",     icon: "✨", cost: 10, slot: "trail" },
+  ...SHOP_COLORS.map(c => ({ id: c.id, name: c.name, icon: "🎨", cost: c.cost, slot: "color", suit: c.suit }))
+];
+const FRESH_LOOK = () => ({ hat: "none", cape: "plainc", trail: "white", color: "own" });
 
 // ---------- page bits ----------
 const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
@@ -148,18 +301,13 @@ const ptitle = document.getElementById("ptitle"), pmsg = document.getElementById
 const nickEl = document.getElementById("nick"),   roomEl = document.getElementById("room");
 const joinBtn = document.getElementById("joinBtn"), startBtn = document.getElementById("startBtn");
 const leaveBtn = document.getElementById("leaveBtn"), lobbyList = document.getElementById("lobbyList");
+const howBtn = document.getElementById("howBtn"), vwarn = document.getElementById("vwarn");
 const rowsEl = document.getElementById("rows");
 
 function fail(text) {
   const d = document.createElement("div");
   d.className = "err"; d.innerHTML = text;
-  document.body.insertBefore(d, document.getElementById("board"));
-}
-
-if (firebaseConfig.apiKey === "PASTE_YOURS") {
-  fail("<b>Almost there!</b> Open this file and paste your Firebase settings into " +
-       "<code>firebaseConfig</code> near the top of the script. See SETUP.md for the steps.");
-  joinBtn.disabled = true;
+  document.body.insertBefore(d, document.getElementById("shop"));
 }
 
 // ---------- connect to Firebase ----------
@@ -167,7 +315,7 @@ if (firebaseConfig.apiKey === "PASTE_YOURS") {
 // 잠깐 끊겼을 때 스크립트 전체가 조용히 죽어서, 화면에 아무 설명도 못 띄운다.
 const SDK = "https://www.gstatic.com/firebasejs/10.12.5/";
 let initializeApp, getAuth, signInAnonymously,
-    getDatabase, ref, set, update, remove, onValue, onDisconnect, serverTimestamp;
+    getDatabase, ref, get, set, update, remove, onValue, onDisconnect, serverTimestamp;
 
 let db, uid = null, offset = 0, ready = false;
 try {
@@ -178,7 +326,7 @@ try {
   ]);
   ({ initializeApp } = appMod);
   ({ getAuth, signInAnonymously } = authMod);
-  ({ getDatabase, ref, set, update, remove, onValue, onDisconnect, serverTimestamp } = dbMod);
+  ({ getDatabase, ref, get, set, update, remove, onValue, onDisconnect, serverTimestamp } = dbMod);
 
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
@@ -200,12 +348,17 @@ const now = () => Date.now() + offset;   // roughly the same clock on every devi
 // ---------- game state ----------
 let room = null, players = {}, game = { state: "lobby" };
 let me = null, lanes = [], running = false, startedAt = 0;
+let cols = 1, rows = 1, laneH = 320, laneW = 720, scale = 1, LW = 720;
+let obstacles = [], obsEnd = 0, nextObsId = 0, rng = null, lastPush = 0, raf = 0;
+
 // 다른 플레이어를 화면에 부드럽게 그리기 위한 값(높이·연기).
 // players 객체는 Firebase 소식이 올 때마다 통째로 새로 바뀌기 때문에,
 // 화면용 값은 반드시 여기 따로 보관해야 초기화되지 않는다.
 let views = {};
-let cols = 1, rows = 1, laneH = 320, laneW = 720, scale = 1, LW = 720;
-let obstacles = [], obsEnd = 0, rng = null, lastPush = 0, raf = 0;
+
+// 내 별 저금통과 옷장. 닉네임을 열쇠로 삼아 Firebase에 두기 때문에
+// 어느 기기에서 열어도 같은 별이 나온다.
+let myName = "", bankKey = "", bank = { stars: 0, owned: ["none", "plainc", "white", "own"], ...FRESH_LOOK() };
 
 // a tiny random-number maker that gives the SAME numbers from the same seed,
 // so every device builds an identical track
@@ -222,26 +375,72 @@ function makeRng(seed) {
 const distanceAt = t => SPEED0 * t + ACCEL * t * t / 2;
 const speedAtDist = d => Math.sqrt(SPEED0 * SPEED0 + 2 * ACCEL * d);
 
+// Every box gets a number the moment it is created. The seed is shared, so
+// box #7 is the same box on every device — that's what lets us count points
+// and stars per player without sending the whole track over the internet.
 function buildTrackUpTo(d) {
   while (obsEnd < d) {
-    const jump = speedAtDist(obsEnd) * (2 * JUMP_POWER / GRAVITY);
-    const gap  = jump * (1.25 + rng() * 0.85);
+    const jump = speedAtDist(obsEnd) * MAX_AIR;
+    const gap  = jump * (1.00 + rng() * 0.68);
     const x = obsEnd + gap, h = 30 + rng() * 28, w = 28 + rng() * 18;
-    obstacles.push({ x, h, w });
+    obstacles.push({ id: nextObsId++, x, h, w });
     obsEnd = x + w;
   }
   while (obstacles.length && obstacles[0].x + obstacles[0].w < d - LW - PX) obstacles.shift();
 }
 
+// ---------- the star bank (kept under banks/{nickname}) ----------
+function keyFor(nick) {
+  const k = String(nick).toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 14);
+  return k || "player";
+}
+
+async function loadBank() {
+  try {
+    const snap = await get(ref(db, `banks/${bankKey}`));
+    const v = snap.val();
+    if (v) bank = Object.assign({ stars: 0, owned: ["none", "plainc", "white", "own"], ...FRESH_LOOK() }, v);
+    if (!Array.isArray(bank.owned)) bank.owned = ["none", "plainc", "white", "own"];
+  } catch (e) {
+    showOops("별 저금통을 못 읽었어요: " + e.message);
+  }
+  drawShop();
+}
+
+async function saveBank() {
+  try { await set(ref(db, `banks/${bankKey}`), bank); }
+  catch (e) { showOops("별 저금통을 못 저장했어요: " + e.message); }
+}
+
+function myLook() { return { hat: bank.hat, cape: bank.cape, trail: bank.trail, color: bank.color }; }
+
+function lookOf(id, laneIndex) {
+  const raw = (id === uid) ? myLook() : ((players[id] && players[id].look) || FRESH_LOOK());
+  const c = SHOP_COLORS.find(c => c.id === raw.color);
+  const [laneSuit, laneDark] = COLORS[laneIndex % 8];
+  return {
+    hat: raw.hat || "none", cape: raw.cape || "plainc", trail: raw.trail || "white",
+    suit: (c && c.suit) || laneSuit, dark: (c && c.dark) || laneDark,
+    laneSuit
+  };
+}
+
 // ---------- joining ----------
-joinBtn.addEventListener("click", () => {
+joinBtn.addEventListener("click", async () => {
   const nick = (nickEl.value || "player").trim().slice(0, 14) || "player";
   const code = (roomEl.value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (code.length < 3) { pmsg.textContent = "Room code needs at least 3 letters or numbers."; return; }
 
+  myName = nick;
+  bankKey = keyFor(nick);
   room = code;
+  await loadBank();
+
   const myRef = ref(db, `rooms/${room}/players/${uid}`);
-  set(myRef, { name: nick, joinedAt: serverTimestamp(), y: GY - 54, alive: false, score: 0 });
+  set(myRef, {
+    name: nick, v: GAME_VERSION, joinedAt: serverTimestamp(),
+    y: GY - PH, alive: false, score: 0, stars: 0, look: myLook()
+  });
   onDisconnect(myRef).remove();          // clean up if the tab closes
 
   onValue(ref(db, `rooms/${room}/players`), s => { players = s.val() || {}; refreshLobby(); });
@@ -249,7 +448,7 @@ joinBtn.addEventListener("click", () => {
 
   joinBtn.style.display = "none";
   nickEl.disabled = roomEl.disabled = true;
-  leaveBtn.style.display = "";
+  leaveBtn.style.display = howBtn.style.display = "";
   ptitle.textContent = "Room " + room;
   pmsg.textContent = "Waiting for players. Anyone here can press Start.";
 });
@@ -273,9 +472,19 @@ function laneOrder() { return Object.keys(players).sort(); }
 function refreshLobby() {
   lanes = laneOrder();
   lobbyList.innerHTML = lanes.map((id, i) =>
-    '<span class="tag"><span class="cdot" style="background:' + COLORS[i % 8][0] + '"></span>' +
+    '<span class="tag"><span class="cdot" style="background:' + lookOf(id, i).suit + '"></span>' +
     esc(players[id].name) + (id === uid ? " (you)" : "") + "</span>"
   ).join("");
+
+  // 물리와 점수가 바뀌었으니, 옛날 화면을 열어둔 사람이 있으면 경주가 어긋난다.
+  const odd = lanes.filter(id => (players[id].v || 1) !== GAME_VERSION).map(id => players[id].name);
+  if (odd.length) {
+    vwarn.textContent = "⚠️ " + odd.join(", ") + " 님이 옛날 버전이에요. 모두 새로고침(Ctrl+Shift+R) 해주세요!";
+    vwarn.classList.remove("hidden");
+  } else {
+    vwarn.classList.add("hidden");
+  }
+
   startBtn.style.display = (room && game.state !== "running") ? "" : "none";
   drawBoard();
 }
@@ -287,7 +496,6 @@ function onGameChange() {
   } else if (running) {
     // 다른 사람 기기가 먼저 "경주 끝"을 알아챈 경우.
     // 여기서도 똑같이 결과 화면을 띄워야 나만 "대기 중" 화면에 남지 않는다.
-    // (이미 누군가 lobby로 바꿔놨으니 다시 쓰지는 않는다)
     endRace(false);
   } else {
     panel.classList.remove("hidden");
@@ -297,6 +505,7 @@ function onGameChange() {
 
 // ---------- a race ----------
 function beginRace() {
+  howto.classList.add("hidden");     // 카운트다운을 가리지 않도록 도움말은 무조건 닫는다
   lanes = laneOrder();
   const n = Math.max(1, lanes.length);
   cols = n <= 4 ? 1 : 2;
@@ -308,15 +517,20 @@ function beginRace() {
   canvas.height = laneH * rows;
 
   rng = makeRng(game.seed);
-  obstacles = []; obsEnd = 600;
+  obstacles = []; obsEnd = 600; nextObsId = 0;
   buildTrackUpTo(LW + PX);
 
   const iAmIn = lanes.includes(uid);
-  me = { y: GY - 54, vy: 0, onGround: true, alive: iAmIn, score: 0, step: 0, puffs: [], pt: 0 };
+  me = {
+    y: GY - PH, vy: 0, onGround: true, alive: iAmIn, score: 0, step: 0,
+    puffs: [], pt: 0, sparks: [],
+    holding: false, holdTime: 0, boosts: BOOSTS_MAX,
+    stars: new Set(), passed: new Set(), starCount: 0
+  };
   views = {};
-  for (const id of lanes) views[id] = { y: GY - 54, puffs: [], pt: 0 };
+  for (const id of lanes) views[id] = { y: GY - PH, puffs: [], pt: 0 };
 
-  update(ref(db, `rooms/${room}/players/${uid}`), { alive: iAmIn, score: 0, y: GY - 54 });
+  update(ref(db, `rooms/${room}/players/${uid}`), { alive: iAmIn, score: 0, stars: 0, y: GY - PH });
 
   panel.classList.add("hidden");
   running = true;
@@ -342,36 +556,63 @@ function step(dt) {
 
   // my own hero — worked out right here, so it always feels instant
   if (me.alive) {
-    me.vy += GRAVITY * dt;
+    const wasBottom = me.y + PH;           // where my feet were a moment ago
+    me.onGround = false;                   // falling unless something holds me up
+
+    if (me.holding) me.holdTime += dt;
+    const floaty = me.holding && me.vy < 0 && me.holdTime < HOLD_MAX;
+    me.vy += GRAVITY * (floaty ? HOLD_EASE : 1) * dt;
     me.y  += me.vy * dt;
-    if (me.y >= GY - 54) { me.y = GY - 54; me.vy = 0; me.onGround = true; }
+
+    if (me.y >= GY - PH) { me.y = GY - PH; me.vy = 0; me.onGround = true; me.boosts = BOOSTS_MAX; }
     if (me.onGround) me.step += SPEED0 * dt;
-    me.score = Math.floor(dist / 10);
 
     for (const o of obstacles) {
-      const ox = PX + (o.x - dist), oy = GY - o.h;
-      if (PX + 6 < ox + o.w && PX + 34 - 6 > ox && me.y + 8 < oy + o.h && me.y + 54 > oy) {
-        me.alive = false;
-        update(ref(db, `rooms/${room}/players/${uid}`), { alive: false, score: me.score, y: me.y });
+      const ox = PX + (o.x - dist), by = GY - o.h;   // by = the top of the box
+
+      if (!(PX + 6 < ox + o.w && PX + PW - 6 > ox)) {
+        // ---- ONE POINT for every box you get safely past ----
+        if (!me.passed.has(o.id) && ox + o.w < PX) { me.passed.add(o.id); me.score += 1; }
+        continue;
+      }
+
+      if (me.vy >= 0 && wasBottom <= by + 3 && me.y + PH >= by) {
+        // ---- LANDED NEATLY ON TOP: that's a star, not a crash ----
+        me.y = by - PH; me.vy = 0; me.onGround = true; me.boosts = BOOSTS_MAX;
+        if (!me.stars.has(o.id)) {
+          me.stars.add(o.id);
+          me.starCount += STAR_BONUS;
+          for (let i = 0; i < 10; i++) {
+            const a = Math.random() * Math.PI * 2;
+            me.sparks.push({ x: PX + 17, y: by - 6, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90 - 40, life: 1 });
+          }
+        }
+      } else if (me.y + 8 < by + o.h && me.y + PH > by) {
+        me.alive = false;                  // smacked straight into the side
+        update(ref(db, `rooms/${room}/players/${uid}`),
+               { alive: false, score: me.score, stars: me.starCount, y: Math.round(me.y) });
       }
     }
   }
 
-  smoke(me, dt, me.y);
+  smoke(me, dt, me.y, me.alive);
+  for (const k of me.sparks) { k.x += k.vx * dt; k.y += k.vy * dt; k.vy += 260 * dt; k.life -= dt / 0.5; }
+  me.sparks = me.sparks.filter(k => k.life > 0);
 
   // everyone else — slide smoothly towards the position they sent
   for (const id of lanes) {
     if (id === uid) continue;
     const p = players[id]; if (!p) continue;
-    const v = views[id] || (views[id] = { y: GY - 54, puffs: [], pt: 0 });
-    v.y += ((p.y ?? GY - 54) - v.y) * Math.min(1, dt * 12);
+    const v = views[id] || (views[id] = { y: GY - PH, puffs: [], pt: 0 });
+    v.y += ((p.y ?? GY - PH) - v.y) * Math.min(1, dt * 12);
     smoke(v, dt, v.y, p.alive);
   }
 
   // tell everyone else where I am, about 12 times a second
   if (me.alive && now() - lastPush > 80) {
     lastPush = now();
-    update(ref(db, `rooms/${room}/players/${uid}`), { y: Math.round(me.y), score: me.score });
+    update(ref(db, `rooms/${room}/players/${uid}`),
+           { y: Math.round(me.y), score: me.score, stars: me.starCount });
   }
 
   // race over when nobody is still flying
@@ -381,7 +622,7 @@ function step(dt) {
 
 function smoke(holder, dt, y, alive = true) {
   holder.puffs = holder.puffs || [];
-  const flying = y < GY - 54 - 2 && alive;
+  const flying = y < GY - PH - 2 && alive;
   holder.pt = (holder.pt || 0) - dt;
   if (flying && holder.pt <= 0) {
     holder.pt = 0.025;
@@ -394,7 +635,16 @@ function smoke(holder, dt, y, alive = true) {
   holder.puffs = holder.puffs.filter(s => s.life > 0 && s.x > -60);
 }
 
-function endRace(publish = true) {
+// a big cough of smoke when the jetpack fires
+function boostPuffs() {
+  for (let i = 0; i < 9; i++) {
+    me.puffs.push({ x: PX + 2 + Math.random() * 6, y: me.y + 34 + Math.random() * 4,
+                    size: 5 + Math.random() * 4, vx: -40 - Math.random() * 70,
+                    vy: 40 + Math.random() * 70, life: 1 });
+  }
+}
+
+async function endRace(publish = true) {
   running = false;
   const scores = lanes.map(id => ({
     name: players[id] ? players[id].name : "?",
@@ -405,22 +655,136 @@ function endRace(publish = true) {
   ptitle.textContent = scores.length < 2 ? "Crash!"
                      : tied ? "It's a tie!"
                      : scores[0].name + " wins!";
-  pmsg.textContent = scores.map(s => s.name + ": " + s.score).join("   •   ");
+  pmsg.textContent = scores.map(s => s.name + ": " + s.score).join("   •   ") +
+                     (me.starCount ? "   —   you earned ⭐" + me.starCount : "");
   panel.classList.remove("hidden");
   startBtn.textContent = "Race again";
   startBtn.style.display = "";
   if (publish && room) set(ref(db, `rooms/${room}/game`), { state: "lobby" });
+
+  // 이번 판에 모은 별을 저금통에 넣는다
+  if (me.starCount > 0) {
+    bank.stars += me.starCount;
+    me.starCount = 0;
+    drawShop();
+    await saveBank();
+  }
 }
 
 // ---------- controls ----------
-function jump() {
+// PRESS: on the ground = jump.  In the air = jetpack boost (costs one boost).
+function press() {
   if (!running || !me || !me.alive || raceTime() < 0) return;
+  me.holding = true;
+  me.holdTime = 0;
   if (me.onGround) { me.vy = -JUMP_POWER; me.onGround = false; }
+  else if (me.boosts > 0) { me.boosts--; me.vy = -BOOST_POWER; boostPuffs(); }
 }
+
+// RELEASE: let go while still going up and the jump gets cut short
+function release() {
+  if (!me) return;
+  me.holding = false;
+  if (me.alive && me.vy < 0) me.vy *= CUT;
+}
+
 document.addEventListener("keydown", e => {
-  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") { e.preventDefault(); jump(); }
+  if (e.code === "KeyF") { e.preventDefault(); toggleFull(); return; }
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
+    e.preventDefault();
+    if (!e.repeat) press();
+  }
 });
-canvas.addEventListener("pointerdown", jump);
+document.addEventListener("keyup", e => {
+  if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") release();
+});
+
+// 온라인은 한 기기에 한 명이라, 화면 아무 데나 눌러도 내가 점프한다.
+// (한 기기 버전과 달리 화면을 칸으로 나눠 계산할 필요가 없다)
+canvas.addEventListener("pointerdown", e => { e.preventDefault(); press(); });
+window.addEventListener("pointerup", release);
+window.addEventListener("pointercancel", release);
+
+// ---------- full screen ----------
+const stage = document.getElementById("stage");
+const fsBtn = document.getElementById("fsBtn");
+
+function isBig() { return !!document.fullscreenElement || stage.classList.contains("big"); }
+function setLabel() { fsBtn.textContent = isBig() ? "⛶ Exit" : "⛶ Full"; }
+function toggleFull() {
+  if (isBig()) {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      const p = document.exitFullscreen();
+      if (p && p.catch) p.catch(() => {});
+    }
+    stage.classList.remove("big");
+  } else {
+    const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+    if (req) { try { const p = req.call(stage); if (p && p.catch) p.catch(() => {}); } catch (err) {} }
+    stage.classList.add("big");     // works even if the browser says no
+  }
+  setLabel();
+  setTimeout(render, 60);
+}
+fsBtn.addEventListener("click", toggleFull);
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) stage.classList.remove("big");
+  setLabel();
+  render();
+});
+setLabel();
+
+// ---------- how to play ----------
+// 온라인은 친구가 Start를 누르면 내 화면도 같이 시작된다. 그래서 도움말은
+// 로비에서만 띄우고, 경기가 시작되면 beginRace()가 무조건 닫는다.
+const howto = document.getElementById("howto");
+howBtn.addEventListener("click", () => howto.classList.remove("hidden"));
+document.getElementById("closeHow").addEventListener("click", () => howto.classList.add("hidden"));
+
+// ---------- shop ----------
+const shopItems = document.getElementById("shopItems");
+const starBank  = document.getElementById("starBank");
+const shopNote  = document.getElementById("shopNote");
+const shopBox   = document.getElementById("shop");
+document.getElementById("shopHead").addEventListener("click", () => shopBox.classList.toggle("folded"));
+
+function drawShop() {
+  starBank.textContent = "⭐ " + bank.stars;
+  shopNote.textContent = room
+    ? "Land on top of boxes to earn stars, then spend them here. Your stars follow your nickname, so they're waiting for you on any device."
+    : "Join a room first — your stars are saved under your nickname.";
+
+  shopItems.innerHTML = "";
+  if (!room) return;
+
+  for (const it of ITEMS) {
+    const owned = bank.owned.includes(it.id);
+    const worn  = bank[it.slot] === it.id;
+    const canBuy = owned || bank.stars >= it.cost;
+    const b = document.createElement("button");
+    b.className = "item" + (worn ? " worn" : owned ? " owned" : canBuy ? "" : " locked");
+    const ico = it.suit
+      ? '<span class="ico" style="display:inline-block;width:24px;height:24px;border-radius:50%;' +
+        'background:' + it.suit + ';border:3px solid #222;vertical-align:middle"></span>'
+      : '<span class="ico">' + it.icon + '</span>';
+    b.innerHTML = ico + '<span class="nm">' + it.name + '</span><br>' +
+                  '<span class="pr">' + (worn ? "wearing" : owned ? "tap to wear" : "⭐ " + it.cost) + '</span>';
+    b.onclick = async () => {
+      if (!owned) {
+        if (bank.stars < it.cost) return;
+        bank.stars -= it.cost;
+        bank.owned.push(it.id);
+      }
+      bank[it.slot] = it.id;
+      drawShop();
+      drawBoard();
+      render();
+      await saveBank();
+      if (room) update(ref(db, `rooms/${room}/players/${uid}`), { look: myLook() });
+    };
+    shopItems.appendChild(b);
+  }
+}
 
 // ---------- drawing ----------
 function laneLeft(i) { return (i % cols) * laneW; }
@@ -430,14 +794,16 @@ function render() {
   ctx.fillStyle = css("--ink");
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const t = raceTime(), dist = t > 0 ? distanceAt(t) : 0;
+  const t = running ? raceTime() : 0, dist = t > 0 ? distanceAt(t) : 0;
   lanes.forEach((id, i) => drawLane(id, i, dist));
 
   ctx.fillStyle = css("--ink");
   for (let i = 1; i < rows; i++) ctx.fillRect(0, laneH * i - 3, canvas.width, 6);
   for (let i = 1; i < cols; i++) ctx.fillRect(laneW * i - 3, 0, 6, canvas.height);
 
-  if (t < 0) {
+  drawMiniBoard();
+
+  if (running && t < 0) {
     const n = Math.ceil(-t);
     ctx.fillStyle = "rgba(35,50,77,.55)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -449,14 +815,60 @@ function render() {
   }
 }
 
+// ---- tiny scoreboard, top right, only in full screen ----
+// (전체화면에서는 아래쪽 진짜 스코어보드가 화면 밖으로 나가므로 여기에 그린다)
+function drawMiniBoard() {
+  if (!isBig() || !lanes.length) return;
+
+  const rowH = 21, pad = 9, w = 178;
+  const h = pad * 2 + lanes.length * rowH;
+  const x = canvas.width - w - 14, y = 54;
+
+  ctx.save();
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, 12); else ctx.rect(x, y, w, h);
+  ctx.fillStyle = "rgba(255,255,255,0.88)"; ctx.fill();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.stroke();
+
+  ctx.textBaseline = "middle";
+  lanes.forEach((id, i) => {
+    const p = players[id]; if (!p) return;
+    const mine = id === uid;
+    const ry = y + pad + i * rowH + rowH / 2;
+    const look = lookOf(id, i);
+    const sc = mine && me ? me.score : (p.score || 0);
+    const stars = mine && me ? me.starCount : (p.stars || 0);
+    const alive = mine && me ? me.alive : !!p.alive;
+
+    ctx.fillStyle = look.suit;
+    ctx.beginPath(); ctx.arc(x + pad + 6, ry, 5, 0, 7); ctx.fill();
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.globalAlpha = alive ? 1 : 0.4;
+    ctx.fillStyle = css("--ink");
+    ctx.font = "bold 12px Trebuchet MS, sans-serif";
+    ctx.textAlign = "left";
+    const nm = p.name.length > 9 ? p.name.slice(0, 8) + "…" : p.name;
+    ctx.fillText(nm, x + pad + 17, ry);
+    ctx.textAlign = "right";
+    ctx.fillText(sc + "   ⭐" + stars, x + w - pad, ry);
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.textBaseline = "alphabetic";
+  ctx.restore();
+}
+
 function drawLane(id, i, dist) {
   const p = players[id]; if (!p) return;
   const mine  = id === uid;
-  const alive = mine ? me.alive : !!p.alive;
-  const y     = mine ? me.y : (views[id] ? views[id].y : GY - 54);
-  const puffs = mine ? me.puffs : (views[id] ? views[id].puffs : []);
-  const [suit, dark] = COLORS[i % 8];
+  const alive = mine && me ? me.alive : !!p.alive;
+  const y     = mine && me ? me.y : (views[id] ? views[id].y : GY - PH);
+  const puffs = mine && me ? me.puffs : (views[id] ? views[id].puffs : []);
+  const sparks = mine && me ? me.sparks : [];
+  const look = lookOf(id, i);
   const left = laneLeft(i), top = laneTop(i);
+  const myStars = mine && me ? me.stars : null;
 
   ctx.save();
   ctx.beginPath(); ctx.rect(left, top, laneW, laneH); ctx.clip();
@@ -477,30 +889,71 @@ function drawLane(id, i, dist) {
     if (ox > LW + 40 || ox + o.w < -40) continue;
     ctx.fillStyle = css("--block"); ctx.fillRect(ox, GY - o.h, o.w, o.h);
     ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.strokeRect(ox, GY - o.h, o.w, o.h);
+    // 내 레인에만 "아직 안 먹은 별"을 띄운다 (남의 레인은 그 사람 사정)
+    if (mine && myStars && !myStars.has(o.id)) drawStar(ox + o.w / 2, GY - o.h - 20, 9, dist);
   }
 
+  for (const k of sparks) {
+    ctx.globalAlpha = Math.max(0, k.life);
+    ctx.fillStyle = "#FFE066";
+    ctx.beginPath(); ctx.arc(k.x, k.y, 3, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
   for (const s of puffs || []) {
-    ctx.globalAlpha = Math.max(0, s.life) * .5;
-    ctx.fillStyle = "#EDF2F8";
+    ctx.globalAlpha = Math.max(0, s.life) * (look.trail === "white" ? 0.5 : 0.75);
+    ctx.fillStyle =
+      look.trail === "fire"    ? (s.life > 0.6 ? "#FF9A2E" : s.life > 0.3 ? "#FF5D3B" : "#8A8A8A") :
+      look.trail === "rainbow" ? "hsl(" + Math.round((s.x * 2 + dist) % 360) + ",90%,62%)" :
+      look.trail === "sparkle" ? (Math.random() < 0.5 ? "#FFE066" : "#FFFFFF") :
+                                 "#EDF2F8";
     ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, 7); ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  drawHero(y, alive, suit, dark, mine ? me.step : dist);
+  drawHero(y, alive, look, mine && me ? me.step : dist);
   ctx.restore();
 
-  ctx.fillStyle = suit;
+  ctx.fillStyle = look.suit;
   ctx.beginPath(); ctx.arc(left + 18, top + 19, 7, 0, 7); ctx.fill();
   ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
   ctx.fillStyle = css("--ink");
   ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.textAlign = "left";
-  const sc = mine ? me.score : (p.score || 0);
-  ctx.fillText(p.name + (mine ? " (you)" : "") + "  " + sc + (alive ? "" : "  — out!"), left + 31, top + 24);
+  const sc = mine && me ? me.score : (p.score || 0);
+  const stars = mine && me ? me.starCount : (p.stars || 0);
+  ctx.fillText(p.name + (mine ? " (you)" : "") + "  " + sc + "  ⭐" + stars +
+               (alive ? "" : "  — out!"), left + 31, top + 24);
+
+  // jetpack fuel: one pip per boost left (mine only — I don't get told about theirs)
+  if (mine && me) {
+    for (let i2 = 0; i2 < BOOSTS_MAX; i2++) {
+      const px = left + laneW - 16 - i2 * 13, py = top + 19;
+      ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 7);
+      ctx.fillStyle = (me.alive && i2 < me.boosts) ? "#FF9A2E" : "rgba(255,255,255,0.45)";
+      ctx.fill();
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
 }
 
-function drawHero(y, alive, suit, dark, stepv) {
+// a five-pointed star, floating above a box
+function drawStar(cx, cy, R, dist) {
+  const bob = Math.sin(dist / 40 + cx) * 3;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + i * Math.PI / 5;
+    const rad = i % 2 ? R * 0.45 : R;
+    const x = cx + Math.cos(ang) * rad, y = cy + bob + Math.sin(ang) * rad;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "#FFD93D"; ctx.fill();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
+}
+
+function drawHero(y, alive, look, stepv) {
   ctx.globalAlpha = alive ? 1 : .35;
-  const onGround = y >= GY - 54 - 2;
+  const onGround = y >= GY - PH - 2;
   const swing = onGround && alive ? Math.sin(stepv / 22) * 8 : 5;
   ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
 
@@ -514,20 +967,73 @@ function drawHero(y, alive, suit, dark, stepv) {
     ctx.lineTo(PX + 3, y + 34 + f * .6); ctx.fill();
   }
 
-  ctx.fillStyle = dark;
+  drawCape(y, stepv, look.cape);
+
+  ctx.fillStyle = look.dark;
   ctx.fillRect(PX - 3, y + 16, 10, 20); ctx.strokeRect(PX - 3, y + 16, 10, 20);
   ctx.fillRect(PX + 7,  y + 36 + Math.max(0, swing),  9, 18 - Math.max(0, swing));
   ctx.fillRect(PX + 20, y + 36 + Math.max(0, -swing), 9, 18 - Math.max(0, -swing));
 
-  ctx.fillStyle = suit;
+  ctx.fillStyle = look.suit;
   ctx.fillRect(PX + 6, y + 20, 24, 18); ctx.strokeRect(PX + 6, y + 20, 24, 18);
   ctx.fillStyle = css("--skin"); ctx.fillRect(PX + 29, y + 22, 8, 11);
   ctx.beginPath(); ctx.arc(PX + 18, y + 12, 11, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = suit;
+  ctx.fillStyle = look.suit;
   ctx.beginPath(); ctx.arc(PX + 18, y + 10, 12, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = css("--glass");
   ctx.fillRect(PX + 12, y + 8, 16, 7); ctx.strokeRect(PX + 12, y + 8, 16, 7);
+
+  drawHat(y, look.hat);
   ctx.globalAlpha = 1;
+}
+
+// ---- decorations ----
+function drawCape(y, stepv, kind) {
+  const flap = Math.sin(stepv / 14) * 4;
+  if (kind === "cape") {
+    ctx.fillStyle = "#E2445C"; ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(PX + 6, y + 20);
+    ctx.quadraticCurveTo(PX - 16, y + 30 + flap, PX - 6, y + 44 + flap);
+    ctx.lineTo(PX + 8, y + 36);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (kind === "wings") {
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(PX + 8, y + 26, 13, 6, dir * (0.6 + flap / 40), 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+  }
+}
+
+function drawHat(y, kind) {
+  const cx = PX + PW / 2 + 1, cy = y + 1;
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+  if (kind === "cap") {
+    ctx.fillStyle = "#E2445C";
+    ctx.beginPath(); ctx.arc(cx, cy, 11, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillRect(cx + 6, cy - 2, 13, 4); ctx.strokeRect(cx + 6, cy - 2, 13, 4);
+  } else if (kind === "crown") {
+    ctx.fillStyle = "#FFD93D";
+    ctx.beginPath();
+    ctx.moveTo(cx - 11, cy); ctx.lineTo(cx - 11, cy - 11); ctx.lineTo(cx - 5, cy - 5);
+    ctx.lineTo(cx, cy - 13);  ctx.lineTo(cx + 5, cy - 5);  ctx.lineTo(cx + 11, cy - 11);
+    ctx.lineTo(cx + 11, cy);  ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (kind === "horns") {
+    ctx.fillStyle = "#C0392B";
+    for (const d of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + d * 8, cy - 1);
+      ctx.quadraticCurveTo(cx + d * 15, cy - 10, cx + d * 9, cy - 13);
+      ctx.quadraticCurveTo(cx + d * 10, cy - 5, cx + d * 4, cy - 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  } else if (kind === "antenna") {
+    ctx.beginPath(); ctx.moveTo(cx, cy - 2); ctx.lineTo(cx + 3, cy - 15); ctx.stroke();
+    ctx.fillStyle = "#35C46A";
+    ctx.beginPath(); ctx.arc(cx + 3, cy - 17, 4, 0, 7); ctx.fill(); ctx.stroke();
+  }
 }
 
 function drawBoard() {
@@ -535,10 +1041,12 @@ function drawBoard() {
     const p = players[id]; if (!p) return "";
     const mine = id === uid;
     const sc = mine && me ? me.score : (p.score || 0);
+    const stars = mine && me ? me.starCount : (p.stars || 0);
     const alive = mine && me ? me.alive : !!p.alive;
     return '<div class="brow' + (mine ? " me" : "") + (alive ? "" : " out") + '">' +
-      '<div class="dot" style="background:' + COLORS[i % 8][0] + '"></div>' +
+      '<div class="dot" style="background:' + lookOf(id, i).suit + '"></div>' +
       '<div class="who">' + esc(p.name) + (mine ? " (you)" : "") + "</div>" +
+      '<div class="stars">⭐ ' + stars + "</div>" +
       '<div class="sc">' + sc + "</div></div>";
   }).join("");
 }
@@ -546,6 +1054,7 @@ function drawBoard() {
 function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function esc(t)  { return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
+drawShop();
 render();
 </script>
 </body>

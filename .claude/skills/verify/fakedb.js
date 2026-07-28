@@ -52,6 +52,10 @@ export async function signInAnonymously() { return { user: { uid: await g.__newU
 export function getDatabase() { return {}; }
 export function ref(db, path) { return { path: String(path) }; }
 export function serverTimestamp() { return { __sv: 'ts' }; }
+export async function get(r) {
+  const v = JSON.parse(await g.__get(r.path));
+  return { val: () => v, exists: () => v !== null };
+}
 export async function set(r, v)    { await g.__set(r.path, JSON.stringify(v)); }
 export async function update(r, v) { await g.__update(r.path, JSON.stringify(v)); }
 export async function remove(r)    { await g.__remove(r.path); }
