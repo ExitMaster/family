@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="숙제 친구">
+<meta name="theme-color" content="#ff8fb8">
 <title>말랑이 숙제 친구</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -860,14 +865,17 @@ function render() {
       <div style="font-size:11px;font-weight:800;color:${on?T.accentDark:T.sub};margin-top:1px;">${l}</div></div>`;
   }).join('');
 
+  // 태블릿처럼 넓은 화면에서도 카드가 늘어지지 않게 가운데 폭을 잡아준다
   document.getElementById('app').innerHTML = `
-  <div style="min-height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,${T.bg},${T.bg2});">
-    <div style="flex-shrink:0;padding:14px 18px 6px;display:flex;align-items:center;justify-content:space-between;">
-      <div class="g" style="font-size:25px;color:${T.accentDark};">🐣 ${h(ST.petName)} 숙제 친구</div>
-      <div style="font-size:13px;font-weight:800;color:${T.accentDark};background:#fff;border:2px solid ${T.line};border-radius:999px;padding:5px 12px;">⭐ ${ST.points}</div>
+  <div style="min-height:100dvh;display:flex;flex-direction:column;align-items:center;background:linear-gradient(180deg,${T.bg},${T.bg2});">
+    <div style="width:100%;max-width:560px;height:100dvh;overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(180deg,${T.bg},${T.bg2});box-shadow:0 0 0 1px ${T.line};">
+      <div style="flex-shrink:0;padding:14px 18px 6px;display:flex;align-items:center;justify-content:space-between;">
+        <div class="g" style="font-size:25px;color:${T.accentDark};">🐣 ${h(ST.petName)} 숙제 친구</div>
+        <div style="font-size:13px;font-weight:800;color:${T.accentDark};background:#fff;border:2px solid ${T.line};border-radius:999px;padding:5px 12px;">⭐ ${ST.points}</div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:6px 16px 12px;">${body}</div>
+      <div style="flex-shrink:0;display:flex;gap:4px;padding:6px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:2px solid ${T.line};">${nav}</div>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:6px 16px 12px;">${body}</div>
-    <div style="flex-shrink:0;display:flex;gap:4px;padding:6px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:2px solid ${T.line};">${nav}</div>
   </div>
   ${overlayHtml()}`;
 }
