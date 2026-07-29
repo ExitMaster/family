@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>트럼펫 알람시계 🎺</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; height:100%; overscroll-behavior:none; background:#1a0d14; }
+body {
+  font-family:'Noto Sans KR',sans-serif; color:#fff5e6; user-select:none; -webkit-user-select:none;
+  min-height:100dvh;
+}
+#app { min-height:100dvh; position:relative; overflow-x:hidden; }
+::-webkit-scrollbar { width:0; height:0; }
+button { font-family:inherit; color:inherit; border:0; background:none; cursor:pointer; }
+input, select { font-family:inherit; }
+
+/* ── 무대 ───────────────────────────────────────── */
+/* 무대는 화면에 고정 — 내용이 길어지면 그 위로 스크롤된다 */
+.stage { position:fixed; inset:0; overflow:hidden; background:#2a0f18; z-index:0; }
+.curtain { position:absolute; top:0; bottom:0; width:20%;
+  background:repeating-linear-gradient(90deg,#8e1229 0 14px,#b81b38 14px 30px,#6d0d20 30px 42px);
+  box-shadow:0 0 60px rgba(0,0,0,.6) inset; }
+.curtain.l { left:0; border-radius:0 0 40% 0; }
+.curtain.r { right:0; border-radius:0 0 0 40%; }
+.valance { position:absolute; top:0; left:0; right:0; height:12%;
+  background:repeating-linear-gradient(90deg,#8e1229 0 16px,#b81b38 16px 34px);
+  border-radius:0 0 50% 50%/0 0 100% 100%; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+.floor { position:absolute; left:0; right:0; bottom:0; height:26%;
+  background:repeating-linear-gradient(180deg,#7a4a22 0 10px,#8c5628 10px 22px);
+  box-shadow:0 -10px 30px rgba(0,0,0,.5) inset; }
+.spot { position:absolute; width:70%; height:120%; top:-30%;
+  background:radial-gradient(ellipse at 50% 0%, rgba(255,236,170,.42), rgba(255,236,170,0) 62%);
+  filter:blur(6px); pointer-events:none; }
+.spot.a { left:-10%; animation:swayA 6s ease-in-out infinite; }
+.spot.b { right:-10%; animation:swayB 7.4s ease-in-out infinite; }
+@keyframes swayA { 0%,100%{transform:rotate(-7deg)} 50%{transform:rotate(9deg)} }
+@keyframes swayB { 0%,100%{transform:rotate(8deg)} 50%{transform:rotate(-8deg)} }
+.crowd { position:absolute; left:0; right:0; bottom:0; height:16%; display:flex; align-items:flex-end;
+  justify-content:center; gap:2%; pointer-events:none; }
+.head { width:7%; padding-bottom:7%; border-radius:50% 50% 40% 40%; background:#160810; opacity:.85; }
+.clap .head { animation:bob 0.5s ease-in-out infinite alternate; }
+.clap .head:nth-child(2n) { animation-delay:.12s }
+.clap .head:nth-child(3n) { animation-delay:.25s }
+@keyframes bob { from{transform:translateY(0)} to{transform:translateY(-14px)} }
+
+.wrap { position:relative; z-index:2; min-height:100dvh; display:flex; flex-direction:column;
+  align-items:center; padding:max(16px,env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); }
+
+h1.title { font-family:'Gaegu',cursive; font-size:clamp(28px,7vw,46px); margin:4px 0 2px; font-weight:700;
+  color:#ffe9a8; text-shadow:0 3px 0 #7a1024, 0 0 24px rgba(255,214,102,.5); }
+.sub { font-family:'Gaegu',cursive; font-size:clamp(16px,3.6vw,22px); color:#ffd9a0; opacity:.9; margin-bottom:10px; }
+
+.card { width:100%; max-width:520px; background:rgba(24,10,17,.78); border:3px solid #ffcf6b;
+  border-radius:22px; padding:16px; margin:8px 0; box-shadow:0 10px 30px rgba(0,0,0,.45); }
+
+.bigclock { font-family:'Gaegu',cursive; font-weight:700; line-height:1;
+  font-size:clamp(64px,20vw,150px); color:#fff3cf; text-shadow:0 6px 0 #8b1226, 0 0 40px rgba(255,205,90,.55); }
+.ampm { font-size:.32em; color:#ffcf6b; }
+
+.btn { display:block; width:100%; max-width:520px; padding:18px; border-radius:20px; font-weight:900;
+  font-size:clamp(19px,4.6vw,26px); background:linear-gradient(180deg,#ffd35c,#f2a327); color:#5c1200;
+  box-shadow:0 6px 0 #b26f0d, 0 8px 22px rgba(0,0,0,.4); margin:8px 0; }
+.btn:active { transform:translateY(4px); box-shadow:0 2px 0 #b26f0d; }
+.btn.ghost { background:rgba(255,255,255,.1); color:#ffe6b8; box-shadow:0 4px 0 rgba(0,0,0,.35); border:2px solid rgba(255,207,107,.55); }
+.btn.danger { background:linear-gradient(180deg,#ff8080,#e03b3b); color:#fff; box-shadow:0 6px 0 #901414; }
+.btn.small { padding:11px 14px; font-size:16px; width:auto; display:inline-block; margin:4px; }
+
+.row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
+.chip { padding:9px 13px; border-radius:999px; border:2px solid rgba(255,207,107,.5);
+  background:rgba(255,255,255,.07); font-weight:700; font-size:15px; }
+.chip.on { background:linear-gradient(180deg,#ffd35c,#f2a327); color:#5c1200; border-color:#ffe9a8; }
+
+.timepick { display:flex; align-items:center; justify-content:center; gap:6px; }
+.tnum { font-family:'Gaegu',cursive; font-weight:700; font-size:clamp(46px,13vw,84px); color:#fff3cf; min-width:1.6em; text-align:center; }
+.tbtn { width:56px; height:46px; border-radius:14px; background:rgba(255,255,255,.12);
+  border:2px solid rgba(255,207,107,.5); font-size:22px; font-weight:900; color:#ffd98a; }
+.tbtn:active { background:rgba(255,207,107,.35); }
+
+.stats { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.stat { flex:1 1 90px; text-align:center; background:rgba(255,255,255,.07); border-radius:16px; padding:10px 6px;
+  border:2px solid rgba(255,207,107,.28); }
+.stat b { display:block; font-family:'Gaegu',cursive; font-size:30px; color:#ffd98a; line-height:1.1; }
+.stat span { font-size:12px; opacity:.8 }
+
+.meterbox { width:100%; height:26px; background:rgba(0,0,0,.5); border-radius:999px; overflow:hidden;
+  border:2px solid rgba(255,255,255,.25); position:relative; }
+.meterfill { height:100%; width:0%; background:linear-gradient(90deg,#7bd66b,#2fb673); transition:width .18s linear; }
+.meterline { position:absolute; top:-4px; bottom:-4px; width:4px; background:#fff; opacity:.9; border-radius:2px; }
+.metertxt { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-weight:900; font-size:14px; text-shadow:0 1px 3px #000; }
+
+video, .shot { width:100%; border-radius:18px; background:#000; display:block; aspect-ratio:4/3; object-fit:cover; }
+
+.ringbg { position:fixed; inset:0; background:radial-gradient(circle at 50% 40%, #ff4d4d, #6b0000);
+  animation:flash .55s steps(2) infinite; z-index:1; pointer-events:none; }
+@keyframes flash { 0%{opacity:.25} 100%{opacity:.62} }
+.shake { animation:shake .35s infinite; }
+@keyframes shake { 0%,100%{transform:translate(0,0) rotate(0)} 25%{transform:translate(-6px,3px) rotate(-2deg)}
+  50%{transform:translate(5px,-4px) rotate(2deg)} 75%{transform:translate(-4px,-2px) rotate(-1deg)} }
+.pop { animation:pop .5s ease; }
+@keyframes pop { 0%{transform:scale(.5); opacity:0} 60%{transform:scale(1.12)} 100%{transform:scale(1); opacity:1} }
+.trumpet { font-size:clamp(70px,20vw,140px); display:inline-block; animation:tw 1.1s ease-in-out infinite; }
+@keyframes tw { 0%,100%{transform:rotate(-9deg) scale(1)} 50%{transform:rotate(9deg) scale(1.08)} }
+
+.conf { position:fixed; top:-30px; width:12px; height:18px; z-index:50; pointer-events:none;
+  animation:fall linear forwards; }
+@keyframes fall { to { transform:translateY(110vh) rotate(720deg); opacity:0 } }
+
+.mini { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; width:100%; }
+.minic { background:rgba(255,255,255,.08); border:2px solid rgba(255,207,107,.4); border-radius:16px;
+  overflow:hidden; text-align:center; padding-bottom:6px; }
+.minic img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; }
+.minic .d { font-family:'Gaegu',cursive; font-size:19px; color:#ffd98a; margin-top:3px }
+.minic .t { font-size:12px; opacity:.85 }
+.badge { display:inline-block; padding:8px 12px; border-radius:14px; margin:4px; font-size:14px; font-weight:700;
+  background:rgba(255,255,255,.08); border:2px solid rgba(255,207,107,.35); }
+.badge.off { opacity:.28 }
+.hint { font-size:14px; opacity:.85; text-align:center; line-height:1.55; margin:6px 0 }
+.warn { background:rgba(255,90,90,.18); border:2px solid #ff8a8a; border-radius:14px; padding:10px; font-size:14px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════
+   트럼펫 알람시계 — 1층 내려가서 나무 사진 찍어야 꺼지는 알람
+   빌드 없음 / 서버 없음 / 단일 HTML / localStorage
+   ══════════════════════════════════════════════════════════════ */
+
+const K_STORE = 'alarm-v1';
+const DAYS = ['일','월','화','수','목','금','토'];
+const MAX_CARDS = 24;          // localStorage 용량 보호
+const XP_PER_LEVEL = 30;
+
+const DEFAULT_STATE = {
+  alarm:    { h:7, m:0, days:[1,2,3,4,5], on:false },
+  settings: { steps:40, green:15 },   // 걸어야 하는 걸음 수 / 통과 초록 비율(%)
+  streak:   { n:0, last:'' },         // 연속 성공 일수 / 마지막 성공 날짜(YYYY-MM-DD)
+  xp:       0,
+  badges:   [],
+  cards:    []                        // { date, wake, photo, green, temp }
+};
+
+const BADGES = [
+  { id:'first',  emoji:'🥇', name:'첫 성공',        desc:'처음으로 미션 성공' },
+  { id:'s3',     emoji:'🔥', name:'3일 연속',       desc:'3일 연속으로 성공' },
+  { id:'s7',     emoji:'🌟', name:'일주일 연속',    desc:'7일 연속으로 성공' },
+  { id:'x10',    emoji:'🏅', name:'열 번 성공',     desc:'미션 10번 성공' },
+  { id:'jungle', emoji:'🌳', name:'정글 탐험가',    desc:'초록 50% 넘는 사진' },
+  { id:'rooster',emoji:'🐓', name:'새벽 트럼펫',    desc:'아침 6시 전에 성공' },
+  { id:'fast',   emoji:'⚡', name:'번개같이',       desc:'2분 안에 미션 성공' }
+];
+
+/* ── 상태 ─────────────────────────────────────────────────── */
+let ST = null;
+let UI = {
+  screen:'home',      // home | armed | ring | move | photo | success | cards
+  steps:0, stepsOK:false, motionOn:false, motionMsg:'',
+  green:0, shot:null, shotGreen:0,
+  ringStart:0, escalate:1, missionStart:0,
+  newBadges:[], lastCard:null
+};
+let tickTimer = null, ringTimer = null, camTimer = null;
+let stream = null, wakeLock = null;
+
+function save() {
+  try { localStorage.setItem(K_STORE, JSON.stringify({
+    alarm:ST.alarm, settings:ST.settings, streak:ST.streak, xp:ST.xp, badges:ST.badges, cards:ST.cards
+  })); } catch(e) { /* 용량 초과 시 조용히 무시 */ }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(K_STORE);
+    ST = raw ? Object.assign({}, DEFAULT_STATE, JSON.parse(raw)) : JSON.parse(JSON.stringify(DEFAULT_STATE));
+    ST.alarm    = Object.assign({}, DEFAULT_STATE.alarm, ST.alarm);
+    ST.settings = Object.assign({}, DEFAULT_STATE.settings, ST.settings);
+    ST.streak   = Object.assign({}, DEFAULT_STATE.streak, ST.streak);
+    if (!Array.isArray(ST.cards))  ST.cards = [];
+    if (!Array.isArray(ST.badges)) ST.badges = [];
+  } catch(e) { ST = JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+}
+
+/* ── 유틸 ─────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+function h(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n) { return String(n).padStart(2,'0'); }
+function ymd(d) { return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function ampm(hh) { return hh < 12 ? '오전' : '오후'; }
+function h12(hh) { return hh%12 === 0 ? 12 : hh%12; }
+function level() { return Math.floor(ST.xp / XP_PER_LEVEL) + 1; }
+function levelPct() { return Math.round((ST.xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100); }
+
+// 알람이 다음에 울릴 절대시각 (없으면 null)
+function nextAlarmAt() {
+  const a = ST.alarm;
+  if (!a.on || !a.days.length) return null;
+  const now = new Date();
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, a.h, a.m, 0, 0);
+    if (d.getTime() > now.getTime() && a.days.includes(d.getDay())) return d.getTime();
+  }
+  return null;
+}
+function fmtLeft(ms) {
+  const m = Math.floor(ms/60000), hh = Math.floor(m/60), mm = m%60;
+  if (hh >= 1) return hh+'시간 '+mm+'분 뒤';
+  return Math.max(1, mm)+'분 뒤';
+}
+
+/* ── 소리 (Web Audio 합성 — 오디오 파일 없음) ──────────────── */
+let AC = null, master = null;
+function audioInit() {
+  if (!AC) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+    AC = new Ctx();
+    master = AC.createGain();
+    master.gain.value = 0.0001;
+    master.connect(AC.destination);
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return true;
+}
+function setVolume(v, sec) {
+  if (!master) return;
+  const t = AC.currentTime;
+  master.gain.cancelScheduledValues(t);
+  master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), t);
+  master.gain.linearRampToValueAtTime(Math.max(0.0001, v), t + (sec||0.4));
+}
+// 트럼펫 한 음: 톱니+사각 믹스 → 로우패스 → 비브라토
+function trumpetNote(freq, at, dur, vol) {
+  if (!AC) return;
+  const t0 = AC.currentTime + at;
+  const g = AC.createGain(), f = AC.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.setValueAtTime(900, t0);
+  f.frequency.linearRampToValueAtTime(3600, t0 + 0.06);
+  f.frequency.linearRampToValueAtTime(2000, t0 + dur);
+  f.Q.value = 3;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.035);       // 빵! 하고 터지는 어택
+  g.gain.setValueAtTime(vol, t0 + dur * 0.72);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  const vib = AC.createOscillator(), vibG = AC.createGain();
+  vib.frequency.value = 5.4; vibG.gain.value = freq * 0.008;
+  vib.connect(vibG);
+  ['sawtooth','square'].forEach((type, i) => {
+    const o = AC.createOscillator();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    vibG.connect(o.frequency);
+    const og = AC.createGain(); og.gain.value = i === 0 ? 1 : 0.35;
+    o.connect(og); og.connect(f);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  });
+  vib.start(t0); vib.stop(t0 + dur + 0.05);
+  f.connect(g); g.connect(master);
+}
+// 팡파레 (기병대 돌격 나팔)
+const FANFARE = [
+  [392,0.00,0.13], [523,0.13,0.13], [659,0.26,0.13], [784,0.39,0.30],
+  [659,0.72,0.14], [784,0.86,0.62]
+];
+function fanfare(vol) {
+  FANFARE.forEach(n => trumpetNote(n[0], n[1], n[2], vol == null ? 0.5 : vol));
+}
+function applause() {
+  if (!audioInit()) return;
+  const len = AC.sampleRate * 2.4;
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const t = i / AC.sampleRate;
+    const env = Math.min(1, t*8) * Math.exp(-t*1.1);
+    d[i] = (Math.random()*2 - 1) * env * (0.5 + 0.5*Math.random());
+  }
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const bp = AC.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.7;
+  const g = AC.createGain(); g.gain.value = 0.5;
+  src.connect(bp); bp.connect(g); g.connect(master);
+  setVolume(0.85, 0.1);
+  src.start();
+}
+function blip(freq, dur, vol) {
+  if (!audioInit()) return;
+  setVolume(0.8, 0.05);
+  trumpetNote(freq, 0, dur || 0.16, vol == null ? 0.35 : vol);
+}
+
+/* ── 화면 꺼짐 방지 ────────────────────────────────────────── */
+async function keepAwake(on) {
+  try {
+    if (on) {
+      if (!wakeLock && navigator.wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch(e) { /* 지원 안 하면 그냥 넘어감 */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (['armed','ring','move','photo'].includes(UI.screen)) keepAwake(true);
+  } else if (['ring','move','photo'].includes(UI.screen)) {
+    escalate('딴 데 가면 안 돼!');          // 도망가면 더 시끄러워짐
+  }
+});
+
+/* ── 알람 울리기 ───────────────────────────────────────────── */
+function startRinging() {
+  UI.screen = 'ring';
+  UI.ringStart = Date.now();
+  UI.escalate = 1;
+  UI.missionStart = Date.now();
+  UI.steps = 0; UI.stepsOK = false; UI.shot = null;
+  keepAwake(true);
+  audioInit();
+  setVolume(0.3, 0.5);
+  if (ringTimer) clearInterval(ringTimer);
+  const boom = () => {
+    fanfare(0.55);
+    const secs = (Date.now() - UI.ringStart) / 1000;
+    const vol = Math.min(1, (0.3 + secs/90) * UI.escalate);   // 90초에 걸쳐 점점 커짐
+    setVolume(vol, 1.2);
+  };
+  boom();
+  ringTimer = setInterval(boom, 2000);
+  render();
+}
+function stopRinging() {
+  if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+  setVolume(0.0001, 0.3);
+}
+function escalate(msg) {
+  UI.escalate = Math.min(2.2, UI.escalate * 1.35);
+  if (msg) UI.motionMsg = msg;
+  if (master) setVolume(1, 0.25);
+  document.body.classList.add('shake');
+  setTimeout(() => document.body.classList.remove('shake'), 900);
+}
+
+/* ── 움직임(걸음) 감지 ─────────────────────────────────────── */
+let lastMag = 0, lastStepAt = 0, motionHandler = null;
+function onMotion(ev) {
+  const a = ev.accelerationIncludingGravity || ev.acceleration;
+  if (!a || a.x == null) return;
+  const mag = Math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+  const d = Math.abs(mag - lastMag);
+  lastMag = lastMag * 0.7 + mag * 0.3;                   // 저역 통과 필터
+  const now = Date.now();
+  if (d > 2.6 && now - lastStepAt > 260) {               // 걸음 한 번
+    lastStepAt = now;
+    UI.steps++;
+    const need = ST.settings.steps;
+    const bar = $('stepFill'), txt = $('stepTxt');
+    if (bar) bar.style.width = Math.min(100, UI.steps/need*100) + '%';
+    if (txt) txt.textContent = Math.min(UI.steps, need) + ' / ' + need + ' 걸음';
+    if (UI.steps % 10 === 0) blip(523, 0.1, 0.25);
+    if (UI.steps >= need && !UI.stepsOK) {
+      UI.stepsOK = true;
+      blip(784, 0.35, 0.4);
+      stopMotion();
+      setTimeout(() => { UI.screen = 'photo'; render(); }, 500);
+    }
+  }
+}
+function stopMotion() {
+  if (motionHandler) { window.removeEventListener('devicemotion', motionHandler); motionHandler = null; }
+}
+async function startMotion() {
+  stopMotion();
+  UI.steps = 0; UI.stepsOK = false;
+  try {
+    const DME = window.DeviceMotionEvent;
+    if (DME && typeof DME.requestPermission === 'function') {
+      const res = await DME.requestPermission();          // iOS는 탭 제스처에서만 허용
+      if (res !== 'granted') throw new Error('denied');
+    } else if (!DME) throw new Error('unsupported');
+    motionHandler = onMotion;
+    window.addEventListener('devicemotion', motionHandler);
+    UI.motionOn = true;
+    // 센서가 값을 안 주는 기기(데스크톱 등) 대비 — 4초 뒤에도 0이면 건너뜀
+    setTimeout(() => {
+      if (UI.screen === 'move' && UI.steps === 0) {
+        UI.motionOn = false;
+        UI.motionMsg = '움직임 센서를 못 써서 사진 검사만 할게!';
+        stopMotion();
+        UI.screen = 'photo'; render();
+      }
+    }, 4000);
+  } catch(e) {
+    UI.motionOn = false;
+    UI.motionMsg = '움직임 센서를 못 써서 사진 검사만 할게!';
+    UI.screen = 'photo'; render();
+  }
+}
+
+/* ── 카메라 + 초록색 검사 ──────────────────────────────────── */
+const cvs = document.createElement('canvas');
+function greenRatio(video) {
+  const W = 128, H = 96;
+  cvs.width = W; cvs.height = H;
+  const ctx = cvs.getContext('2d', { willReadFrequently:true });
+  try { ctx.drawImage(video, 0, 0, W, H); } catch(e) { return 0; }
+  let data;
+  try { data = ctx.getImageData(0, 0, W, H).data; } catch(e) { return 0; }
+  let green = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i+1], b = data[i+2];
+    // 초록: G가 R보다 확실히 크고 B보다도 크며, 너무 어둡지 않을 것
+    if (g > 42 && g > r * 1.14 && g > b * 1.05) green++;
+  }
+  return Math.round(green / (W*H) * 100);
+}
+async function startCamera() {
+  stopCamera();
+  const v = $('cam');
+  if (!v) return;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:{ ideal:'environment' }, width:{ ideal:640 } }, audio:false
+    });
+    v.srcObject = stream;
+    v.setAttribute('playsinline','');
+    v.muted = true;
+    await v.play();
+    $('camErr').style.display = 'none';
+    camTimer = setInterval(() => {
+      if (!v.videoWidth) return;
+      UI.green = greenRatio(v);
+      const need = ST.settings.green;
+      const fill = $('gFill'), txt = $('gTxt');
+      if (fill) fill.style.width = Math.min(100, UI.green * 2) + '%';
+      if (txt) txt.textContent = '초록 ' + UI.green + '%  (' + need + '% 넘어야 통과!)';
+    }, 200);
+  } catch(e) {
+    const err = $('camErr');
+    if (err) {
+      err.style.display = 'block';
+      err.innerHTML = '카메라를 못 켰어 😢<br>주소가 <b>https</b>인지, 카메라 허용을 눌렀는지 확인해줘.<br><small>' + h(e.name||'') + '</small>';
+    }
+  }
+}
+function stopCamera() {
+  if (camTimer) { clearInterval(camTimer); camTimer = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+}
+function takeShot() {
+  const v = $('cam');
+  if (!v || !v.videoWidth) { escalate('카메라가 아직 준비 안 됐어!'); return; }
+  const g = greenRatio(v);
+  const need = ST.settings.green;
+  if (g < need) {
+    escalate('');
+    const msg = $('shotMsg');
+    if (msg) msg.innerHTML = '<div class="warn">초록이 <b>' + g + '%</b>밖에 없어! 나무에 더 가까이 가서 잎이 화면에 꽉 차게 찍어봐 🌳</div>';
+    blip(220, 0.3, 0.4);
+    return;
+  }
+  // 통과 — 카드에 넣을 작은 사진으로 저장
+  const W = 320, H = Math.round(320 * v.videoHeight / v.videoWidth) || 240;
+  const c2 = document.createElement('canvas');
+  c2.width = W; c2.height = H;
+  c2.getContext('2d').drawImage(v, 0, 0, W, H);
+  UI.shot = c2.toDataURL('image/jpeg', 0.55);
+  UI.shotGreen = g;
+  stopCamera();
+  succeed();
+}
+
+/* ── 성공 처리 ─────────────────────────────────────────────── */
+function succeed() {
+  stopRinging();
+  keepAwake(false);
+  const now = new Date();
+  const today = ymd(now);
+  const took = Math.round((Date.now() - UI.missionStart) / 1000);
+
+  // 연속 기록
+  if (ST.streak.last !== today) {
+    const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    ST.streak.n = (ST.streak.last === ymd(y)) ? ST.streak.n + 1 : 1;
+    ST.streak.last = today;
+  }
+  ST.xp += 10;
+
+  // 기상 카드
+  const card = {
+    date: today,
+    wake: pad(now.getHours()) + ':' + pad(now.getMinutes()),
+    photo: UI.shot,
+    green: UI.shotGreen,
+    temp: null
+  };
+  ST.cards.unshift(card);
+  if (ST.cards.length > MAX_CARDS) ST.cards.length = MAX_CARDS;
+  UI.lastCard = card;
+
+  // 배지
+  const total = ST.cards.length;
+  const earn = [];
+  const give = id => { if (!ST.badges.includes(id)) { ST.badges.push(id); earn.push(id); } };
+  give('first');
+  if (ST.streak.n >= 3) give('s3');
+  if (ST.streak.n >= 7) give('s7');
+  if (total >= 10) give('x10');
+  if (UI.shotGreen >= 50) give('jungle');
+  if (now.getHours() < 6) give('rooster');
+  if (took <= 120) give('fast');
+  UI.newBadges = earn;
+  ST.xp += earn.length * 5;
+
+  save();
+  UI.screen = 'success';
+  render();
+  applause();
+  setTimeout(() => fanfare(0.6), 400);
+  confetti();
+  fetchTemp(card);
+}
+// 온도는 있으면 좋고 없어도 그만 — 절대 미션을 막지 않는다
+function fetchTemp(card) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + pos.coords.latitude.toFixed(2) +
+                '&longitude=' + pos.coords.longitude.toFixed(2) + '&current=temperature_2m';
+      const r = await fetch(u);
+      const j = await r.json();
+      const t = j && j.current && j.current.temperature_2m;
+      if (typeof t === 'number') {
+        card.temp = Math.round(t);
+        save();
+        const el = $('cardTemp');
+        if (el) el.textContent = '🌤️ ' + card.temp + '°';
+      }
+    } catch(e) {}
+  }, () => {}, { timeout:6000, maximumAge:600000 });
+}
+function confetti() {
+  const colors = ['#ffd35c','#ff7a7a','#7bd66b','#7ab8ff','#ff9ae0','#fff3cf'];
+  for (let i = 0; i < 60; i++) {
+    const s = document.createElement('span');
+    s.className = 'conf';
+    s.style.left = Math.random()*100 + 'vw';
+    s.style.background = colors[i % colors.length];
+    s.style.animationDuration = (1.6 + Math.random()*1.6) + 's';
+    s.style.animationDelay = (Math.random()*0.7) + 's';
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 4200);
+  }
+}
+
+/* ── 화면 ─────────────────────────────────────────────────── */
+function stageHTML(clap) {
+  return '<div class="stage">' +
+    '<div class="spot a"></div><div class="spot b"></div>' +
+    '<div class="floor"></div>' +
+    '<div class="crowd' + (clap ? ' clap' : '') + '">' + '<div class="head"></div>'.repeat(11) + '</div>' +
+    '<div class="curtain l"></div><div class="curtain r"></div><div class="valance"></div>' +
+  '</div>';
+}
+
+function render() {
+  const app = $('app');
+  const S = UI.screen;
+  let body = '';
+
+  if (S === 'home')         body = viewHome();
+  else if (S === 'armed')   body = viewArmed();
+  else if (S === 'ring')    body = viewRing();
+  else if (S === 'move')    body = viewMove();
+  else if (S === 'photo')   body = viewPhoto();
+  else if (S === 'success') body = viewSuccess();
+  else if (S === 'cards')   body = viewCards();
+
+  const ringing = (S === 'ring' || S === 'move' || S === 'photo');
+  app.innerHTML = (ringing ? '<div class="ringbg"></div>' : '') + stageHTML(S === 'success') +
+                  '<div class="wrap">' + body + '</div>';
+  wire();
+}
+
+function viewHome() {
+  const a = ST.alarm;
+  const next = nextAlarmAt();
+  const badgeRow = BADGES.map(b => {
+    const on = ST.badges.includes(b.id);
+    return '<span class="badge' + (on ? '' : ' off') + '" title="' + h(b.desc) + '">' + b.emoji + ' ' + h(b.name) + '</span>';
+  }).join('');
+  return `
+    <h1 class="title">🎺 트럼펫 알람시계</h1>
+    <div class="sub">1층 나무 사진을 찍어야만 꺼진다!</div>
+
+    <div class="card">
+      <div class="timepick">
+        <button class="tbtn" data-act="h-">−</button>
+        <div class="tnum">${pad(a.h)}</div>
+        <button class="tbtn" data-act="h+">＋</button>
+        <div class="tnum" style="min-width:.4em">:</div>
+        <button class="tbtn" data-act="m-">−</button>
+        <div class="tnum">${pad(a.m)}</div>
+        <button class="tbtn" data-act="m+">＋</button>
+      </div>
+      <div class="hint">${ampm(a.h)} ${h12(a.h)}시 ${a.m ? a.m + '분' : '정각'}</div>
+      <div class="row" style="margin-top:8px">
+        ${DAYS.map((d,i) => '<button class="chip' + (a.days.includes(i) ? ' on' : '') + '" data-day="' + i + '">' + d + '</button>').join('')}
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn ghost small" data-act="weekday">평일만</button>
+        <button class="btn ghost small" data-act="everyday">매일</button>
+      </div>
+    </div>
+
+    <button class="btn" data-act="arm">⏰ 알람 켜기</button>
+    ${next ? '<div class="hint">다음 알람: ' + fmtLeft(next - Date.now()) + '</div>' : ''}
+    <button class="btn ghost" data-act="test">🧪 지금 한 번 해보기</button>
+
+    <div class="card">
+      <div class="stats">
+        <div class="stat"><b>🔥 ${ST.streak.n}</b><span>연속 성공</span></div>
+        <div class="stat"><b>🏆 Lv.${level()}</b><span>${levelPct()}% 다음 레벨</span></div>
+        <div class="stat"><b>🌳 ${ST.cards.length}</b><span>모은 카드</span></div>
+      </div>
+      <div style="margin-top:10px" class="row">${badgeRow}</div>
+      <button class="btn ghost small" data-act="cards" style="margin-top:8px">📸 내 기상 카드 보기</button>
+    </div>
+
+    <div class="card">
+      <div class="hint" style="text-align:left">
+        <b>미션 난이도</b><br>
+        걸어야 하는 걸음: <b>${ST.settings.steps}</b>걸음
+        <button class="chip" data-act="st-">−10</button>
+        <button class="chip" data-act="st+">+10</button><br>
+        사진 초록 비율: <b>${ST.settings.green}%</b>
+        <button class="chip" data-act="gr-">−5</button>
+        <button class="chip" data-act="gr+">+5</button>
+      </div>
+    </div>
+    <div class="hint" style="max-width:520px">
+      태블릿을 <b>충전기에 꽂고</b> 이 화면을 켜 둔 채로 자야 알람이 울려!
+    </div>
+  `;
+}
+
+function viewArmed() {
+  const next = nextAlarmAt();
+  const now = new Date();
+  return `
+    <h1 class="title">알람 준비 완료!</h1>
+    <div class="bigclock" id="liveClock">${pad(now.getHours())}:${pad(now.getMinutes())}</div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:44px">⏰</div>
+      <div class="sub" style="margin:6px 0 0">${ampm(ST.alarm.h)} ${h12(ST.alarm.h)}시 ${ST.alarm.m ? ST.alarm.m + '분' : '정각'}에 팡파레!</div>
+      <div class="hint" id="leftTxt">${next ? fmtLeft(next - Date.now()) : ''}</div>
+    </div>
+    <div class="hint">🎺 화면을 끄지 말고 그대로 두고 자기!<br>충전기 꽂는 거 잊지 마 🔌</div>
+    <button class="btn ghost" data-act="disarm">알람 끄기</button>
+  `;
+}
+
+function viewRing() {
+  return `
+    <h1 class="title">일어나!! 🎺</h1>
+    <div class="trumpet">🎺</div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:24px; font-family:Gaegu,cursive">미션</div>
+      <div class="sub" style="font-size:22px">1️⃣ 1층까지 걸어 내려가기<br>2️⃣ 나무 사진 찍기 🌳</div>
+      <div class="hint">이거 안 하면 절대 안 꺼져 😈</div>
+    </div>
+    <button class="btn" data-act="startmission">미션 시작! 🏃</button>
+  `;
+}
+
+function viewMove() {
+  const need = ST.settings.steps;
+  return `
+    <h1 class="title">1층으로 출발! 🏃</h1>
+    <div class="card">
+      <div class="hint">태블릿을 들고 <b>${need}걸음</b> 걸어야 카메라가 열려!</div>
+      <div class="meterbox"><div class="meterfill" id="stepFill"></div>
+        <div class="metertxt" id="stepTxt">0 / ${need} 걸음</div></div>
+      <div class="hint" style="font-size:32px">🚶‍♂️ 🪜 🚶‍♀️</div>
+      ${UI.motionMsg ? '<div class="warn">' + h(UI.motionMsg) + '</div>' : ''}
+    </div>
+    <div class="hint">흔들기만 하면 안 돼. 진짜로 걸어야 세진다!</div>
+  `;
+}
+
+function viewPhoto() {
+  const need = ST.settings.green;
+  return `
+    <h1 class="title">나무를 찍어! 🌳</h1>
+    <div class="card">
+      <video id="cam" playsinline muted></video>
+      <div class="warn" id="camErr" style="display:none; margin-top:8px"></div>
+      <div class="meterbox" style="margin-top:10px"><div class="meterfill" id="gFill"></div>
+        <div class="meterline" style="left:${Math.min(99, need*2)}%"></div>
+        <div class="metertxt" id="gTxt">초록 0%  (${need}% 넘어야 통과!)</div></div>
+      <div id="shotMsg"></div>
+    </div>
+    <button class="btn" data-act="shot">📸 찍기!</button>
+    <div class="hint">나뭇잎이 화면에 <b>꽉 차게</b> 가까이 가서 찍어야 통과돼!</div>
+  `;
+}
+
+function viewSuccess() {
+  const c = UI.lastCard || {};
+  const nb = UI.newBadges.map(id => {
+    const b = BADGES.find(x => x.id === id);
+    return b ? '<span class="badge">' + b.emoji + ' ' + h(b.name) + ' 획득!</span>' : '';
+  }).join('');
+  return `
+    <h1 class="title pop">성공!! 🎉</h1>
+    <div class="sub">관객이 전부 일어나서 박수치고 있어!</div>
+    <div class="card pop" style="text-align:center">
+      ${c.photo ? '<img class="shot" src="' + c.photo + '" alt="오늘 찍은 나무">' : ''}
+      <div class="stats" style="margin-top:10px">
+        <div class="stat"><b>${h((c.date||'').slice(5).replace('-','/'))}</b><span>날짜</span></div>
+        <div class="stat"><b>${h(c.wake||'')}</b><span>기상 시간</span></div>
+        <div class="stat"><b id="cardTemp">${c.temp != null ? '🌤️ ' + c.temp + '°' : '🌤️ —'}</b><span>바깥 온도</span></div>
+      </div>
+      <div class="stats" style="margin-top:8px">
+        <div class="stat"><b>🔥 ${ST.streak.n}</b><span>연속 성공</span></div>
+        <div class="stat"><b>🏆 Lv.${level()}</b><span>+10 XP</span></div>
+        <div class="stat"><b>🌳 ${c.green != null ? c.green + '%' : '-'}</b><span>초록 비율</span></div>
+      </div>
+      ${nb ? '<div class="row" style="margin-top:10px">' + nb + '</div>' : ''}
+    </div>
+    <button class="btn" data-act="home">좋아! 🎺</button>
+    <button class="btn ghost" data-act="cards">📸 카드 모아 보기</button>
+  `;
+}
+
+function viewCards() {
+  if (!ST.cards.length) {
+    return '<h1 class="title">📸 기상 카드</h1><div class="card"><div class="hint">아직 카드가 없어!<br>내일 아침에 첫 카드를 만들어보자 🌳</div></div>' +
+           '<button class="btn" data-act="home">뒤로</button>';
+  }
+  const grid = ST.cards.map(c =>
+    '<div class="minic">' +
+      (c.photo ? '<img src="' + c.photo + '" alt="">' : '') +
+      '<div class="d">' + h((c.date||'').slice(5).replace('-','/')) + '</div>' +
+      '<div class="t">⏰ ' + h(c.wake||'') + (c.temp != null ? ' · 🌤️' + c.temp + '°' : '') + '</div>' +
+    '</div>'
+  ).join('');
+  return `
+    <h1 class="title">📸 기상 카드 ${ST.cards.length}장</h1>
+    <div class="card"><div class="mini">${grid}</div></div>
+    <button class="btn" data-act="home">뒤로</button>
+  `;
+}
+
+/* ── 이벤트 배선 ───────────────────────────────────────────── */
+function wire() {
+  document.querySelectorAll('[data-day]').forEach(el => {
+    el.onclick = () => {
+      const i = +el.dataset.day, ds = ST.alarm.days;
+      const k = ds.indexOf(i);
+      if (k >= 0) ds.splice(k, 1); else ds.push(i);
+      ds.sort(); save(); blip(660, 0.08, 0.2); render();
+    };
+  });
+  document.querySelectorAll('[data-act]').forEach(el => { el.onclick = () => act(el.dataset.act); });
+
+  if (UI.screen === 'photo') startCamera();
+  if (UI.screen === 'armed') startTick();
+}
+
+function act(a) {
+  const al = ST.alarm, se = ST.settings;
+  switch (a) {
+    case 'h+': al.h = (al.h + 1) % 24; save(); render(); break;
+    case 'h-': al.h = (al.h + 23) % 24; save(); render(); break;
+    case 'm+': al.m = (al.m + 5) % 60; save(); render(); break;
+    case 'm-': al.m = (al.m + 55) % 60; save(); render(); break;
+    case 'weekday': al.days = [1,2,3,4,5]; save(); render(); break;
+    case 'everyday': al.days = [0,1,2,3,4,5,6]; save(); render(); break;
+    case 'st+': se.steps = Math.min(200, se.steps + 10); save(); render(); break;
+    case 'st-': se.steps = Math.max(10, se.steps - 10); save(); render(); break;
+    case 'gr+': se.green = Math.min(60, se.green + 5); save(); render(); break;
+    case 'gr-': se.green = Math.max(5, se.green - 5); save(); render(); break;
+    case 'arm':
+      if (!al.days.length) { alert('요일을 하나는 골라줘!'); return; }
+      al.on = true; save();
+      audioInit(); blip(784, 0.3, 0.4);       // 여기서 소리 잠금 해제 (아이패드 필수)
+      UI.screen = 'armed'; keepAwake(true); render();
+      break;
+    case 'disarm':
+      al.on = false; save(); stopTick(); keepAwake(false);
+      UI.screen = 'home'; render();
+      break;
+    case 'test': audioInit(); startRinging(); break;
+    case 'startmission':
+      UI.missionStart = Date.now();
+      UI.screen = 'move'; render(); startMotion();
+      break;
+    case 'shot': takeShot(); break;
+    case 'cards': UI.screen = 'cards'; render(); break;
+    case 'home':
+      stopRinging(); stopCamera(); stopMotion(); keepAwake(false);
+      UI.screen = al.on ? 'armed' : 'home'; render();
+      break;
+  }
+}
+
+/* ── 알람 감시 타이머 ──────────────────────────────────────── */
+function startTick() {
+  if (tickTimer) return;
+  tickTimer = setInterval(() => {
+    if (UI.screen !== 'armed') return;
+    const now = new Date();
+    const cl = $('liveClock');
+    if (cl) cl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    const next = nextAlarmAt();
+    const lt = $('leftTxt');
+    if (lt && next) lt.textContent = fmtLeft(next - Date.now());
+    // 설정한 시각의 그 분(minute) 안에 들어오면 발사
+    if (ST.alarm.on && ST.alarm.days.includes(now.getDay()) &&
+        now.getHours() === ST.alarm.h && now.getMinutes() === ST.alarm.m) {
+      startRinging();
+    }
+  }, 1000);
+}
+function stopTick() { if (tickTimer) { clearInterval(tickTimer); tickTimer = null; } }
+
+/* ── 시작 ─────────────────────────────────────────────────── */
+load();
+UI.screen = ST.alarm.on ? 'armed' : 'home';
+render();
+if (UI.screen === 'armed') startTick();
+</script>
+</body>
+</html>
