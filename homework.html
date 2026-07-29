@@ -36,15 +36,21 @@ button, input, select { font-family:inherit; }
 // ─────────────────────────────────────────────────────────────
 //  말랑이 숙제 친구 — 단일 파일 앱 (빌드 없음 / 서버 없음)
 //  아이 화면: 오늘 숙제 체크 → 포인트 → 말랑이 성장 → 스티커 & 연속일
+//             집중 타이머, 포인트로 꾸미는 리워드샵
 //  보호자 화면: PIN 잠금, 반복 숙제(요일 지정) + 하루짜리 숙제 등록
 // ─────────────────────────────────────────────────────────────
 
 // ── 테마 (파스텔 + 둥근 모양) ────────────────────────────────
-const T = {
-  bg:'#fff6fa', bg2:'#f1f7ff', card:'#ffffff',
-  ink:'#4a3b45', sub:'#9b8b95', line:'#ffdcea', soft:'#fff0f6',
-  accent:'#ff8fb8', accentDark:'#e0608e'
+//  T는 현재 테마 색이 담기는 곳. 리워드샵에서 테마를 사면 applyTheme()로 갈아끼운다.
+const THEMES = {
+  cherry:   { name:'벚꽃',   emoji:'🌸', cost:0,   c:{ bg:'#fff6fa', bg2:'#f1f7ff', line:'#ffdcea', soft:'#fff0f6', accent:'#ff8fb8', accentDark:'#e0608e', ink:'#4a3b45', sub:'#9b8b95' } },
+  mint:     { name:'민트',   emoji:'🌿', cost:60,  c:{ bg:'#f2fdf8', bg2:'#eefaff', line:'#c9eedd', soft:'#e9faf2', accent:'#57c9a0', accentDark:'#2e9c78', ink:'#33463f', sub:'#8aa39a' } },
+  sky:      { name:'하늘',   emoji:'☁️', cost:60,  c:{ bg:'#f3f9ff', bg2:'#eef4ff', line:'#cfe4fb', soft:'#e9f3ff', accent:'#6cadf0', accentDark:'#3d84cc', ink:'#33404f', sub:'#8b98a8' } },
+  lavender: { name:'라벤더', emoji:'💜', cost:60,  c:{ bg:'#faf5ff', bg2:'#f3f1ff', line:'#e2d4f7', soft:'#f3ecff', accent:'#a985e8', accentDark:'#7d59c4', ink:'#413a4f', sub:'#948ca3' } },
+  night:    { name:'밤하늘', emoji:'🌙', cost:150, c:{ bg:'#fff9ec', bg2:'#f5f0ff', line:'#f0dfb6', soft:'#fff5e0', accent:'#f0b13f', accentDark:'#c98a1c', ink:'#4a4030', sub:'#a1957f' } }
 };
+let T = { ...THEMES.cherry.c, card:'#ffffff' };
+function applyTheme() { Object.assign(T, (THEMES[ST.theme] || THEMES.cherry).c); }
 // 과목별 색/이모지. 보호자가 새 과목을 만들면 '기타' 색을 쓴다.
 const SUBJECTS = {
   '수학학원': { color:'#7fb0ff', soft:'#eaf2ff', emoji:'➗' },
@@ -83,6 +89,19 @@ const STICKERS = [
   { id:'grow',   emoji:'🥚', name:'부화 성공',  desc:'말랑이가 알에서 깨어남', cond:s=>stageOf(s.exp)>=1 }
 ];
 
+// ── 리워드샵 ─────────────────────────────────────────────────
+//  포인트(⭐)는 숙제/타이머로 벌고, 여기서 말랑이 꾸미기에 쓴다.
+//  exp(성장)는 따로 쌓이므로 물건을 사도 말랑이가 작아지지 않는다.
+const SHOP_ACC = [
+  { id:'ribbon', emoji:'🎀', name:'리본',     cost:30  },
+  { id:'cap',    emoji:'🧢', name:'모자',     cost:50  },
+  { id:'glass',  emoji:'🕶️', name:'선글라스', cost:70  },
+  { id:'scarf',  emoji:'🧣', name:'목도리',   cost:90  },
+  { id:'phone',  emoji:'🎧', name:'헤드폰',   cost:120 },
+  { id:'crown',  emoji:'👑', name:'왕관',     cost:200 }
+];
+const ACC = id => SHOP_ACC.find(a => a.id === id);
+
 // ── 상태 ─────────────────────────────────────────────────────
 const K_STORE = 'hw-v1-state';
 const DEFAULT_STATE = {
@@ -100,13 +119,19 @@ const DEFAULT_STATE = {
   totalDone: 0, clearDays: 0, subjDone: {},
   pin: '1234',
   sound: true,
+  owned: [],          // 산 물건 id (액세서리 + 테마)
+  equip: null,        // 지금 말랑이가 쓰고 있는 액세서리 id
+  theme: 'cherry',
+  timer: null,        // 집중 타이머 { endAt, totalSec, running, leftSec, taskId }
   screen: 'today',
   overlay: null,      // {type:'stage'|'clear'|'sticker', ...}
   parentUnlocked: false,
   weekOffset: 0,
   draft: null         // 보호자 화면에서 작성 중인 숙제
 };
-let ST = { ...DEFAULT_STATE };
+// DEFAULT_STATE 안의 배열/객체를 그대로 쓰면 원본이 오염되므로 항상 복사해서 쓴다
+const freshState = () => JSON.parse(JSON.stringify(DEFAULT_STATE));
+let ST = freshState();
 
 function save() {
   try {
@@ -117,9 +142,10 @@ function save() {
 function load() {
   try {
     const raw = localStorage.getItem(K_STORE);
-    ST = raw ? { ...DEFAULT_STATE, ...JSON.parse(raw) } : { ...DEFAULT_STATE };
-  } catch(e) { ST = { ...DEFAULT_STATE }; }
+    ST = raw ? { ...freshState(), ...JSON.parse(raw) } : freshState();
+  } catch(e) { ST = freshState(); }
   ST.screen='today'; ST.overlay=null; ST.parentUnlocked=false; ST.weekOffset=0; ST.draft=null;
+  applyTheme();
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
@@ -183,7 +209,8 @@ function popText(txt) {
 
 // ── 말랑이 그림 (파라메트릭 SVG) ─────────────────────────────
 //  stage: 0=알, 1~4 = 자란 모습. mood: 'happy'|'excited'|'calm'|'sleepy'
-function mallang({ stage=1, mood='calm', size=140 }) {
+function mallang({ stage=1, mood='calm', size=140, acc=undefined }) {
+  if (acc === undefined) acc = ST.equip;   // 따로 안 주면 지금 착용 중인 것
   const S = STAGES[stage] || STAGES[1];
   const body = S.body, ink = '#5c3a4a';
   const dark = c => { const x=c.replace('#',''); const r=parseInt(x.slice(0,2),16),g=parseInt(x.slice(2,4),16),b=parseInt(x.slice(4,6),16);
@@ -215,7 +242,15 @@ function mallang({ stage=1, mood='calm', size=140 }) {
     : mood==='sleepy'
     ? `<ellipse cx="50" cy="59" rx="3" ry="3.6" fill="#c8607f"/>`
     : `<path d="M43 56 Q50 63 57 56" fill="none" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>`;
-  const crown = stage>=4 ? `<path d="M36 16 L42 24 L50 13 L58 24 L64 16 L62 27 L38 27 Z" fill="#ffd76a" stroke="#e0a92e" stroke-width="2" stroke-linejoin="round"/>` : '';
+  // 액세서리 — 머리 위 / 눈 / 목 위치로 나눠 붙인다
+  const accEmoji = acc ? (ACC(acc)||{}).emoji : '';
+  const accArt = !accEmoji ? ''
+    : acc==='glass' ? `<text x="50" y="50" font-size="24" text-anchor="middle">${accEmoji}</text>`
+    : acc==='scarf' ? `<text x="50" y="79" font-size="24" text-anchor="middle">${accEmoji}</text>`
+    : acc==='phone' ? `<text x="50" y="35" font-size="30" text-anchor="middle">${accEmoji}</text>`
+    : `<text x="50" y="22" font-size="24" text-anchor="middle">${accEmoji}</text>`;
+  const wearsHat = acc==='cap' || acc==='crown' || acc==='ribbon' || acc==='phone';
+  const crown = (stage>=4 && !wearsHat) ? `<path d="M36 16 L42 24 L50 13 L58 24 L64 16 L62 27 L38 27 Z" fill="#ffd76a" stroke="#e0a92e" stroke-width="2" stroke-linejoin="round"/>` : '';
   const extra = mood==='sleepy' ? `<text x="72" y="30" font-size="14">💤</text>`
               : mood==='excited' ? `<text x="8" y="30" font-size="14" style="animation:sparkle 1.2s ease-in-out infinite">✨</text><text x="76" y="34" font-size="12" style="animation:sparkle 1.6s ease-in-out infinite">✨</text>` : '';
   const sc = S.size;
@@ -231,7 +266,7 @@ function mallang({ stage=1, mood='calm', size=140 }) {
       <ellipse cx="76" cy="58" rx="7" ry="5" fill="#ff9fbe" opacity="0.5"/>
       ${eyes}${mouth}
       <circle cx="50" cy="52" r="2" fill="${ink}" opacity="0.55"/>
-      ${extra}
+      ${accArt}${extra}
     </g>
   </svg>`;
 }
@@ -310,6 +345,93 @@ function checkStickers() {
   return got;
 }
 
+// ── 집중 타이머 ──────────────────────────────────────────────
+//  고른 시간만큼 집중하면 보너스 포인트. 남은 시간은 '끝나는 시각'으로 저장해서
+//  새로고침하거나 앱을 닫았다 켜도 이어진다.
+const PT_TIMER = 5;
+const TIMER_MINS = [5, 10, 15, 20, 25];
+
+function timerLeft() {
+  const tm = ST.timer;
+  if (!tm) return 0;
+  return tm.running ? Math.max(0, Math.round((tm.endAt - Date.now())/1000)) : tm.leftSec;
+}
+function startTimer(min) {
+  ST.timer = { totalSec: min*60, endAt: Date.now() + min*60*1000, running: true, leftSec: min*60 };
+  tone(660,0,0.12,0.14,'triangle'); tone(880,0.1,0.2,0.13,'triangle');
+  save(); render();
+}
+function pauseTimer() {
+  const tm = ST.timer; if (!tm || !tm.running) return;
+  tm.leftSec = timerLeft(); tm.running = false;
+  sfxUndo(); save(); render();
+}
+function resumeTimer() {
+  const tm = ST.timer; if (!tm || tm.running) return;
+  tm.endAt = Date.now() + tm.leftSec*1000; tm.running = true;
+  save(); render();
+}
+function stopTimer() {
+  if (!ST.timer) return;
+  if (timerLeft() > 0 && !confirm('타이머를 그만할까요?')) return;
+  ST.timer = null; save(); render();
+}
+function finishTimer() {
+  const mins = Math.round((ST.timer.totalSec||0)/60);
+  ST.timer = null;
+  ST.points += PT_TIMER; ST.exp += PT_TIMER;
+  const before = stageOf(ST.exp - PT_TIMER), after = stageOf(ST.exp);
+  sfxClear(); boom(40);
+  ST.overlay = (after > before) ? { type:'stage', stage:after, next:checkStickers() }
+                                : { type:'timer', mins };
+  save(); render();
+}
+// 1초마다: 타이머가 켜져 있으면 숫자만 갈아끼우고, 0이 되면 축하로 넘어간다
+setInterval(() => {
+  if (!ST.timer || !ST.timer.running) return;
+  const left = timerLeft();
+  if (left <= 0) { finishTimer(); return; }
+  const lbl = document.getElementById('tmLabel'), ring = document.getElementById('tmRing');
+  if (!lbl || !ring) { if (ST.screen==='today' && !ST.overlay) render(); return; }
+  lbl.textContent = `${Math.floor(left/60)}:${pad2(left%60)}`;
+  const C = 2*Math.PI*42;
+  ring.setAttribute('stroke-dasharray', `${(C*left/ST.timer.totalSec).toFixed(1)} ${C.toFixed(1)}`);
+}, 1000);
+
+function timerCard() {
+  const tm = ST.timer;
+  if (!tm) {
+    return `<div class="card" style="padding:13px 15px;margin-bottom:12px;border:2px solid ${T.line};">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:9px;">
+        <div class="g" style="font-size:20px;color:${T.ink};">⏳ 집중 타이머</div>
+        <div style="font-size:11.5px;color:${T.sub};font-weight:700;">끝까지 하면 +${PT_TIMER}⭐</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        ${TIMER_MINS.map(m=>`<span class="tapbtn" onclick="startTimer(${m})" style="flex:1;text-align:center;font-size:13.5px;font-weight:800;color:${T.accentDark};background:${T.soft};border:2px solid ${T.line};border-radius:13px;padding:10px 2px;">${m}분</span>`).join('')}
+      </div></div>`;
+  }
+  const left = timerLeft(), C = 2*Math.PI*42;
+  return `<div class="card" style="padding:14px 15px;margin-bottom:12px;border:2px solid ${T.accent};background:linear-gradient(180deg,#fff,${T.soft});">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="position:relative;flex-shrink:0;width:96px;height:96px;">
+        <svg viewBox="0 0 100 100" width="96" height="96" style="transform:rotate(-90deg);">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="${T.line}" stroke-width="9"/>
+          <circle id="tmRing" cx="50" cy="50" r="42" fill="none" stroke="${T.accent}" stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="${(C*left/tm.totalSec).toFixed(1)} ${C.toFixed(1)}"/>
+        </svg>
+        <div id="tmLabel" class="g" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:25px;color:${T.accentDark};">${Math.floor(left/60)}:${pad2(left%60)}</div>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div class="g" style="font-size:20px;color:${T.ink};">${tm.running ? '집중하는 중! 💪' : '잠깐 쉬는 중 ☕'}</div>
+        <div style="font-size:12.5px;color:${T.sub};margin-top:2px;line-height:1.45;">${tm.running ? '끝날 때까지 딴 짓 안 하기!' : '준비되면 다시 눌러줘.'}</div>
+        <div style="display:flex;gap:6px;margin-top:9px;">
+          <span class="tapbtn" onclick="${tm.running?'pauseTimer()':'resumeTimer()'}" style="flex:1;text-align:center;font-size:13.5px;font-weight:800;color:#fff;background:${T.accent};border-radius:13px;padding:10px 2px;box-shadow:0 3px 0 ${T.accentDark};">${tm.running?'⏸ 잠깐':'▶ 계속'}</span>
+          <span class="tapbtn" onclick="stopTimer()" style="flex:1;text-align:center;font-size:13.5px;font-weight:800;color:${T.sub};background:#fff;border:2px solid ${T.line};border-radius:13px;padding:9px 2px;">⏹ 그만</span>
+        </div>
+      </div>
+    </div></div>`;
+}
+
 // ── 화면: 오늘 ───────────────────────────────────────────────
 function screenToday() {
   const k = todayKey(), d = new Date();
@@ -384,8 +506,81 @@ function screenToday() {
 
   return `
   <div class="g" style="font-size:15px;color:${T.sub};margin:2px 2px 0;">${d.getMonth()+1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일</div>
-  ${petCard}${stats}${progress}${items}
+  ${petCard}${stats}${timerCard()}${progress}${items}
   <div style="height:8px;"></div>`;
+}
+
+// ── 화면: 리워드샵 ───────────────────────────────────────────
+function screenShop() {
+  const own = id => ST.owned.includes(id);
+
+  const accCards = SHOP_ACC.map(a => {
+    const has = own(a.id), on = ST.equip === a.id, can = ST.points >= a.cost;
+    return `<div class="card tapbtn" onclick="${has ? `equipAcc('${a.id}')` : `buy('acc','${a.id}')`}"
+      style="padding:12px 6px;text-align:center;border:2px solid ${on?T.accent:(has?T.line:'#eee7ea')};background:${on?'linear-gradient(180deg,#fff,'+T.soft+')':'#fff'};">
+      <div style="font-size:30px;filter:${has?'none':'grayscale(0.7)'};opacity:${has?1:0.5};">${a.emoji}</div>
+      <div class="g" style="font-size:16px;color:${T.ink};margin-top:1px;">${a.name}</div>
+      <div style="font-size:11.5px;font-weight:800;margin-top:3px;color:${on?T.accentDark:(has?T.sub:(can?T.accentDark:'#c9c2c6'))};">${on?'✓ 쓰는 중':(has?'눌러서 쓰기':`⭐ ${a.cost}`)}</div>
+    </div>`;
+  }).join('');
+
+  const thCards = Object.keys(THEMES).map(id => {
+    const th = THEMES[id], has = th.cost===0 || own('th_'+id), on = ST.theme===id, can = ST.points >= th.cost;
+    return `<div class="card tapbtn" onclick="${has ? `setTheme('${id}')` : `buy('th','${id}')`}"
+      style="padding:12px 6px;text-align:center;border:2px solid ${on?T.accent:(has?T.line:'#eee7ea')};background:${th.c.bg};">
+      <div style="font-size:26px;filter:${has?'none':'grayscale(0.7)'};opacity:${has?1:0.5};">${th.emoji}</div>
+      <div class="g" style="font-size:15px;color:${th.c.ink};margin-top:1px;">${th.name}</div>
+      <div style="display:flex;gap:3px;justify-content:center;margin-top:4px;">
+        ${[th.c.accent, th.c.line, th.c.soft].map(c=>`<span style="width:11px;height:11px;border-radius:50%;background:${c};display:inline-block;border:1px solid rgba(0,0,0,0.06);"></span>`).join('')}
+      </div>
+      <div style="font-size:11.5px;font-weight:800;margin-top:4px;color:${on?th.c.accentDark:(has?th.c.sub:(can?th.c.accentDark:'#c9c2c6'))};">${on?'✓ 쓰는 중':(has?'눌러서 쓰기':`⭐ ${th.cost}`)}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="g" style="font-size:26px;color:${T.ink};margin:4px 2px 2px;">🛍️ 리워드샵</div>
+  <div style="font-size:13px;color:${T.sub};margin:0 2px 12px;line-height:1.5;">숙제하고 모은 ⭐로 말랑이를 꾸며줄 수 있어요.<br>물건을 사도 말랑이 성장은 줄지 않아요!</div>
+
+  <div class="card" style="padding:14px;border:2px solid ${T.line};margin-bottom:12px;display:flex;align-items:center;gap:14px;">
+    <div style="flex-shrink:0;">${mallang({stage:stageOf(ST.exp), mood:'happy', size:88})}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="g" style="font-size:20px;color:${T.accentDark};">지금 내 포인트</div>
+      <div class="g" style="font-size:30px;color:${T.ink};line-height:1.1;">⭐ ${ST.points}</div>
+      ${ST.equip ? `<div class="tapbtn" onclick="equipAcc(null)" style="margin-top:6px;display:inline-block;font-size:11.5px;font-weight:800;color:${T.sub};border:1.5px solid ${T.line};border-radius:10px;padding:5px 10px;">액세서리 빼기</div>` : ''}
+    </div>
+  </div>
+
+  <div class="g" style="font-size:21px;color:${T.ink};margin:0 2px 8px;">🎀 꾸미기</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px;">${accCards}</div>
+  <div class="g" style="font-size:21px;color:${T.ink};margin:0 2px 8px;">🎨 색깔 테마</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;">${thCards}</div>
+  <div style="height:8px;"></div>`;
+}
+
+function buy(kind, id) {
+  const item = kind==='acc' ? ACC(id) : THEMES[id];
+  if (!item) return;
+  const key = kind==='acc' ? id : 'th_'+id;
+  if (ST.owned.includes(key)) return;
+  if (ST.points < item.cost) {
+    tone(240,0,0.18,0.12,'sine');
+    alert(`포인트가 ${item.cost - ST.points}개 모자라요. 숙제를 더 하고 오자! 💪`);
+    return;
+  }
+  if (!confirm(`${item.emoji} ${item.name}을(를) ⭐${item.cost}에 살까요?`)) return;
+  ST.points -= item.cost;
+  ST.owned.push(key);
+  if (kind==='acc') ST.equip = id; else { ST.theme = id; applyTheme(); }
+  sfxSticker(); boom(22);
+  ST.overlay = { type:'buy', emoji:item.emoji, name:item.name };
+  save(); render();
+}
+function equipAcc(id) {
+  ST.equip = (ST.equip === id) ? null : id;   // 같은 걸 또 누르면 벗기
+  sfxCheck(); save(); render();
+}
+function setTheme(id) {
+  ST.theme = id; applyTheme(); sfxCheck(); save(); render();
 }
 
 // ── 화면: 달력(연속 기록) ────────────────────────────────────
@@ -594,7 +789,8 @@ function changePin() {
 function resetAll() {
   if (!confirm('숙제, 포인트, 말랑이, 스티커를 전부 지울까요? 되돌릴 수 없어요.')) return;
   try { localStorage.removeItem(K_STORE); } catch(e) {}
-  ST = { ...DEFAULT_STATE, tasks:[], log:{}, stickers:[], subjDone:{} };
+  ST = freshState();
+  applyTheme();
   render();
 }
 
@@ -614,6 +810,15 @@ function overlayHtml() {
       <div class="g" style="font-size:31px;color:${T.accentDark};margin-top:4px;">오늘 숙제 전부 끝!</div>
       <div style="font-size:15px;font-weight:700;color:${T.ink};margin-top:4px;">보너스 +${PT_CLEAR} 포인트 · 🔥 ${ST.streak}일 연속</div>
       <div style="font-size:13.5px;color:${T.sub};margin-top:6px;">정말 잘했어! 이제 마음껏 놀아도 좋아 🛝</div>`;
+  } else if (o.type === 'timer') {
+    inner = `<div style="display:flex;justify-content:center;">${mallang({stage:stageOf(ST.exp), mood:'excited', size:130})}</div>
+      <div class="g" style="font-size:29px;color:${T.accentDark};margin-top:4px;">${o.mins}분 집중 성공! ⏳</div>
+      <div style="font-size:15px;font-weight:700;color:${T.ink};margin-top:3px;">+${PT_TIMER} 포인트</div>
+      <div style="font-size:13.5px;color:${T.sub};margin-top:6px;line-height:1.5;">끝까지 앉아 있었구나. 대단해!<br>잠깐 물 마시고 와도 좋아 💧</div>`;
+  } else if (o.type === 'buy') {
+    inner = `<div style="font-size:52px;">${o.emoji}</div>
+      <div class="g" style="font-size:29px;color:${T.accentDark};margin-top:4px;">${h(o.name)} 샀다!</div>
+      <div style="font-size:13.5px;color:${T.sub};margin-top:6px;line-height:1.5;">말랑이가 아주 좋아해요.<br>남은 포인트: ⭐ ${ST.points}</div>`;
   } else {
     const got = (o.ids||[]).map(id => STICKERS.find(s => s.id===id)).filter(Boolean);
     inner = `<div style="font-size:46px;">${got.map(s=>s.emoji).join(' ')}</div>
@@ -638,13 +843,14 @@ function closeOverlay() {
 }
 
 // ── 셸 & 렌더 ────────────────────────────────────────────────
-const TABS = [['today','🏠','오늘'],['week','🔥','기록'],['sticker','🎟️','스티커'],['parent','🔒','어른']];
+const TABS = [['today','🏠','오늘'],['week','🔥','기록'],['sticker','🎟️','스티커'],['shop','🛍️','상점'],['parent','🔒','어른']];
 
 function render() {
   syncStreak();
   const body = ST.screen==='today' ? screenToday()
              : ST.screen==='week'  ? screenWeek()
              : ST.screen==='sticker' ? screenSticker()
+             : ST.screen==='shop'  ? screenShop()
              : screenParent();
 
   const nav = TABS.map(([id,e,l]) => {
