@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>말랑이 숙제 친구</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; height:100%; overscroll-behavior:none; }
+body { font-family:'Noto Sans KR',sans-serif; user-select:none; -webkit-user-select:none; background:#fff6fa; }
+button, input, select { font-family:inherit; }
+::-webkit-scrollbar { width:0; height:0; }
+
+@keyframes blobBob   { 0%,100%{transform:translateY(0) rotate(0deg)}   50%{transform:translateY(-5px) rotate(1deg)} }
+@keyframes blobHappy { 0%,100%{transform:translateY(0) scale(1,1)}     45%{transform:translateY(-12px) scale(0.97,1.04)} }
+@keyframes blobEgg   { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+@keyframes tapPop    { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
+@keyframes popIn     { 0%{transform:scale(0.5); opacity:0} 65%{transform:scale(1.1)} 100%{transform:scale(1); opacity:1} }
+@keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0deg); opacity:1} 100%{transform:translateY(105vh) rotate(520deg); opacity:0} }
+@keyframes floatUp   { 0%{transform:translateY(0) scale(0.8); opacity:0} 25%{opacity:1; transform:scale(1.1)} 100%{transform:translateY(-70px) scale(1); opacity:0} }
+@keyframes sparkle   { 0%,100%{opacity:.3; transform:scale(.8)} 50%{opacity:1; transform:scale(1.2)} }
+@keyframes shine     { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+.tapbtn { cursor:pointer; }
+.tapbtn:active { animation: tapPop 0.25s ease; }
+.card { background:#fff; border-radius:24px; box-shadow:0 3px 0 rgba(224,96,142,0.13); }
+.g { font-family:'Gaegu',cursive; font-weight:700; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="fx" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:90;"></div>
+<script>
+// ─────────────────────────────────────────────────────────────
+//  말랑이 숙제 친구 — 단일 파일 앱 (빌드 없음 / 서버 없음)
+//  아이 화면: 오늘 숙제 체크 → 포인트 → 말랑이 성장 → 스티커 & 연속일
+//  보호자 화면: PIN 잠금, 반복 숙제(요일 지정) + 하루짜리 숙제 등록
+// ─────────────────────────────────────────────────────────────
+
+// ── 테마 (파스텔 + 둥근 모양) ────────────────────────────────
+const T = {
+  bg:'#fff6fa', bg2:'#f1f7ff', card:'#ffffff',
+  ink:'#4a3b45', sub:'#9b8b95', line:'#ffdcea', soft:'#fff0f6',
+  accent:'#ff8fb8', accentDark:'#e0608e'
+};
+// 과목별 색/이모지. 보호자가 새 과목을 만들면 '기타' 색을 쓴다.
+const SUBJECTS = {
+  '수학학원': { color:'#7fb0ff', soft:'#eaf2ff', emoji:'➗' },
+  '한우리':   { color:'#f0a94a', soft:'#fff4e4', emoji:'📖' },
+  '학교숙제': { color:'#6fc98a', soft:'#eafaf0', emoji:'🏫' },
+  '기타':     { color:'#c58cf0', soft:'#f6ecff', emoji:'✨' }
+};
+const SUBJ = k => SUBJECTS[k] || SUBJECTS['기타'];
+const DAYS = ['일','월','화','수','목','금','토'];
+
+// ── 말랑이 성장 단계 ─────────────────────────────────────────
+//  exp = 지금까지 모은 총 포인트. 단계가 오르면 축하 오버레이가 뜬다.
+const STAGES = [
+  { name:'알',        need:0,   size:0.72, body:'#ffe8f0' },
+  { name:'아기 말랑이', need:40,  size:0.82, body:'#ffd4e4' },
+  { name:'말랑이',     need:150, size:0.95, body:'#ffc0d8' },
+  { name:'큰 말랑이',  need:400, size:1.05, body:'#ffb3d9' },
+  { name:'반짝 말랑이', need:800, size:1.15, body:'#f5b0ff' }
+];
+const stageOf = exp => { let i=0; for(let k=0;k<STAGES.length;k++) if(exp>=STAGES[k].need) i=k; return i; };
+
+// ── 스티커 도감 ──────────────────────────────────────────────
+//  cond(ST) 가 참이 되는 순간 자동으로 획득한다.
+const STICKERS = [
+  { id:'first',  emoji:'🌱', name:'첫 걸음',    desc:'숙제 1개 완료',        cond:s=>s.totalDone>=1 },
+  { id:'five',   emoji:'🍀', name:'다섯 개!',   desc:'숙제 5개 완료',        cond:s=>s.totalDone>=5 },
+  { id:'twenty', emoji:'🌻', name:'스무 개!',   desc:'숙제 20개 완료',       cond:s=>s.totalDone>=20 },
+  { id:'fifty',  emoji:'🌈', name:'쉰 개!',     desc:'숙제 50개 완료',       cond:s=>s.totalDone>=50 },
+  { id:'clear1', emoji:'⭐', name:'올클리어',   desc:'하루 숙제 전부 끝내기', cond:s=>s.clearDays>=1 },
+  { id:'clear5', emoji:'🏅', name:'올클리어 5', desc:'전부 끝낸 날 5일',      cond:s=>s.clearDays>=5 },
+  { id:'st3',    emoji:'🔥', name:'3일 연속',   desc:'3일 연속 올클리어',     cond:s=>s.bestStreak>=3 },
+  { id:'st7',    emoji:'💎', name:'일주일 연속', desc:'7일 연속 올클리어',    cond:s=>s.bestStreak>=7 },
+  { id:'math',   emoji:'➗', name:'수학 척척',  desc:'수학학원 숙제 10개',    cond:s=>(s.subjDone['수학학원']||0)>=10 },
+  { id:'hanuri', emoji:'📖', name:'한우리 박사', desc:'한우리 숙제 10개',      cond:s=>(s.subjDone['한우리']||0)>=10 },
+  { id:'school', emoji:'🏫', name:'학교 성실',  desc:'학교숙제 10개',        cond:s=>(s.subjDone['학교숙제']||0)>=10 },
+  { id:'grow',   emoji:'🥚', name:'부화 성공',  desc:'말랑이가 알에서 깨어남', cond:s=>stageOf(s.exp)>=1 }
+];
+
+// ── 상태 ─────────────────────────────────────────────────────
+const K_STORE = 'hw-v1-state';
+const DEFAULT_STATE = {
+  // 숙제 목록 — 보호자가 등록한다.
+  //  반복: { id, subject, title, days:[2,4] }        → 그 요일마다 매주 나타남
+  //  하루: { id, subject, title, days:[], date:'YYYY-MM-DD' } → 그 날에만 나타남
+  tasks: [],
+  _seq: 1,
+  log: {},            // 'YYYY-MM-DD' → { done:[taskId...], clear:true }
+  points: 0,          // 지금 가진 포인트 (= 총 획득량, 쓰는 곳은 아직 없음)
+  exp: 0,             // 말랑이 경험치 (포인트와 같이 오름)
+  petName: '말랑이',
+  stickers: [],       // 획득한 스티커 id
+  streak: 0, bestStreak: 0, streakDate: null,
+  totalDone: 0, clearDays: 0, subjDone: {},
+  pin: '1234',
+  sound: true,
+  screen: 'today',
+  overlay: null,      // {type:'stage'|'clear'|'sticker', ...}
+  parentUnlocked: false,
+  weekOffset: 0,
+  draft: null         // 보호자 화면에서 작성 중인 숙제
+};
+let ST = { ...DEFAULT_STATE };
+
+function save() {
+  try {
+    const { screen, overlay, parentUnlocked, weekOffset, draft, ...persist } = ST;
+    localStorage.setItem(K_STORE, JSON.stringify(persist));
+  } catch(e) {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(K_STORE);
+    ST = raw ? { ...DEFAULT_STATE, ...JSON.parse(raw) } : { ...DEFAULT_STATE };
+  } catch(e) { ST = { ...DEFAULT_STATE }; }
+  ST.screen='today'; ST.overlay=null; ST.parentUnlocked=false; ST.weekOffset=0; ST.draft=null;
+}
+
+// ── 유틸 ─────────────────────────────────────────────────────
+const h = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad2 = n => String(n).padStart(2,'0');
+const keyOf = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const todayKey = () => keyOf(new Date());
+function dateFromKey(k){ const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d); }
+function addDays(k, n){ const d=dateFromKey(k); d.setDate(d.getDate()+n); return keyOf(d); }
+
+// 그 날짜에 해야 하는 숙제 목록
+function tasksOn(dateKey) {
+  const dow = dateFromKey(dateKey).getDay();
+  return ST.tasks.filter(t => (t.days && t.days.length) ? t.days.includes(dow) : t.date === dateKey);
+}
+const dayLog = k => ST.log[k] || { done:[], clear:false };
+const isDone = (k, id) => dayLog(k).done.includes(id);
+
+// ── 소리 (WebAudio — 파일 없음) ──────────────────────────────
+let AC = null;
+function tone(freq, start, dur, vol, type) {
+  if (!ST.sound) return;
+  try {
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const o = AC.createOscillator(), g = AC.createGain(), t0 = AC.currentTime + start;
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol||0.18, t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0+dur+0.05);
+  } catch(e) {}
+}
+const sfxCheck  = () => { tone(880,0,0.14,0.16,'triangle'); tone(1318.5,0.09,0.20,0.14,'triangle'); };
+const sfxClear  = () => [523.3,659.3,784,1046.5].forEach((f,i)=>tone(f,i*0.11,0.34,0.16,'triangle'));
+const sfxStage  = () => [392,523.3,659.3,784,1046.5,1318.5].forEach((f,i)=>tone(f,i*0.09,0.4,0.15,'sine'));
+const sfxSticker= () => { tone(1046.5,0,0.12,0.14,'sine'); tone(1567.9,0.1,0.25,0.12,'sine'); };
+const sfxUndo   = () => tone(330,0,0.12,0.10,'sine');
+
+// ── 이펙트 ───────────────────────────────────────────────────
+const CONFETTI = ['🌸','⭐','💖','🎉','🍬','✨','🧁','🌟'];
+function boom(n) {
+  const fx = document.getElementById('fx');
+  for (let i=0;i<(n||26);i++) {
+    const s = document.createElement('div');
+    s.textContent = CONFETTI[Math.floor(Math.random()*CONFETTI.length)];
+    const dur = 1.5 + Math.random()*1.3;
+    s.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-6vh;font-size:${16+Math.random()*18}px;animation:confettiFall ${dur}s linear forwards;animation-delay:${Math.random()*0.4}s;`;
+    fx.appendChild(s);
+    setTimeout(()=>s.remove(), (dur+0.6)*1000);
+  }
+}
+function popText(txt) {
+  const fx = document.getElementById('fx');
+  const s = document.createElement('div');
+  s.textContent = txt;
+  s.style.cssText = `position:absolute;left:50%;top:38%;transform:translateX(-50%);font-family:'Gaegu',cursive;font-weight:700;font-size:34px;color:${T.accentDark};text-shadow:0 2px 0 #fff;animation:floatUp 1.3s ease-out forwards;`;
+  fx.appendChild(s);
+  setTimeout(()=>s.remove(), 1400);
+}
+
+// ── 말랑이 그림 (파라메트릭 SVG) ─────────────────────────────
+//  stage: 0=알, 1~4 = 자란 모습. mood: 'happy'|'excited'|'calm'|'sleepy'
+function mallang({ stage=1, mood='calm', size=140 }) {
+  const S = STAGES[stage] || STAGES[1];
+  const body = S.body, ink = '#5c3a4a';
+  const dark = c => { const x=c.replace('#',''); const r=parseInt(x.slice(0,2),16),g=parseInt(x.slice(2,4),16),b=parseInt(x.slice(4,6),16);
+    const f=v=>Math.max(0,Math.round(v*0.82)).toString(16).padStart(2,'0'); return '#'+f(r)+f(g)+f(b); };
+
+  if (stage === 0) { // 알 — 아직 안 깨어남
+    return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" style="animation:blobEgg 3s ease-in-out infinite;transform-origin:50% 90%;overflow:visible;">
+      <ellipse cx="50" cy="92" rx="26" ry="5" fill="#000" opacity="0.06"/>
+      <path d="M50 16 C 72 16 84 46 84 62 C 84 80 69 90 50 90 C 31 90 16 80 16 62 C 16 46 28 16 50 16 Z" fill="#fff2f7" stroke="${T.line}" stroke-width="3"/>
+      <path d="M27 58 L38 52 L36 62 L47 56 L45 66 L57 60 L55 70 L67 63" fill="none" stroke="#f3c6da" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="38" cy="40" r="3.4" fill="#ffdcea"/><circle cx="60" cy="34" r="2.4" fill="#ffdcea"/>
+      <text x="78" y="26" font-size="15" style="animation:sparkle 1.8s ease-in-out infinite">✨</text>
+    </svg>`;
+  }
+
+  const anim = mood==='excited' ? 'blobHappy 0.9s ease-in-out infinite'
+             : mood==='happy'   ? 'blobBob 2.0s ease-in-out infinite'
+             : 'blobBob 3.2s ease-in-out infinite';
+  const eyes = mood==='excited'
+    ? `<path d="M32 47 Q37 39 42 47" fill="none" stroke="${ink}" stroke-width="3.4" stroke-linecap="round"/>
+       <path d="M58 47 Q63 39 68 47" fill="none" stroke="${ink}" stroke-width="3.4" stroke-linecap="round"/>`
+    : mood==='sleepy'
+    ? `<path d="M32 45 Q37 51 42 45" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>
+       <path d="M58 45 Q63 51 68 45" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>`
+    : `<ellipse cx="37" cy="45" rx="4.6" ry="5.6" fill="${ink}"/><circle cx="35.4" cy="43" r="1.7" fill="#fff"/>
+       <ellipse cx="63" cy="45" rx="4.6" ry="5.6" fill="${ink}"/><circle cx="61.4" cy="43" r="1.7" fill="#fff"/>`;
+  const mouth = mood==='excited'
+    ? `<path d="M43 56 Q50 68 57 56 Z" fill="#c8607f"/><path d="M46 60 Q50 64 54 60 Z" fill="#ff9fbe"/>`
+    : mood==='sleepy'
+    ? `<ellipse cx="50" cy="59" rx="3" ry="3.6" fill="#c8607f"/>`
+    : `<path d="M43 56 Q50 63 57 56" fill="none" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>`;
+  const crown = stage>=4 ? `<path d="M36 16 L42 24 L50 13 L58 24 L64 16 L62 27 L38 27 Z" fill="#ffd76a" stroke="#e0a92e" stroke-width="2" stroke-linejoin="round"/>` : '';
+  const extra = mood==='sleepy' ? `<text x="72" y="30" font-size="14">💤</text>`
+              : mood==='excited' ? `<text x="8" y="30" font-size="14" style="animation:sparkle 1.2s ease-in-out infinite">✨</text><text x="76" y="34" font-size="12" style="animation:sparkle 1.6s ease-in-out infinite">✨</text>` : '';
+  const sc = S.size;
+
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" style="animation:${anim};transform-origin:50% 88%;overflow:visible;">
+    <ellipse cx="50" cy="93" rx="${26*sc}" ry="5" fill="#000" opacity="0.07"/>
+    <g transform="translate(50 88) scale(${sc}) translate(-50 -88)">
+      ${crown}
+      <path d="M33 30 Q30 14 38 12 Q44 16 43 30 Z" fill="${body}" stroke="${dark(body)}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M67 30 Q70 14 62 12 Q56 16 57 30 Z" fill="${body}" stroke="${dark(body)}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M50 22 C 74 22 86 44 86 62 C 86 80 70 88 50 88 C 30 88 14 80 14 62 C 14 44 26 22 50 22 Z" fill="${body}" stroke="${dark(body)}" stroke-width="2.6"/>
+      <ellipse cx="24" cy="58" rx="7" ry="5" fill="#ff9fbe" opacity="0.5"/>
+      <ellipse cx="76" cy="58" rx="7" ry="5" fill="#ff9fbe" opacity="0.5"/>
+      ${eyes}${mouth}
+      <circle cx="50" cy="52" r="2" fill="${ink}" opacity="0.55"/>
+      ${extra}
+    </g>
+  </svg>`;
+}
+
+// ── 완료 처리 ───────────────────────────────────────────────
+const PT_TASK = 10, PT_CLEAR = 30;
+
+function toggleTask(id) {
+  const k = todayKey();
+  const lg = ST.log[k] ? ST.log[k] : (ST.log[k] = { done:[], clear:false });
+  const task = ST.tasks.find(t => t.id === id);
+  if (!task) return;
+
+  if (lg.done.includes(id)) {                       // 실수로 눌렀을 때 되돌리기
+    lg.done = lg.done.filter(x => x !== id);
+    ST.points = Math.max(0, ST.points - PT_TASK);
+    ST.exp    = Math.max(0, ST.exp - PT_TASK);
+    ST.totalDone = Math.max(0, ST.totalDone - 1);
+    ST.subjDone[task.subject] = Math.max(0, (ST.subjDone[task.subject]||0) - 1);
+    if (lg.clear) {
+      lg.clear = false;
+      ST.clearDays = Math.max(0, ST.clearDays-1);
+      ST.points = Math.max(0, ST.points-PT_CLEAR); ST.exp = Math.max(0, ST.exp-PT_CLEAR);
+      if (ST.streakDate === k) {                    // 오늘치 연속 기록도 함께 되돌린다
+        ST.streak = Math.max(0, ST.streak-1);
+        ST.streakDate = ST.streak > 0 ? addDays(k,-1) : null;
+      }
+    }
+    sfxUndo(); save(); render(); return;
+  }
+
+  const before = stageOf(ST.exp);
+  lg.done.push(id);
+  ST.points += PT_TASK; ST.exp += PT_TASK;
+  ST.totalDone += 1;
+  ST.subjDone[task.subject] = (ST.subjDone[task.subject]||0) + 1;
+  sfxCheck(); boom(14); popText('+' + PT_TASK);
+
+  // 오늘 것을 전부 끝냈나?
+  const all = tasksOn(k);
+  const cleared = all.length > 0 && all.every(t => lg.done.includes(t.id));
+  if (cleared && !lg.clear) {
+    lg.clear = true;
+    ST.clearDays += 1;
+    ST.points += PT_CLEAR; ST.exp += PT_CLEAR;
+    bumpStreak(k);
+  }
+
+  const after = stageOf(ST.exp);
+  const newStickers = checkStickers();
+
+  if (after > before)      ST.overlay = { type:'stage', stage:after, next:newStickers };
+  else if (cleared)        ST.overlay = { type:'clear', next:newStickers };
+  else if (newStickers.length) ST.overlay = { type:'sticker', ids:newStickers };
+
+  if (ST.overlay && ST.overlay.type==='stage')   { sfxStage(); boom(60); }
+  else if (ST.overlay && ST.overlay.type==='clear') { sfxClear(); boom(50); }
+  else if (ST.overlay) sfxSticker();
+
+  save(); render();
+}
+
+function bumpStreak(k) {
+  ST.streak = (ST.streakDate === addDays(k,-1)) ? ST.streak + 1 : 1;
+  ST.streakDate = k;
+  ST.bestStreak = Math.max(ST.bestStreak, ST.streak);
+}
+// 하루라도 건너뛰면 연속 기록은 끊긴다 (오늘/어제까지만 살아있음)
+function syncStreak() {
+  const k = todayKey();
+  if (ST.streakDate && ST.streakDate !== k && ST.streakDate !== addDays(k,-1)) ST.streak = 0;
+}
+function checkStickers() {
+  const got = [];
+  STICKERS.forEach(s => { if (!ST.stickers.includes(s.id) && s.cond(ST)) { ST.stickers.push(s.id); got.push(s.id); } });
+  return got;
+}
+
+// ── 화면: 오늘 ───────────────────────────────────────────────
+function screenToday() {
+  const k = todayKey(), d = new Date();
+  const list = tasksOn(k), lg = dayLog(k);
+  const doneN = list.filter(t => lg.done.includes(t.id)).length;
+  const pct = list.length ? Math.round(doneN/list.length*100) : 0;
+  const st = stageOf(ST.exp);
+  const mood = list.length===0 ? 'sleepy' : (doneN===list.length ? 'excited' : (doneN>0 ? 'happy' : 'calm'));
+  const nextStage = STAGES[st+1];
+  const toNext = nextStage ? nextStage.need - ST.exp : 0;
+
+  const say = list.length===0 ? '오늘은 숙제가 없는 날! 푹 쉬자 💤'
+            : doneN===0       ? '오늘도 같이 해보자! 하나만 먼저 골라볼까?'
+            : doneN===list.length ? '우와아! 오늘 숙제 전부 끝! 최고야 🎉'
+            : `${list.length-doneN}개만 더 하면 끝이야. 할 수 있어!`;
+
+  const petCard = `
+  <div class="card" style="padding:16px 18px 14px;margin-bottom:14px;background:linear-gradient(180deg,#fff,${T.soft});border:2px solid ${T.line};">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="flex-shrink:0;">${mallang({stage:st, mood, size:104})}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">
+          <div class="g" style="font-size:23px;color:${T.accentDark};line-height:1.15;">${h(ST.petName)}</div>
+          <div style="font-size:11.5px;font-weight:800;color:${T.accentDark};background:${T.soft};border:1.5px solid ${T.line};border-radius:999px;padding:2px 9px;white-space:nowrap;">${h(STAGES[st].name)}</div>
+        </div>
+        <div style="font-size:14px;color:${T.ink};line-height:1.45;margin-top:2px;">${say}</div>
+        <div style="margin-top:8px;height:12px;background:#fff;border:1.5px solid ${T.line};border-radius:999px;overflow:hidden;">
+          <div style="height:100%;width:${nextStage ? Math.min(100, Math.round((ST.exp-STAGES[st].need)/(nextStage.need-STAGES[st].need)*100)) : 100}%;background:linear-gradient(90deg,${T.accent},#ffc46b);border-radius:999px;transition:width .5s;"></div>
+        </div>
+        <div style="font-size:12px;color:${T.sub};margin-top:4px;">${nextStage ? `다음 단계까지 ${toNext}포인트!` : '마지막 단계까지 다 키웠어요! 👑'}</div>
+      </div>
+    </div>
+  </div>`;
+
+  const stats = `
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    ${[['⭐', ST.points, '포인트'], ['🔥', ST.streak, '일 연속'], ['🎟️', `${ST.stickers.length}/${STICKERS.length}`, '스티커']]
+      .map(([e,v,l]) => `<div class="card" style="flex:1;text-align:center;padding:10px 4px;border:2px solid ${T.line};">
+        <div style="font-size:19px;">${e}</div>
+        <div class="g" style="font-size:22px;color:${T.accentDark};line-height:1.1;">${h(v)}</div>
+        <div style="font-size:11px;color:${T.sub};">${l}</div></div>`).join('')}
+  </div>`;
+
+  const progress = list.length ? `
+  <div style="margin:0 2px 10px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
+      <div class="g" style="font-size:22px;color:${T.ink};">📚 오늘의 숙제</div>
+      <div style="font-size:13px;font-weight:700;color:${T.sub};">${doneN} / ${list.length}</div>
+    </div>
+    <div style="height:14px;background:#fff;border:2px solid ${T.line};border-radius:999px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,${T.accent},#ffd08a);transition:width .45s;"></div>
+    </div>
+  </div>` : '';
+
+  const items = list.length ? list.map(t => {
+    const done = lg.done.includes(t.id);
+    const s = SUBJ(t.subject);
+    return `<div class="card tapbtn" onclick="toggleTask('${t.id}')" style="display:flex;align-items:center;gap:12px;padding:14px 15px;margin-bottom:9px;border:2px solid ${done ? '#e6e2e4' : s.color};background:${done ? '#f7f5f6' : '#fff'};">
+      <div style="width:34px;height:34px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;background:${done ? '#ebe7e9' : s.soft};">${done ? '✅' : (t.emoji || s.emoji)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11.5px;font-weight:800;color:${done ? '#b3adb0' : s.color};letter-spacing:0.02em;">${h(t.subject)}</div>
+        <div style="font-size:16px;font-weight:700;color:${done ? '#b3adb0' : T.ink};text-decoration:${done ? 'line-through' : 'none'};word-break:keep-all;line-height:1.35;">${h(t.title)}</div>
+      </div>
+      <div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;border:2.5px solid ${done ? '#cfc9cc' : s.color};background:${done ? '#cfc9cc' : '#fff'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:900;">${done ? '✓' : ''}</div>
+    </div>`;
+  }).join('') : `
+    <div class="card" style="padding:30px 20px;text-align:center;border:2px dashed ${T.line};">
+      <div style="font-size:38px;">🌤️</div>
+      <div class="g" style="font-size:23px;color:${T.ink};margin-top:6px;">오늘은 숙제가 없어요</div>
+      <div style="font-size:13.5px;color:${T.sub};margin-top:4px;line-height:1.5;">숙제는 보호자가 <b>🔒 어른</b> 탭에서 넣어줄 수 있어요.</div>
+    </div>`;
+
+  return `
+  <div class="g" style="font-size:15px;color:${T.sub};margin:2px 2px 0;">${d.getMonth()+1}월 ${d.getDate()}일 ${DAYS[d.getDay()]}요일</div>
+  ${petCard}${stats}${progress}${items}
+  <div style="height:8px;"></div>`;
+}
+
+// ── 화면: 달력(연속 기록) ────────────────────────────────────
+function screenWeek() {
+  const today = todayKey();
+  const base = dateFromKey(today);
+  base.setDate(base.getDate() - base.getDay() + ST.weekOffset*7);   // 이번 주 일요일
+
+  let cells = '';
+  for (let i=0;i<7;i++) {
+    const dk = keyOf(new Date(base.getFullYear(), base.getMonth(), base.getDate()+i));
+    const lg = dayLog(dk), list = tasksOn(dk);
+    const isToday = dk === today;
+    const future = dk > today;
+    const mark = lg.clear ? '🔥' : (list.length===0 ? '💤' : (lg.done.length ? '🌱' : (future ? '·' : '💧')));
+    cells += `<div style="flex:1;text-align:center;padding:9px 2px 10px;border-radius:16px;background:${isToday ? T.soft : '#fff'};border:2px solid ${isToday ? T.accent : T.line};">
+      <div style="font-size:11.5px;font-weight:800;color:${i===0?'#f08a8a':i===6?'#7fb0ff':T.sub};">${DAYS[i]}</div>
+      <div style="font-size:13px;font-weight:700;color:${T.ink};margin-top:1px;">${dateFromKey(dk).getDate()}</div>
+      <div style="font-size:19px;margin-top:3px;line-height:1;">${mark}</div>
+      <div style="font-size:10.5px;color:${T.sub};margin-top:3px;">${list.length ? `${lg.done.length}/${list.length}` : '-'}</div>
+    </div>`;
+  }
+
+  // 요일별 반복 숙제 미리보기
+  const byDay = DAYS.map((nm,i) => {
+    const ts = ST.tasks.filter(t => t.days && t.days.includes(i));
+    if (!ts.length) return '';
+    return `<div style="display:flex;gap:9px;align-items:flex-start;padding:9px 2px;border-bottom:1px dashed ${T.line};">
+      <div class="g" style="width:30px;flex-shrink:0;font-size:20px;color:${T.accentDark};">${nm}</div>
+      <div style="flex:1;display:flex;flex-wrap:wrap;gap:5px;">
+        ${ts.map(t=>{const s=SUBJ(t.subject);return `<span style="font-size:12px;font-weight:700;color:${s.color};background:${s.soft};border-radius:999px;padding:4px 10px;">${t.emoji||s.emoji} ${h(t.title)}</span>`}).join('')}
+      </div></div>`;
+  }).join('');
+
+  return `
+  <div class="g" style="font-size:26px;color:${T.ink};margin:4px 2px 12px;">🔥 나의 기록</div>
+  <div class="card" style="padding:14px 12px;border:2px solid ${T.line};margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
+      <div class="tapbtn" onclick="setState({weekOffset:${ST.weekOffset-1}})" style="padding:4px 12px;font-size:17px;color:${T.accentDark};">◀</div>
+      <div class="g" style="font-size:19px;color:${T.ink};">${ST.weekOffset===0?'이번 주':ST.weekOffset===-1?'지난 주':ST.weekOffset===1?'다음 주':`${ST.weekOffset>0?'+':''}${ST.weekOffset}주`}</div>
+      <div class="tapbtn" onclick="setState({weekOffset:${ST.weekOffset+1}})" style="padding:4px 12px;font-size:17px;color:${T.accentDark};">▶</div>
+    </div>
+    <div style="display:flex;gap:4px;">${cells}</div>
+    <div style="font-size:11px;color:${T.sub};margin-top:9px;text-align:center;line-height:1.6;">🔥 전부 끝낸 날 · 🌱 조금 한 날 · 💧 아직 · 💤 숙제 없는 날</div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    ${[['🔥',ST.streak,'지금 연속'],['🏆',ST.bestStreak,'최고 기록'],['✅',ST.totalDone,'총 숙제']]
+      .map(([e,v,l])=>`<div class="card" style="flex:1;text-align:center;padding:11px 4px;border:2px solid ${T.line};">
+        <div style="font-size:18px;">${e}</div><div class="g" style="font-size:24px;color:${T.accentDark};line-height:1.1;">${v}</div>
+        <div style="font-size:11px;color:${T.sub};">${l}</div></div>`).join('')}
+  </div>
+  ${byDay ? `<div class="card" style="padding:12px 15px 6px;border:2px solid ${T.line};">
+    <div class="g" style="font-size:20px;color:${T.ink};margin-bottom:4px;">🗓️ 매주 반복하는 숙제</div>${byDay}</div>` : ''}
+  <div style="height:8px;"></div>`;
+}
+
+// ── 화면: 스티커 ─────────────────────────────────────────────
+function screenSticker() {
+  const cards = STICKERS.map(s => {
+    const got = ST.stickers.includes(s.id);
+    return `<div class="card" style="padding:13px 8px;text-align:center;border:2px solid ${got?T.accent:'#eee7ea'};background:${got?'linear-gradient(180deg,#fff,'+T.soft+')':'#fbf9fa'};">
+      <div style="font-size:32px;filter:${got?'none':'grayscale(1)'};opacity:${got?1:0.28};">${got?s.emoji:'❔'}</div>
+      <div class="g" style="font-size:17px;color:${got?T.accentDark:'#c3bcc0'};margin-top:2px;">${got?h(s.name):'???'}</div>
+      <div style="font-size:10.5px;color:${T.sub};line-height:1.35;margin-top:2px;word-break:keep-all;">${h(s.desc)}</div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="g" style="font-size:26px;color:${T.ink};margin:4px 2px 4px;">🎟️ 스티커 모으기</div>
+  <div style="font-size:13px;color:${T.sub};margin:0 2px 12px;">${ST.stickers.length}장 모았어요 · ${STICKERS.length - ST.stickers.length}장 남았어요!</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;">${cards}</div>
+  <div style="height:8px;"></div>`;
+}
+
+// ── 화면: 보호자 ─────────────────────────────────────────────
+function screenParent() {
+  if (!ST.parentUnlocked) {
+    return `
+    <div class="g" style="font-size:26px;color:${T.ink};margin:4px 2px 12px;">🔒 어른 화면</div>
+    <div class="card" style="padding:24px 20px;text-align:center;border:2px solid ${T.line};">
+      <div style="font-size:40px;">🔐</div>
+      <div class="g" style="font-size:22px;color:${T.ink};margin-top:6px;">보호자 PIN을 입력해 주세요</div>
+      <div style="font-size:12.5px;color:${T.sub};margin-top:4px;">숙제 등록과 수정은 어른만 할 수 있어요. (처음 PIN: 1234)</div>
+      <input id="pinInput" type="password" inputmode="numeric" maxlength="8" placeholder="••••"
+        style="margin-top:14px;width:150px;text-align:center;letter-spacing:0.4em;font-size:22px;font-weight:700;color:${T.ink};border:2.5px solid ${T.line};border-radius:14px;padding:10px;outline:none;">
+      <div class="tapbtn" onclick="tryPin()" style="margin:12px auto 0;max-width:200px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:13px;border-radius:16px;box-shadow:0 4px 0 ${T.accentDark};">열기</div>
+    </div>`;
+  }
+
+  const dr = ST.draft || { subject:'수학학원', title:'', emoji:'', days:[], date: todayKey(), repeat:true };
+  const subjChips = Object.keys(SUBJECTS).map(nm => {
+    const s = SUBJECTS[nm], on = dr.subject === nm;
+    return `<span class="tapbtn" onclick="draft({subject:'${nm}'})" style="font-size:13px;font-weight:800;padding:8px 13px;border-radius:999px;border:2px solid ${on?s.color:T.line};background:${on?s.soft:'#fff'};color:${on?s.color:T.sub};">${s.emoji} ${nm}</span>`;
+  }).join('');
+  const dayChips = DAYS.map((nm,i) => {
+    const on = dr.days.includes(i);
+    return `<span class="tapbtn" onclick="toggleDay(${i})" style="width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:14px;font-weight:800;border:2px solid ${on?T.accent:T.line};background:${on?T.accent:'#fff'};color:${on?'#fff':T.sub};">${nm}</span>`;
+  }).join('');
+
+  const rows = ST.tasks.length ? ST.tasks.map(t => {
+    const s = SUBJ(t.subject);
+    const when = (t.days && t.days.length) ? '매주 ' + t.days.slice().sort().map(i=>DAYS[i]).join('·') : (t.date === todayKey() ? '오늘만' : t.date + ' 하루');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px dashed ${T.line};">
+      <div style="width:30px;height:30px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:${s.soft};font-size:16px;">${t.emoji||s.emoji}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:${T.ink};word-break:keep-all;">${h(t.title)}</div>
+        <div style="font-size:11.5px;color:${s.color};font-weight:700;">${h(t.subject)} · ${h(when)}</div>
+      </div>
+      <div class="tapbtn" onclick="removeTask('${t.id}')" style="flex-shrink:0;font-size:12px;font-weight:800;color:#e07a7a;border:1.5px solid #f5cfcf;background:#fff5f5;border-radius:10px;padding:6px 10px;">삭제</div>
+    </div>`;
+  }).join('') : `<div style="padding:18px 4px;text-align:center;font-size:13px;color:${T.sub};">아직 등록된 숙제가 없어요.</div>`;
+
+  return `
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 2px 12px;">
+    <div class="g" style="font-size:26px;color:${T.ink};">🔒 어른 화면</div>
+    <div class="tapbtn" onclick="setState({parentUnlocked:false,draft:null})" style="font-size:12px;font-weight:800;color:${T.sub};border:1.5px solid ${T.line};border-radius:10px;padding:6px 11px;">잠그기</div>
+  </div>
+
+  <div class="card" style="padding:15px 16px;border:2px solid ${T.line};margin-bottom:12px;">
+    <div class="g" style="font-size:21px;color:${T.accentDark};margin-bottom:9px;">➕ 숙제 등록</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${subjChips}</div>
+    <input id="dTitle" value="${h(dr.title)}" oninput="draft({title:this.value},true)" placeholder="예) 연산 문제집 3쪽"
+      style="width:100%;font-size:15.5px;font-weight:600;color:${T.ink};border:2.5px solid ${T.line};border-radius:14px;padding:11px 13px;outline:none;margin-bottom:9px;">
+    <input id="dEmoji" value="${h(dr.emoji)}" oninput="draft({emoji:this.value},true)" placeholder="이모지 (선택) 예) 📗" maxlength="4"
+      style="width:100%;font-size:15px;color:${T.ink};border:2.5px solid ${T.line};border-radius:14px;padding:10px 13px;outline:none;margin-bottom:11px;">
+
+    <div style="display:flex;gap:7px;margin-bottom:10px;">
+      ${[[true,'🔁 매주 반복'],[false,'📅 하루만']].map(([v,l])=>`<span class="tapbtn" onclick="draft({repeat:${v}})" style="flex:1;text-align:center;font-size:13.5px;font-weight:800;padding:10px;border-radius:14px;border:2px solid ${dr.repeat===v?T.accent:T.line};background:${dr.repeat===v?T.soft:'#fff'};color:${dr.repeat===v?T.accentDark:T.sub};">${l}</span>`).join('')}
+    </div>
+
+    ${dr.repeat
+      ? `<div style="font-size:12.5px;color:${T.sub};font-weight:700;margin-bottom:6px;">무슨 요일에 하나요? (여러 개 선택)</div>
+         <div style="display:flex;gap:5px;justify-content:space-between;margin-bottom:11px;">${dayChips}</div>`
+      : `<div style="font-size:12.5px;color:${T.sub};font-weight:700;margin-bottom:6px;">언제 하나요?</div>
+         <input id="dDate" type="date" value="${h(dr.date)}" onchange="draft({date:this.value},true)"
+           style="width:100%;font-size:15px;color:${T.ink};border:2.5px solid ${T.line};border-radius:14px;padding:10px 13px;outline:none;margin-bottom:11px;">`}
+
+    <div class="tapbtn" onclick="addTask()" style="text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:13px;border-radius:16px;box-shadow:0 4px 0 ${T.accentDark};">숙제 추가하기</div>
+  </div>
+
+  <div class="card" style="padding:14px 16px;border:2px solid ${T.line};margin-bottom:12px;">
+    <div class="g" style="font-size:21px;color:${T.accentDark};margin-bottom:2px;">📋 등록된 숙제 (${ST.tasks.length})</div>
+    ${rows}
+  </div>
+
+  <div class="card" style="padding:14px 16px;border:2px solid ${T.line};">
+    <div class="g" style="font-size:21px;color:${T.accentDark};margin-bottom:9px;">⚙️ 설정</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="tapbtn" onclick="renamePet()"  style="font-size:14px;font-weight:700;color:${T.ink};border:2px solid ${T.line};border-radius:13px;padding:11px 13px;">🐣 말랑이 이름 바꾸기 <span style="color:${T.sub};font-weight:600;">(지금: ${h(ST.petName)})</span></div>
+      <div class="tapbtn" onclick="toggleSound()" style="font-size:14px;font-weight:700;color:${T.ink};border:2px solid ${T.line};border-radius:13px;padding:11px 13px;">${ST.sound?'🔊 소리 켜짐':'🔇 소리 꺼짐'} — 눌러서 바꾸기</div>
+      <div class="tapbtn" onclick="changePin()" style="font-size:14px;font-weight:700;color:${T.ink};border:2px solid ${T.line};border-radius:13px;padding:11px 13px;">🔑 PIN 바꾸기</div>
+      <div class="tapbtn" onclick="resetAll()" style="font-size:14px;font-weight:700;color:#e07a7a;border:2px solid #f5cfcf;background:#fff5f5;border-radius:13px;padding:11px 13px;">🗑️ 전부 초기화</div>
+    </div>
+  </div>
+  <div style="height:8px;"></div>`;
+}
+
+// ── 보호자 화면 동작 ─────────────────────────────────────────
+function tryPin() {
+  const el = document.getElementById('pinInput');
+  if (el && el.value === String(ST.pin)) { ST.parentUnlocked = true; render(); }
+  else { alert('PIN이 달라요.'); if (el) el.value=''; }
+}
+// silent=true 면 입력 중이라 다시 그리지 않는다 (커서가 튀지 않게)
+function draft(patch, silent) {
+  ST.draft = { subject:'수학학원', title:'', emoji:'', days:[], date:todayKey(), repeat:true, ...(ST.draft||{}), ...patch };
+  if (!silent) render();
+}
+function toggleDay(i) {
+  const d = (ST.draft && ST.draft.days) ? ST.draft.days.slice() : [];
+  const k = d.indexOf(i);
+  if (k >= 0) d.splice(k,1); else d.push(i);
+  draft({ days:d });
+}
+function addTask() {
+  const d = ST.draft || {};
+  const title = (d.title || '').trim();
+  if (!title) { alert('숙제 내용을 적어 주세요.'); return; }
+  if (d.repeat !== false && !(d.days||[]).length) { alert('반복할 요일을 하나 이상 골라 주세요.'); return; }
+  ST.tasks.push({
+    id: 't' + (ST._seq++),
+    subject: d.subject || '수학학원',
+    title,
+    emoji: (d.emoji||'').trim(),
+    days: d.repeat !== false ? (d.days||[]).slice().sort() : [],
+    date: d.repeat !== false ? null : (d.date || todayKey())
+  });
+  ST.draft = { subject: d.subject, title:'', emoji:'', days: d.repeat!==false ? (d.days||[]).slice() : [], date: d.date||todayKey(), repeat: d.repeat!==false };
+  sfxSticker(); save(); render();
+}
+function removeTask(id) {
+  const t = ST.tasks.find(x => x.id === id);
+  if (!t || !confirm(`"${t.title}" 숙제를 지울까요?`)) return;
+  ST.tasks = ST.tasks.filter(x => x.id !== id);
+  save(); render();
+}
+function renamePet() {
+  const n = prompt('말랑이의 새 이름은?', ST.petName);
+  if (n && n.trim()) { ST.petName = n.trim().slice(0,10); save(); render(); }
+}
+function toggleSound() { ST.sound = !ST.sound; if (ST.sound) sfxCheck(); save(); render(); }
+function changePin() {
+  const n = prompt('새 PIN (숫자 4자리)', String(ST.pin));
+  if (n && /^\d{4,8}$/.test(n.trim())) { ST.pin = n.trim(); save(); alert('PIN을 바꿨어요.'); }
+  else if (n !== null) alert('숫자 4자리로 적어 주세요.');
+}
+function resetAll() {
+  if (!confirm('숙제, 포인트, 말랑이, 스티커를 전부 지울까요? 되돌릴 수 없어요.')) return;
+  try { localStorage.removeItem(K_STORE); } catch(e) {}
+  ST = { ...DEFAULT_STATE, tasks:[], log:{}, stickers:[], subjDone:{} };
+  render();
+}
+
+// ── 축하 오버레이 ────────────────────────────────────────────
+function overlayHtml() {
+  const o = ST.overlay;
+  if (!o) return '';
+  let inner = '';
+  if (o.type === 'stage') {
+    const S = STAGES[o.stage];
+    inner = `<div style="display:flex;justify-content:center;">${mallang({stage:o.stage, mood:'excited', size:160})}</div>
+      <div class="g" style="font-size:30px;color:${T.accentDark};margin-top:6px;">${h(ST.petName)}(이)가 자랐어요!</div>
+      <div style="font-size:16px;font-weight:700;color:${T.ink};margin-top:2px;">지금은 <b>${h(S.name)}</b> 단계 ✨</div>
+      <div style="font-size:13.5px;color:${T.sub};margin-top:6px;line-height:1.5;">네가 숙제를 해준 덕분이야.<br>고마워!</div>`;
+  } else if (o.type === 'clear') {
+    inner = `<div style="font-size:52px;">🎉</div>
+      <div class="g" style="font-size:31px;color:${T.accentDark};margin-top:4px;">오늘 숙제 전부 끝!</div>
+      <div style="font-size:15px;font-weight:700;color:${T.ink};margin-top:4px;">보너스 +${PT_CLEAR} 포인트 · 🔥 ${ST.streak}일 연속</div>
+      <div style="font-size:13.5px;color:${T.sub};margin-top:6px;">정말 잘했어! 이제 마음껏 놀아도 좋아 🛝</div>`;
+  } else {
+    const got = (o.ids||[]).map(id => STICKERS.find(s => s.id===id)).filter(Boolean);
+    inner = `<div style="font-size:46px;">${got.map(s=>s.emoji).join(' ')}</div>
+      <div class="g" style="font-size:29px;color:${T.accentDark};margin-top:4px;">새 스티커를 받았어!</div>
+      <div style="font-size:15px;font-weight:700;color:${T.ink};margin-top:3px;">${got.map(s=>h(s.name)).join(', ')}</div>`;
+  }
+  const chained = (o.type!=='sticker' && o.next && o.next.length)
+    ? `<div style="margin-top:10px;font-size:13.5px;font-weight:700;color:${T.accentDark};">＋ 새 스티커 ${o.next.map(id=>{const s=STICKERS.find(x=>x.id===id);return s?s.emoji+' '+h(s.name):''}).join(', ')}</div>` : '';
+
+  return `<div onclick="closeOverlay()" style="position:fixed;inset:0;z-index:80;background:rgba(74,59,69,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div class="card" style="max-width:330px;width:100%;padding:26px 22px;text-align:center;border:3px solid ${T.accent};animation:popIn .45s ease;">
+      ${inner}${chained}
+      <div class="tapbtn" style="margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:13px;border-radius:16px;box-shadow:0 4px 0 ${T.accentDark};">좋아! 👍</div>
+    </div></div>`;
+}
+function closeOverlay() {
+  const o = ST.overlay;
+  // 단계 상승/올클리어와 함께 딴 스티커는 이어서 한 번 더 보여준다
+  if (o && o.type !== 'sticker' && o.next && o.next.length) ST.overlay = { type:'sticker', ids:o.next };
+  else ST.overlay = null;
+  render();
+}
+
+// ── 셸 & 렌더 ────────────────────────────────────────────────
+const TABS = [['today','🏠','오늘'],['week','🔥','기록'],['sticker','🎟️','스티커'],['parent','🔒','어른']];
+
+function render() {
+  syncStreak();
+  const body = ST.screen==='today' ? screenToday()
+             : ST.screen==='week'  ? screenWeek()
+             : ST.screen==='sticker' ? screenSticker()
+             : screenParent();
+
+  const nav = TABS.map(([id,e,l]) => {
+    const on = ST.screen===id;
+    return `<div class="tapbtn" onclick="setState({screen:'${id}',draft:null})" style="flex:1;text-align:center;padding:7px 2px 3px;border-radius:16px;background:${on?T.soft:'transparent'};">
+      <div style="font-size:21px;filter:${on?'none':'grayscale(0.55)'};opacity:${on?1:0.6};">${e}</div>
+      <div style="font-size:11px;font-weight:800;color:${on?T.accentDark:T.sub};margin-top:1px;">${l}</div></div>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+  <div style="min-height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,${T.bg},${T.bg2});">
+    <div style="flex-shrink:0;padding:14px 18px 6px;display:flex;align-items:center;justify-content:space-between;">
+      <div class="g" style="font-size:25px;color:${T.accentDark};">🐣 ${h(ST.petName)} 숙제 친구</div>
+      <div style="font-size:13px;font-weight:800;color:${T.accentDark};background:#fff;border:2px solid ${T.line};border-radius:999px;padding:5px 12px;">⭐ ${ST.points}</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:6px 16px 12px;">${body}</div>
+    <div style="flex-shrink:0;display:flex;gap:4px;padding:6px 12px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:2px solid ${T.line};">${nav}</div>
+  </div>
+  ${overlayHtml()}`;
+}
+function setState(patch) { Object.assign(ST, patch); render(); }
+
+// 자정을 넘겨 앱을 켜 두었을 때도 '오늘'이 맞게 유지되도록
+let _dayWatch = todayKey();
+setInterval(() => { const k = todayKey(); if (k !== _dayWatch) { _dayWatch = k; render(); } }, 30000);
+
+load();
+render();
+</script>
+</body>
+</html>
