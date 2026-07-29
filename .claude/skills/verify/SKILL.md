@@ -1,6 +1,6 @@
 ---
 name: verify
-description: 이 리포의 단일 파일 HTML 앱(index.html, routine.html, timer.html, jump/, bunny/)을 헤드리스 Chromium으로 구동해 검증하는 방법
+description: 이 리포의 단일 파일 HTML 앱(index.html, routine.html, timer.html, pet.html, jump/, bunny/)을 헤드리스 Chromium으로 구동해 검증하는 방법
 ---
 
 # 검증 방법
@@ -30,6 +30,7 @@ await page.goto('file:///home/user/family/timer.html');
 
 - **timer.html**: 시작 🚀 → +10분 칩 → 다음 → 할 일 선택 → 시작 → `#remainBig` 카운트다운 확인 → 새로고침 후 세션 복원 확인. 시간 의존 상태(임박/완료)는 `page.evaluate`로 `ST.session.targetAt`을 조작한 뒤 `save(); lastUrg=null; render();`. `confirm`/`alert`은 `page.once('dialog', ...)`로 처리.
 - **index.html**(카피바라): 상태는 localStorage `capy-v2-state`.
+- **pet.html**(픽셀 펫): 종류 카드 클릭 → `#go` → `#nm` 입력 → `#ok` → `#cv`를 15번 클릭해 부화 → `#bFeed`/`#bPlay`/`#bWash`/`#bSleep`/`#bPoop`. 상태는 localStorage `family-pet-v1`이고 `ST`·`tick()`·`checkGrow()`가 전역이라 `page.evaluate`로 바로 조작된다. 오프라인 경과는 `ST.pet.lastTick`을 과거로 돌린 뒤 `tick()`. 스프라이트는 모든 행이 정확히 16칸이어야 하니 `SPR_BABY`/`SPR_ADULT` 행 길이를 확인할 것. 여러 탭을 동시에 열면 1초 타이머가 서로 localStorage를 덮어쓰므로 **검증은 컨텍스트 하나에 페이지 하나**로.
 - **jump/local.html**: 칩으로 플레이어 선택 → Start race → `runners` 길이·점수 확인.
 - 가로(844×390)와 세로(390×844) 두 뷰포트 모두 스크린샷.
 

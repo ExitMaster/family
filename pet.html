@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>픽셀 펫 키우기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; min-height:100%; overscroll-behavior:none; }
+body {
+  font-family:'Noto Sans KR',sans-serif; user-select:none; -webkit-user-select:none;
+  background:linear-gradient(180deg,#f3efff,#e6f0ff); color:#3b4256;
+  display:flex; justify-content:center;
+}
+#app { width:100%; max-width:520px; padding:10px 12px 26px; }
+/* 픽셀이 뭉개지지 않게. 가로 화면에선 방이 화면을 다 먹지 않도록 높이를 제한한다. */
+canvas { image-rendering:pixelated; image-rendering:crisp-edges; max-width:61vh; margin:0 auto; }
+@keyframes tapPop  { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
+@keyframes popIn   { 0%{transform:scale(0.6); opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1); opacity:1} }
+@keyframes floatUp { 0%{transform:translateY(0); opacity:0} 15%{opacity:1} 100%{transform:translateY(-26px); opacity:0} }
+@keyframes wobble  { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+.tapbtn:active { animation:tapPop 0.2s ease; }
+.pop { animation:popIn 0.25s ease; }
+::-webkit-scrollbar { width:0; height:0; }
+button { font-family:inherit; cursor:pointer; border:none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── 상수 ─────────────────────────────────────────────────────
+const K_STORE = 'family-pet-v1';
+
+const INK = '#3b4256', SUB = '#8a90a5', LINE = '#e2e5f0';
+const CARD = '#ffffff';
+
+// 스탯이 0까지 떨어지는 데 걸리는 시간(시간 단위). 하루쯤 안 봐도 완전히 망가지진 않게 넉넉히.
+const DRAIN_H = { hunger:9, happy:11, clean:14, energy:13 };
+const SLEEP_RECOVER_H = 3;          // 잘 때 기운이 0 → 100 되는 시간
+const OFFLINE_CAP_MIN = 12 * 60;    // 앱을 오래 꺼놔도 12시간치만 반영
+const POOP_EVERY_MIN = 55;          // 깨어 있을 때 이 정도마다 응가
+const POOP_MAX = 4;
+const HATCH_TAPS = 15;              // 알을 이만큼 두드리면 부화
+
+// 성장 단계 (필요한 돌봄 점수)
+const STAGES = [
+  { key:'egg',   name:'알',     need:0   },
+  { key:'baby',  name:'아기',   need:0   },
+  { key:'kid',   name:'어린이', need:80  },
+  { key:'adult', name:'어른',   need:260 }
+];
+
+const PETS = {
+  dog:    { name:'강아지', emoji:'🐶', pal:{ k:'#6b4a2a', b:'#f0b96e', s:'#d09a52', e:'#3a2a1c', m:'#3a2a1c', c:'#ffa9a9', w:'#ffffff', y:'#ffd166', p:'#ff9db1' } },
+  parrot: { name:'앵무새', emoji:'🦜', pal:{ k:'#8f3b2f', b:'#ff8f7d', s:'#4fb3f5', e:'#3a1f1a', m:'#3a1f1a', c:'#ffc2b8', w:'#ffffff', y:'#ffb03a', p:'#ffd75e' } },
+  cat:   { name:'고양이', emoji:'🐱', pal:{ k:'#5c4b8a', b:'#c3b1f5', s:'#a795e0', e:'#332a52', m:'#332a52', c:'#ffb0c8', w:'#ffffff', y:'#ffd166', p:'#ff9db1' } },
+  chick: { name:'병아리', emoji:'🐤', pal:{ k:'#a97a1f', b:'#ffdb62', s:'#f0c33c', e:'#4a3a12', m:'#4a3a12', c:'#ffb3a0', w:'#ffffff', y:'#ff9f3c', p:'#ff9db1' } },
+  dino:  { name:'공룡',   emoji:'🦕', pal:{ k:'#2f6b45', b:'#8ddc9c', s:'#69c07d', e:'#1e4630', m:'#1e4630', c:'#ffb0b0', w:'#ffffff', y:'#ffe27a', p:'#ff9db1' } }
+};
+
+// ── 픽셀 스프라이트 (한 글자 = 한 픽셀) ───────────────────────
+// k=선, b=몸, s=그림자, e=눈, m=입/코, c=볼, w=흰색, y=포인트색, p=분홍
+const SPR_W = 16;
+
+const SPR_EGG = [
+  '................',
+  '......kkkk......',
+  '.....kwwwwk.....',
+  '....kwwwwwwk....',
+  '....kwwsswwk....',
+  '...kwwwwwwwwk...',
+  '...kwwwwwwwwk...',
+  '...kwsswwsswk...',
+  '..kwwwwwwwwwwk..',
+  '..kwwwwwwwwwwk..',
+  '..kwwwwsswwwwk..',
+  '..kwwwwwwwwwwk..',
+  '..kwwwwwwwwwwk..',
+  '...kwwwwwwwwk...',
+  '....kkwwwwkk....',
+  '......kkkk......'
+];
+const PAL_EGG = { k:'#9a8464', w:'#fff8ea', s:'#ffd9a8' };
+
+const SPR_BABY = {
+  dog: [
+    '................',
+    '..kk........kk..',
+    '.kbbk......kbbk.',
+    '.kbbkkkkkkkkbbk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbbbbbbbk..',
+    '..kbcbbmmbbcbk..',
+    '...kbbbmmbbbk...',
+    '...kbbbbbbbbk...',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkbbkkkkbbkk..',
+    '...kkk....kkk...'
+  ],
+  parrot: [
+    '.......pp.......',
+    '......pppp......',
+    '..kkkkkppkkkkk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbyyyybbbk..',
+    '..kbbbbyybbbbk..',
+    '...kbbbbbbbbk...',
+    '...ksssbbbbbk...',
+    '..ksssssbbbbbk..',
+    '..kbssssbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkyykkkkyykk..',
+    '...yyy....yyy...'
+  ],
+  cat: [
+    '................',
+    '..k..........k..',
+    '.kbk........kbk.',
+    '.kbbkkkkkkkkbbk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbbbbbbbk..',
+    '.wkbcbbmmbbcbkw.',
+    '...kbbbmmbbbk...',
+    '...kbbbbbbbbk...',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkbbkkkkbbkk..',
+    '...kkk....kkk...'
+  ],
+  chick: [
+    '.......kk.......',
+    '......kbbk......',
+    '......kbbk......',
+    '..kkkkkbbkkkkk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbyybbbbk..',
+    '..kbcbbyybbcbk..',
+    '...kbbbbbbbbk...',
+    '...kbbbbbbbbk...',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkyykkkkyykk..',
+    '...yyy....yyy...'
+  ],
+  dino: [
+    '................',
+    '....y..y..y.....',
+    '....y..y..y.....',
+    '..kkkkkkkkkkkk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbbbbbbbk..',
+    '..kbcbbmmbbcbk..',
+    '...kbbbmmbbbk...',
+    '...kbbbbbbbbk...',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkbbkkkkbbkk..',
+    '...kkk....kkk...'
+  ]
+};
+
+// 어른 스프라이트: 머리 + 몸통 + 팔다리라 세로로 더 길다.
+const SPR_ADULT = {
+  dog: [
+    '..kk........kk..',
+    '.kbbk......kbbk.',
+    '.kbbkkkkkkkkbbk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbbbbbbbk..',
+    '..kbcbbmmbbcbk..',
+    '...kbbbmmbbbk...',
+    '....kkkkkkkk....',
+    '.....kbbbbk.....',
+    '...kkbbbbbbkk...',
+    '.kkbbbbbbbbbbkk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkbbkkkkbbkk..',
+    '...kkk....kkk...'
+  ],
+  parrot: [
+    '.......pp.......',
+    '......pppp......',
+    '..kkkkkppkkkkk..',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbyyyybbbk..',
+    '..kbbbbyybbbbk..',
+    '...kbbbbbbbbk...',
+    '....kkkkkkkk....',
+    '.....kbbbbk.....',
+    '...kkbbbbbbkk...',
+    '.kkbssbbbbssbkk.',
+    '.kbsssbbbbsssbk.',
+    '..kbssbbbbssbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkyykkkkyykk..',
+    '...yyy....yyy...'
+  ],
+  cat: [
+    '..k..........k..',
+    '.kbk........kbk.',
+    '.kbbkkkkkkkkbbk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbbbbbbbk..',
+    '.wkbcbbmmbbcbkw.',
+    '...kbbbmmbbbk...',
+    '....kkkkkkkk....',
+    '.....kbbbbk.....',
+    '...kkbbbbbbkk...',
+    '.kkbbbbbbbbbbkk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkbbkkkkbbkk..',
+    '...kkk....kkk...'
+  ],
+  chick: [
+    '.......kk.......',
+    '......kbbk......',
+    '..kkkkkbbkkkkk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbyybbbbk..',
+    '..kbcbbyybbcbk..',
+    '...kbbbbbbbbk...',
+    '....kkkkkkkk....',
+    '.....kbbbbk.....',
+    '...kkbbbbbbkk...',
+    '.kkbbbbbbbbbbkk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkyykkkkyykk..',
+    '...yyy....yyy...'
+  ],
+  dino: [
+    '....y..y..y.....',
+    '....y..y..y.....',
+    '..kkkkkkkkkkkk..',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kbebbbbbbebk..',
+    '..kbbbbbbbbbbk..',
+    '..kbcbbmmbbcbk..',
+    '...kbbbmmbbbk...',
+    '....kkkkkkkk....',
+    '...yykbbbbkyy...',
+    '...kkbbbbbbkk...',
+    '.kkbbbbbbbbbbkk.',
+    '.kbbbbbbbbbbbbk.',
+    '..kbbbbbbbbbbk..',
+    '..kbbbbbbbbbbk..',
+    '..kkbbkkkkbbkk..',
+    '...kkk....kkk...'
+  ]
+};
+
+const SPR_POOP = [
+  '..kkk...',
+  '.kbbbk..',
+  'kbbbbbk.',
+  '.kkkkk..',
+  'kbbbbbbk',
+  'kbbbbbbk',
+  '.kkkkkk.',
+  '........'
+];
+const PAL_POOP = { k:'#5d3d22', b:'#8a5f36' };
+
+const SPR_BOWL = [
+  '.kkkkkkkkkkkk.',
+  'kwmmmmmmmmmmwk',
+  'kwwwwwwwwwwwwk',
+  '.kwwwwwwwwww k',
+  '..kkkkkkkkkk..'
+];
+const PAL_BOWL = { k:'#6b5a8a', w:'#dfe4f7', m:'#ff9f5a' };
+
+// ── 상태 ─────────────────────────────────────────────────────
+const DEFAULT_STATE = {
+  pet: null,          // { type, name, stage, exp, hunger, happy, clean, energy, sleeping, taps, poops, poopTimer, born, lastTick, careTimer }
+  album: [],          // { t, text }
+  settings: { sound:true }
+};
+
+let ST = null;
+let UI = { screen:'start', pickType:'dog', nameDraft:'', overlay:null, toast:null, toastT:0 };
+let FX = [];          // 하트·별 같은 반짝이 효과
+let bowl = 0;         // 밥그릇이 남아 있는 시간(초)
+let bubble = null;    // { text, until }
+let blinkAt = 0;
+
+function save() {
+  try { localStorage.setItem(K_STORE, JSON.stringify(ST)); } catch(e) {}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(K_STORE);
+    if (raw) {
+      const p = JSON.parse(raw);
+      ST = Object.assign({}, DEFAULT_STATE, p);
+      ST.settings = Object.assign({}, DEFAULT_STATE.settings, p.settings || {});
+      if (!Array.isArray(ST.album)) ST.album = [];
+    }
+  } catch(e) { ST = null; }
+  if (!ST) ST = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  UI.screen = ST.pet ? 'main' : 'start';
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function nowMs() { return Date.now(); }
+
+// ── 소리 (짧은 삑 소리) ──────────────────────────────────────
+let actx = null;
+function beep(freq, dur, type) {
+  if (!ST.settings.sound) return;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.06, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + (dur || 0.12));
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + (dur || 0.12));
+  } catch(e) {}
+}
+function melody(notes) { notes.forEach((n, i) => setTimeout(() => beep(n, 0.12), i * 110)); }
+
+// ── 펫 만들기 ────────────────────────────────────────────────
+function createPet(type, name) {
+  const t = nowMs();
+  ST.pet = {
+    type, name: name || PETS[type].name,
+    stage:'egg', exp:0, taps:0,
+    hunger:80, happy:80, clean:90, energy:90,
+    sleeping:false, poops:[], poopTimer:0, careTimer:0,
+    born:t, lastTick:t
+  };
+  ST.album = [{ t, text:'알을 데려왔어요 🥚' }];
+  save();
+}
+
+function albumAdd(text) {
+  ST.album.unshift({ t: nowMs(), text });
+  if (ST.album.length > 40) ST.album.length = 40;
+}
+
+// ── 시간 흐름 ────────────────────────────────────────────────
+// 앱을 꺼놔도 시간은 흐른다. 마지막으로 계산한 시각부터 지금까지를 한꺼번에 반영.
+function tick() {
+  const p = ST.pet;
+  if (!p) return;
+  const t = nowMs();
+  let mins = (t - p.lastTick) / 60000;
+  if (mins <= 0) { p.lastTick = t; return; }
+  mins = Math.min(mins, OFFLINE_CAP_MIN);
+  p.lastTick = t;
+
+  if (p.stage === 'egg') return;   // 알은 배고프지 않다
+
+  if (p.sleeping) {
+    // 자는 동안엔 배가 천천히 고프고, 기운은 쑥쑥 찬다
+    p.hunger -= mins * (100 / (DRAIN_H.hunger * 60)) * 0.4;
+    p.happy  -= mins * (100 / (DRAIN_H.happy  * 60)) * 0.3;
+    p.clean  -= mins * (100 / (DRAIN_H.clean  * 60)) * 0.3;
+    p.energy += mins * (100 / (SLEEP_RECOVER_H * 60));
+    if (p.energy >= 100) { p.energy = 100; p.sleeping = false; }
+  } else {
+    p.hunger -= mins * (100 / (DRAIN_H.hunger * 60));
+    p.happy  -= mins * (100 / (DRAIN_H.happy  * 60));
+    p.energy -= mins * (100 / (DRAIN_H.energy * 60));
+    // 응가가 쌓여 있으면 방이 더 빨리 더러워진다
+    p.clean  -= mins * (100 / (DRAIN_H.clean * 60)) * (1 + p.poops.length * 0.5);
+    // 응가
+    p.poopTimer += mins;
+    while (p.poopTimer >= POOP_EVERY_MIN) {
+      p.poopTimer -= POOP_EVERY_MIN;
+      if (p.poops.length < POOP_MAX) p.poops.push({ x: 20 + Math.random() * 260, s: Math.random() < 0.5 ? 1 : -1 });
+    }
+  }
+
+  p.hunger = clamp(p.hunger, 0, 100);
+  p.happy  = clamp(p.happy,  0, 100);
+  p.clean  = clamp(p.clean,  0, 100);
+  p.energy = clamp(p.energy, 0, 100);
+
+  // 잘 지낸 시간만큼 돌봄 점수가 쌓인다 (전부 40점 이상일 때만)
+  if (Math.min(p.hunger, p.happy, p.clean, p.energy) >= 40) {
+    p.careTimer += mins;
+    while (p.careTimer >= 3) { p.careTimer -= 3; p.exp += 1; }
+  } else {
+    p.careTimer = 0;
+  }
+
+  checkGrow();
+}
+
+function stageIndex() { return STAGES.findIndex(s => s.key === ST.pet.stage); }
+
+function checkGrow() {
+  const p = ST.pet;
+  const i = stageIndex();
+  if (i < 1) return;                      // 알은 두드려서 부화
+  const next = STAGES[i + 1];
+  if (next && p.exp >= next.need) {
+    p.stage = next.key;
+    albumAdd(`${next.name}(으)로 자랐어요! 🎉`);
+    burst('⭐', 14);
+    melody([523, 659, 784, 1046]);
+    say(`${next.name}이 됐어! 고마워 😊`, 5);
+  }
+}
+
+// ── 행동 ─────────────────────────────────────────────────────
+function canAct() {
+  const p = ST.pet;
+  if (!p || p.stage === 'egg') return false;
+  if (p.sleeping) { say('쿨쿨... 자는 중이야 💤', 3); return false; }
+  return true;
+}
+
+function feed() {
+  if (!canAct()) return;
+  const p = ST.pet;
+  if (p.hunger > 92) { say('배가 너무 불러! 🤢', 3); beep(200, 0.15); return; }
+  p.hunger = clamp(p.hunger + 26, 0, 100);
+  p.happy  = clamp(p.happy + 4, 0, 100);
+  p.clean  = clamp(p.clean - 3, 0, 100);
+  p.exp += 2;
+  bowl = 4;
+  burst('🍖', 5);
+  beep(660, 0.1); setTimeout(() => beep(880, 0.1), 90);
+  say(['냠냠! 맛있다 😋', '더 줘도 돼! 🍚', '고마워! 🥰'][Math.floor(Math.random() * 3)], 3);
+  after();
+}
+
+function play() {
+  if (!canAct()) return;
+  const p = ST.pet;
+  if (p.energy < 12) { say('너무 졸려... 재워줘 😴', 3); beep(200, 0.15); return; }
+  p.happy  = clamp(p.happy + 22, 0, 100);
+  p.energy = clamp(p.energy - 11, 0, 100);
+  p.hunger = clamp(p.hunger - 5, 0, 100);
+  p.exp += 2;
+  burst('❤️', 8);
+  melody([784, 988]);
+  say(['재밌다! 또 하자 🎾', '꺄악! 신난다 🤸', '너랑 노는 게 제일 좋아 💛'][Math.floor(Math.random() * 3)], 3);
+  after();
+}
+
+function wash() {
+  if (!canAct()) return;
+  const p = ST.pet;
+  if (p.clean > 92) { say('벌써 깨끗해! ✨', 3); beep(200, 0.15); return; }
+  p.clean = clamp(p.clean + 40, 0, 100);
+  p.happy = clamp(p.happy + 6, 0, 100);
+  p.exp += 2;
+  burst('🫧', 9);
+  melody([1046, 880, 1174]);
+  say('뽀득뽀득! 시원해 🛁', 3);
+  after();
+}
+
+function sleepToggle() {
+  const p = ST.pet;
+  if (!p || p.stage === 'egg') return;
+  p.sleeping = !p.sleeping;
+  if (p.sleeping) { say('잘 자... 💤', 3); beep(330, 0.2, 'sine'); }
+  else { p.exp += 1; say('잘 잤다! 좋은 아침 ☀️', 3); beep(880, 0.12); }
+  after();
+}
+
+function cleanPoop() {
+  const p = ST.pet;
+  if (!p || !p.poops.length) return;
+  p.poops = [];
+  p.clean = clamp(p.clean + 18, 0, 100);
+  p.happy = clamp(p.happy + 5, 0, 100);
+  p.exp += 2;
+  burst('✨', 7);
+  beep(900, 0.08); setTimeout(() => beep(1200, 0.08), 80);
+  say('방이 깨끗해졌어! 🧹', 3);
+  after();
+}
+
+function petTap() {
+  const p = ST.pet;
+  if (!p) return;
+  if (p.stage === 'egg') {
+    p.taps++;
+    burst('✨', 3);
+    beep(400 + p.taps * 20, 0.06);
+    if (p.taps >= HATCH_TAPS) {
+      p.stage = 'baby';
+      p.exp = 0;
+      albumAdd(`${p.name}이(가) 태어났어요! 🐣`);
+      burst('🎉', 18);
+      melody([523, 659, 784, 1046, 1318]);
+      say('안녕! 나 태어났어 🐣', 6);
+    }
+    after();
+    return;
+  }
+  if (p.sleeping) { say('쿨쿨... 💤', 2); return; }
+  p.happy = clamp(p.happy + 1.5, 0, 100);
+  burst('❤️', 2);
+  after(true);
+}
+
+// 행동 뒤 공통 처리
+function after(quiet) {
+  checkGrow();
+  save();
+  if (!quiet) render();
+}
+
+function say(text, sec) { bubble = { text, until: nowMs() + (sec || 3) * 1000 }; }
+
+function burst(emoji, n) {
+  for (let i = 0; i < n; i++) {
+    FX.push({
+      emoji, x: 160 + (Math.random() - 0.5) * 90, y: 150 + (Math.random() - 0.5) * 40,
+      vx: (Math.random() - 0.5) * 1.4, vy: -0.9 - Math.random() * 0.9,
+      life: 1, size: 14 + Math.random() * 10
+    });
+  }
+}
+
+// ── 기분 판단 ────────────────────────────────────────────────
+function mood() {
+  const p = ST.pet;
+  if (p.stage === 'egg') return { key:'egg', face:'🥚', text:`알을 톡톡 두드려봐! (${p.taps}/${HATCH_TAPS})` };
+  if (p.sleeping)        return { key:'sleep', face:'😴', text:'쿨쿨 자는 중이야' };
+  if (p.hunger < 20)     return { key:'hungry', face:'🍽️', text:'배가 너무 고파...' };
+  if (p.energy < 18)     return { key:'sleepy', face:'🥱', text:'너무 졸려... 재워줘' };
+  if (p.clean < 22)      return { key:'dirty', face:'😖', text:'몸이 끈적끈적해...' };
+  if (p.happy < 25)      return { key:'sad', face:'😢', text:'심심해... 놀아줘' };
+  if (Math.min(p.hunger, p.happy, p.clean, p.energy) > 70) return { key:'great', face:'😄', text:'기분이 최고야!' };
+  return { key:'ok', face:'🙂', text:'그럭저럭 괜찮아' };
+}
+
+function needsHelp() {
+  const p = ST.pet;
+  if (p.stage === 'egg' || p.sleeping) return false;
+  return p.hunger < 25 || p.happy < 25 || p.clean < 25 || p.energy < 20 || p.poops.length >= 2;
+}
+
+// ── 그리기 ───────────────────────────────────────────────────
+const CW = 320, CH = 240;
+let cv = null, cx = null;
+
+function drawSprite(rows, pal, ox, oy, px, opt) {
+  opt = opt || {};
+  for (let y = 0; y < rows.length; y++) {
+    const row = rows[y].padEnd(SPR_W, '.');
+    for (let x = 0; x < row.length; x++) {
+      const ch = row[x];
+      if (ch === '.' || ch === ' ') continue;
+      if (ch === 'e' && opt.closedEyes) {
+        // 눈 감은 모습: 가로로 짧은 선
+        cx.fillStyle = pal.k;
+        cx.fillRect(ox + (x - 0.5) * px, oy + (y + 0.35) * px, px * 2, Math.max(1, px * 0.55));
+        continue;
+      }
+      const col = pal[ch];
+      if (!col) continue;
+      cx.fillStyle = col;
+      cx.fillRect(ox + x * px, oy + y * px, px, px);
+    }
+  }
+}
+
+function isNight() { const h = new Date().getHours(); return h >= 20 || h < 6; }
+
+function drawRoom() {
+  const p = ST.pet;
+  const night = isNight() || (p && p.sleeping);
+
+  // 벽
+  const g = cx.createLinearGradient(0, 0, 0, CH);
+  if (night) { g.addColorStop(0, '#2b2f5c'); g.addColorStop(1, '#454a86'); }
+  else       { g.addColorStop(0, '#cfe6ff'); g.addColorStop(1, '#eaf3ff'); }
+  cx.fillStyle = g; cx.fillRect(0, 0, CW, CH);
+
+  // 창문
+  cx.fillStyle = night ? '#1b1f45' : '#a9d8ff';
+  cx.fillRect(28, 34, 74, 58);
+  cx.fillStyle = night ? '#3a3f78' : '#7cc0f5';
+  cx.fillRect(28, 34, 74, 6);
+  cx.fillStyle = night ? '#3a3f78' : '#cfe9ff';
+  cx.fillRect(62, 34, 5, 58);
+  cx.fillRect(28, 60, 74, 5);
+  if (night) {
+    cx.fillStyle = '#ffe9a3'; cx.fillRect(76, 44, 14, 14);   // 달
+    cx.fillStyle = '#1b1f45'; cx.fillRect(72, 42, 10, 12);
+    cx.fillStyle = '#fffbe0';
+    [[36,48],[50,72],[88,76],[42,82],[94,50]].forEach(s => cx.fillRect(s[0], s[1], 3, 3));
+  } else {
+    cx.fillStyle = '#ffe066'; cx.fillRect(80, 44, 14, 14);   // 해
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(34, 72, 22, 8); cx.fillRect(40, 66, 12, 8);
+  }
+
+  // 액자
+  cx.fillStyle = night ? '#5b5fa0' : '#f6b26b';
+  cx.fillRect(216, 40, 56, 44);
+  cx.fillStyle = night ? '#2b2f5c' : '#fff6e2';
+  cx.fillRect(222, 46, 44, 32);
+  cx.fillStyle = night ? '#8f95d8' : '#7fd48f';
+  cx.fillRect(228, 62, 32, 10);
+  cx.fillStyle = night ? '#c9cdf5' : '#ffcf5c';
+  cx.fillRect(238, 52, 10, 10);
+
+  // 바닥
+  cx.fillStyle = night ? '#5a4a6e' : '#e6c79b';
+  cx.fillRect(0, 176, CW, CH - 176);
+  cx.fillStyle = night ? '#4a3c5c' : '#d6b184';
+  for (let x = 0; x < CW; x += 32) cx.fillRect(x, 176, 2, CH - 176);
+  cx.fillStyle = night ? '#6a5a80' : '#f0d6b0';
+  cx.fillRect(0, 176, CW, 4);
+
+  // 러그
+  cx.fillStyle = night ? '#7a6a95' : '#ffd8e2';
+  cx.fillRect(96, 196, 128, 30);
+  cx.fillStyle = night ? '#8f7fab' : '#ffc0d0';
+  cx.fillRect(104, 202, 112, 18);
+}
+
+function drawPet(t) {
+  const p = ST.pet;
+  const idx = stageIndex();
+  let rows, pal, px;
+
+  if (p.stage === 'egg') {
+    rows = SPR_EGG; pal = PAL_EGG; px = 8;
+  } else {
+    pal = PETS[p.type].pal;
+    if (p.stage === 'adult') { rows = SPR_ADULT[p.type]; px = 10; }
+    else if (p.stage === 'kid') { rows = SPR_BABY[p.type]; px = 10; }
+    else { rows = SPR_BABY[p.type]; px = 7; }
+  }
+
+  const w = SPR_W * px, h = rows.length * px;
+  const ox = Math.round((CW - w) / 2);
+
+  // 통통 튀는 움직임 (잘 때는 숨쉬듯 아주 조금만)
+  let bob;
+  if (p.stage === 'egg') bob = Math.sin(t / 260) * 3 * (p.taps > 0 ? 1.6 : 1);
+  else if (p.sleeping)   bob = Math.sin(t / 900) * 1.5;
+  else                   bob = Math.abs(Math.sin(t / 420)) * -5;
+  const oy = Math.round(206 - h + bob);
+
+  // 그림자
+  cx.fillStyle = 'rgba(0,0,0,0.16)';
+  cx.fillRect(ox + 12, 202, w - 24, 6);
+
+  // 눈 깜빡임
+  if (t > blinkAt) blinkAt = t + 2200 + Math.random() * 2600;
+  const blinking = blinkAt - t < 140;
+
+  drawSprite(rows, pal, ox, oy, px, { closedEyes: p.sleeping || blinking });
+
+  // 자는 중 Z
+  if (p.sleeping) {
+    cx.font = 'bold 16px sans-serif'; cx.fillStyle = '#ffffff';
+    const zt = (t / 700) % 3;
+    for (let i = 0; i < 3; i++) {
+      const k = (zt + i) % 3;
+      cx.globalAlpha = 1 - k / 3;
+      cx.fillText('z', ox + w - 6 + k * 7, oy + 10 - k * 12);
+    }
+    cx.globalAlpha = 1;
+  }
+
+  // 도움이 필요하면 머리 위에 느낌표
+  if (needsHelp() && Math.floor(t / 500) % 2 === 0) {
+    cx.font = 'bold 22px sans-serif'; cx.fillStyle = '#ff5c72';
+    cx.fillText('!', ox + w / 2 - 4, oy - 6);
+  }
+
+  return { ox, oy, w, h };
+}
+
+function drawItems(t) {
+  const p = ST.pet;
+  // 응가
+  p.poops.forEach(q => drawSprite(SPR_POOP, PAL_POOP, Math.round(q.x), 196, 4));
+  // 밥그릇
+  if (bowl > 0) drawSprite(SPR_BOWL, PAL_BOWL, 34, 200, 5);
+}
+
+function drawFX() {
+  cx.textAlign = 'center';
+  FX.forEach(f => {
+    cx.globalAlpha = clamp(f.life, 0, 1);
+    cx.font = Math.round(f.size) + 'px sans-serif';
+    cx.fillText(f.emoji, f.x, f.y);
+  });
+  cx.globalAlpha = 1;
+  cx.textAlign = 'left';
+}
+
+function drawBubble() {
+  if (!bubble || nowMs() > bubble.until) return;
+  const text = bubble.text;
+  cx.font = 'bold 15px "Noto Sans KR", sans-serif';
+  const w = Math.min(280, cx.measureText(text).width + 24);
+  const x = Math.round((CW - w) / 2), y = 16;
+  cx.fillStyle = 'rgba(255,255,255,0.96)';
+  cx.fillRect(x, y, w, 30);
+  cx.fillStyle = '#d7dcf0';
+  cx.fillRect(x, y + 30, w, 3);
+  cx.fillStyle = 'rgba(255,255,255,0.96)';
+  cx.fillRect(CW / 2 - 6, y + 30, 12, 8);
+  cx.fillStyle = INK;
+  cx.textAlign = 'center';
+  cx.fillText(text, CW / 2, y + 20);
+  cx.textAlign = 'left';
+}
+
+let lastFrame = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (!cv || !ST.pet || UI.screen !== 'main') return;
+  const dt = Math.min(50, t - lastFrame); lastFrame = t;
+
+  drawRoom();
+  drawItems(t);
+  drawPet(t);
+
+  // 효과 업데이트
+  FX.forEach(f => { f.x += f.vx * dt / 16; f.y += f.vy * dt / 16; f.vy += 0.02 * dt / 16; f.life -= 0.012 * dt / 16; });
+  FX = FX.filter(f => f.life > 0);
+  if (FX.length > 80) FX.splice(0, FX.length - 80);
+
+  drawFX();
+  drawBubble();
+}
+
+// ── 화면 (DOM) ───────────────────────────────────────────────
+function el(html) { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
+
+function meterRow(emoji, label, val, color) {
+  const v = Math.round(val);
+  return `
+  <div style="display:flex;align-items:center;gap:8px;margin:7px 0">
+    <div style="width:22px;text-align:center;font-size:17px">${emoji}</div>
+    <div style="width:44px;font-size:13px;color:${SUB};font-weight:700">${label}</div>
+    <div style="flex:1;height:14px;background:#eef0f8;border-radius:99px;overflow:hidden">
+      <div style="height:100%;width:${v}%;background:${color};border-radius:99px;transition:width .35s ease"></div>
+    </div>
+    <div style="width:34px;text-align:right;font-size:12px;color:${SUB};font-weight:700">${v}</div>
+  </div>`;
+}
+
+function ageDays() {
+  return Math.max(0, Math.floor((nowMs() - ST.pet.born) / 86400000));
+}
+
+function growthInfo() {
+  const p = ST.pet, i = stageIndex();
+  if (p.stage === 'egg') {
+    return { pct: (p.taps / HATCH_TAPS) * 100, label:'🥚 부화',
+             text:`부화까지 ${Math.max(0, HATCH_TAPS - p.taps)}번 더!` };
+  }
+  const next = STAGES[i + 1];
+  if (!next) return { pct:100, label:'🌱 성장', text:'다 자랐어요! 최고 단계 🏆' };
+  const cur = STAGES[i].need;
+  const pct = clamp(((p.exp - cur) / (next.need - cur)) * 100, 0, 100);
+  return { pct, label:'🌱 성장', text:`${next.name}까지 ${Math.max(0, next.need - p.exp)}점 남았어요` };
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (UI.screen === 'start') { app.innerHTML = viewStart(); bindStart(); return; }
+  if (UI.screen === 'name')  { app.innerHTML = viewName();  bindName();  return; }
+  app.innerHTML = viewMain();
+  bindMain();
+}
+
+function viewStart() {
+  const cards = Object.keys(PETS).map(k => {
+    const on = UI.pickType === k;
+    return `<button class="tapbtn petcard" data-type="${k}" style="
+      flex:1;min-width:110px;background:${on ? '#fff' : '#f7f8fd'};
+      border:3px solid ${on ? '#6b7cff' : LINE};border-radius:18px;padding:14px 8px;
+      display:flex;flex-direction:column;align-items:center;gap:6px;
+      box-shadow:${on ? '0 6px 16px rgba(107,124,255,.25)' : 'none'}">
+      <div style="font-size:38px">${PETS[k].emoji}</div>
+      <div style="font-weight:800;color:${INK};font-size:15px">${PETS[k].name}</div>
+    </button>`;
+  }).join('');
+
+  return `
+  <div style="text-align:center;padding-top:18px">
+    <div style="font-family:Gaegu,sans-serif;font-size:40px;font-weight:700;color:${INK}">픽셀 펫 키우기</div>
+    <div style="color:${SUB};font-size:14px;margin-top:2px">알을 하나 고르면 시작해요 🥚</div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:22px">${cards}</div>
+  <div style="background:${CARD};border-radius:18px;padding:14px 16px;margin-top:18px;color:${SUB};font-size:13.5px;line-height:1.7">
+    🥚 알을 톡톡 두드리면 부화해요<br>
+    🍖 밥 주고 🎾 놀아주고 🛁 씻겨주면 자라요<br>
+    ⏰ 앱을 꺼도 시간은 계속 흘러요
+  </div>
+  <button id="go" class="tapbtn" style="width:100%;margin-top:18px;background:#6b7cff;color:#fff;
+    font-size:19px;font-weight:800;padding:16px;border-radius:18px;box-shadow:0 6px 0 #4b5ce0">
+    이 알로 시작하기 🚀
+  </button>`;
+}
+
+function bindStart() {
+  document.querySelectorAll('.petcard').forEach(b => {
+    b.onclick = () => { UI.pickType = b.dataset.type; beep(700, 0.07); render(); };
+  });
+  document.getElementById('go').onclick = () => { UI.screen = 'name'; UI.nameDraft = ''; beep(880, 0.1); render(); };
+}
+
+function viewName() {
+  return `
+  <div style="text-align:center;padding-top:40px">
+    <div style="font-size:70px">${PETS[UI.pickType].emoji}</div>
+    <div style="font-family:Gaegu,sans-serif;font-size:34px;font-weight:700;color:${INK};margin-top:6px">이름을 지어줄까?</div>
+    <div style="color:${SUB};font-size:14px">나중에 바꿀 수도 있어요</div>
+  </div>
+  <input id="nm" maxlength="8" placeholder="예) 콩이" value="${UI.nameDraft}" style="
+    width:100%;margin-top:22px;padding:16px;font-size:20px;text-align:center;font-family:inherit;
+    border:3px solid ${LINE};border-radius:18px;outline:none;color:${INK}">
+  <button id="ok" class="tapbtn" style="width:100%;margin-top:14px;background:#6b7cff;color:#fff;
+    font-size:19px;font-weight:800;padding:16px;border-radius:18px;box-shadow:0 6px 0 #4b5ce0">
+    좋아! 데려가기 💛
+  </button>
+  <button id="back" class="tapbtn" style="width:100%;margin-top:10px;background:#f0f2fa;color:${SUB};
+    font-size:15px;font-weight:700;padding:12px;border-radius:14px">← 다시 고르기</button>`;
+}
+
+function bindName() {
+  const inp = document.getElementById('nm');
+  inp.oninput = () => { UI.nameDraft = inp.value; };
+  inp.onkeydown = e => { if (e.key === 'Enter') document.getElementById('ok').click(); };
+  document.getElementById('ok').onclick = () => {
+    const nm = (inp.value || '').trim() || PETS[UI.pickType].name;
+    createPet(UI.pickType, nm);
+    UI.screen = 'main';
+    melody([523, 659, 784]);
+    render();
+  };
+  document.getElementById('back').onclick = () => { UI.screen = 'start'; render(); };
+  setTimeout(() => inp.focus(), 60);
+}
+
+function actionBtn(id, emoji, label, color, shadow, disabled) {
+  return `<button id="${id}" class="tapbtn" ${disabled ? 'disabled' : ''} style="
+    flex:1;min-width:74px;background:${disabled ? '#e9ebf3' : color};color:${disabled ? '#b3b8ca' : '#fff'};
+    border-radius:16px;padding:12px 6px;font-weight:800;font-size:14px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    box-shadow:${disabled ? 'none' : '0 5px 0 ' + shadow}">
+    <span style="font-size:22px">${emoji}</span>${label}</button>`;
+}
+
+function viewMain() {
+  const p = ST.pet, m = mood(), g = growthInfo();
+  const stName = STAGES[stageIndex()].name;
+  const egg = p.stage === 'egg';
+
+  const meters = egg ? '' : `
+    ${meterRow('🍖', '배고픔', p.hunger, '#ff9f5a')}
+    ${meterRow('😊', '기분',   p.happy,  '#ff7aa8')}
+    ${meterRow('⚡', '기운',   p.energy, '#5bc0ff')}
+    ${meterRow('🫧', '깨끗',   p.clean,  '#7fd48f')}`;
+
+  const actions = egg ? '' : `
+  <div style="display:flex;gap:8px;margin-top:12px">
+    ${actionBtn('bFeed', '🍖', '밥 주기', '#ff9f5a', '#e07d38', p.sleeping)}
+    ${actionBtn('bPlay', '🎾', '놀아주기', '#ff7aa8', '#e0568a', p.sleeping)}
+    ${actionBtn('bWash', '🛁', '씻기기', '#5bc0ff', '#3a9ada', p.sleeping)}
+    ${actionBtn('bSleep', p.sleeping ? '☀️' : '😴', p.sleeping ? '깨우기' : '재우기', '#9b8cff', '#7566e0', false)}
+  </div>
+  ${p.poops.length ? `<button id="bPoop" class="tapbtn" style="width:100%;margin-top:8px;background:#a9825a;color:#fff;
+      font-weight:800;font-size:15px;padding:12px;border-radius:16px;box-shadow:0 5px 0 #86653f">
+      🧹 응가 치우기 (${p.poops.length}개)</button>` : ''}`;
+
+  return `
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <div style="font-size:26px">${PETS[p.type].emoji}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-family:Gaegu,sans-serif;font-size:27px;font-weight:700;color:${INK};line-height:1.1">${escapeHtml(p.name)}</div>
+      <div style="font-size:12px;color:${SUB};font-weight:600">${stName} · 함께한 지 ${ageDays()}일 · 돌봄 ${p.exp}점</div>
+    </div>
+    <button id="bSound" class="tapbtn" style="background:#fff;border-radius:12px;width:38px;height:38px;font-size:17px">${ST.settings.sound ? '🔊' : '🔈'}</button>
+    <button id="bMenu" class="tapbtn" style="background:#fff;border-radius:12px;width:38px;height:38px;font-size:17px">📔</button>
+  </div>
+
+  <div style="background:${CARD};border-radius:20px;padding:8px;box-shadow:0 4px 14px rgba(60,70,120,.10)">
+    <canvas id="cv" width="320" height="240" style="width:100%;display:block;border-radius:14px"></canvas>
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 8px 3px">
+      <div style="font-size:20px">${m.face}</div>
+      <div style="font-size:14px;font-weight:700;color:${INK}">${m.text}</div>
+    </div>
+  </div>
+
+  ${actions}
+
+  <div style="background:${CARD};border-radius:20px;padding:12px 14px;margin-top:12px;box-shadow:0 4px 14px rgba(60,70,120,.08)">
+    ${meters}
+    <div style="margin-top:${egg ? 0 : 10}px">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:${SUB};margin-bottom:5px">
+        <span>${g.label}</span><span>${g.text}</span>
+      </div>
+      <div style="height:14px;background:#eef0f8;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${Math.round(g.pct)}%;background:linear-gradient(90deg,#8ddc9c,#5bc0ff);border-radius:99px;transition:width .35s ease"></div>
+      </div>
+    </div>
+  </div>
+
+  ${UI.overlay ? UI.overlay : ''}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function bindMain() {
+  cv = document.getElementById('cv');
+  cx = cv.getContext('2d');
+  cx.imageSmoothingEnabled = false;
+  cx.textBaseline = 'alphabetic';
+
+  cv.onclick = () => { petTap(); };
+
+  const on = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
+  on('bFeed', feed); on('bPlay', play); on('bWash', wash);
+  on('bSleep', sleepToggle); on('bPoop', cleanPoop);
+  on('bSound', () => { ST.settings.sound = !ST.settings.sound; beep(880, 0.08); save(); render(); });
+  on('bMenu', openMenu);
+
+  // 오버레이 버튼들
+  on('ovClose', () => { UI.overlay = null; render(); });
+  on('ovRename', () => {
+    const nm = prompt('새 이름은?', ST.pet.name);
+    if (nm && nm.trim()) { ST.pet.name = nm.trim().slice(0, 8); albumAdd(`이름이 "${ST.pet.name}"(으)로 바뀌었어요 ✏️`); save(); }
+    UI.overlay = null; render();
+  });
+  on('ovReset', () => {
+    if (confirm('정말 처음부터 다시 시작할까? 지금 펫과는 안녕이야 😢')) {
+      ST = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      save(); UI.overlay = null; UI.screen = 'start'; render();
+    }
+  });
+}
+
+function openMenu() {
+  const items = ST.album.map(a => {
+    const d = new Date(a.t);
+    const when = `${d.getMonth() + 1}월 ${d.getDate()}일`;
+    return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid ${LINE}">
+      <div style="width:64px;font-size:12px;color:${SUB};font-weight:700">${when}</div>
+      <div style="flex:1;font-size:14px;color:${INK}">${escapeHtml(a.text)}</div></div>`;
+  }).join('') || `<div style="color:${SUB};font-size:14px;padding:10px 0">아직 기록이 없어요</div>`;
+
+  UI.overlay = `
+  <div style="position:fixed;inset:0;background:rgba(30,34,60,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20">
+    <div class="pop" style="background:#fff;width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:18px 18px 24px;max-height:80vh;overflow:auto">
+      <div style="font-family:Gaegu,sans-serif;font-size:28px;font-weight:700;color:${INK};margin-bottom:6px">📔 성장 앨범</div>
+      ${items}
+      <button id="ovRename" class="tapbtn" style="width:100%;margin-top:14px;background:#f0f2fa;color:${INK};font-weight:800;font-size:15px;padding:13px;border-radius:14px">✏️ 이름 바꾸기</button>
+      <button id="ovReset" class="tapbtn" style="width:100%;margin-top:8px;background:#fff0f1;color:#e05566;font-weight:800;font-size:15px;padding:13px;border-radius:14px">🔄 처음부터 다시 키우기</button>
+      <button id="ovClose" class="tapbtn" style="width:100%;margin-top:8px;background:#6b7cff;color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:16px">닫기</button>
+    </div>
+  </div>`;
+  render();
+}
+
+// ── 시작 ─────────────────────────────────────────────────────
+function boot() {
+  load();
+
+  if (ST.pet) {
+    const gapMin = (nowMs() - ST.pet.lastTick) / 60000;
+    tick();
+    if (gapMin > 25 && ST.pet.stage !== 'egg') {
+      const m = mood();
+      if (m.key === 'hungry' || m.key === 'sad' || m.key === 'dirty') say('기다렸어! ' + m.text, 6);
+      else say('다시 왔구나! 반가워 🥰', 5);
+    }
+  }
+  render();
+  requestAnimationFrame(frame);
+
+  // 1초마다 상태 갱신, 화면 숫자는 5초마다 다시 그린다
+  let sec = 0;
+  setInterval(() => {
+    if (!ST.pet) return;
+    tick();
+    if (bowl > 0) bowl -= 1;
+    sec++;
+    if (sec % 5 === 0 && UI.screen === 'main' && !UI.overlay) { save(); render(); }
+  }, 1000);
+
+  // 앱을 다시 열었을 때(탭 복귀) 바로 반영
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && ST.pet) { tick(); save(); if (UI.screen === 'main') render(); }
+  });
+}
+
+boot();
+</script>
+</body>
+</html>
