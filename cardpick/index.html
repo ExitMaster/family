@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101828" />
+  <meta name="description" content="결제 직전 가장 유리한 카드와 분할결제 조합을 찾는 개인용 PWA" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>카드픽</title>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">개인용 카드 할인 도우미</p>
+      <h1>카드픽</h1>
+    </div>
+    <button id="installButton" class="icon-button hidden" type="button" aria-label="앱 설치">설치</button>
+  </header>
+
+  <main id="app" class="app-shell" aria-live="polite"></main>
+
+  <nav class="bottom-nav" aria-label="주요 메뉴">
+    <button type="button" data-route="home" class="nav-item active"><span>⌕</span><small>추천</small></button>
+    <button type="button" data-route="fixed" class="nav-item"><span>◷</span><small>고정결제</small></button>
+    <button type="button" data-route="cards" class="nav-item"><span>▣</span><small>카드</small></button>
+    <button type="button" data-route="links" class="nav-item"><span>✦</span><small>Link</small></button>
+    <button type="button" data-route="more" class="nav-item"><span>☰</span><small>기록</small></button>
+  </nav>
+
+  <dialog id="modal" class="modal"></dialog>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
