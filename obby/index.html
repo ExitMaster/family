@@ -98,6 +98,17 @@
     font-weight:bold; font-size:19px; color:#1E1B33;
   }
   #tJ.press { background:rgba(255,197,61,.85); }
+  /* killer-snail action buttons — only shown in that mode */
+  .act {
+    position:absolute; width:62px; height:62px; border-radius:50%;
+    border:4px solid rgba(30,27,51,.5); display:none;
+    align-items:center; justify-content:center; font-weight:bold; font-size:22px; color:#1E1B33;
+  }
+  #touch.war .act { display:flex; }
+  #tZ { right:118px; bottom:34px; background:rgba(255,255,255,.55); }
+  #tK { right:22px;  bottom:116px; background:rgba(255,120,120,.6); }
+  #tT { right:118px; bottom:116px; background:rgba(91,231,255,.55); }
+  .act.press { filter:brightness(1.35); }
   footer { font-size:12px; opacity:.6; text-align:center; max-width:960px; }
 
   /* phone in landscape: give the whole screen to the game */
@@ -155,9 +166,15 @@
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
         <tr><td>Phone / tablet</td><td>joystick + jump button, drag the right side to look</td></tr>
+        <tr><td colspan="2" style="padding-top:9px;color:#9BE58A"><b>🐌 In Killer Snail only</b></td></tr>
+        <tr><td>Throw salt</td><td><b>Z</b> — costs salt, aims itself at the snail</td></tr>
+        <tr><td>Swing</td><td><b>K</b> — big damage, but you must be right next to it</td></tr>
+        <tr><td>Teleport home</td><td><b>T</b> — jump straight to the safehouse (16s cooldown)</td></tr>
       </table>
       <p><b>💠 Aura orbs</b> are saved forever — spend them in the Aura Shop.<br>
-         <b>🐌 Killer Snail</b> flies through walls and never stops. Grab 🧂 salt to freeze it.<br>
+         <b>🐌 Killer Snail</b> flies through walls with a knife. You get <b>3 hearts</b> — fight back with
+         salt (<b>Z</b>) and swings (<b>K</b>), and let the <b>soldiers</b> shoot it. Hide in the
+         <b>🏠 safehouse</b> (<b>T</b>) — but the shield only lasts about 11 seconds, so you cannot camp.<br>
          <b>♾️ Infinity</b> falls forever — find the hole in each floor before the spikes above catch you.</p>
       <button class="ghost" id="btnHelpBack">⬅ Back</button>
     </div>
@@ -185,6 +202,9 @@
   <div id="touch">
     <div id="stick"><div id="knob"></div></div>
     <div id="tJ">JUMP</div>
+    <div class="act" id="tZ" title="Throw salt">🧂</div>
+    <div class="act" id="tK" title="Swing">👊</div>
+    <div class="act" id="tT" title="Teleport to safehouse">🏠</div>
   </div>
 </div>
 
@@ -316,7 +336,7 @@ const FS = `
 precision mediump float;
 varying vec3 vNrm; varying vec3 vCol; varying float vFog; varying float vY;
 uniform vec3 uTint, uFogCol, uLight;
-uniform float uFogNear, uFogFar, uGlow;
+uniform float uFogNear, uFogFar, uGlow, uAlpha;
 void main(){
   vec3 n = normalize(vNrm);
   float d = max(dot(n, normalize(uLight)), 0.0);
@@ -325,7 +345,7 @@ void main(){
   vec3 col = base * (0.55 + 0.38*d + 0.12*top);
   col = mix(col, base, uGlow);                       // glowing things ignore the light
   float f = clamp((vFog - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-  gl_FragColor = vec4(mix(col, uFogCol, f), 1.0);
+  gl_FragColor = vec4(mix(col, uFogCol, f), uAlpha);
 }`;
 
 function shader(type, src) {
@@ -347,7 +367,8 @@ if (gl) {
     uVP: gl.getUniformLocation(prog,'uVP'), uModel: gl.getUniformLocation(prog,'uModel'),
     uTint: gl.getUniformLocation(prog,'uTint'), uFogCol: gl.getUniformLocation(prog,'uFogCol'),
     uLight: gl.getUniformLocation(prog,'uLight'), uFogNear: gl.getUniformLocation(prog,'uFogNear'),
-    uFogFar: gl.getUniformLocation(prog,'uFogFar'), uGlow: gl.getUniformLocation(prog,'uGlow')
+    uFogFar: gl.getUniformLocation(prog,'uFogFar'), uGlow: gl.getUniformLocation(prog,'uGlow'),
+    uAlpha: gl.getUniformLocation(prog,'uAlpha')
   };
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
@@ -380,8 +401,26 @@ function drawMesh(m, model, col, glow) {
   gl.uniformMatrix4fv(loc.uModel, false, model);
   gl.uniform3f(loc.uTint, col[0], col[1], col[2]);
   gl.uniform1f(loc.uGlow, glow || 0);
+  gl.uniform1f(loc.uAlpha, 1);
   bindMesh(m);
   gl.drawArrays(gl.TRIANGLES, 0, m.count);
+}
+// additive pass — for see-through glowing things like the safehouse shield
+function drawGhost(m, model, col, alpha) {
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthMask(false);
+  gl.disable(gl.CULL_FACE);
+  gl.uniformMatrix4fv(loc.uModel, false, model);
+  gl.uniform3f(loc.uTint, col[0], col[1], col[2]);
+  gl.uniform1f(loc.uGlow, 1);
+  gl.uniform1f(loc.uAlpha, alpha);
+  bindMesh(m);
+  gl.drawArrays(gl.TRIANGLES, 0, m.count);
+  gl.enable(gl.CULL_FACE);
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+  gl.uniform1f(loc.uAlpha, 1);
 }
 function drawBox(cx,cy,cz, sx,sy,sz, col, ry, glow) {
   compose(MODEL, cx,cy,cz, ry||0, 0, sx,sy,sz);
@@ -483,6 +522,11 @@ const Sound = (function(){
     die:  ()=>tone(300,.35,'sawtooth',.055,70),
     check:()=>tone(700,.14,'triangle',.05,1050),
     salt: ()=>tone(1200,.16,'square',.05,500),
+    swing:()=>tone(520,.12,'sawtooth',.05,180),
+    pop:  ()=>tone(900,.07,'square',.035,1500),
+    raise:()=>tone(180,.28,'sawtooth',.045,420),
+    stab: ()=>tone(1500,.09,'square',.055,240),
+    hurt: ()=>{ tone(320,.22,'sawtooth',.07,90); },
     hit:  ()=>tone(180,.18,'square',.05,90),
     devil:()=>{ tone(150,.5,'sawtooth',.05,70); setTimeout(()=>tone(120,.6,'sawtooth',.045,60),160); },
     win:  ()=>{ tone(660,.12,'triangle',.06); setTimeout(()=>tone(880,.12,'triangle',.06),110); setTimeout(()=>tone(1180,.22,'triangle',.06),230); },
@@ -517,6 +561,11 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Space') { input.jumpPressed = true; e.preventDefault(); }
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  if (game.screen === 'play' && game.mode === 'snail') {
+    if (e.code === 'KeyZ') shootSalt();
+    else if (e.code === 'KeyK') meleeSwing();
+    else if (e.code === 'KeyT') teleportHome();
+  }
   if (e.code === 'KeyR' && game.screen === 'play') respawnOrRestart();
   else if (e.code === 'Escape' || e.code === 'KeyP') {
     if (game.screen === 'play') showScreen('pause'); else if (game.screen === 'pause') resume();
@@ -542,7 +591,7 @@ function readKeys() {
 let dragId = null, dragX = 0, dragY = 0;
 stage.addEventListener('pointerdown', e => {
   if (game.screen !== 'play') return;
-  if (e.target.id === 'knob' || e.target.id === 'stick' || e.target.id === 'tJ') return;
+  if (['knob','stick','tJ','tZ','tK','tT'].includes(e.target.id)) return;
   dragId = e.pointerId; dragX = e.clientX; dragY = e.clientY;
   stage.setPointerCapture(e.pointerId);
 });
@@ -584,6 +633,14 @@ jbtn.addEventListener('pointerdown', e => { e.preventDefault(); jbtn.classList.a
 const jUp = e => { e.preventDefault(); jbtn.classList.remove('press'); touchJump = false; };
 jbtn.addEventListener('pointerup', jUp);
 jbtn.addEventListener('pointercancel', jUp);
+// the three war buttons: salt, swing, teleport
+for (const [id, fn] of [['tZ', () => shootSalt()], ['tK', () => meleeSwing()], ['tT', () => teleportHome()]]) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.classList.add('press'); fn(); });
+  const up = e => { e.preventDefault(); el.classList.remove('press'); };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+}
 const TOUCH = matchMedia('(pointer: coarse)').matches;
 if (TOUCH) touchWrap.classList.add('on');
 
@@ -691,8 +748,10 @@ function ch_steps(b) {
 }
 function ch_zigzag(b) {
   b.plat(6, 4);
-  // offset vs width is tuned so the diagonal hop stays inside the jump arc
-  const g = 2.3 + b.d*1.1, s = 2.1;
+  // The hop is diagonal, so what matters is sqrt(gap^2 + (2*offset)^2) against the
+  // ~5.3 unit jump arc. At the old 2.1 offset the sideways move alone ate 4.2 of it
+  // and the hardest zigzag was not actually jumpable.
+  const g = 1.8 + b.d*0.9, s = 1.6;      // worst case: sqrt(2.7^2 + 3.2^2) = 4.2
   for (let i=0;i<4;i++) {
     b.gap(g);
     const x = (i%2 ? s : -s);
@@ -899,17 +958,40 @@ function buildArena() {
   for (const s of [[-1,0],[1,0],[0,-1],[0,1]]) {                               // fences
     W.solids.push(box(s[0]*H, 1.5, s[1]*H, s[0] ? 1 : H, 2.5, s[1] ? 1 : H, W.pal.side, 'plat'));
   }
+  // ---- the safehouse: walls the snail cannot pass while the shield holds ----
+  const SH = { x:0, y:0, z:0, hx:6, hz:6, wallH:4.4 };
+  const wall = '#EDE3CF', trim = '#8C7A5B';
+  const wy = SH.wallH/2, T = 0.6;
+  W.solids.push(box(SH.x, 0.2, SH.z, SH.hx, 0.4, SH.hz, '#C7B899', 'plat'));            // floor slab
+  W.solids.push(box(SH.x, wy, SH.z - SH.hx, SH.hx, wy, T, wall, 'plat'));               // back wall
+  W.solids.push(box(SH.x - SH.hx, wy, SH.z, T, wy, SH.hz, wall, 'plat'));               // left wall
+  W.solids.push(box(SH.x + SH.hx, wy, SH.z, T, wy, SH.hz, wall, 'plat'));               // right wall
+  for (const s of [-1, 1]) {                                                            // front wall + doorway
+    W.solids.push(box(SH.x + s*4.05, wy, SH.z + SH.hz, 1.95, wy, T, wall, 'plat'));
+  }
+  W.solids.push(box(SH.x, SH.wallH + 0.3, SH.z + SH.hz, 2.1, 0.3, T, trim, 'plat'));    // door lintel
+  W.solids.push(box(SH.x, SH.wallH + 0.4, SH.z, SH.hx + 0.5, 0.4, SH.hz + 0.5, trim, 'plat')); // roof
+  W.safe = { x:SH.x, y:2.4, z:SH.z, hx:SH.hx - 0.9, hy:3.2, hz:SH.hz - 0.9, wallH:SH.wallH, roofY:SH.wallH + 0.8 };
+
+  // ---- soldiers: two on the roof, two guarding the door ----
+  const roofY = SH.wallH + 0.8;
+  W.soldierPosts = [
+    { x:-4.2, y:roofY, z:-4.2 }, { x:4.2, y:roofY, z:-4.2 },
+    { x:-8.2, y:0,     z:8.2  }, { x:8.2,  y:0,    z:8.2  }
+  ];
+
   const rng = mulberry32(777);
   const spots = [];
   for (let i=0;i<26;i++) {
     const x = (rng()-0.5)*(ARENA-14), z = (rng()-0.5)*(ARENA-14);
     const h = 1.6 + rng()*5.5, w = 3.5 + rng()*4;
+    if (Math.abs(x) < SH.hx + w/2 + 3 && Math.abs(z) < SH.hz + w/2 + 3) continue;  // keep the safehouse clear
     W.solids.push(box(x, h/2, z, w/2, h/2, w/2, rng()<.5 ? W.pal.top : W.pal.side, 'plat'));
     spots.push({ x, y: h + 1.1, z });
   }
   W.orbSpots = spots;
-  W.saltSpots = [ {x:-22,y:1.2,z:-22}, {x:22,y:1.2,z:-22}, {x:-22,y:1.2,z:22}, {x:22,y:1.2,z:22}, {x:0,y:1.2,z:0} ];
-  W.spawn = { x:0, y:1.2, z:0 };
+  W.saltSpots = [ {x:-22,y:1.2,z:-22}, {x:22,y:1.2,z:-22}, {x:-22,y:1.2,z:22}, {x:22,y:1.2,z:22}, {x:-15,y:1.2,z:0} ];
+  W.spawn = { x:0, y:1.2, z:15 };      // just outside the door, house in view
   W.deathY = -30;
   return W;
 }
@@ -994,8 +1076,13 @@ const cam = { yaw: 0, pitch: 0.38, dist: 9.5, x:0, y:0, z:0, tx:0, ty:0, tz:0 };
 const game = {
   screen:'menu', mode:null, levelId:null, world:null, player:null,
   time:0, runOrbs:0, deaths:0, dead:0, won:false, depth:0,
-  banner:null, flash:0, shake:0, particles:[], snail:null, salts:[], orbTimer:0, speech:null
+  banner:null, flash:0, shake:0, particles:[], snail:null, salts:[], orbTimer:0, speech:null,
+  // killer-snail war: hearts, salt ammo, soldiers, safehouse shield
+  hp:3, maxHp:3, iframe:0, ammo:0, bullets:[], soldiers:[], wave:1, kills:0,
+  shield:1, inSafe:false, tpCd:0, shootCd:0, meleeCd:0, swing:0, snailRespawn:0
 };
+const MAX_AMMO = 30;
+const SNAIL_SPEED = 4.2;      // constant, every wave — you can always outrun it
 
 function makePlayer(sp) {
   return {
@@ -1222,11 +1309,149 @@ function updateObby(dt) {
   }
 }
 
+/* ---- KILLER SNAIL: the war ------------------------------------------------
+   You are not defenceless any more. Z throws salt, K swings, T teleports home,
+   and four soldiers patrol the yard shooting at the snail. The snail carries a
+   knife: it winds up, then stabs, and you have three hearts.            */
+
+function camForward() {
+  const cp = Math.cos(cam.pitch);
+  return { x: -Math.sin(cam.yaw)*cp, y: -Math.sin(cam.pitch), z: -Math.cos(cam.yaw)*cp };
+}
+function playerInSafe() {
+  const s = game.world && game.world.safe, p = game.player;
+  if (!s || !p) return false;
+  return Math.abs(p.x-s.x) < s.hx && Math.abs(p.z-s.z) < s.hz && Math.abs(p.y-s.y) < s.hy;
+}
+function spawnSnail(wave) {
+  const a = Math.random()*Math.PI*2, hp = 120 + (wave-1)*70;
+  return {
+    x: Math.sin(a)*27, y: 2.2, z: Math.cos(a)*27,
+    spd:1.2, stun:0, wob:0, yaw:0, hp, maxHp:hp,
+    atk:0, atkCd:0, stagger:0, hurt:0, dead:0, sayCd:2
+  };
+}
+function makeSoldiers() {
+  const posts = (game.world.soldierPosts || []);
+  // Soldiers cannot be killed. The snail has not worked this out yet.
+  return posts.map((s, i) => ({
+    x:s.x, y:0.95, z:s.z, hx:0.42, hy:0.95, hz:0.42, vx:0, vz:0,
+    yaw:0, cd: 0.6 + i*0.3, hit:0, walk:0, circle: i%2 ? 1 : -1, unstick:0, home:{x:s.x, z:s.z}
+  }));
+}
+
+function shootSalt() {
+  if (game.dead > 0 || game.shootCd > 0) return;
+  if (game.ammo <= 0) {
+    game.shootCd = 0.4;
+    game.banner = { text:'🧂 Out of salt! Grab a shaker', t:1.2 };
+    return;
+  }
+  const p = game.player, sn = game.snail;
+  game.ammo--; game.shootCd = 0.22;
+  const f = camForward();
+  let dx = f.x, dy = f.y, dz = f.z;
+  // forgiving aim: if the snail is roughly in front, the throw curves onto it
+  if (sn && sn.dead <= 0) {
+    const ax = sn.x-p.x, ay = (sn.y+0.3)-(p.y+0.4), az = sn.z-p.z;
+    const l = Math.hypot(ax,ay,az) || 1;
+    if (l < 46 && (ax/l*f.x + ay/l*f.y + az/l*f.z) > 0.45) { dx = ax/l; dy = ay/l; dz = az/l; }
+  }
+  game.bullets.push({ x:p.x, y:p.y+0.4, z:p.z, vx:dx*38, vy:dy*38, vz:dz*38, life:1.4, dmg:11, mine:1 });
+  Sound.salt();
+}
+
+function meleeSwing() {
+  if (game.dead > 0 || game.meleeCd > 0) return;
+  game.meleeCd = 0.7; game.swing = 0.32;
+  Sound.swing();
+  const p = game.player, sn = game.snail;
+  if (!sn || sn.dead > 0) return;
+  const dx = sn.x-p.x, dy = sn.y-p.y, dz = sn.z-p.z;
+  const l = Math.hypot(dx,dy,dz) || 1;
+  if (l > 4.2) return;
+  hurtSnail(24);
+  sn.stagger = Math.max(sn.stagger, 0.55);
+  sn.atk = 0;                                   // a solid hit interrupts the stab
+  sn.x += dx/l*7; sn.z += dz/l*7;
+  game.shake = 9;
+  burst(sn.x, sn.y, sn.z, 16, '#FFE08A');
+}
+
+function teleportHome() {
+  if (game.dead > 0 || game.tpCd > 0) {
+    if (game.tpCd > 0) game.banner = { text:'🏠 Teleport recharging — ' + Math.ceil(game.tpCd) + 's', t:1.1 };
+    return;
+  }
+  const s = game.world.safe, p = game.player;
+  game.tpCd = 16;
+  burst(p.x, p.y, p.z, 18, '#5BE7FF');
+  p.x = s.x; p.y = s.y - s.hy + PHY + 0.5; p.z = s.z;
+  p.vx = p.vy = p.vz = 0;
+  burst(p.x, p.y, p.z, 18, '#5BE7FF');
+  snapCamera();
+  Sound.check();
+  game.banner = { text:'🏠 Teleported to the safehouse', t:1.3 };
+}
+
+// speech bubble that rides along above the snail's shell
+function snailSay(text, hold) {
+  const sn = game.snail;
+  if (!sn || sn.dead > 0) return;
+  game.speech = { text, t: hold || 2, snail: true };
+  sn.sayCd = 5 + Math.random()*4;
+}
+
+function hurtSnail(dmg) {
+  const sn = game.snail;
+  if (!sn || sn.dead > 0) return;
+  sn.hp -= dmg; sn.hurt = 0.18;
+  if (sn.hp <= 0) {
+    sn.hp = 0; sn.dead = 1;
+    // last words, left hanging in the air where it fell
+    game.speech = { text:'I NOT KILL YOU', t:3.4, x:sn.x, y:sn.y + 3.2, z:sn.z, green:true };
+    game.kills++;
+    game.snailRespawn = 3;
+    save.orbs += 12; save.lifetimeOrbs += 12; persist();
+    for (let i=0;i<4;i++) burst(sn.x, sn.y + i*0.4, sn.z, 20, i%2 ? '#FFE08A' : '#9BE58A');
+    Sound.win();
+    game.banner = { text:'🐌 SNAIL DOWN!  +12 aura  ·  wave ' + (game.wave+1) + ' incoming', t:2.6 };
+    game.shake = 16;
+  }
+}
+
+function hurtPlayer(fromX, fromZ) {
+  if (game.iframe > 0 || game.dead > 0) return;
+  game.hp--;
+  game.iframe = 1.5;
+  game.shake = 15; game.flash = 0.55;
+  const p = game.player;
+  const a = Math.atan2(p.x-fromX, p.z-fromZ);
+  p.vx = Math.sin(a)*11; p.vz = Math.cos(a)*11; p.vy = 6;
+  burst(p.x, p.y, p.z, 18, '#FF5B5B');
+  Sound.hurt();
+  if (game.hp <= 0) killPlayer();
+  else game.banner = { text:'🔪 STABBED!  ' + game.hp + ' ' + (game.hp === 1 ? 'heart' : 'hearts') + ' left', t:1.6 };
+}
+
 function updateSnail(dt) {
-  const p = game.player, W = game.world, sn = game.snail;
+  const p = game.player, W = game.world;
   stepPlayer(dt);
   collectOrbs();
 
+  game.iframe = Math.max(0, game.iframe - dt);
+  game.shootCd = Math.max(0, game.shootCd - dt);
+  game.meleeCd = Math.max(0, game.meleeCd - dt);
+  game.swing = Math.max(0, game.swing - dt);
+  game.tpCd = Math.max(0, game.tpCd - dt);
+
+  // ---- safehouse shield: safe while it holds, and it only holds for a while
+  game.inSafe = playerInSafe();
+  if (game.inSafe) game.shield = Math.max(0, game.shield - dt/11);
+  else game.shield = Math.min(1, game.shield + dt/15);
+  const shieldOn = game.shield > 0.02;
+
+  // ---- orbs keep coming back so there is always a reason to leave cover
   game.orbTimer -= dt;
   if (game.orbTimer <= 0) {
     game.orbTimer = 4;
@@ -1238,29 +1463,170 @@ function updateSnail(dt) {
     }
   }
 
+  // ---- salt shakers reload you
   for (const s of game.salts) {
     if (s.got > 0) { s.got -= dt; continue; }
-    if (Math.hypot(p.x-s.x, p.y-s.y, p.z-s.z) < 2.1) {
-      s.got = 12; sn.stun = 3.4;
-      const a = Math.atan2(sn.x-p.x, sn.z-p.z);
-      sn.x += Math.sin(a)*10; sn.z += Math.cos(a)*10;
-      Sound.salt(); burst(s.x, s.y, s.z, 18, '#FFFFFF');
-      game.banner = { text:'🧂 SALT! The snail is frozen', t:1.4 };
+    if (Math.hypot(p.x-s.x, p.y-s.y, p.z-s.z) < 2.3) {
+      s.got = 10;
+      game.ammo = Math.min(MAX_AMMO, game.ammo + 10);
+      Sound.salt(); burst(s.x, s.y, s.z, 16, '#FFFFFF');
+      game.banner = { text:'🧂 +10 salt', t:1.1 };
     }
   }
 
-  // slow at first, but it eventually outruns you — every run has to end
-  sn.spd = Math.min(340, 55 + game.time*2.3) / 45;
-  sn.wob += dt*3;
-  if (sn.stun > 0) sn.stun -= dt;
-  else {
-    const dx = p.x-sn.x, dy = (p.y-0.2)-sn.y, dz = p.z-sn.z;
-    const l = Math.hypot(dx,dy,dz) || 1;
-    sn.x += dx/l*sn.spd*dt; sn.y += dy/l*sn.spd*dt; sn.z += dz/l*sn.spd*dt;
-    sn.yaw = angLerp(sn.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.02, dt));
+  // ---- the snail
+  let sn = game.snail;
+  if (sn && sn.dead > 0) {
+    sn.dead += dt;
+    game.snailRespawn -= dt;
+    if (game.snailRespawn <= 0) {
+      game.wave++;
+      game.snail = sn = spawnSnail(game.wave);
+      game.banner = { text:'🐌 WAVE ' + game.wave + '!', t:2 };
+    }
+  } else if (sn) {
+    sn.wob += dt*3;
+    sn.hurt = Math.max(0, sn.hurt - dt);
+    sn.stagger = Math.max(0, sn.stagger - dt);
+    sn.atkCd = Math.max(0, sn.atkCd - dt);
+    if (sn.stun > 0) sn.stun -= dt;
+
+    // always the same speed — slower than you, but it never stops coming
+    sn.spd = SNAIL_SPEED;
+
+    // pick a target: the player, unless a soldier is much closer.
+    // it keeps going for the soldiers even though it can never win that fight.
+    let tx = p.x, ty = p.y - 0.2, tz = p.z, tgt = null;
+    let best = Math.hypot(p.x-sn.x, p.z-sn.z) * (game.inSafe && shieldOn ? 4 : 1);
+    for (const s of game.soldiers) {
+      const d = Math.hypot(s.x-sn.x, s.z-sn.z) * 1.6;
+      if (d < best) { best = d; tgt = s; tx = s.x; ty = s.y; tz = s.z; }
+    }
+
+    const frozen = sn.stun > 0 || sn.stagger > 0;
+    if (sn.atk > 0) {
+      sn.atk -= dt;                                     // winding up: it holds still
+      if (sn.atk <= 0) {
+        sn.atkCd = 1.3;
+        const d = Math.hypot(tx-sn.x, tz-sn.z);
+        if (d < 4) {
+          if (tgt) {
+            // it stabs a soldier with everything it has. Nothing happens.
+            tgt.hit = 0.35;
+            const a = Math.atan2(tgt.x-sn.x, tgt.z-sn.z);
+            tgt.x += Math.sin(a)*1.2; tgt.z += Math.cos(a)*1.2;
+            burst(tgt.x, tgt.y+0.6, tgt.z, 10, '#FFE08A');
+            snailSay(Math.random() < 0.5 ? 'WHY YOU NOT DIE' : 'STAY DOWN SOLDIER', 2);
+          } else if (!(game.inSafe && shieldOn)) {
+            hurtPlayer(sn.x, sn.z);
+          }
+        }
+        Sound.stab();
+      }
+    } else if (!frozen) {
+      const dx = tx-sn.x, dy = ty-sn.y, dz = tz-sn.z;
+      const l = Math.hypot(dx,dy,dz) || 1;
+      sn.x += dx/l*sn.spd*dt; sn.y += dy/l*sn.spd*dt; sn.z += dz/l*sn.spd*dt;
+      sn.yaw = angLerp(sn.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.02, dt));
+      if (l < 3.1 && sn.atkCd <= 0) {                     // telegraphed stab
+        sn.atk = 0.5; Sound.raise();
+        snailSay(tgt ? 'I KILL YOU SOLDIER' : 'I KILL YOU', 2.2);
+      }
+    }
+    sn.sayCd = Math.max(0, sn.sayCd - dt);
+    if (sn.sayCd <= 0 && !game.speech) snailSay('I KILL YOU', 2);   // it keeps announcing it
+
+    // the shield physically keeps it out of the safehouse
+    if (shieldOn) {
+      const s = W.safe, pad = 1.6;
+      const ix = s.hx + pad - Math.abs(sn.x - s.x);
+      const iz = s.hz + pad - Math.abs(sn.z - s.z);
+      const iy = s.hy + pad - Math.abs(sn.y - s.y);
+      if (ix > 0 && iz > 0 && iy > 0) {
+        if (ix < iz) sn.x = s.x + Math.sign(sn.x - s.x || 1) * (s.hx + pad);
+        else sn.z = s.z + Math.sign(sn.z - s.z || 1) * (s.hz + pad);
+        if (Math.random() < 0.25) burst(sn.x, sn.y, sn.z, 2, '#5BE7FF');
+      }
+    }
+
+    if (!(game.inSafe && shieldOn) &&
+        Math.hypot(p.x-sn.x, (p.y-sn.y)*0.8, p.z-sn.z) < 1.7) hurtPlayer(sn.x, sn.z);
   }
+
+  updateSoldiers(dt);
+  updateBullets(dt);
+
   if (p.y < W.deathY) killPlayer();
-  if (Math.hypot(p.x-sn.x, (p.y-sn.y)*0.8, p.z-sn.z) < 1.9) killPlayer();
+}
+
+/* ---- soldiers: patrol the yard, keep their distance, shoot the snail ---- */
+function updateSoldiers(dt) {
+  const sn = game.snail, W = game.world, alive = sn && sn.dead <= 0;
+  for (const s of game.soldiers) {
+    s.walk += dt;
+    s.hit = Math.max(0, s.hit - dt);
+
+    let mx = 0, mz = 0;
+    if (alive) {
+      const dx = sn.x - s.x, dz = sn.z - s.z;
+      const d = Math.hypot(dx, dz) || 1;
+      // hold a firing line ~13 away: close in when far, back off when too near
+      const push = d > 15 ? 1 : d < 11 ? -1.15 : 0;
+      mx = dx/d*push + (-dz/d)*s.circle*0.55;
+      mz = dz/d*push + ( dx/d)*s.circle*0.55;
+      s.yaw = angLerp(s.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.02, dt));
+    } else {
+      const dx = s.home.x - s.x, dz = s.home.z - s.z;   // no snail: walk home
+      const d = Math.hypot(dx, dz);
+      if (d > 1.2) { mx = dx/d; mz = dz/d; s.yaw = angLerp(s.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.05, dt)); }
+    }
+    // stay in the yard, never wander to the fence
+    const hd = Math.hypot(s.x, s.z);
+    if (hd > 26) { mx -= s.x/hd*1.4; mz -= s.z/hd*1.4; }
+
+    if (s.unstick > 0) { s.unstick -= dt; const t = mx; mx = -mz; mz = t; }
+    const ml = Math.hypot(mx, mz);
+    if (ml > 0.01) {
+      const spd = 5.2;
+      const px = s.x, pz = s.z;
+      moveAxis(s, 'x', mx/ml*spd*dt, W.solids);
+      moveAxis(s, 'z', mz/ml*spd*dt, W.solids);
+      if (Math.hypot(s.x-px, s.z-pz) < spd*dt*0.35 && s.unstick <= 0) s.unstick = 0.6;
+    }
+
+    // fire
+    s.cd -= dt;
+    if (alive && s.cd <= 0) {
+      const dx = sn.x - s.x, dy = (sn.y+0.2) - (s.y+0.7), dz = sn.z - s.z;
+      const d = Math.hypot(dx,dy,dz);
+      if (d < 24) {
+        s.cd = 1.6;
+        game.bullets.push({
+          x:s.x, y:s.y+0.7, z:s.z,
+          vx:dx/d*30, vy:dy/d*30, vz:dz/d*30, life:1.4, dmg:4, mine:0
+        });
+        Sound.pop();
+      }
+    }
+  }
+}
+
+function updateBullets(dt) {
+  const sn = game.snail;
+  for (let i = game.bullets.length - 1; i >= 0; i--) {
+    const b = game.bullets[i];
+    b.x += b.vx*dt; b.y += b.vy*dt; b.z += b.vz*dt;
+    b.vy -= 5*dt;                                    // a little arc
+    b.life -= dt;
+    let hit = false;
+    if (sn && sn.dead <= 0 && Math.hypot(b.x-sn.x, b.y-sn.y, b.z-sn.z) < 2) {
+      hurtSnail(b.dmg);
+      sn.stun = Math.max(sn.stun, b.mine ? 0.22 : 0.12);   // salt makes it flinch
+      burst(b.x, b.y, b.z, 6, '#FFFFFF');
+      hit = true;
+    }
+    if (hit || b.life <= 0 || b.y < -2) game.bullets.splice(i, 1);
+  }
 }
 
 function updateInfinity(dt) {
@@ -1307,9 +1673,11 @@ function endRun() {
     let unlocked = false;
     if (t >= 60 && !ownsSkin('snail')) { save.owned.push('snail'); unlocked = true; Sound.unlock(); }
     persist();
-    showResult('🐌 The snail got you!',
+    if (game.kills > (save.best.kills || 0)) save.best.kills = game.kills;
+    showResult('🔪 The snail got you!',
       '⏱ Survived <b>' + fmtTime(t) + '</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
-      '<br>🏆 Best: ' + fmtTime(save.best.snail || 0) +
+      '<br>🐌 Snails defeated: <b>' + game.kills + '</b>  (reached wave ' + game.wave + ')' +
+      '<br>🏆 Best time: ' + fmtTime(save.best.snail || 0) + ' · most snails: ' + (save.best.kills || 0) +
       '<br>💠 ' + game.runOrbs + ' aura collected' +
       (unlocked ? '<br>🎁 <b>Snail King skin unlocked!</b>'
                 : (t < 60 ? '<br><span style="opacity:.7">Survive 60s to unlock the Snail King skin.</span>' : '')),
@@ -1373,9 +1741,27 @@ function updateCamera(dt, snap) {
   cam.ty = snap ? ty : lerp(cam.ty, ty, k);
   cam.tz = snap ? tz : lerp(cam.tz, tz, k);
   const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
-  cam.x = cam.tx + Math.sin(cam.yaw)*cam.dist*cp;
-  cam.y = cam.ty + sp*cam.dist;
-  cam.z = cam.tz + Math.cos(cam.yaw)*cam.dist*cp;
+  const dx = Math.sin(cam.yaw)*cp, dy = sp, dz = Math.cos(cam.yaw)*cp;
+  const d = cameraReach(cam.tx, cam.ty, cam.tz, dx, dy, dz, cam.dist);
+  cam.x = cam.tx + dx*d;
+  cam.y = cam.ty + dy*d;
+  cam.z = cam.tz + dz*d;
+}
+// don't let the camera sink into a wall — pull it in to the last clear spot
+function cameraReach(tx, ty, tz, dx, dy, dz, want) {
+  const W = game.world;
+  if (!W) return want;
+  const r = 0.5, steps = 12;
+  const pt = { cx:0, cy:0, cz:0, hx:r, hy:r, hz:r };
+  for (let i = 1; i <= steps; i++) {
+    const t = want * i/steps;
+    pt.cx = tx + dx*t; pt.cy = ty + dy*t; pt.cz = tz + dz*t;
+    for (const s of W.solids) {
+      if (s.gone || s.kind === 'crumble') continue;
+      if (aabb(pt, s)) return Math.max(2.2, want * (i-1)/steps);
+    }
+  }
+  return want;
 }
 function snapCamera() { updateCamera(0, true); }
 
@@ -1491,24 +1877,79 @@ function drawCharacter(x, y, z, yaw, skinId, walk, squash, airborne) {
   }
 }
 
+/* ---- safehouse shield: a glowing dome you can see through ---- */
+function drawShield(t) {
+  const s = game.world.safe;
+  if (!s || game.shield <= 0.02) return;
+  const flick = game.shield < 0.25 ? (0.4 + 0.6*Math.abs(Math.sin(t*14))) : 1;
+  const a = (0.20 + 0.10*Math.sin(t*2)) * flick * clamp(game.shield*1.4, 0, 1);
+  const r = s.hx + 2.6;
+  compose(MODEL, s.x, s.y - s.hy, s.z, 0, 0, r*2, (s.hy+3.4)*2, r*2);
+  drawGhost(meshes.ball, MODEL, hex(game.shield < 0.25 ? '#FF7A7A' : '#5BE7FF'), a);
+}
+
+/* ---- soldiers: blocky guards that walk, aim and fire ---- */
+function drawSoldier(s, t) {
+  const flash = s.hit > 0;                                  // stabbed, and completely fine
+  const uni = flash ? [1,1,1] : hex('#3E6B4F');
+  const skin = flash ? [1,1,1] : hex('#E8B98A');
+  const hat  = flash ? [1,1,1] : hex('#2C4C39');
+  const glow = flash ? 0.8 : 0;
+  const y = s.y + Math.sin(s.walk*9)*0.06;
+  for (const k of [-1,1]) {
+    const sw = Math.sin(s.walk*9 + (k>0?0:Math.PI))*0.28;
+    compose(MODEL, s.x + Math.cos(s.yaw)*k*0.22 + Math.sin(s.yaw)*sw*0.6, y - 0.62,
+                   s.z - Math.sin(s.yaw)*k*0.22 + Math.cos(s.yaw)*sw*0.6, s.yaw, 0, 0.26, 0.68, 0.26);
+    drawMesh(meshes.cube, MODEL, hat, glow);
+  }
+  compose(MODEL, s.x, y, s.z, s.yaw, 0, 0.72, 0.86, 0.48);
+  drawMesh(meshes.cube, MODEL, uni, glow);
+  compose(MODEL, s.x, y + 0.78, s.z, s.yaw, 0, 0.46, 0.46, 0.46);
+  drawMesh(meshes.cube, MODEL, skin, glow);
+  compose(MODEL, s.x, y + 1.04, s.z, s.yaw, 0, 0.56, 0.18, 0.56);
+  drawMesh(meshes.cube, MODEL, hat, glow);
+  // salt gun, held out toward whatever it is aiming at
+  const gx = s.x + Math.sin(s.yaw)*0.75, gz = s.z + Math.cos(s.yaw)*0.75;
+  compose(MODEL, gx, y + 0.44, gz, s.yaw, 0, 0.2, 0.2, 0.9);
+  drawMesh(meshes.cube, MODEL, hex('#4A4A55'));
+  if (s.cd > 1.4) {                          // muzzle flash right after firing
+    compose(MODEL, gx + Math.sin(s.yaw)*0.6, y + 0.44, gz + Math.cos(s.yaw)*0.6, 0, 0, 0.5, 0.5, 0.5);
+    drawMesh(meshes.ball, MODEL, [1,1,1], 1);
+  }
+}
+
 function drawSnail(sn) {
   const bob = Math.sin(sn.wob)*0.12;
-  const y = sn.y + bob, glow = sn.stun > 0 ? 0.6 : 0.15;
+  const y = sn.y + bob;
+  const glow = sn.hurt > 0 ? 0.9 : sn.atk > 0 ? 0.55 : sn.stun > 0 ? 0.6 : 0.15;
+  const skin = sn.hurt > 0 ? [1,1,1] : hex('#9BE58A');
   compose(MODEL, sn.x, y - 0.35, sn.z, sn.yaw, 0, 1.5, 0.8, 2.6);
-  drawMesh(meshes.cube, MODEL, hex('#9BE58A'), glow);
+  drawMesh(meshes.cube, MODEL, skin, glow);
   compose(MODEL, sn.x, y + 0.35, sn.z, sn.yaw, 0, 2.3, 2.3, 2.3);
-  drawMesh(meshes.ball, MODEL, hex(sn.stun > 0 ? '#8FB6FF' : '#C97B3C'), glow);
+  drawMesh(meshes.ball, MODEL, sn.hurt > 0 ? [1,1,1] : hex(sn.stun > 0 ? '#8FB6FF' : '#C97B3C'), glow);
   // head + eye stalks
   const hx = sn.x + Math.sin(sn.yaw)*1.25, hz = sn.z + Math.cos(sn.yaw)*1.25;
   compose(MODEL, hx, y - 0.15, hz, sn.yaw, 0, 0.85, 0.85, 0.85);
-  drawMesh(meshes.ball, MODEL, hex('#9BE58A'), glow);
+  drawMesh(meshes.ball, MODEL, skin, glow);
   for (const s of [-1,1]) {
     const ex = hx + Math.cos(sn.yaw)*s*0.3, ez = hz - Math.sin(sn.yaw)*s*0.3;
     compose(MODEL, ex, y + 0.55, ez, 0, 0, 0.11, 0.9, 0.11);
-    drawMesh(meshes.cube, MODEL, hex('#9BE58A'), glow);
+    drawMesh(meshes.cube, MODEL, skin, glow);
     compose(MODEL, ex, y + 1.05, ez, 0, 0, 0.3, 0.3, 0.3);
     drawMesh(meshes.ball, MODEL, hex('#FF3B3B'), 0.75);
   }
+
+  // ---- the knife. raised while it winds up, thrust forward on the stab ----
+  const wind = sn.atk > 0 ? 1 - sn.atk/0.5 : 0;          // 0 -> 1 through the windup
+  const reach = sn.atk > 0 ? 0.5 + wind*0.9 : 0.75;
+  const lift  = sn.atk > 0 ? 1.5 - wind*0.5 : 0.35;
+  const tilt  = sn.atk > 0 ? -0.9 + wind*1.5 : -0.35;
+  const kx = hx + Math.sin(sn.yaw)*reach + Math.cos(sn.yaw)*0.75;
+  const kz = hz + Math.cos(sn.yaw)*reach - Math.sin(sn.yaw)*0.75;
+  compose(MODEL, kx, y + lift - 0.28, kz, sn.yaw, tilt, 0.16, 0.36, 0.16);   // handle
+  drawMesh(meshes.cube, MODEL, hex('#3A2B22'));
+  compose(MODEL, kx, y + lift + 0.34, kz, sn.yaw, tilt, 0.1, 1.05, 0.3);     // blade
+  drawMesh(meshes.cube, MODEL, hex('#E6ECF5'), sn.atk > 0 ? 0.7 : 0.35);
 }
 
 function drawDevilNpc(n, t) {
@@ -1632,7 +2073,15 @@ function drawWorld(t) {
     drawBox(s.x, s.y + Math.sin(t*2)*0.12, s.z, 0.75, 1.1, 0.75, hex('#FFFFFF'), t*0.8, 0.35);
     drawBox(s.x, s.y + 0.62 + Math.sin(t*2)*0.12, s.z, 0.55, 0.2, 0.55, hex('#C7CBD8'), t*0.8);
   }
-  if (game.mode === 'snail' && game.snail) drawSnail(game.snail);
+  if (game.mode === 'snail') {
+    for (const s of game.soldiers) drawSoldier(s, t);
+    for (const b of game.bullets) {
+      compose(MODEL, b.x, b.y, b.z, 0, 0, 0.34, 0.34, 0.34);
+      drawMesh(meshes.ball, MODEL, b.mine ? [1,1,1] : hex('#BFE8FF'), 1);
+    }
+    if (game.snail && game.snail.dead <= 0) drawSnail(game.snail);
+    drawShield(t);
+  }
   if (W.npc) drawDevilNpc(W.npc, t);
 
   // infinity crusher
@@ -1730,30 +2179,95 @@ function drawHUD(t) {
     H.fillText(Math.round(pr*100) + '%', HW/2, 44);
   }
 
-  // snail proximity warning
-  if (game.mode === 'snail' && game.snail) {
-    const p = game.player, sn = game.snail;
-    const d = Math.hypot(p.x-sn.x, p.y-sn.y, p.z-sn.z);
-    if (d < 16) {
-      const a = clamp((16-d)/16, 0, 1);
-      H.fillStyle = 'rgba(255,60,60,' + (a*0.34) + ')';
-      H.fillRect(0,0,HW,HH);
-      if (d < 9) {
-        H.textAlign = 'center';
-        H.font = 'bold 27px "Trebuchet MS", sans-serif';
-        H.fillStyle = 'rgba(255,255,255,' + a + ')';
-        H.fillText('🐌 BEHIND YOU!', HW/2, 96);
-      }
+  // ---- killer snail: hearts, ammo, shield, wave, boss bar ----
+  if (game.mode === 'snail') {
+    const p = game.player, sn = game.snail, alive = sn && sn.dead <= 0;
+
+    // hearts
+    H.textAlign = 'left';
+    H.font = 'bold 24px "Trebuchet MS", sans-serif';
+    for (let i = 0; i < game.maxHp; i++) {
+      H.globalAlpha = i < game.hp ? (game.iframe > 0 && i === game.hp ? 0.5 : 1) : 0.25;
+      H.fillText('❤️', 18 + i*30, 84);
     }
-    const sp = project(sn.x, sn.y+1.5, sn.z);
-    if (!sp || sp.x < 0 || sp.x > HW || sp.y < 0 || sp.y > HH) {
-      H.textAlign = 'center';
+    H.globalAlpha = 1;
+
+    // salt ammo
+    H.fillStyle = 'rgba(18,16,31,.6)';
+    rr2(14, 96, 132, 32, 10); H.fill();
+    H.font = 'bold 18px "Trebuchet MS", sans-serif';
+    H.fillStyle = game.ammo > 0 ? '#fff' : '#FF8A8A';
+    H.fillText('🧂 ' + game.ammo, 26, 118);
+    H.font = 'bold 11px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.55)';
+    H.fillText('Z', 122, 118);
+
+    // shield battery
+    H.fillStyle = 'rgba(18,16,31,.6)';
+    rr2(14, 134, 132, 30, 10); H.fill();
+    H.fillStyle = 'rgba(255,255,255,.18)';
+    rr2(24, 146, 82, 8, 4); H.fill();
+    H.fillStyle = game.shield < 0.25 ? '#FF7A7A' : '#5BE7FF';
+    rr2(24, 146, 82*game.shield, 8, 4); H.fill();
+    H.font = 'bold 11px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.75)';
+    H.fillText('🛡', 24, 144);
+    H.fillStyle = game.tpCd > 0 ? 'rgba(255,255,255,.4)' : '#FFD166';
+    H.fillText(game.tpCd > 0 ? 'T ' + Math.ceil(game.tpCd) + 's' : 'T ready', 112, 154);
+
+    // wave + boss bar live along the bottom, clear of the banner and the sticks
+    H.textAlign = 'center';
+    H.font = 'bold 13px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.8)';
+    H.fillText('WAVE ' + game.wave + '   ·   🐌 ' + game.kills + ' down', HW/2, HH-66);
+
+    if (alive) {
+      const w = 300, x = HW/2 - w/2, y = HH-56;
+      H.fillStyle = 'rgba(18,16,31,.6)';
+      rr2(x-6, y, w+12, 22, 8); H.fill();
+      H.fillStyle = 'rgba(255,255,255,.16)';
+      rr2(x, y+5, w, 12, 6); H.fill();
+      H.fillStyle = sn.hp/sn.maxHp < 0.3 ? '#FF6B6B' : '#9BE58A';
+      rr2(x, y+5, w*clamp(sn.hp/sn.maxHp,0,1), 12, 6); H.fill();
+      H.font = 'bold 10px "Trebuchet MS", sans-serif';
+      H.fillStyle = '#fff';
+      H.fillText('KILLER SNAIL  ' + Math.ceil(sn.hp), HW/2, y+15);
+    }
+
+    if (game.inSafe && game.shield > 0.02) {
       H.font = 'bold 15px "Trebuchet MS", sans-serif';
-      H.fillStyle = 'rgba(155,229,138,.95)';
-      const ax = sp ? clamp(sp.x, 40, HW-40) : HW/2, ay = sp ? clamp(sp.y, 40, HH-40) : 60;
-      H.beginPath(); H.arc(ax, ay, 19, 0, 6.284); H.fill();
-      H.fillStyle = '#1E1B33';
-      H.fillText('🐌', ax, ay+6);
+      H.fillStyle = 'rgba(91,231,255,.95)';
+      H.fillText('🏠 SAFEHOUSE — shield holding', HW/2, HH-92);
+    } else if (game.inSafe) {
+      H.font = 'bold 15px "Trebuchet MS", sans-serif';
+      H.fillStyle = 'rgba(255,122,122,.95)';
+      H.fillText('⚠ SHIELD DOWN — it can get in!', HW/2, HH-92);
+    }
+
+    if (alive) {
+      const d = Math.hypot(p.x-sn.x, p.y-sn.y, p.z-sn.z);
+      const safe = game.inSafe && game.shield > 0.02;
+      if (d < 16 && !safe) {
+        const a = clamp((16-d)/16, 0, 1);
+        H.fillStyle = 'rgba(255,60,60,' + (a*0.30) + ')';
+        H.fillRect(0,0,HW,HH);
+        if (sn.atk > 0) {
+          H.textAlign = 'center';
+          H.font = 'bold 27px "Trebuchet MS", sans-serif';
+          H.fillStyle = 'rgba(255,255,255,' + a + ')';
+          H.fillText('🔪 IT IS SWINGING — MOVE!', HW/2, 152);
+        }
+      }
+      const sp = project(sn.x, sn.y+1.5, sn.z);
+      if (!sp || sp.x < 0 || sp.x > HW || sp.y < 0 || sp.y > HH) {
+        H.textAlign = 'center';
+        H.font = 'bold 15px "Trebuchet MS", sans-serif';
+        H.fillStyle = 'rgba(155,229,138,.95)';
+        const ax = sp ? clamp(sp.x, 40, HW-40) : HW/2, ay = sp ? clamp(sp.y, 40, HH-40) : 60;
+        H.beginPath(); H.arc(ax, ay, 19, 0, 6.284); H.fill();
+        H.fillStyle = '#1E1B33';
+        H.fillText('🐌', ax, ay+6);
+      }
     }
   }
 
@@ -1770,21 +2284,30 @@ function drawHUD(t) {
   // the devil's line, drawn as a speech bubble over his head
   if (game.speech && game.speech.t > 0) {
     const s = game.speech;
-    const pt = project(s.x, s.y, s.z);
+    const sn = game.snail;
+    // the snail's lines follow it around; the devil's stay put
+    const wx = s.snail && sn ? sn.x : s.x;
+    const wy = s.snail && sn ? sn.y + 3.2 : s.y;
+    const wz = s.snail && sn ? sn.z : s.z;
+    const pt = (s.snail && (!sn || sn.dead > 0)) ? null : project(wx, wy, wz);
     if (pt) {
       const a = clamp(s.t, 0, 1);
+      const green = s.snail || s.green;
+      const bg = green ? 'rgba(6,26,10,.88)' : 'rgba(20,4,10,.88)';
+      const edge = green ? '#9BE58A' : '#FF6B3D';
+      const ink = green ? '#DDFFCF' : '#FF9A5A';
       H.textAlign = 'center';
       H.font = 'bold 26px "Trebuchet MS", sans-serif';
       const w = H.measureText(s.text).width + 40;
       H.globalAlpha = a;
-      H.fillStyle = 'rgba(20,4,10,.88)';
+      H.fillStyle = bg;
       rr2(pt.x - w/2, pt.y - 46, w, 50, 14); H.fill();
-      H.strokeStyle = '#FF6B3D'; H.lineWidth = 3;
+      H.strokeStyle = edge; H.lineWidth = 3;
       rr2(pt.x - w/2, pt.y - 46, w, 50, 14); H.stroke();
       H.beginPath();
       H.moveTo(pt.x-10, pt.y+3); H.lineTo(pt.x+10, pt.y+3); H.lineTo(pt.x, pt.y+18);
-      H.closePath(); H.fillStyle = 'rgba(20,4,10,.88)'; H.fill();
-      H.fillStyle = '#FF9A5A';
+      H.closePath(); H.fillStyle = bg; H.fill();
+      H.fillStyle = ink;
       H.fillText(s.text, pt.x, pt.y - 12);
       H.globalAlpha = 1;
     }
@@ -1867,10 +2390,17 @@ function startSnail() {
   resetRun();
   game.world.orbs = game.world.orbSpots.map(s => ({ x:s.x, y:s.y, z:s.z, got:false }));
   game.salts = game.world.saltSpots.map(s => ({ x:s.x, y:s.y, z:s.z, got:0 }));
-  game.snail = { x:-26, y:2.2, z:-26, spd:1.2, stun:0, wob:0, yaw:0 };
+  game.wave = 1; game.kills = 0;
+  game.snail = spawnSnail(1);
+  game.soldiers = makeSoldiers();
+  game.hp = game.maxHp; game.iframe = 0; game.ammo = 14;
+  game.bullets = []; game.shield = 1; game.inSafe = false;
+  game.tpCd = 0; game.shootCd = 0; game.meleeCd = 0; game.swing = 0; game.snailRespawn = 0;
   game.orbTimer = 0;
+  cam.yaw = 0;                     // start looking at the safehouse
+  snapCamera();
   bakeStatic(game.world);
-  game.banner = { text:'🐌  RUN!', t:2.0 };
+  game.banner = { text:'🐌  FIGHT BACK!  Z = salt · K = swing · T = safehouse', t:3.4 };
   showScreen('play');
 }
 function startInfinity() {
@@ -1887,7 +2417,9 @@ function resetRun() {
   game.time = 0; game.runOrbs = 0; game.deaths = 0;
   game.dead = 0; game.won = false; game.flash = 0; game.shake = 0;
   game.particles.length = 0; game.speech = null;
-  if (game.mode !== 'snail') { game.snail = null; game.salts = []; }
+  if (game.mode !== 'snail') {
+    game.snail = null; game.salts = []; game.soldiers = []; game.bullets = [];
+  }
   cam.yaw = Math.PI;          // courses run toward +Z, so start looking that way
   cam.pitch = 0.38;
   snapCamera();
@@ -1957,6 +2489,7 @@ const screens = {
 };
 function showScreen(name) {
   game.screen = name;
+  touchWrap.classList.toggle('war', game.mode === 'snail');   // salt/swing/teleport buttons
   if (name === 'play') { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   for (const k in screens) screens[k].classList.toggle('on', k === name);
@@ -2052,6 +2585,7 @@ window.OBBY = {
   game, save, cam, input, LEVELS, SKINS, CHUNKS, POOL, update, readKeys, bakeStatic, resetRun,
   buildCourse, buildArena, buildShaft, addShaftLayer,
   startLevel, startSnail, startInfinity, showScreen, persist,
+  shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, project, cam,
   consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
 };
 
