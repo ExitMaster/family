@@ -342,6 +342,28 @@ function fail(text) {
   document.body.insertBefore(d, document.getElementById("shop"));
 }
 
+// ---------- 닉네임·방 코드 기억하기 ----------
+// 별 저금통은 닉네임을 열쇠로 삼는다. 그래서 다음에 열었을 때 닉네임을 조금이라도
+// 다르게 치면(공백 하나, 글자 하나) 남의 빈 저금통이 열린다. 기억해 두는 건
+// 편의 기능이 아니라 모은 별을 지키는 장치다.
+const REMEMBER = "jump-who";
+
+function loadWho() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REMEMBER) || "{}");
+    if (saved.nick) nickEl.value = saved.nick;
+    if (saved.room) roomEl.value = saved.room;
+  } catch (e) {         // 시크릿 모드이거나 저장된 게 없을 뿐, 게임엔 지장 없다
+  }
+}
+
+function saveWho(nick, room) {
+  try { localStorage.setItem(REMEMBER, JSON.stringify({ nick, room })); }
+  catch (e) { /* 저장이 막혀 있어도 이번 판은 그대로 할 수 있다 */ }
+}
+
+loadWho();
+
 // ---------- connect to Firebase ----------
 // import를 try 안에서(동적으로) 한다. 맨 위에 고정 import로 두면 인터넷이
 // 잠깐 끊겼을 때 스크립트 전체가 조용히 죽어서, 화면에 아무 설명도 못 띄운다.
@@ -537,6 +559,7 @@ joinBtn.addEventListener("click", async () => {
   myName = nick;
   bankKey = keyFor(nick);
   room = code;
+  saveWho(nick, code);      // 다음에 열면 그대로 채워져 있다
   await loadBank();
 
   const myRef = ref(db, `rooms/${room}/players/${uid}`);
