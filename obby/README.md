@@ -15,6 +15,7 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 | Back to checkpoint | `R` |
 | Pause | `ESC` or `P` |
 | Fullscreen | `F` or the ⛶ button |
+| Music / sound | 🎵 and 🔊 buttons, top right |
 | Phone / tablet | joystick bottom-left, JUMP bottom-right, drag to look around |
 | **Killer Snail only** | `Z` throw salt · `K` swing · `T` teleport to the safehouse |
 
@@ -31,8 +32,11 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | Level | What is in it |
 |---|---|
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
-| 🐕 **Inu** | Spinning bars, crumbling wood, ferries, spike patches |
+| 👦 **Inu** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
+
+**Inu is a name, not a dog.** The level and the unlockable skin are a boy in a green
+cap — if you ever see dog ears on him again, that is a bug.
 
 Devil unlocks after Inu, Inu after Angel. Clearing a level the first time pays a
 **+25 aura bonus**.
@@ -80,6 +84,24 @@ Your **depth in metres** is the score, and your best depth is saved.
 Angel (40), Inu (90), Ghost (120), Devil (160), Rainbow (320). Snail King is not
 for sale — you have to earn it in Killer Snail.
 
+## Music
+
+Every level has its own song, and there are no audio files — the notes are
+oscillators driven by a small step sequencer (`SONGS` / `Music` in the source), so
+the game is still one HTML file you can email to someone.
+
+| Where | Sounds like |
+|---|---|
+| Menu | slow and quiet |
+| 😇 Angel | dreamy, major, 92 bpm |
+| 👦 Inu | bouncy hero music, 126 bpm |
+| 😈 Devil | dark minor sawtooth, 148 bpm |
+| 🐌 Killer Snail | tense and stabby, 116 bpm |
+| ♾️ Infinity | everything walking downwards, 88 bpm |
+
+Songs are `lead1` / `bass` arrays of MIDI note numbers, 16 steps to the bar, `0` for
+a rest. To write a new one, add an entry to `SONGS` and point a theme at it.
+
 ## How it works inside
 
 Everything is in `index.html`.
@@ -90,6 +112,11 @@ Everything is in `index.html`.
 * **Physics** — axis-aligned boxes, resolved one axis at a time. Coyote time and
   jump buffering are in, so jumps feel forgiving. The camera walks the same boxes
   and pulls in when a wall would otherwise end up between it and you.
+* **Spikes** are the one hazard whose hit box is *not* what you see. They are drawn
+  as pyramids that taper to a point, so a box the size of the patch kills you while
+  you are still clearly above the tips. `spikeBox()` keeps the drawn size but carries
+  a smaller `chx/chy/chz` box — inset at the sides, and only as tall as the fat lower
+  half of each spike — and `hitHazards()` tests that one instead.
 * **Levels** — built from *chunks* (`CHUNKS` in the source). Every chunk starts
   and ends on a platform at the same height, so any two chunks can be joined and
   the course is always connected. A level is a fixed random seed picking chunks
