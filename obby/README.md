@@ -113,8 +113,11 @@ Everything is in `index.html`.
   sphere), directional light + fog. Static level geometry is baked into a single
   vertex buffer and drawn in one call; only moving things get their own draw call.
 * **Physics** — axis-aligned boxes, resolved one axis at a time. Coyote time and
-  jump buffering are in, so jumps feel forgiving. The camera walks the same boxes
-  and pulls in when a wall would otherwise end up between it and you.
+  jump buffering are in, so jumps feel forgiving. Landing with no direction held
+  zeroes your horizontal speed on the spot: friction alone takes about 0.15s to
+  stop you, which is a whole platform-width of slide and walks you off narrow
+  ledges. The camera walks the same boxes and pulls in when a wall would otherwise
+  end up between it and you.
 * **Spikes** are the one hazard whose hit box is *not* what you see. They are drawn
   as pyramids that taper to a point, so a box the size of the patch kills you while
   you are still clearly above the tips. `spikeBox()` keeps the drawn size but carries
