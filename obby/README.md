@@ -34,6 +34,12 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
+| 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
+
+**Nightmare is a troll level and that is deliberate, not a bug.** Get within 15 units
+of the portal and it runs away at 1.06× your top speed, drifting up and out over the
+void, then taunts you. `troll:true` on the level turns this on; the code is in
+`updateObby`. If someone reports "the last level is broken", this is why.
 
 Angel, human, devil — the three levels are the difficulty ladder.
 
