@@ -1171,7 +1171,14 @@ function render() {
 // lane ends up under them has to shuffle its hearts and fuel badge inwards,
 // or the player can't see how many hearts they have left.
 function hudInset(left, top) {
-  return (top === 0 && left + laneW >= canvas.width - 1) ? 140 : 0;
+  if (!(top === 0 && left + laneW >= canvas.width - 1)) return 0;
+  // The buttons are a fixed CSS size, but we draw in canvas units. On a phone
+  // one canvas pixel is only about half a CSS pixel, so the buttons cover twice
+  // as much of the picture as they do on a laptop — a flat 140 left the hearts
+  // right back underneath them on exactly the screens kids play on. Convert,
+  // then refuse to push so far in that the hearts land on the player's name.
+  const perCss = canvas.width / (canvas.clientWidth || canvas.width);
+  return Math.min(140 * perCss, Math.max(0, laneW - 210));
 }
 
 // ---- tiny scoreboard, top right, only in full screen ----
@@ -1278,11 +1285,11 @@ function drawLane(id, i, dist) {
   for (const o of obstacles) {
     const ox = PX + (o.x - dist);
     if (ox > LW + 40 || ox + o.w < -40) continue;
-    if (o.kind === "pit") continue;                  // already carved out above
 
+    // pits are already carved out of the ground above — they only need their star
     if (o.kind === "bird") {
       drawBird(ox, o, dist);
-    } else {
+    } else if (o.kind !== "pit") {
       const by = obsTop(o, dist), bh = obsThick(o);
 
       ctx.fillStyle = o.kind === "tower" ? "#8E7A66"
