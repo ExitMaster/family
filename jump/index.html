@@ -39,6 +39,13 @@
     background: #fff; box-shadow: 0 3px 0 var(--ink);
   }
 
+  #sndBtn {
+    position: absolute; top: 9px; right: 84px; z-index: 6;
+    font-size: 14px; padding: 5px 10px; border-width: 3px; border-radius: 10px;
+    background: #fff; box-shadow: 0 3px 0 var(--ink);
+  }
+  #stage.big #sndBtn { top: 14px; right: 92px; }
+
   #panel {
     position: absolute; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 12px; padding: 18px;
@@ -161,28 +168,32 @@
     <div class="card">
       <h2>🚀 How to play</h2>
       <div class="rule"><span class="em">👆</span><span><b>Press SPACE</b> (or tap the screen) to blast off.</span></div>
-      <div class="rule"><span class="em">⏱️</span><span><b>Hold it down to fly higher.</b> Let go early and you only do a little hop.</span></div>
-      <div class="rule"><span class="em">🔥</span><span><b>Tap again in mid-air for a jetpack boost</b> — it shoves you further. You get <b>3 per flight</b> (the orange dots). They refill the moment you touch down.</span></div>
+      <div class="rule"><span class="em">⏱️</span><span><b>Hold it down to fly higher.</b> Let go early and you only do a little hop — that's how you sneak under things.</span></div>
+      <div class="rule"><span class="em">🔥</span><span><b>Tap again in mid-air for a jetpack boost</b> — it shoves you further. Right now your fuel is <b>endless (🔥 ∞)</b>, so you can keep tapping and keep climbing.</span></div>
       <div class="rule"><span class="em">📦</span><span>Clear a box safely: <b>+1 point</b>.</span></div>
-      <div class="rule"><span class="em">⭐</span><span>Land neatly <b>on top</b> of a box: <b>+3 stars</b> — spend them in the shop below.</span></div>
-      <div class="rule"><span class="em">💥</span><span>Smack into the <b>side</b> of a box and you're out. Everyone else keeps flying.</span></div>
-      <div class="rule"><span class="em">⛶</span><span>Press <b>F</b> or the ⛶ button for full screen.</span></div>
+      <div class="rule"><span class="em">⭐</span><span><b>Just touch a floating star</b> and it's yours: <b>+3 stars</b>. Brushing past counts — you don't have to land. Spend them in the shop below.</span></div>
+      <div class="rule"><span class="em">🛬</span><span>Coming down on a box counts as a <b>landing</b>, even a messy diagonal one. Only a proper smack into the <b>side</b> hurts.</span></div>
+      <div class="rule"><span class="em">♥</span><span>You have <b>3 hearts</b> (top right of your strip). A side-smack costs one heart, bounces you on top of the box, and you blink for a second where nothing can hurt you. Lose all 3 and you turn into a ghost — everyone else keeps flying.</span></div>
+      <div class="rule"><span class="em">🏰</span><span>Every so often a <b>giant tower</b> rears up with a red flag on top. Its star is worth <b>12 stars</b> — blast your way up there and grab it.</span></div>
+      <div class="rule"><span class="em">⛶</span><span>Press <b>F</b> for full screen, <b>S</b> for sound.</span></div>
       <button id="closeHow">Got it! 🚀</button>
     </div>
   </div>
+  <button id="sndBtn" title="Sound on/off (S)">🔊</button>
   <button id="fsBtn" title="Full screen (F)">⛶ Full</button>
 </div>
 
 <p class="note" id="hint">
   <b>Hold</b> SPACE (or the screen) to jump higher &nbsp;·&nbsp; tap again in mid-air for a
-  jetpack <b>boost</b> (3 per flight) &nbsp;·&nbsp; <b>F</b> for full screen
+  jetpack <b>boost</b> (🔥 ∞) &nbsp;·&nbsp; <b>♥ 3 hearts</b> each
+  <br><b>F</b> for full screen &nbsp;·&nbsp; <b>S</b> for sound
 </p>
 
 <div id="shop">
   <h3 id="shopHead"><span class="fold">▶</span> ✨ Avatar shop <span id="starBank">⭐ 0</span></h3>
   <div id="shopBody">
     <p class="note" id="shopNote" style="margin:0 0 12px; text-align:left">
-      Land on top of boxes to earn stars, then spend them here.
+      Touch the floating stars to collect them, then spend them here.
     </p>
     <div id="shopItems"></div>
   </div>
@@ -238,19 +249,25 @@ const firebaseConfig = {
 //  numbers, or the track and the scores won't match. If you change
 //  any of these, bump GAME_VERSION so old tabs get warned.
 // ============================================================
-const GAME_VERSION = 2;
+const GAME_VERSION = 3;
 
 const JUMP_POWER  = 620;   // the pop you get the instant you press
 const HOLD_EASE   = 0.35;  // gravity while you keep holding (smaller = floatier)
 const HOLD_MAX    = 0.30;  // holding only helps for this long (seconds)
 const CUT         = 0.45;  // let go early and the jump gets chopped this much
 const BOOST_POWER = 400;   // mid-air jetpack tap
-const BOOSTS_MAX  = 3;     // boosts per trip through the air
-const MAX_AIR     = 1.3;   // measured longest flight: hold + 3 boosts ≈ 1.27s
+const BOOSTS_MAX  = 3;     // boosts per trip through the air (ignored when UNLIMITED)
+const UNLIMITED   = true;  // TRUE = infinite jetpack blasts
+const TOWER_EVERY = 9;     // a giant tower shows up after this many normal boxes
+const TOWER_STARS = 12;    // reaching a tower's star is worth this much
+const MAX_AIR     = 0.95;  // longest possible time in the air
 const GRAVITY     = 2000;  // bigger = fall faster
-const SPEED0      = 430;   // starting speed
-const ACCEL       = 12;    // how much faster each second
-const STAR_BONUS  = 3;     // stars for landing on a box
+const SPEED0      = 330;   // starting speed
+const ACCEL       = 9;     // how much faster each second
+const STAR_BONUS  = 3;     // stars for touching a normal box's star
+const LIVES_MAX   = 3;     // hearts everybody starts with
+const LAND_GRACE  = 26;    // a landing can be this sloppy and still count as a landing
+const SAFE_TIME   = 1.4;   // seconds of blinking "can't be hurt" after a bonk
 const COUNTDOWN   = 3;     // seconds of "3, 2, 1, GO!"
 const LH = 320, GY = LH - 50, PX = 90;   // lane height, ground, player x
 const PW = 34, PH = 54;                  // player size
@@ -350,6 +367,9 @@ let room = null, players = {}, game = { state: "lobby" };
 let me = null, lanes = [], running = false, startedAt = 0;
 let cols = 1, rows = 1, laneH = 320, laneW = 720, scale = 1, LW = 720;
 let obstacles = [], obsEnd = 0, nextObsId = 0, rng = null, lastPush = 0, raf = 0;
+let allOutAt = 0;   // when the last player went out, so the ghosts get to float up
+let lastTick = null; // last countdown number we beeped for
+let clouds = [];     // purely for looks, but built from the shared seed anyway
 
 // 다른 플레이어를 화면에 부드럽게 그리기 위한 값(높이·연기).
 // players 객체는 Firebase 소식이 올 때마다 통째로 새로 바뀌기 때문에,
@@ -378,16 +398,38 @@ const speedAtDist = d => Math.sqrt(SPEED0 * SPEED0 + 2 * ACCEL * d);
 // Every box gets a number the moment it is created. The seed is shared, so
 // box #7 is the same box on every device — that's what lets us count points
 // and stars per player without sending the whole track over the internet.
+//
+// The tower counter lives out here on purpose: old boxes get thrown away as
+// the race rolls on, so we can't count them off the list. It is reset in
+// beginRace(), and only ever moved along from inside this one function, which
+// is what keeps every device building the same towers in the same places.
+let sinceTower = 4;
+
 function buildTrackUpTo(d) {
   while (obsEnd < d) {
     const jump = speedAtDist(obsEnd) * MAX_AIR;
-    const gap  = jump * (1.00 + rng() * 0.68);
-    const x = obsEnd + gap, h = 30 + rng() * 28, w = 28 + rng() * 18;
-    obstacles.push({ id: nextObsId++, x, h, w });
-    obsEnd = x + w;
+    const wantTower = sinceTower >= TOWER_EVERY;
+    // towers need a much longer run-up, or you'd fly straight into the wall
+    const gap = jump * (1.00 + rng() * 0.68) * (wantTower ? 1.9 : 1);
+    const x = obsEnd + gap;
+
+    if (wantTower) {
+      const h = 168 + rng() * 42, w = 50;
+      obstacles.push({ id: nextObsId++, x, h, w, tower: true });
+      sinceTower = 0;
+      obsEnd = x + w;
+    } else {
+      const h = 30 + rng() * 28, w = 28 + rng() * 18;
+      obstacles.push({ id: nextObsId++, x, h, w });
+      sinceTower++;
+      obsEnd = x + w;
+    }
   }
   while (obstacles.length && obstacles[0].x + obstacles[0].w < d - LW - PX) obstacles.shift();
 }
+
+// where a box's star floats — towers hold theirs high above the roof
+function starY(o) { return GY - o.h - (o.tower ? 42 : 20); }
 
 // ---------- the star bank (kept under banks/{nickname}) ----------
 function keyFor(nick) {
@@ -439,7 +481,7 @@ joinBtn.addEventListener("click", async () => {
   const myRef = ref(db, `rooms/${room}/players/${uid}`);
   set(myRef, {
     name: nick, v: GAME_VERSION, joinedAt: serverTimestamp(),
-    y: GY - PH, alive: false, score: 0, stars: 0, look: myLook()
+    y: GY - PH, alive: false, score: 0, stars: 0, lives: LIVES_MAX, look: myLook()
   });
   onDisconnect(myRef).remove();          // clean up if the tab closes
 
@@ -517,20 +559,32 @@ function beginRace() {
   canvas.height = laneH * rows;
 
   rng = makeRng(game.seed);
-  obstacles = []; obsEnd = 600; nextObsId = 0;
+  obstacles = []; obsEnd = 600; nextObsId = 0; sinceTower = 4;
   buildTrackUpTo(LW + PX);
+
+  // clouds get their own random-number maker so that adding or removing one
+  // can never shift the boxes out from under anybody
+  const crng = makeRng((game.seed ^ 0x9E3779B9) >>> 0);
+  clouds = [];
+  for (let i = 0; i < 5; i++) {
+    clouds.push({ x: crng() * LW, y: 30 + crng() * 90, s: 0.6 + crng() * 0.7 });
+  }
+  lastTick = null;
 
   const iAmIn = lanes.includes(uid);
   me = {
     y: GY - PH, vy: 0, onGround: true, alive: iAmIn, score: 0, step: 0,
     puffs: [], pt: 0, sparks: [],
     holding: false, holdTime: 0, boosts: BOOSTS_MAX,
+    lives: LIVES_MAX, invuln: 0, ghost: null, ring: null,
     stars: new Set(), passed: new Set(), starCount: 0
   };
   views = {};
-  for (const id of lanes) views[id] = { y: GY - PH, puffs: [], pt: 0 };
+  for (const id of lanes) views[id] = { y: GY - PH, puffs: [], pt: 0, ghost: null, ring: null, wasAlive: false };
+  allOutAt = 0;
 
-  update(ref(db, `rooms/${room}/players/${uid}`), { alive: iAmIn, score: 0, stars: 0, y: GY - PH });
+  update(ref(db, `rooms/${room}/players/${uid}`),
+         { alive: iAmIn, score: 0, stars: 0, lives: LIVES_MAX, y: GY - PH });
 
   panel.classList.add("hidden");
   running = true;
@@ -560,12 +614,24 @@ function step(dt) {
     me.onGround = false;                   // falling unless something holds me up
 
     if (me.holding) me.holdTime += dt;
+    if (me.invuln > 0) me.invuln -= dt;
     const floaty = me.holding && me.vy < 0 && me.holdTime < HOLD_MAX;
     me.vy += GRAVITY * (floaty ? HOLD_EASE : 1) * dt;
     me.y  += me.vy * dt;
 
+    if (me.y < 6) { me.y = 6; if (me.vy < 0) me.vy = 0; }   // sky ceiling
     if (me.y >= GY - PH) { me.y = GY - PH; me.vy = 0; me.onGround = true; me.boosts = BOOSTS_MAX; }
     if (me.onGround) me.step += SPEED0 * dt;
+
+    // ---- FLY THROUGH A STAR AND IT'S YOURS ----
+    for (const o of obstacles) {
+      if (me.stars.has(o.id)) continue;
+      const sx = PX + (o.x - dist) + o.w / 2, sy = starY(o);
+      const nx = Math.max(PX + 4, Math.min(sx, PX + PW - 4));   // nearest bit of me
+      const ny = Math.max(me.y,   Math.min(sy, me.y + PH));
+      const dx = sx - nx, dy = sy - ny;
+      if (dx * dx + dy * dy < 16 * 16) grabStar(o, dist);
+    }
 
     for (const o of obstacles) {
       const ox = PX + (o.x - dist), by = GY - o.h;   // by = the top of the box
@@ -576,48 +642,126 @@ function step(dt) {
         continue;
       }
 
-      if (me.vy >= 0 && wasBottom <= by + 3 && me.y + PH >= by) {
-        // ---- LANDED NEATLY ON TOP: that's a star, not a crash ----
+      if (me.vy >= 0 && me.y + PH >= by && wasBottom <= by + LAND_GRACE) {
+        // ---- LANDED ON TOP: that's a star, not a crash (a messy landing still counts) ----
         me.y = by - PH; me.vy = 0; me.onGround = true; me.boosts = BOOSTS_MAX;
-        if (!me.stars.has(o.id)) {
-          me.stars.add(o.id);
-          me.starCount += STAR_BONUS;
-          for (let i = 0; i < 10; i++) {
-            const a = Math.random() * Math.PI * 2;
-            me.sparks.push({ x: PX + 17, y: by - 6, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90 - 40, life: 1 });
-          }
-        }
+        grabStar(o, dist);
       } else if (me.y + 8 < by + o.h && me.y + PH > by) {
-        me.alive = false;                  // smacked straight into the side
-        update(ref(db, `rooms/${room}/players/${uid}`),
-               { alive: false, score: me.score, stars: me.starCount, y: Math.round(me.y) });
+        bonk(o);                           // smacked into the side: lose a heart
       }
+
+      if (!me.passed.has(o.id) && ox + o.w < PX) { me.passed.add(o.id); me.score += 1; }
     }
   }
 
   smoke(me, dt, me.y, me.alive);
-  for (const k of me.sparks) { k.x += k.vx * dt; k.y += k.vy * dt; k.vy += 260 * dt; k.life -= dt / 0.5; }
-  me.sparks = me.sparks.filter(k => k.life > 0);
+  driftExtras(me, dt);
 
   // everyone else — slide smoothly towards the position they sent
   for (const id of lanes) {
     if (id === uid) continue;
     const p = players[id]; if (!p) continue;
-    const v = views[id] || (views[id] = { y: GY - PH, puffs: [], pt: 0 });
+    const v = views[id] || (views[id] = { y: GY - PH, puffs: [], pt: 0, ghost: null, ring: null, wasAlive: false });
     v.y += ((p.y ?? GY - PH) - v.y) * Math.min(1, dt * 12);
+    // The moment their last heart goes, puff them into a ghost on my screen too.
+    // wasAlive starts false on purpose: it only turns true once I have actually
+    // seen them flying, so a leftover "alive: false" from the previous race
+    // can't spawn a phantom ghost the instant this one begins.
+    if (v.wasAlive && !p.alive) {
+      v.ghost = { x: PX + 17, y: v.y + 18, vy: -120, wob: 0, fade: 0 };
+      v.ring  = { x: PX + 17, y: v.y + 18, life: 1 };
+    }
+    v.wasAlive = !!p.alive;
     smoke(v, dt, v.y, p.alive);
+    driftExtras(v, dt);
   }
 
   // tell everyone else where I am, about 12 times a second
   if (me.alive && now() - lastPush > 80) {
     lastPush = now();
     update(ref(db, `rooms/${room}/players/${uid}`),
-           { y: Math.round(me.y), score: me.score, stars: me.starCount });
+           { y: Math.round(me.y), score: me.score, stars: me.starCount, lives: me.lives });
   }
 
-  // race over when nobody is still flying
+  // race over when nobody is still flying — but let the ghosts float up first
   const anyAlive = lanes.some(id => id === uid ? me.alive : players[id] && players[id].alive);
-  if (!anyAlive && t > 0.5) endRace();
+  if (!anyAlive && t > 0.5) {
+    if (!allOutAt) allOutAt = now();
+    const risen = lanes.every(id => {
+      const g = (id === uid ? me : views[id] || {}).ghost;
+      return !g || g.y <= 64.5;
+    });
+    const waited = (now() - allOutAt) / 1000;
+    if ((risen && waited > 1.2) || waited > 6) endRace();
+  } else {
+    allOutAt = 0;
+  }
+}
+
+// sparks, the golden ring and the little ghost — all the bits that just drift
+function driftExtras(h, dt) {
+  h.sparks = h.sparks || [];
+  for (const k of h.sparks) { k.x += k.vx * dt; k.y += k.vy * dt; k.vy += 260 * dt; k.life -= dt / 0.5; }
+  h.sparks = h.sparks.filter(k => k.life > 0);
+
+  if (h.ring) {                              // golden ring: rises, widens, fades
+    h.ring.y -= 85 * dt;
+    h.ring.life -= dt / 1.2;
+    if (h.ring.life <= 0) h.ring = null;
+  }
+
+  if (h.ghost) {                             // ghost: floats up, then hovers and bobs
+    const g = h.ghost;
+    g.wob += dt;
+    g.fade = Math.min(1, g.fade + dt * 2.2);
+    if (g.y > 64) { g.y += g.vy * dt; g.vy = Math.min(-52, g.vy + 60 * dt); }
+    else g.y = 64;
+  }
+}
+
+// Grab a star: brushing it is enough, no landing required.
+function grabStar(o, dist) {
+  if (me.stars.has(o.id)) return;
+  me.stars.add(o.id);
+  me.starCount += o.tower ? TOWER_STARS : STAR_BONUS;
+  SFX.star();
+  const sx = PX + (o.x - dist) + o.w / 2, sy = starY(o);
+  for (let i = 0; i < 12; i++) {            // sparkle burst right where the star was
+    const a = Math.random() * Math.PI * 2;
+    me.sparks.push({ x: sx, y: sy, vx: Math.cos(a) * 95, vy: Math.sin(a) * 95 - 40, life: 1 });
+  }
+}
+
+// A bump costs one heart, not the whole race.
+// You get shoved on top of the box and blink for a moment where nothing can hurt you.
+function bonk(o) {
+  if (me.invuln > 0) return;         // still blinking from the last one
+  me.lives--;
+  me.invuln = SAFE_TIME;
+
+  SFX.bonk();
+  me.y = GY - o.h - PH;              // pop up on top of the box you clipped
+  me.vy = -260;                      // with a little ouch-bounce
+  me.onGround = false;
+
+  for (let i = 0; i < 14; i++) {     // red sparks so you can see what happened
+    const a = Math.random() * Math.PI * 2;
+    me.sparks.push({ x: PX + 17, y: me.y + 27, c: "#FF5D3B",
+                     vx: Math.cos(a) * 130, vy: Math.sin(a) * 130 - 30, life: 1 });
+  }
+
+  if (me.lives <= 0) {
+    me.lives = 0;
+    me.alive = false;
+    setTimeout(SFX.out, 120);
+    // ---- you become a little ghost, and a golden ring floats away ----
+    me.ghost = { x: PX + 17, y: me.y + 18, vy: -120, wob: 0, fade: 0 };
+    me.ring  = { x: PX + 17, y: me.y + 18, life: 1 };
+  }
+
+  update(ref(db, `rooms/${room}/players/${uid}`),
+         { alive: me.alive, lives: me.lives, score: me.score,
+           stars: me.starCount, y: Math.round(me.y) });
 }
 
 function smoke(holder, dt, y, alive = true) {
@@ -646,6 +790,7 @@ function boostPuffs() {
 
 async function endRace(publish = true) {
   running = false;
+  setTimeout(SFX.win, 500);
   const scores = lanes.map(id => ({
     name: players[id] ? players[id].name : "?",
     score: id === uid ? me.score : (players[id] ? players[id].score || 0 : 0)
@@ -671,14 +816,80 @@ async function endRace(publish = true) {
   }
 }
 
+// ---------- SOUND ----------
+// No sound files needed: the browser builds every beep out of thin air.
+let actx = null, soundOn = true;
+
+function audio() {
+  if (!soundOn) return null;
+  if (!actx) {
+    const A = window.AudioContext || window.webkitAudioContext;
+    if (!A) return null;
+    try { actx = new A(); } catch (err) { return null; }
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+
+// one beep: slides from one note to another
+function beep(type, from, to, dur, vol) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(from, a.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, to), a.currentTime + dur);
+  g.gain.setValueAtTime(vol, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0008, a.currentTime + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur + 0.02);
+}
+
+// a burst of static: whooshes, thuds and crashes are made of this
+function shhh(dur, vol, cutoff) {
+  const a = audio(); if (!a) return;
+  const frames = Math.floor(a.sampleRate * dur);
+  const buf = a.createBuffer(1, frames, a.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < frames; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / frames);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cutoff;
+  const g = a.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start();
+}
+
+const SFX = {
+  jump:  () => { beep("square", 300, 640, 0.13, 0.10); },
+  boost: () => { beep("sawtooth", 240, 900, 0.18, 0.07); shhh(0.20, 0.10, 1600); },
+  star:  () => { [880, 1174, 1568].forEach((f, i) => setTimeout(() => beep("sine", f, f, 0.10, 0.11), i * 55)); },
+  bonk:  () => { beep("triangle", 190, 55, 0.22, 0.16); shhh(0.16, 0.14, 700); },
+  out:   () => { beep("square", 420, 70, 0.55, 0.13); },
+  win:   () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep("square", f, f, 0.16, 0.10), i * 110)); },
+  tick:  () => { beep("square", 520, 520, 0.09, 0.09); },
+  go:    () => { beep("square", 660, 880, 0.16, 0.10); }
+};
+
+const sndBtn = document.getElementById("sndBtn");
+function toggleSound() {
+  soundOn = !soundOn;
+  sndBtn.textContent = soundOn ? "🔊" : "🔇";
+  if (soundOn) SFX.go();
+}
+sndBtn.addEventListener("click", toggleSound);
+
 // ---------- controls ----------
 // PRESS: on the ground = jump.  In the air = jetpack boost (costs one boost).
 function press() {
   if (!running || !me || !me.alive || raceTime() < 0) return;
   me.holding = true;
   me.holdTime = 0;
-  if (me.onGround) { me.vy = -JUMP_POWER; me.onGround = false; }
-  else if (me.boosts > 0) { me.boosts--; me.vy = -BOOST_POWER; boostPuffs(); }
+  if (me.onGround) { me.vy = -JUMP_POWER; me.onGround = false; SFX.jump(); }
+  else if (UNLIMITED || me.boosts > 0) {
+    if (!UNLIMITED) me.boosts--;
+    me.vy = -BOOST_POWER;
+    boostPuffs();
+    SFX.boost();
+  }
 }
 
 // RELEASE: let go while still going up and the jump gets cut short
@@ -688,14 +899,24 @@ function release() {
   if (me.alive && me.vy < 0) me.vy *= CUT;
 }
 
+// 닉네임·방 코드 칸에 글자를 치는 중에는 단축키가 끼어들면 안 된다.
+// (그러지 않으면 "f"가 든 닉네임을 못 쓰고, 스페이스도 안 먹힌다)
+const typing = e => {
+  const t = e.target;
+  return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+};
+
 document.addEventListener("keydown", e => {
+  if (typing(e)) return;
   if (e.code === "KeyF") { e.preventDefault(); toggleFull(); return; }
+  if (e.code === "KeyS") { e.preventDefault(); toggleSound(); return; }
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
     e.preventDefault();
     if (!e.repeat) press();
   }
 });
 document.addEventListener("keyup", e => {
+  if (typing(e)) return;
   if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") release();
 });
 
@@ -751,7 +972,7 @@ document.getElementById("shopHead").addEventListener("click", () => shopBox.clas
 function drawShop() {
   starBank.textContent = "⭐ " + bank.stars;
   shopNote.textContent = room
-    ? "Land on top of boxes to earn stars, then spend them here. Your stars follow your nickname, so they're waiting for you on any device."
+    ? "Fly through the floating stars to collect them, then spend them here. Your stars follow your nickname, so they're waiting for you on any device."
     : "Join a room first — your stars are saved under your nickname.";
 
   shopItems.innerHTML = "";
@@ -812,7 +1033,17 @@ function render() {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(n > 0 ? n : "GO!", canvas.width / 2, canvas.height / 2);
     ctx.textBaseline = "alphabetic";
+
+    // one beep per number, and a higher one on GO! — but only once each
+    if (n !== lastTick) { lastTick = n; n > 0 ? SFX.tick() : SFX.go(); }
   }
+}
+
+// The ⛶ and 🔊 buttons float over the top-right corner of the stage. Whatever
+// lane ends up under them has to shuffle its hearts and fuel badge inwards,
+// or the player can't see how many hearts they have left.
+function hudInset(left, top) {
+  return (top === 0 && left + laneW >= canvas.width - 1) ? 140 : 0;
 }
 
 // ---- tiny scoreboard, top right, only in full screen ----
@@ -862,10 +1093,13 @@ function drawMiniBoard() {
 function drawLane(id, i, dist) {
   const p = players[id]; if (!p) return;
   const mine  = id === uid;
+  // 내 것이면 실제 물리 상태, 남의 것이면 화면용 보관함(views)에서 꺼낸다
+  const h     = (mine && me) ? me : (views[id] || {});
   const alive = mine && me ? me.alive : !!p.alive;
-  const y     = mine && me ? me.y : (views[id] ? views[id].y : GY - PH);
-  const puffs = mine && me ? me.puffs : (views[id] ? views[id].puffs : []);
-  const sparks = mine && me ? me.sparks : [];
+  const y     = h.y ?? (GY - PH);
+  const puffs = h.puffs || [];
+  const sparks = h.sparks || [];
+  const lives = mine && me ? me.lives : (p.lives ?? LIVES_MAX);
   const look = lookOf(id, i);
   const left = laneLeft(i), top = laneTop(i);
   const myStars = mine && me ? me.stars : null;
@@ -878,6 +1112,19 @@ function drawLane(id, i, dist) {
   sky.addColorStop(0, css("--sky-top")); sky.addColorStop(1, css("--sky-bottom"));
   ctx.fillStyle = sky; ctx.fillRect(0, 0, LW, LH);
 
+  // clouds drift at a fraction of the world speed. Their x comes straight out of
+  // `dist`, so there is no per-frame state to keep in step between devices.
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  const span = LW + 120;
+  for (const c of clouds) {
+    const cx = ((c.x - dist * 0.15) % span + span) % span - 60;
+    ctx.beginPath();
+    ctx.arc(cx, c.y, 20 * c.s, 0, 7);
+    ctx.arc(cx + 24 * c.s, c.y + 6 * c.s, 15 * c.s, 0, 7);
+    ctx.arc(cx - 22 * c.s, c.y + 8 * c.s, 13 * c.s, 0, 7);
+    ctx.fill();
+  }
+
   ctx.fillStyle = css("--dirt");  ctx.fillRect(0, GY, LW, LH - GY);
   ctx.fillStyle = css("--grass"); ctx.fillRect(0, GY, LW, 13);
   ctx.fillStyle = "rgba(255,255,255,.35)";
@@ -885,17 +1132,39 @@ function drawLane(id, i, dist) {
   for (let x = -60; x < LW + 60; x += 60) ctx.fillRect(x - off, GY + 22, 22, 4);
 
   for (const o of obstacles) {
-    const ox = PX + (o.x - dist);
+    const ox = PX + (o.x - dist), by = GY - o.h;
     if (ox > LW + 40 || ox + o.w < -40) continue;
-    ctx.fillStyle = css("--block"); ctx.fillRect(ox, GY - o.h, o.w, o.h);
-    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.strokeRect(ox, GY - o.h, o.w, o.h);
+
+    ctx.fillStyle = o.tower ? "#8E7A66" : css("--block");
+    ctx.fillRect(ox, by, o.w, o.h);
+
+    if (o.tower) {                                   // bricks, windows and a flag
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      for (let y = by + 8; y < GY - 6; y += 16) ctx.fillRect(ox + 3, y, o.w - 6, 3);
+      ctx.fillStyle = "#FFD98A";
+      for (let y = by + 20; y < GY - 24; y += 42) {
+        ctx.fillRect(ox + 10, y, 11, 15);
+        ctx.fillRect(ox + o.w - 21, y, 11, 15);
+      }
+      ctx.fillStyle = "#E2445C";                     // flag on the roof
+      ctx.fillRect(ox + o.w / 2 - 1, by - 26, 2.5, 26);
+      ctx.beginPath();
+      ctx.moveTo(ox + o.w / 2 + 1.5, by - 26);
+      ctx.lineTo(ox + o.w / 2 + 22, by - 20);
+      ctx.lineTo(ox + o.w / 2 + 1.5, by - 14);
+      ctx.closePath(); ctx.fill();
+    }
+
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.strokeRect(ox, by, o.w, o.h);
     // 내 레인에만 "아직 안 먹은 별"을 띄운다 (남의 레인은 그 사람 사정)
-    if (mine && myStars && !myStars.has(o.id)) drawStar(ox + o.w / 2, GY - o.h - 20, 9, dist);
+    if (mine && myStars && !myStars.has(o.id)) {
+      drawStar(ox + o.w / 2, starY(o), o.tower ? 13 : 9, dist);
+    }
   }
 
   for (const k of sparks) {
     ctx.globalAlpha = Math.max(0, k.life);
-    ctx.fillStyle = "#FFE066";
+    ctx.fillStyle = k.c || "#FFE066";
     ctx.beginPath(); ctx.arc(k.x, k.y, 3, 0, 7); ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -911,7 +1180,9 @@ function drawLane(id, i, dist) {
   }
   ctx.globalAlpha = 1;
 
-  drawHero(y, alive, look, mine && me ? me.step : dist);
+  if (h.ring) drawRing(h.ring);
+  if (!alive && h.ghost) drawGhost(h.ghost, look);
+  else drawHero(y, alive, look, mine && me ? me.step : dist, mine && me ? me.invuln : 0);
   ctx.restore();
 
   ctx.fillStyle = look.suit;
@@ -922,18 +1193,80 @@ function drawLane(id, i, dist) {
   const sc = mine && me ? me.score : (p.score || 0);
   const stars = mine && me ? me.starCount : (p.stars || 0);
   ctx.fillText(p.name + (mine ? " (you)" : "") + "  " + sc + "  ⭐" + stars +
-               (alive ? "" : "  — out!"), left + 31, top + 24);
+               (alive ? "" : "  — 👻"), left + 31, top + 24);
 
-  // jetpack fuel: one pip per boost left (mine only — I don't get told about theirs)
-  if (mine && me) {
+  // hearts left — everyone sends theirs, so I can see who's nearly out
+  const hudR = left + laneW - 10 - hudInset(left, top);
+  ctx.font = "15px Trebuchet MS, sans-serif";
+  ctx.textAlign = "right";
+  for (let i2 = 0; i2 < LIVES_MAX; i2++) {
+    ctx.fillStyle = i2 < lives ? "#E2445C" : "rgba(255,255,255,0.5)";
+    ctx.fillText("♥", hudR - i2 * 14, top + 40);
+  }
+  ctx.textAlign = "left";
+
+  if (UNLIMITED) {                       // endless fuel
+    ctx.fillStyle = "#FF9A2E";
+    ctx.font = "bold 15px Trebuchet MS, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("🔥 ∞", hudR, top + 22);
+    ctx.textAlign = "left";
+  } else if (mine && me) {
+    // jetpack fuel: one pip per boost left (mine only — I don't get told about theirs)
     for (let i2 = 0; i2 < BOOSTS_MAX; i2++) {
-      const px = left + laneW - 16 - i2 * 13, py = top + 19;
+      const px = hudR - 6 - i2 * 13, py = top + 19;
       ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 7);
       ctx.fillStyle = (me.alive && i2 < me.boosts) ? "#FF9A2E" : "rgba(255,255,255,0.45)";
       ctx.fill();
       ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
     }
   }
+}
+
+// the golden ring that floats up out of you
+function drawRing(g) {
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, g.life) * 0.9;
+  ctx.strokeStyle = "#FFC53D";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.ellipse(g.x, g.y, 12 + (1 - g.life) * 20, 4 + (1 - g.life) * 7, 0, 0, 7);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// a friendly little ghost, wearing your colour
+function drawGhost(g, look) {
+  const x = g.x, y = g.y + Math.sin(g.wob * 3) * 4;
+
+  ctx.save();
+  ctx.globalAlpha = 0.55 + g.fade * 0.35;
+
+  // halo
+  ctx.strokeStyle = "#FFC53D"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(x, y - 30, 13, 4.5, 0, 0, 7); ctx.stroke();
+
+  // body: round head, wavy sheet at the bottom
+  ctx.beginPath();
+  ctx.arc(x, y, 16, Math.PI, 0);
+  ctx.lineTo(x + 16, y + 15);
+  ctx.quadraticCurveTo(x + 10.5, y + 25, x + 5.5, y + 15);
+  ctx.quadraticCurveTo(x, y + 25, x - 5.5, y + 15);
+  ctx.quadraticCurveTo(x - 10.5, y + 25, x - 16, y + 15);
+  ctx.closePath();
+  ctx.fillStyle = "#FFFFFF"; ctx.fill();
+  ctx.globalAlpha *= 0.3;
+  ctx.fillStyle = look.suit; ctx.fill();          // a hint of your own colour
+  ctx.globalAlpha = 0.55 + g.fade * 0.35;
+  ctx.strokeStyle = look.dark; ctx.lineWidth = 3; ctx.stroke();
+
+  // face
+  ctx.fillStyle = css("--ink");
+  ctx.beginPath(); ctx.ellipse(x - 5.5, y - 3, 2.6, 3.6, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 5.5, y - 3, 2.6, 3.6, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x, y + 6, 3.2, 2.2, 0, 0, 7); ctx.fill();
+
+  ctx.restore();
 }
 
 // a five-pointed star, floating above a box
@@ -951,8 +1284,10 @@ function drawStar(cx, cy, R, dist) {
   ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
 }
 
-function drawHero(y, alive, look, stepv) {
-  ctx.globalAlpha = alive ? 1 : .35;
+function drawHero(y, alive, look, stepv, invuln = 0) {
+  // blinking = just got bonked, nothing can hurt you for a moment
+  ctx.globalAlpha = !alive ? .35
+                  : (invuln > 0 && Math.floor(invuln * 12) % 2) ? .35 : 1;
   const onGround = y >= GY - PH - 2;
   const swing = onGround && alive ? Math.sin(stepv / 22) * 8 : 5;
   ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;

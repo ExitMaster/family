@@ -37,6 +37,27 @@
 
   h1 { margin: 0; font-size: 26px; letter-spacing: -0.5px; text-align: center; }
 
+  #fsBtn {
+    position: absolute; top: 9px; right: 9px; z-index: 6;
+    font-size: 14px; padding: 5px 11px; border-width: 3px; border-radius: 10px;
+    background: #fff; box-shadow: 0 3px 0 var(--ink);
+  }
+
+  #sndBtn {
+    position: absolute; top: 9px; right: 84px; z-index: 6;
+    font-size: 14px; padding: 5px 10px; border-width: 3px; border-radius: 10px;
+    background: #fff; box-shadow: 0 3px 0 var(--ink);
+  }
+  #stage.big #sndBtn { top: 14px; right: 92px; }
+
+  /* ---- FULL SCREEN ---- */
+  #stage.big {
+    position: fixed; inset: 0; z-index: 100; max-width: none;
+    border: 0; border-radius: 0; box-shadow: none; background: var(--ink);
+  }
+  #stage.big canvas { width: 100%; height: 100%; object-fit: contain; }
+  #stage.big #fsBtn { top: 14px; right: 14px; }
+
   #stage {
     position: relative; width: 100%; max-width: 720px;
     border: 6px solid var(--ink); border-radius: 18px; overflow: hidden;
@@ -52,6 +73,36 @@
     text-align: center; padding: 18px;
   }
   #overlay.hidden { display: none; }
+
+  /* ---- HOW TO PLAY SIGN ---- */
+  #howto {
+    position: absolute; inset: 0; z-index: 7; padding: 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(35,50,77,0.93); overflow: auto;
+  }
+  #howto.hidden { display: none; }
+  #howto .card {
+    background: #fff; color: var(--ink); border: 5px solid var(--ink);
+    border-radius: 18px; padding: 14px 18px; max-width: 470px; width: 100%;
+    text-align: left; box-shadow: 0 8px 0 rgba(0,0,0,.3);
+  }
+  #howto h2 { margin: 0 0 8px; font-size: 21px; text-align: center; }
+  #howto .rule { display: flex; gap: 9px; align-items: flex-start; margin: 5px 0; font-size: 14px; }
+  #howto .rule .em { font-size: 17px; width: 24px; text-align: center; flex: none; }
+  #keyList {
+    display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px;
+    border-top: 3px dashed #DDE3EC; padding-top: 10px;
+  }
+  #keyList .kc {
+    display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: bold;
+    background: #EFF2F7; border-radius: 999px; padding: 4px 10px;
+  }
+  #keyList .kc .cd { width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--ink); }
+  #goBtn { display: block; width: 100%; margin-top: 12px; font-size: 19px; }
+  #againWrap {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 12px; opacity: .7; margin-top: 9px; cursor: pointer;
+  }
   #overlay h2 { margin: 0; font-size: clamp(19px, 4.2vw, 30px); }
   #overlay p  { margin: 0; font-size: clamp(13px, 2.6vw, 16px); line-height: 1.5; }
   .label { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; }
@@ -81,12 +132,60 @@
   button:disabled { opacity: 0.45; cursor: not-allowed; }
   button:focus-visible, .chip:focus-visible { outline: 4px solid white; outline-offset: 3px; }
 
-  #board, #world {
+  #shop {
+    width: 100%; max-width: 720px; background: #fff; border: 5px solid var(--ink);
+    border-radius: 16px; box-shadow: 0 6px 0 rgba(35,50,77,.25); padding: 14px 18px;
+  }
+  #shop h3 {
+    margin: 0 0 6px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: .6;
+    cursor: pointer; user-select: none;
+  }
+  #shop h3:hover { opacity: .9; }
+  #oops {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999; cursor: pointer;
+    background: #E2445C; color: #fff; font-family: monospace; font-size: 13px;
+    padding: 8px 12px; line-height: 1.4; border-bottom: 4px solid #9B1F33;
+  }
+  .fold { display: inline-block; transition: transform .15s; }
+  #shop:not(.folded) .fold { transform: rotate(90deg); }
+  #shop.folded h3 { margin-bottom: 0; }
+  #shop.folded #shopBody { display: none; }
+  #starBank { float: right; letter-spacing: 0; font-size: 16px; opacity: 1; color: #C58B00; }
+  #whoTabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tab {
+    font-family: inherit; font-size: 14px; font-weight: bold; cursor: pointer;
+    background: #EFF2F7; color: var(--ink); border: 3px solid transparent;
+    border-radius: 999px; padding: 5px 12px; box-shadow: none;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab.on { border-color: var(--ink); background: #fff; }
+  .tab .cd { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); }
+  #shopItems { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 9px; }
+  .item {
+    font-family: inherit; cursor: pointer; text-align: center; line-height: 1.35;
+    background: #F7F9FC; color: var(--ink); border: 3px solid #DDE3EC;
+    border-radius: 13px; padding: 9px 6px; box-shadow: none; font-size: 13px;
+  }
+  .item .ico { font-size: 24px; display: block; }
+  .item .nm { font-weight: bold; }
+  .item .pr { font-size: 12px; opacity: .7; }
+  .item.owned { border-color: #9CC6F5; background: #F0F7FF; }
+  .item.worn  { border-color: var(--ink); background: #FFF3D6; }
+  .item.locked { opacity: .5; }
+
+  #board {
     width: 100%; max-width: 720px;
     background: white; border: 5px solid var(--ink); border-radius: 16px;
     box-shadow: 0 6px 0 rgba(35,50,77,0.25); padding: 14px 18px;
   }
-  #board h3, #world h3 { margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; }
+  #board h3 {
+    margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6;
+    cursor: pointer; user-select: none;
+  }
+  #board h3:hover { opacity: .9; }
+  #board:not(.folded) .fold { transform: rotate(90deg); }
+  #board.folded h3 { margin-bottom: 0; }
+  #board.folded #rows { display: none; }
   .row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; }
   .row + .row { margin-top: 5px; }
   .row.leader { background: #FFF3D6; }
@@ -97,6 +196,7 @@
   .who { font-weight: bold; font-size: 17px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .crown { font-size: 18px; width: 22px; }
   .now { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .stars { font-size: 14px; width: 52px; text-align: right; }
   .best { font-size: 13px; opacity: 0.65; width: 74px; text-align: right; }
 
   .note { font-size: 12.5px; opacity: 0.6; margin: 10px 0 0; line-height: 1.5; }
@@ -105,7 +205,6 @@
     font-size: 14px; padding: 6px 14px; box-shadow: 0 3px 0 var(--ink);
     background: white; margin-top: 10px;
   }
-  #worldStatus { font-size: 12px; letter-spacing: 0; text-transform: none; opacity: 0.7; }
 </style>
 </head>
 <body>
@@ -120,26 +219,72 @@
     <div id="picker"></div>
     <button id="startBtn">Start race</button>
   </div>
+  <div id="howto" class="hidden">
+    <div class="card">
+      <h2>🚀 How to play</h2>
+      <div class="rule"><span class="em">👆</span><span><b>Press your key</b> (or tap your own strip of the screen) to blast off.</span></div>
+      <div class="rule"><span class="em">⏱️</span><span><b>Hold it down to fly higher.</b> Let go early and you only do a little hop — that's how you sneak under things.</span></div>
+      <div class="rule"><span class="em">🔥</span><span><b>Tap again in mid-air for a jetpack boost</b> — it shoves you further. Right now your fuel is <b>endless (🔥 ∞)</b>, so you can keep tapping and keep climbing.</span></div>
+      <div class="rule"><span class="em">📦</span><span>Clear a box safely: <b>+1 point</b>.</span></div>
+      <div class="rule"><span class="em">⭐</span><span><b>Just touch a floating star</b> and it's yours: <b>+3 stars</b>. Brushing past counts — you don't have to land. Spend them in the avatar shop.</span></div>
+      <div class="rule"><span class="em">🛬</span><span>Coming down on a box counts as a <b>landing</b>, even a messy diagonal one. Only a proper smack into the <b>side</b> hurts.</span></div>
+      <div class="rule"><span class="em">♥</span><span>You have <b>3 hearts</b> (top right of your strip). A side-smack costs one heart, bounces you on top of the box, and you blink for a second where nothing can hurt you. Lose all 3 and you're out.</span></div>
+      <div class="rule"><span class="em">⛶</span><span>Press <b>F</b> or the ⛶ button for full screen.</span></div>
+      <div class="rule"><span class="em">🏰</span><span>Every so often a <b>giant tower</b> rears up with a red flag on top. Its star is worth <b>12 stars</b> — blast your way up there and grab it.</span></div>
+      <div id="keyList"></div>
+      <button id="goBtn">GO! 🚀</button>
+      <label id="againWrap"><input type="checkbox" id="showAgain" checked> show this before every race</label>
+    </div>
+  </div>
+  <button id="sndBtn" title="Sound on/off (S)">🔊</button>
+  <button id="fsBtn" title="Full screen (F)">⛶ Full</button>
 </div>
 
-<p class="label" style="opacity:.6">On a tablet, tap your own strip of the screen to jump.</p>
+<p class="label" style="opacity:.6">
+  <b>Hold</b> to jump higher &nbsp;·&nbsp; tap again in mid-air for a jetpack <b>boost</b> (3 per flight, the orange dots) &nbsp;·&nbsp; <b>♥ 3 hearts</b> each
+  <br>Tap your own strip of the screen to jump &nbsp;·&nbsp; ⛶ button or <b>F</b> key for full screen
+</p>
+
+<div id="shop">
+  <h3 id="shopHead"><span class="fold">▶</span> ✨ Avatar shop <span id="starBank">⭐ 0</span></h3>
+  <div id="shopBody">
+    <p class="note" style="margin:0 0 12px">
+      Land on top of boxes to earn stars, then spend them on decorations.
+      Pick who you're dressing up, then tap an item to buy or wear it.
+      <br><span style="opacity:.7">(tap "Avatar shop" up there to fold it away)</span>
+    </p>
+    <div id="whoTabs"></div>
+    <div id="shopItems"></div>
+  </div>
+</div>
 
 <div id="board">
-  <h3>Scoreboard</h3>
+  <h3 id="boardHead"><span class="fold">▶</span> Scoreboard <span id="liveCount" style="float:right;font-size:13px"></span></h3>
   <div id="rows"></div>
 </div>
 
-<div id="world">
-  <h3>🌍 World board <span id="worldStatus">loading…</span></h3>
-  <div id="worldRows"></div>
-  <button id="refreshBtn" class="small">Refresh</button>
-  <p class="note">
-    Best scores from everyone playing this game, on any device. Anyone who plays can
-    see these names, so use nicknames only — never your real full name, school or address.
-  </p>
-</div>
+
 
 <script>
+// ---------- if anything breaks, say so on screen (not hidden in the console) ----------
+function showOops(text) {
+  let box = document.getElementById("oops");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "oops";
+    box.title = "tap to hide";
+    box.addEventListener("click", () => box.remove());
+    document.body.appendChild(box);
+  }
+  box.textContent = "⚠️ " + text + "   (tap to hide)";
+}
+window.addEventListener("error", e => {
+  showOops((e.message || "something broke") + "  — line " + (e.lineno || "?"));
+});
+window.addEventListener("unhandledrejection", e => {
+  showOops("waiting-job broke: " + ((e.reason && e.reason.message) || e.reason));
+});
+
 // ============================================================
 //  JETPACK JUMP  —  pick any 1 to 4 heroes
 // ============================================================
@@ -148,10 +293,23 @@ const NAMES = ["unimai17", "aidooony2020", "ys", "hykim88", "guest", "guest 2", 
 const KEYS  = ["W / SPACE", "↑", "T", "I", "B", "N", "M"];
 const KEYCODES = [["KeyW", "Space"], ["ArrowUp"], ["KeyT"], ["KeyI"], ["KeyB"], ["KeyN"], ["KeyM"]];
 
-const JUMP_POWER  = 760;   // bigger = jump higher
+const JUMP_POWER  = 620;   // the pop you get the instant you press
+const HOLD_EASE   = 0.35;  // gravity while you keep holding (smaller = floatier)
+const HOLD_MAX    = 0.30;  // holding only helps for this long (seconds)
+const CUT         = 0.45;  // let go early and the jump gets chopped this much
+const BOOST_POWER = 400;   // mid-air jetpack tap
+const BOOSTS_MAX  = 3;     // boosts you get per trip through the air (ignored when UNLIMITED)
+const UNLIMITED   = true;  // TRUE = infinite jetpack blasts
+const TOWER_EVERY = 9;     // a giant tower shows up after this many normal boxes
+const TOWER_STARS = 12;    // reaching a tower's star is worth this much
+const MAX_AIR     = 0.95;  // longest possible time in the air
 const GRAVITY     = 2000;  // bigger = fall faster
 const START_SPEED = 330;   // how fast the world moves at the start
 const SPEED_UP    = 9;     // how much faster it gets every second
+const STAR_BONUS  = 3;     // stars you earn for landing on a box
+const LIVES_MAX   = 3;     // hearts everybody starts with
+const LAND_GRACE  = 26;    // a landing can be this sloppy and still count as a landing
+const SAFE_TIME   = 1.4;   // seconds of blinking "can't be hurt" after a bonk
 
 const LH = 320;            // each player's screen, measured inside the game
 const GY = LH - 50;        // where the ground is
@@ -175,9 +333,31 @@ let running = false, lastTime = 0, laneH = 320, laneW = 720, scale = 1, LW = 720
 let cols = 1, rows = 1;
 let bests = [0, 0, 0, 0, 0, 0, 0];
 let boardRows = [];
+let nextBlockId = 0;
 
 function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-function heroColor(i) { return css("--p" + (i + 1) + "-suit"); }
+// ---------- the paint box ----------
+const COLORS = [
+  { id: "own",     name: "Own colour", cost: 0,  suit: null,      dark: null      },
+  { id: "sky",     name: "Sky",        cost: 4,  suit: "#38BDF8", dark: "#0369A1" },
+  { id: "lime",    name: "Lime",       cost: 4,  suit: "#7CD62B", dark: "#4A8A0C" },
+  { id: "cherry",  name: "Cherry",     cost: 5,  suit: "#E2445C", dark: "#9B1F33" },
+  { id: "grape",   name: "Grape",      cost: 6,  suit: "#A96BFF", dark: "#6E37C4" },
+  { id: "mango",   name: "Mango",      cost: 6,  suit: "#FF7A1A", dark: "#B94D00" },
+  { id: "bubble",  name: "Bubblegum",  cost: 8,  suit: "#FF5FA2", dark: "#C42E6C" },
+  { id: "gold",    name: "Gold",       cost: 9,  suit: "#FFC53D", dark: "#B57F00" },
+  { id: "mint",    name: "Mint",       cost: 9,  suit: "#17BEBB", dark: "#0C7F7D" },
+  { id: "ninja",   name: "Ninja",      cost: 12, suit: "#3A3F4B", dark: "#15181F" },
+  { id: "ghost",   name: "Ghost",      cost: 12, suit: "#EDF2F7", dark: "#9AA6B4" }
+];
+
+// which colour hero i is actually wearing (null = the colour they were born with)
+function colorOf(i) {
+  const c = COLORS.find(c => c.id === looks[i].color);
+  if (c && c.suit) return c;
+  return { suit: css("--p" + (i + 1) + "-suit"), dark: css("--p" + (i + 1) + "-dark") };
+}
+function heroColor(i) { return colorOf(i).suit; }
 
 // ---------- the "who's playing" picker ----------
 function buildPicker() {
@@ -210,6 +390,8 @@ function refreshStart() {
 function newGame() {
   const picked = NAMES.map((_, i) => i).filter(i => chosen[i]);
   if (picked.length === 0) return;
+  ghostShow = -1;
+  sinceTower = 4;
 
   const n = picked.length;
   cols  = COLUMNS[n];
@@ -222,13 +404,17 @@ function newGame() {
 
   runners = picked.map((hero, lane) => ({
     hero: hero, lane: lane, name: NAMES[hero],
-    suit: "--p" + (hero + 1) + "-suit", dark: "--p" + (hero + 1) + "-dark",
+    suit: colorOf(hero).suit, dark: colorOf(hero).dark,
     x: 90, y: GY - 54, w: 34, h: 54, vy: 0, onGround: true, step: 0,
-    puffs: [], puffTimer: 0,
+    holding: false, holdTime: 0, boosts: BOOSTS_MAX,
+    lives: LIVES_MAX, invuln: 0, ghost: null, ring: null,
+    puffs: [], puffTimer: 0, sparks: [],
+    stars: new Set(), starCount: 0, passed: new Set(),
     alive: true, score: 0
   }));
 
   blocks = [];
+  nextBlockId = 0;
   clouds = [];
   for (let i = 0; i < 5; i++) {
     clouds.push({ x: Math.random() * LW, y: 30 + Math.random() * 90, s: 0.6 + Math.random() * 0.7 });
@@ -243,14 +429,52 @@ function newGame() {
   requestAnimationFrame(loop);
 }
 
-function jump(hero) {
+// PRESS: on the ground = jump.  In the air = jetpack boost (costs one boost).
+function press(hero) {
   if (!running) return;
   const r = runners.find(r => r.hero === hero);
-  if (r && r.alive && r.onGround) { r.vy = -JUMP_POWER; r.onGround = false; }
+  if (!r || !r.alive) return;
+
+  r.holding = true;
+  r.holdTime = 0;
+
+  if (r.onGround) {
+    r.vy = -JUMP_POWER;
+    r.onGround = false;
+    SFX.jump();
+  } else if (UNLIMITED || r.boosts > 0) {
+    if (!UNLIMITED) r.boosts--;
+    r.vy = -BOOST_POWER;
+    boostPuffs(r);
+    SFX.boost();
+  }
+}
+
+// RELEASE: let go while still going up and the jump gets cut short
+function release(hero) {
+  const r = runners.find(r => r.hero === hero);
+  if (!r) return;
+  r.holding = false;
+  if (r.alive && r.vy < 0) r.vy *= CUT;
+}
+
+// a big cough of smoke when the jetpack fires
+function boostPuffs(r) {
+  for (let i = 0; i < 9; i++) {
+    r.puffs.push({
+      x: r.x + 2 + Math.random() * 6,
+      y: r.y + 34 + Math.random() * 4,
+      size: 5 + Math.random() * 4,
+      vx: -40 - Math.random() * 70,
+      vy: 40 + Math.random() * 70,
+      life: 1
+    });
+  }
 }
 
 function gameOver() {
   running = false;
+  setTimeout(SFX.win, 500);
   for (const r of runners) bests[r.hero] = Math.max(bests[r.hero], r.score);
 
   const top = Math.max(...runners.map(r => r.score));
@@ -264,9 +488,10 @@ function gameOver() {
     msg.textContent = runners.map(r => r.name + ": " + r.score).join("   •   ");
   }
   startBtn.textContent = "Play again";
+  for (const r of runners) looks[r.hero].stars += r.starCount;
+  drawShop();
   overlay.classList.remove("hidden");
   updateBoard();
-  postWorld();
 }
 
 // ---------- scoreboard (everyone always has a row) ----------
@@ -280,11 +505,13 @@ function buildBoard() {
       '<div class="dot" style="background:' + heroColor(i) + '"></div>' +
       '<div class="who">' + name + '</div>' +
       '<div class="crown"></div>' +
+      '<div class="stars">⭐ 0</div>' +
       '<div class="now">—</div>' +
       '<div class="best">best 0</div>';
     rowsEl.appendChild(row);
     boardRows.push({
       row: row, crown: row.querySelector(".crown"),
+      starEl: row.querySelector(".stars"),
       nowEl: row.querySelector(".now"), bestEl: row.querySelector(".best")
     });
   });
@@ -293,11 +520,21 @@ function buildBoard() {
 function updateBoard() {
   const top = runners.length ? Math.max(...runners.map(r => r.score)) : 0;
 
+  // a peek at who's winning, so the folded header still tells you something
+  if (runners.length) {
+    const lead = runners.find(r => r.score === top);
+    const alive = runners.filter(r => r.alive).length;
+    liveCount.textContent = "👑 " + lead.name + " " + top + "   ·   " + alive + " flying";
+  } else {
+    liveCount.textContent = "";
+  }
+
   boardRows.forEach((el, i) => {
     const r = runners.find(r => r.hero === i);
 
     if (!r) {                       // sitting out, but their best score stays
       el.nowEl.textContent  = "—";
+      el.starEl.textContent = "";
       el.bestEl.textContent = "best " + bests[i];
       el.crown.textContent  = "";
       el.row.className = "row sitting";
@@ -306,6 +543,7 @@ function updateBoard() {
 
     const lead = runners.length > 1 && r.score === top && top > 0;
     el.nowEl.textContent  = r.score;
+    el.starEl.textContent = "⭐ " + r.starCount;
     el.bestEl.textContent = "best " + Math.max(bests[i], r.score);
     el.crown.textContent  = lead ? "👑" : "";
     el.row.className = "row" + (r.alive ? "" : " out") + (lead ? " leader" : "");
@@ -320,8 +558,12 @@ function loop(now) {
   else draw();
 }
 
+let sinceTower = 4;          // boxes built since the last tower
+let ghostShow = -1;          // -1 = race is on. 0 and up = counting while the ghosts rise.
+
 function update(dt) {
-  speed  += SPEED_UP * dt;
+  if (ghostShow >= 0) speed *= 0.965;      // everybody's out: the world glides to a stop
+  else speed += SPEED_UP * dt;
   worldX += speed * dt;
   const move = (speed / scale) * dt;
 
@@ -334,10 +576,18 @@ function update(dt) {
   blocks = blocks.filter(b => b.x + b.w > -30);
 
   const last = blocks[blocks.length - 1];
-  const jumpDist  = (speed / scale) * (2 * JUMP_POWER / GRAVITY);
-  const gapNeeded = jumpDist * (1.25 + Math.random() * 0.85);
-  if (!last || LW - (last.x + last.w) > gapNeeded) {
-    blocks.push({ x: LW + 20, h: 30 + Math.random() * 28, w: 28 + Math.random() * 18 });
+  const jumpDist  = (speed / scale) * MAX_AIR;
+  const gapNeeded = jumpDist * (1.00 + Math.random() * 0.68);
+  const wantTower = sinceTower >= TOWER_EVERY;
+  const needed = gapNeeded * (wantTower ? 1.9 : 1);      // towers need a longer run-up
+  if (!last || LW - (last.x + last.w) > needed) {
+    if (wantTower) {
+      blocks.push({ id: nextBlockId++, x: LW + 20, h: 168 + Math.random() * 42, w: 50, tower: true });
+      sinceTower = 0;
+    } else {
+      blocks.push({ id: nextBlockId++, x: LW + 20, h: 30 + Math.random() * 28, w: 28 + Math.random() * 18 });
+      sinceTower++;
+    }
   }
 
   // ---- SMOKE TRAIL ----
@@ -366,24 +616,123 @@ function update(dt) {
     }
     r.puffs = r.puffs.filter(s => s.life > 0 && s.x > -80);
     if (r.puffs.length > 140) r.puffs.splice(0, r.puffs.length - 140);
+
+    for (const k of r.sparks) {
+      k.x += k.vx * dt - move; k.y += k.vy * dt; k.vy += 260 * dt; k.life -= dt / 0.5;
+    }
+    r.sparks = r.sparks.filter(k => k.life > 0);
+
+    if (r.ring) {                              // golden ring: rises, widens, fades
+      r.ring.y -= 85 * dt;
+      r.ring.life -= dt / 1.2;
+      if (r.ring.life <= 0) r.ring = null;
+    }
+
+    if (r.ghost) {                             // ghost: floats up, then hovers and bobs
+      const g = r.ghost;
+      g.wob += dt;
+      g.fade = Math.min(1, g.fade + dt * 2.2);
+      if (g.y > 64) { g.y += g.vy * dt; g.vy = Math.min(-52, g.vy + 60 * dt); }
+      else g.y = 64;
+    }
   }
 
   for (const r of runners) {
     if (!r.alive) continue;
-    r.score += Math.round(speed * dt * 0.1);
-    r.vy += GRAVITY * dt;
+
+    const wasBottom = r.y + r.h;     // where my feet were a moment ago
+    r.onGround = false;              // I'm falling unless something holds me up
+
+    // still holding the key AND still going up? gravity goes easy on you
+    if (r.holding) r.holdTime += dt;
+    if (r.invuln > 0) r.invuln -= dt;
+    const floaty = r.holding && r.vy < 0 && r.holdTime < HOLD_MAX;
+    r.vy += GRAVITY * (floaty ? HOLD_EASE : 1) * dt;
     r.y  += r.vy * dt;
-    if (r.y >= GY - r.h) { r.y = GY - r.h; r.vy = 0; r.onGround = true; }
-    if (r.onGround) r.step += move;
+
+    if (r.y < 6) { r.y = 6; if (r.vy < 0) r.vy = 0; }        // sky ceiling: you can't leave the screen
+    if (r.y >= GY - r.h) { r.y = GY - r.h; r.vy = 0; r.onGround = true; r.boosts = BOOSTS_MAX; }
+
+    // ---- FLY THROUGH A STAR AND IT'S YOURS ----
+    for (const b of blocks) {
+      if (r.stars.has(b.id)) continue;
+      const sx = b.x + b.w / 2, sy = GY - b.h - (b.tower ? 42 : 20);   // where the star floats
+      const nx = Math.max(r.x + 4, Math.min(sx, r.x + r.w - 4));   // nearest bit of me
+      const ny = Math.max(r.y,     Math.min(sy, r.y + r.h));
+      const dx = sx - nx, dy = sy - ny;
+      if (dx * dx + dy * dy < 16 * 16) grabStar(r, b);
+    }
 
     for (const b of blocks) {
-      const by = GY - b.h;
-      if (r.x + 6 < b.x + b.w && r.x + r.w - 6 > b.x &&
-          r.y + 8 < by + b.h  && r.y + r.h > by) { r.alive = false; }
+      const by = GY - b.h;           // the top of the box
+      if (!(r.x + 6 < b.x + b.w && r.x + r.w - 6 > b.x)) {
+        if (!r.passed.has(b.id) && b.x + b.w < r.x) { r.passed.add(b.id); r.score += 1; }
+        continue;
+      }
+
+      if (r.vy >= 0 && r.y + r.h >= by && wasBottom <= by + LAND_GRACE) {
+        // ---- LANDED NEATLY ON TOP: that's a star, not a crash ----
+        r.y = by - r.h; r.vy = 0; r.onGround = true; r.boosts = BOOSTS_MAX;
+        grabStar(r, b);
+      } else if (r.y + 8 < by + b.h && r.y + r.h > by) {
+        bonk(r, b);                  // smacked into the side: lose a heart
+      }
+
+      // ---- ONE POINT for every box you get safely past ----
+      if (!r.passed.has(b.id) && b.x + b.w < r.x) { r.passed.add(b.id); r.score += 1; }
     }
+
+    if (r.onGround) r.step += move;
   }
 
-  if (runners.every(r => !r.alive)) gameOver();
+  // ---- everybody's a ghost: let them float all the way up before the menu appears ----
+  if (runners.every(r => !r.alive)) {
+    if (ghostShow < 0) ghostShow = 0;
+    ghostShow += dt;
+    const risen = runners.every(r => !r.ghost || r.ghost.y <= 64.5);
+    if ((risen && ghostShow > 1.2) || ghostShow > 6) gameOver();
+  }
+}
+
+// Grab a star: brushing it is enough, no landing required.
+function grabStar(r, b) {
+  if (r.stars.has(b.id)) return;
+  r.stars.add(b.id);
+  r.starCount += b.tower ? TOWER_STARS : STAR_BONUS;
+  SFX.star();
+  const sx = b.x + b.w / 2, sy = GY - b.h - (b.tower ? 42 : 20);
+  for (let i = 0; i < 12; i++) {            // sparkle burst right where the star was
+    const a = Math.random() * Math.PI * 2;
+    r.sparks.push({ x: sx, y: sy, vx: Math.cos(a) * 95, vy: Math.sin(a) * 95 - 40, life: 1 });
+  }
+}
+
+// A bump costs one heart, not the whole race.
+// You get shoved on top of the box and blink for a moment where nothing can hurt you.
+function bonk(r, b) {
+  if (r.invuln > 0) return;          // still blinking from the last one
+  r.lives--;
+  r.invuln = SAFE_TIME;
+
+  SFX.bonk();
+  r.y = GY - b.h - r.h;              // pop up on top of the box you clipped
+  r.vy = -260;                       // with a little ouch-bounce
+  r.onGround = false;
+
+  for (let i = 0; i < 14; i++) {     // red sparks so you can see what happened
+    const a = Math.random() * Math.PI * 2;
+    r.sparks.push({ x: r.x + 17, y: r.y + 27, c: "#FF5D3B",
+                    vx: Math.cos(a) * 130, vy: Math.sin(a) * 130 - 30, life: 1 });
+  }
+
+  if (r.lives <= 0) {
+    r.lives = 0;
+    r.alive = false;
+    setTimeout(SFX.out, 120);
+    // ---- you become a little ghost, and a golden ring floats away ----
+    r.ghost = { x: r.x + 17, y: r.y + 18, vy: -120, wob: 0, fade: 0 };
+    r.ring  = { x: r.x + 17, y: r.y + 18, life: 1 };
+  }
 }
 
 // ---------- drawing ----------
@@ -396,6 +745,54 @@ function draw() {
   ctx.fillStyle = css("--ink");            // lines between the screens
   for (let i = 1; i < rows; i++) ctx.fillRect(0, laneH * i - 3, canvas.width, 6);
   for (let i = 1; i < cols; i++) ctx.fillRect(laneW * i - 3, 0, 6, canvas.height);
+
+  drawMiniBoard();
+}
+
+// The ⛶ and 🔊 buttons float over the top-right corner of the stage. Whatever
+// lane ends up under them has to shuffle its hearts and fuel badge inwards,
+// or the player can't see how many hearts they have left.
+function hudInset(left, top) {
+  return (top === 0 && left + laneW >= canvas.width - 1) ? 140 : 0;
+}
+
+// ---- tiny scoreboard, top right, only in full screen ----
+// (in full screen the real scoreboard is off the page, so we draw a little one here)
+function drawMiniBoard() {
+  if (!isBig() || !runners.length) return;
+
+  const rowH = 21, pad = 9, w = 168;
+  const h = pad * 2 + runners.length * rowH;
+  const x = canvas.width - w - 14, y = 54;
+
+  ctx.save();
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, 12);
+  else ctx.rect(x, y, w, h);
+  ctx.fillStyle = "rgba(255,255,255,0.88)"; ctx.fill();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.stroke();
+
+  ctx.textBaseline = "middle";
+  runners.forEach((r, i) => {
+    const ry = y + pad + i * rowH + rowH / 2;
+
+    ctx.fillStyle = r.suit;
+    ctx.beginPath(); ctx.arc(x + pad + 6, ry, 5, 0, 7); ctx.fill();
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.globalAlpha = r.alive ? 1 : 0.4;
+    ctx.fillStyle = css("--ink");
+    ctx.font = "bold 12px Trebuchet MS, sans-serif";
+    ctx.textAlign = "left";
+    const nm = r.name.length > 9 ? r.name.slice(0, 8) + "…" : r.name;
+    ctx.fillText(nm, x + pad + 17, ry);
+    ctx.textAlign = "right";
+    ctx.fillText(r.score + "   ⭐" + r.starCount, x + w - pad, ry);
+    ctx.globalAlpha = 1;
+  });
+
+  ctx.textBaseline = "alphabetic";
+  ctx.restore();
 }
 
 // where on the canvas does this player's screen sit?
@@ -433,34 +830,160 @@ function drawLane(r) {
   for (let x = -60; x < LW + 60; x += 60) ctx.fillRect(x - off, GY + 22, 22, 4);
 
   for (const b of blocks) {
-    ctx.fillStyle = css("--block");
-    ctx.fillRect(b.x, GY - b.h, b.w, b.h);
+    const by = GY - b.h;
+    ctx.fillStyle = b.tower ? "#8E7A66" : css("--block");
+    ctx.fillRect(b.x, by, b.w, b.h);
+
+    if (b.tower) {                                   // bricks, windows and a flag
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      for (let y = by + 8; y < GY - 6; y += 16) ctx.fillRect(b.x + 3, y, b.w - 6, 3);
+      ctx.fillStyle = "#FFD98A";
+      for (let y = by + 20; y < GY - 24; y += 42) {
+        ctx.fillRect(b.x + 10, y, 11, 15);
+        ctx.fillRect(b.x + b.w - 21, y, 11, 15);
+      }
+      ctx.fillStyle = "#E2445C";                     // flag on the roof
+      ctx.fillRect(b.x + b.w / 2 - 1, by - 26, 2.5, 26);
+      ctx.beginPath();
+      ctx.moveTo(b.x + b.w / 2 + 1.5, by - 26);
+      ctx.lineTo(b.x + b.w / 2 + 22, by - 20);
+      ctx.lineTo(b.x + b.w / 2 + 1.5, by - 14);
+      ctx.closePath(); ctx.fill();
+    }
+
     ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
-    ctx.strokeRect(b.x, GY - b.h, b.w, b.h);
+    ctx.strokeRect(b.x, by, b.w, b.h);
+    if (!r.stars.has(b.id)) drawStar(b.x + b.w / 2, by - (b.tower ? 42 : 20), b.tower ? 13 : 9);
   }
 
+  for (const k of r.sparks) {                 // sparkles from collecting a star
+    ctx.globalAlpha = Math.max(0, k.life);
+    ctx.fillStyle = k.c || "#FFE066";
+    ctx.beginPath(); ctx.arc(k.x, k.y, 3, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
   // smoke first, so the hero is drawn on top of it
+  const trail = looks[r.hero].trail;
   for (const s of r.puffs) {
-    ctx.globalAlpha = Math.max(0, s.life) * 0.5;
-    ctx.fillStyle = "#EDF2F8";
+    ctx.globalAlpha = Math.max(0, s.life) * (trail === "white" ? 0.5 : 0.75);
+    ctx.fillStyle =
+      trail === "fire"    ? (s.life > 0.6 ? "#FF9A2E" : s.life > 0.3 ? "#FF5D3B" : "#8A8A8A") :
+      trail === "rainbow" ? "hsl(" + Math.round((s.x * 2 + worldX) % 360) + ",90%,62%)" :
+      trail === "sparkle" ? (Math.random() < 0.5 ? "#FFE066" : "#FFFFFF") :
+                            "#EDF2F8";
     ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, 7); ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  drawHero(r);
+  if (r.ring) drawRing(r);
+  if (!r.alive && r.ghost) drawGhost(r); else drawHero(r);
   ctx.restore();
 
-  ctx.fillStyle = css(r.suit);
+  ctx.fillStyle = r.suit;
   ctx.beginPath(); ctx.arc(left + 18, top + 19, 7, 0, 7); ctx.fill();
   ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
   ctx.fillStyle = css("--ink");
   ctx.font = "bold 14px Trebuchet MS, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(r.name + "  " + r.score + (r.alive ? "" : "  — out!"), left + 31, top + 24);
+  ctx.fillText(r.name + "  " + r.score + "  ⭐" + r.starCount +
+               (r.alive ? "" : "  — 👻"), left + 31, top + 24);
+
+  // hearts left
+  const hudR = left + laneW - 10 - hudInset(left, top);
+  ctx.font = "15px Trebuchet MS, sans-serif";
+  ctx.textAlign = "right";
+  for (let i = 0; i < LIVES_MAX; i++) {
+    ctx.fillStyle = i < r.lives ? "#E2445C" : "rgba(255,255,255,0.5)";
+    ctx.fillText("♥", hudR - i * 14, top + 40);
+  }
+  ctx.textAlign = "left";
+
+  if (UNLIMITED) {                       // endless fuel
+    ctx.fillStyle = "#FF9A2E";
+    ctx.font = "bold 15px Trebuchet MS, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("🔥 ∞", hudR, top + 22);
+    ctx.textAlign = "left";
+  } else
+  // jetpack fuel: one pip per boost left
+  for (let i = 0; i < BOOSTS_MAX; i++) {
+    const px = hudR - 6 - i * 13, py = top + 19;
+    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 7);
+    ctx.fillStyle = (r.alive && i < r.boosts) ? "#FF9A2E" : "rgba(255,255,255,0.45)";
+    ctx.fill();
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+// the golden ring that floats up out of you
+function drawRing(r) {
+  const g = r.ring;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, g.life) * 0.9;
+  ctx.strokeStyle = "#FFC53D";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.ellipse(g.x, g.y, 12 + (1 - g.life) * 20, 4 + (1 - g.life) * 7, 0, 0, 7);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// a friendly little ghost, wearing your colour
+function drawGhost(r) {
+  const g = r.ghost;
+  const x = g.x, y = g.y + Math.sin(g.wob * 3) * 4;
+
+  ctx.save();
+  ctx.globalAlpha = 0.55 + g.fade * 0.35;
+
+  // halo
+  ctx.strokeStyle = "#FFC53D"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(x, y - 30, 13, 4.5, 0, 0, 7); ctx.stroke();
+
+  // body: round head, wavy sheet at the bottom
+  ctx.beginPath();
+  ctx.arc(x, y, 16, Math.PI, 0);
+  ctx.lineTo(x + 16, y + 15);
+  ctx.quadraticCurveTo(x + 10.5, y + 25, x + 5.5, y + 15);
+  ctx.quadraticCurveTo(x, y + 25, x - 5.5, y + 15);
+  ctx.quadraticCurveTo(x - 10.5, y + 25, x - 16, y + 15);
+  ctx.closePath();
+  ctx.fillStyle = "#FFFFFF"; ctx.fill();
+  ctx.globalAlpha *= 0.3;
+  ctx.fillStyle = r.suit; ctx.fill();            // a hint of your own colour
+  ctx.globalAlpha = 0.55 + g.fade * 0.35;
+  ctx.strokeStyle = r.dark; ctx.lineWidth = 3; ctx.stroke();
+
+  // face
+  ctx.fillStyle = css("--ink");
+  ctx.beginPath(); ctx.ellipse(x - 5.5, y - 3, 2.6, 3.6, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x + 5.5, y - 3, 2.6, 3.6, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x, y + 6, 3.2, 2.2, 0, 0, 7); ctx.fill();
+
+  ctx.restore();
+}
+
+// a five-pointed star, floating above a box
+function drawStar(cx, cy, R) {
+  const bob = Math.sin(worldX / 40 + cx) * 3;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + i * Math.PI / 5;
+    const rad = i % 2 ? R * 0.45 : R;
+    const x = cx + Math.cos(ang) * rad, y = cy + bob + Math.sin(ang) * rad;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = "#FFD93D";
+  ctx.fill();
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.stroke();
 }
 
 function drawHero(p) {
-  ctx.globalAlpha = p.alive ? 1 : 0.35;
+  const look = looks[p.hero];
+  ctx.globalAlpha = !p.alive ? 0.35
+                  : (p.invuln > 0 && Math.floor(p.invuln * 12) % 2) ? 0.35 : 1;
   const swing = p.onGround && p.alive ? Math.sin(p.step / 22) * 8 : 5;
   ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
 
@@ -476,13 +999,15 @@ function drawHero(p) {
     ctx.lineTo(p.x + 3, p.y + 34 + flick * 0.6); ctx.fill();
   }
 
-  ctx.fillStyle = css(p.dark);
+  drawCape(p, look.cape);
+
+  ctx.fillStyle = p.dark;
   ctx.fillRect(p.x - 3, p.y + 16, 10, 20);
   ctx.strokeRect(p.x - 3, p.y + 16, 10, 20);
   ctx.fillRect(p.x + 7,  p.y + 36 + Math.max(0, swing),  9, 18 - Math.max(0, swing));
   ctx.fillRect(p.x + 20, p.y + 36 + Math.max(0, -swing), 9, 18 - Math.max(0, -swing));
 
-  ctx.fillStyle = css(p.suit);
+  ctx.fillStyle = p.suit;
   ctx.fillRect(p.x + 6, p.y + 20, p.w - 10, 18);
   ctx.strokeRect(p.x + 6, p.y + 20, p.w - 10, 18);
 
@@ -490,7 +1015,7 @@ function drawHero(p) {
   ctx.fillRect(p.x + p.w - 5, p.y + 22, 8, 11);
   ctx.beginPath(); ctx.arc(p.x + p.w / 2 + 1, p.y + 12, 11, 0, 7); ctx.fill(); ctx.stroke();
 
-  ctx.fillStyle = css(p.suit);
+  ctx.fillStyle = p.suit;
   ctx.beginPath(); ctx.arc(p.x + p.w / 2 + 1, p.y + 10, 12, Math.PI, Math.PI * 2);
   ctx.fill(); ctx.stroke();
 
@@ -498,102 +1023,294 @@ function drawHero(p) {
   ctx.fillRect(p.x + 12, p.y + 8, 16, 7);
   ctx.strokeRect(p.x + 12, p.y + 8, 16, 7);
 
+  drawHat(p, look.hat);
   ctx.globalAlpha = 1;
 }
 
-// ============================================================
-//  WORLD BOARD  —  one shared list of best scores, for every device
-// ============================================================
-const WORLD_KEY  = "jetpack_world_board";
-const worldRows  = document.getElementById("worldRows");
-const worldState = document.getElementById("worldStatus");
-const refreshBtn = document.getElementById("refreshBtn");
-
-// is the shared storage actually available here?
-const CLOUD = (typeof window !== "undefined" && window.storage) ? window.storage : null;
-let world = {};
-
-async function readWorld() {
-  const res = await CLOUD.get(WORLD_KEY, true);   // true = shared with everybody
-  return res && res.value ? JSON.parse(res.value) : {};
-}
-
-async function loadWorld() {
-  // window.storage(공용 저장소)는 Claude 앱 안에서만 제공된다.
-  // 웹에 올려서 열면 없으므로, 위쪽 스코어보드만 쓰도록 안내하고 조용히 넘어간다.
-  if (!CLOUD) {
-    worldState.textContent = "(이 페이지에서는 꺼져 있어요)";
-    worldRows.innerHTML = "<p class='note'>세계 랭킹은 여기서는 안 나와요. 위쪽 스코어보드는 그대로 잘 돌아가요! " +
-                          "친구들이랑 각자 기기에서 같이 하려면 <a href='./'>온라인 버전</a>으로 가면 돼요.</p>";
-    return;
-  }
-  worldState.textContent = "loading…";
-  try {
-    world = await readWorld();
-  } catch (e) {
-    world = {};                 // an empty board just means nobody has played yet
-  }
-  worldState.textContent = "";
-  renderWorld();
-}
-
-// send this game's scores up, but only if they beat what's already there
-async function postWorld() {
-  if (!CLOUD) return;
-  worldState.textContent = "saving…";
-  try {
-    let latest = {};
-    try { latest = await readWorld(); } catch (e) { latest = {}; }
-
-    let changed = false;
-    for (const r of runners) {
-      const name = String(r.name).slice(0, 24);
-      if (!latest[name] || r.score > latest[name]) { latest[name] = r.score; changed = true; }
+// ---- decorations ----
+function drawCape(p, kind) {
+  const flap = Math.sin(p.step / 14) * 4;
+  if (kind === "cape") {
+    ctx.fillStyle = "#E2445C"; ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 6, p.y + 20);
+    ctx.quadraticCurveTo(p.x - 16, p.y + 30 + flap, p.x - 6, p.y + 44 + flap);
+    ctx.lineTo(p.x + 8, p.y + 36);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (kind === "wings") {
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(p.x + 8, p.y + 26, 13, 6, dir * (0.6 + flap / 40), 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
     }
-    if (changed) await CLOUD.set(WORLD_KEY, JSON.stringify(latest), true);
-    world = latest;
-    worldState.textContent = "";
-    renderWorld();
-  } catch (e) {
-    worldState.textContent = "(couldn't save — try Refresh)";
   }
 }
 
-function renderWorld() {
-  const list = Object.entries(world)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-
-  if (!list.length) {
-    worldRows.innerHTML = "<p class='note'>Nobody has posted a score yet. Play a round and you'll be first!</p>";
-    return;
+function drawHat(p, kind) {
+  const cx = p.x + p.w / 2 + 1, cy = p.y + 1;
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+  if (kind === "cap") {
+    ctx.fillStyle = "#E2445C";
+    ctx.beginPath(); ctx.arc(cx, cy, 11, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillRect(cx + 6, cy - 2, 13, 4); ctx.strokeRect(cx + 6, cy - 2, 13, 4);
+  } else if (kind === "crown") {
+    ctx.fillStyle = "#FFD93D";
+    ctx.beginPath();
+    ctx.moveTo(cx - 11, cy); ctx.lineTo(cx - 11, cy - 11); ctx.lineTo(cx - 5, cy - 5);
+    ctx.lineTo(cx, cy - 13);  ctx.lineTo(cx + 5, cy - 5);  ctx.lineTo(cx + 11, cy - 11);
+    ctx.lineTo(cx + 11, cy);  ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (kind === "horns") {
+    ctx.fillStyle = "#C0392B";
+    for (const d of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + d * 8, cy - 1);
+      ctx.quadraticCurveTo(cx + d * 15, cy - 10, cx + d * 9, cy - 13);
+      ctx.quadraticCurveTo(cx + d * 10, cy - 5, cx + d * 4, cy - 2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  } else if (kind === "antenna") {
+    ctx.beginPath(); ctx.moveTo(cx, cy - 2); ctx.lineTo(cx + 3, cy - 15); ctx.stroke();
+    ctx.fillStyle = "#35C46A";
+    ctx.beginPath(); ctx.arc(cx + 3, cy - 17, 4, 0, 7); ctx.fill(); ctx.stroke();
   }
-
-  const medal = ["🥇", "🥈", "🥉"];
-  worldRows.innerHTML = list.map((entry, i) => {
-    const mine = runners.some(r => r.name === entry[0]);
-    return '<div class="row' + (mine ? ' leader' : '') + '">' +
-             '<div class="rank">' + (medal[i] || (i + 1)) + '</div>' +
-             '<div class="who">' + escapeName(entry[0]) + '</div>' +
-             '<div class="now">' + entry[1] + '</div>' +
-           '</div>';
-  }).join("");
 }
 
-function escapeName(t) {
-  return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// ============================================================
+//  AVATAR SHOP  —  spend stars on decorations
+// ============================================================
+const ITEMS = [
+  { id: "none",   name: "Plain",       icon: "🙂", cost: 0,  slot: "hat"  },
+  { id: "cap",    name: "Cap",         icon: "🧢", cost: 4,  slot: "hat"  },
+  { id: "crown",  name: "Crown",       icon: "👑", cost: 12, slot: "hat"  },
+  { id: "horns",  name: "Horns",       icon: "😈", cost: 9,  slot: "hat"  },
+  { id: "antenna",name: "Antenna",     icon: "📡", cost: 6,  slot: "hat"  },
+  { id: "plainc", name: "No cape",     icon: "🚫", cost: 0,  slot: "cape" },
+  { id: "cape",   name: "Cape",        icon: "🦸", cost: 7,  slot: "cape" },
+  { id: "wings",  name: "Wings",       icon: "🪽", cost: 15, slot: "cape" },
+  { id: "white",  name: "White smoke", icon: "☁️", cost: 0,  slot: "trail" },
+  { id: "fire",   name: "Fire trail",  icon: "🔥", cost: 5,  slot: "trail" },
+  { id: "rainbow",name: "Rainbow",     icon: "🌈", cost: 14, slot: "trail" },
+  { id: "sparkle",name: "Sparkle",     icon: "✨", cost: 10, slot: "trail" },
+  ...COLORS.map(c => ({ id: c.id, name: c.name, icon: "🎨", cost: c.cost, slot: "color", suit: c.suit }))
+];
+
+// what each hero owns and is wearing
+const looks = NAMES.map(() => ({
+  stars: 0, owned: ["none", "plainc", "white", "own"],
+  hat: "none", cape: "plainc", trail: "white", color: "own"
+}));
+
+// give a hero their new paint job without restarting anything
+function repaintHero(i) {
+  const c = colorOf(i);
+  for (const r of runners) if (r.hero === i) { r.suit = c.suit; r.dark = c.dark; }
+  const row = rowsEl.children[i];
+  if (row) row.querySelector(".dot").style.background = c.suit;
+  buildPicker();
+  draw();
 }
 
-refreshBtn.addEventListener("click", loadWorld);
+let shopWho = 0;
+const whoTabs = document.getElementById("whoTabs");
+const shopItems = document.getElementById("shopItems");
+const starBank = document.getElementById("starBank");
+const shopBox  = document.getElementById("shop");
+const boardBox = document.getElementById("board");
+const liveCount = document.getElementById("liveCount");
+document.getElementById("boardHead").addEventListener("click", () => {
+  boardBox.classList.toggle("folded");
+});
+document.getElementById("shopHead").addEventListener("click", () => {
+  shopBox.classList.toggle("folded");
+});
+
+function drawShop() {
+  whoTabs.innerHTML = "";
+  NAMES.forEach((n, i) => {
+    const t = document.createElement("button");
+    t.className = "tab" + (i === shopWho ? " on" : "");
+    t.innerHTML = '<span class="cd" style="background:' + heroColor(i) + '"></span>' +
+                  n + ' <span style="opacity:.6">⭐' + looks[i].stars + '</span>';
+    t.onclick = () => { shopWho = i; drawShop(); };
+    whoTabs.appendChild(t);
+  });
+
+  const L = looks[shopWho];
+  starBank.textContent = "⭐ " + L.stars;
+
+  shopItems.innerHTML = "";
+  for (const it of ITEMS) {
+    const owned = L.owned.includes(it.id);
+    const worn  = L[it.slot] === it.id;
+    const canBuy = owned || L.stars >= it.cost;
+    const b = document.createElement("button");
+    b.className = "item" + (worn ? " worn" : owned ? " owned" : canBuy ? "" : " locked");
+    const ico = it.suit
+      ? '<span class="ico" style="display:inline-block;width:24px;height:24px;border-radius:50%;' +
+        'background:' + it.suit + ';border:3px solid #222;vertical-align:middle"></span>'
+      : '<span class="ico">' + it.icon + '</span>';
+    b.innerHTML = ico +
+                  '<span class="nm">' + it.name + '</span><br>' +
+                  '<span class="pr">' + (worn ? "wearing" : owned ? "tap to wear" : "⭐ " + it.cost) + '</span>';
+    b.onclick = () => {
+      if (!owned) {
+        if (L.stars < it.cost) return;
+        L.stars -= it.cost;
+        L.owned.push(it.id);
+      }
+      L[it.slot] = it.id;
+      if (it.slot === "color") repaintHero(shopWho);
+      drawShop();
+    };
+    shopItems.appendChild(b);
+  }
+}
+
+// ---------- full screen ----------
+const stage = document.getElementById("stage");
+const fsBtn = document.getElementById("fsBtn");
+
+function isBig() {
+  return !!document.fullscreenElement || stage.classList.contains("big");
+}
+function setLabel() {
+  fsBtn.textContent = isBig() ? "⛶ Exit" : "⛶ Full";
+}
+function toggleFull() {
+  if (isBig()) {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      const p = document.exitFullscreen();
+      if (p && p.catch) p.catch(() => {});
+    }
+    stage.classList.remove("big");
+  } else {
+    const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+    if (req) {
+      try { const p = req.call(stage); if (p && p.catch) p.catch(() => {}); } catch (err) {}
+    }
+    stage.classList.add("big");     // works even if the browser says no
+  }
+  setLabel();
+  setTimeout(draw, 60);
+}
+
+fsBtn.addEventListener("click", toggleFull);
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) stage.classList.remove("big");
+  setLabel();
+  draw();
+});
+setLabel();
+
+// ---------- the "how to play" sign ----------
+const howto    = document.getElementById("howto");
+const keyList  = document.getElementById("keyList");
+const showAgain= document.getElementById("showAgain");
+
+function openHowTo() {
+  keyList.innerHTML = "";
+  NAMES.forEach((n, i) => {
+    if (!chosen[i]) return;
+    const c = document.createElement("span");
+    c.className = "kc";
+    c.innerHTML = '<span class="cd" style="background:' + heroColor(i) + '"></span>' +
+                  n + ' → ' + KEYS[i];
+    keyList.appendChild(c);
+  });
+  howto.classList.remove("hidden");
+}
+
+startBtn.addEventListener("click", () => {
+  if (chosen.filter(Boolean).length === 0) return;
+  if (showAgain.checked) openHowTo();
+  else newGame();
+});
+
+document.getElementById("goBtn").addEventListener("click", () => {
+  howto.classList.add("hidden");
+  SFX.go();                    // also wakes the sound up on the very first tap
+  newGame();
+});
+
+// ---------- SOUND ----------
+// No sound files needed: the browser builds every beep out of thin air.
+let actx = null, soundOn = true;
+
+function audio() {
+  if (!soundOn) return null;
+  if (!actx) {
+    const A = window.AudioContext || window.webkitAudioContext;
+    if (!A) return null;
+    try { actx = new A(); } catch (err) { return null; }
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+
+// one beep: slides from one note to another
+function beep(type, from, to, dur, vol) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(from, a.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, to), a.currentTime + dur);
+  g.gain.setValueAtTime(vol, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0008, a.currentTime + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur + 0.02);
+}
+
+// a burst of static: whooshes, thuds and crashes are made of this
+function shhh(dur, vol, cutoff) {
+  const a = audio(); if (!a) return;
+  const frames = Math.floor(a.sampleRate * dur);
+  const buf = a.createBuffer(1, frames, a.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < frames; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / frames);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cutoff;
+  const g = a.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start();
+}
+
+const SFX = {
+  jump:  () => { beep("square", 300, 640, 0.13, 0.10); },
+  boost: () => { beep("sawtooth", 240, 900, 0.18, 0.07); shhh(0.20, 0.10, 1600); },
+  star:  () => { [880, 1174, 1568].forEach((f, i) => setTimeout(() => beep("sine", f, f, 0.10, 0.11), i * 55)); },
+  land:  () => { beep("triangle", 220, 150, 0.07, 0.06); },
+  bonk:  () => { beep("triangle", 190, 55, 0.22, 0.16); shhh(0.16, 0.14, 700); },
+  out:   () => { beep("square", 420, 70, 0.55, 0.13); },
+  win:   () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep("square", f, f, 0.16, 0.10), i * 110)); },
+  go:    () => { beep("square", 660, 880, 0.16, 0.10); }
+};
+
+const sndBtn = document.getElementById("sndBtn");
+function toggleSound() {
+  soundOn = !soundOn;
+  sndBtn.textContent = soundOn ? "🔊" : "🔇";
+  if (soundOn) SFX.go();
+}
+sndBtn.addEventListener("click", toggleSound);
 
 // ---------- controls ----------
-startBtn.addEventListener("click", newGame);
 
 document.addEventListener("keydown", e => {
+  if (e.code === "KeyF") { e.preventDefault(); toggleFull(); return; }
+  if (e.code === "KeyS") { e.preventDefault(); toggleSound(); return; }
   for (let i = 0; i < KEYCODES.length; i++) {
-    if (KEYCODES[i].includes(e.code)) { e.preventDefault(); jump(i); }
+    if (KEYCODES[i].includes(e.code)) { e.preventDefault(); if (!e.repeat) press(i); }
   }
 });
+
+document.addEventListener("keyup", e => {
+  for (let i = 0; i < KEYCODES.length; i++) {
+    if (KEYCODES[i].includes(e.code)) release(i);
+  }
+});
+
+const touching = new Map();   // which finger is holding which hero
 
 canvas.addEventListener("pointerdown", e => {
   if (!running || !runners.length) return;
@@ -601,12 +1318,24 @@ canvas.addEventListener("pointerdown", e => {
   const col = Math.min(cols - 1, Math.floor((e.clientX - box.left) / box.width  * cols));
   const row = Math.min(rows - 1, Math.floor((e.clientY - box.top)  / box.height * rows));
   const lane = row * cols + col;
-  if (lane < runners.length) jump(runners[lane].hero);
+  if (lane < runners.length) {
+    const hero = runners[lane].hero;
+    touching.set(e.pointerId, hero);
+    press(hero);
+  }
 });
+
+function letGo(e) {
+  const hero = touching.get(e.pointerId);
+  if (hero !== undefined) { release(hero); touching.delete(e.pointerId); }
+}
+window.addEventListener("pointerup", letGo);
+window.addEventListener("pointercancel", letGo);
 
 // ---------- first screen ----------
 buildPicker();
 buildBoard();
+drawShop();
 newGame();          // draw one frame so it isn't blank
 running = false;
 title.textContent = "Who's playing?";
@@ -615,7 +1344,6 @@ startBtn.textContent = "Start race";
 overlay.classList.remove("hidden");
 updateBoard();
 draw();
-loadWorld();
 </script>
 </body>
 </html>
