@@ -580,7 +580,7 @@ function beginRace() {
     stars: new Set(), passed: new Set(), starCount: 0
   };
   views = {};
-  for (const id of lanes) views[id] = { y: GY - PH, puffs: [], pt: 0, ghost: null, ring: null, wasAlive: true };
+  for (const id of lanes) views[id] = { y: GY - PH, puffs: [], pt: 0, ghost: null, ring: null, wasAlive: false };
   allOutAt = 0;
 
   update(ref(db, `rooms/${room}/players/${uid}`),
@@ -661,9 +661,12 @@ function step(dt) {
   for (const id of lanes) {
     if (id === uid) continue;
     const p = players[id]; if (!p) continue;
-    const v = views[id] || (views[id] = { y: GY - PH, puffs: [], pt: 0, ghost: null, ring: null, wasAlive: true });
+    const v = views[id] || (views[id] = { y: GY - PH, puffs: [], pt: 0, ghost: null, ring: null, wasAlive: false });
     v.y += ((p.y ?? GY - PH) - v.y) * Math.min(1, dt * 12);
-    // the moment their last heart goes, puff them into a ghost on my screen too
+    // The moment their last heart goes, puff them into a ghost on my screen too.
+    // wasAlive starts false on purpose: it only turns true once I have actually
+    // seen them flying, so a leftover "alive: false" from the previous race
+    // can't spawn a phantom ghost the instant this one begins.
     if (v.wasAlive && !p.alive) {
       v.ghost = { x: PX + 17, y: v.y + 18, vy: -120, wob: 0, fade: 0 };
       v.ring  = { x: PX + 17, y: v.y + 18, life: 1 };
