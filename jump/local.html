@@ -231,6 +231,9 @@
       <div class="rule"><span class="em">♥</span><span>You have <b>3 hearts</b> (top right of your strip). A side-smack costs one heart, bounces you on top of the box, and you blink for a second where nothing can hurt you. Lose all 3 and you're out.</span></div>
       <div class="rule"><span class="em">⛶</span><span>Press <b>F</b> or the ⛶ button for full screen.</span></div>
       <div class="rule"><span class="em">🏰</span><span>Every so often a <b>giant tower</b> rears up with a red flag on top. Its star is worth <b>12 stars</b> — blast your way up there and grab it.</span></div>
+      <div class="rule"><span class="em">🐦</span><span>A <b>bird</b> hovering in the air. Clip it and it swats you down for a heart — birds sit low <i>and</i> right up by the ceiling, so you can't just fly along the top any more.</span></div>
+      <div class="rule"><span class="em">🕳️</span><span>A <b>hole</b> in the ground. Jump it! Fall in and you scramble back out, but it costs a heart. There's a star floating over every hole.</span></div>
+      <div class="rule"><span class="em">🛗</span><span>A <b>sliding platform</b> (the blue one with arrows). It drifts up and down and always floats over your head, so you can run under it — or land on it for a star.</span></div>
       <div id="keyList"></div>
       <button id="goBtn">GO! 🚀</button>
       <label id="againWrap"><input type="checkbox" id="showAgain" checked> show this before every race</label>
@@ -241,7 +244,8 @@
 </div>
 
 <p class="label" style="opacity:.6">
-  <b>Hold</b> to jump higher &nbsp;·&nbsp; tap again in mid-air for a jetpack <b>boost</b> (3 per flight, the orange dots) &nbsp;·&nbsp; <b>♥ 3 hearts</b> each
+  <b>Hold</b> to jump higher &nbsp;·&nbsp; tap again in mid-air for a jetpack <b>boost</b> (🔥 ∞) &nbsp;·&nbsp; <b>♥ 3 hearts</b> each
+  <br>Watch out for 🐦 birds, 🕳️ holes and 🛗 sliding platforms
   <br>Tap your own strip of the screen to jump &nbsp;·&nbsp; ⛶ button or <b>F</b> key for full screen
 </p>
 
@@ -310,6 +314,14 @@ const STAR_BONUS  = 3;     // stars you earn for landing on a box
 const LIVES_MAX   = 3;     // hearts everybody starts with
 const LAND_GRACE  = 26;    // a landing can be this sloppy and still count as a landing
 const SAFE_TIME   = 1.4;   // seconds of blinking "can't be hurt" after a bonk
+
+// ---- the other things on the track, besides plain boxes ----
+const PIT_CHANCE  = 0.18;  // a hole in the ground you have to clear
+const BIRD_CHANCE = 0.20;  // a bird parked in mid-air
+const PLAT_CHANCE = 0.15;  // a platform that slides up and down
+const BIRD_W = 34, BIRD_H = 24;   // how much room a bird takes up
+const PLAT_T = 14;                // how thick a floating platform is
+const PIT_STAR = 58;              // how high a hole's star floats above the ground
 
 const LH = 320;            // each player's screen, measured inside the game
 const GY = LH - 50;        // where the ground is
@@ -581,12 +593,37 @@ function update(dt) {
   const wantTower = sinceTower >= TOWER_EVERY;
   const needed = gapNeeded * (wantTower ? 1.9 : 1);      // towers need a longer run-up
   if (!last || LW - (last.x + last.w) > needed) {
+    const X = LW + 20;
     if (wantTower) {
-      blocks.push({ id: nextBlockId++, x: LW + 20, h: 168 + Math.random() * 42, w: 50, tower: true });
+      blocks.push({ id: nextBlockId++, kind: "tower", x: X, w: 50, h: 168 + Math.random() * 42 });
       sinceTower = 0;
     } else {
-      blocks.push({ id: nextBlockId++, x: LW + 20, h: 30 + Math.random() * 28, w: 28 + Math.random() * 18 });
       sinceTower++;
+      // the first few are always plain boxes, so nobody gets ambushed at the start
+      const roll = nextBlockId < 3 ? 1 : Math.random();
+
+      if (roll < PIT_CHANCE) {
+        // a hole in the ground, always narrower than one comfortable jump
+        blocks.push({ id: nextBlockId++, kind: "pit", x: X, h: 0,
+                      w: jumpDist * (0.34 + Math.random() * 0.22) });
+
+      } else if (roll < PIT_CHANCE + BIRD_CHANCE) {
+        // high birds sit up where the ceiling-huggers fly; low ones you duck under
+        const high = Math.random() < 0.45;
+        blocks.push({ id: nextBlockId++, kind: "bird", x: X, w: BIRD_W, h: 0,
+                      y: high ? 12 + Math.random() * 26 : 116 + Math.random() * 32 });
+
+      } else if (roll < PIT_CHANCE + BIRD_CHANCE + PLAT_CHANCE) {
+        // even at its lowest this clears a standing player's head, so it is
+        // always a bonus and never a road block
+        blocks.push({ id: nextBlockId++, kind: "plat", x: X,
+                      w: 56 + Math.random() * 26, h: 120 + Math.random() * 30,
+                      range: 20 + Math.random() * 15, phase: Math.random() * 6.283 });
+
+      } else {
+        blocks.push({ id: nextBlockId++, kind: "box", x: X,
+                      h: 30 + Math.random() * 28, w: 28 + Math.random() * 18 });
+      }
     }
   }
 
@@ -651,34 +688,51 @@ function update(dt) {
     r.y  += r.vy * dt;
 
     if (r.y < 6) { r.y = 6; if (r.vy < 0) r.vy = 0; }        // sky ceiling: you can't leave the screen
-    if (r.y >= GY - r.h) { r.y = GY - r.h; r.vy = 0; r.onGround = true; r.boosts = BOOSTS_MAX; }
+
+    // ---- IS THERE GROUND UNDER MY FEET, OR A HOLE? ----
+    let overPit = false;
+    for (const b of blocks) {
+      if (b.kind !== "pit") continue;
+      if (r.x + 9 < b.x + b.w && r.x + r.w - 9 > b.x) { overPit = true; break; }
+    }
+
+    if (!overPit && r.y >= GY - r.h) {
+      r.y = GY - r.h; r.vy = 0; r.onGround = true; r.boosts = BOOSTS_MAX;
+    } else if (overPit && r.y + r.h > GY + 26) {
+      fallInPit(r);                  // dropped down the hole
+    }
 
     // ---- FLY THROUGH A STAR AND IT'S YOURS ----
     for (const b of blocks) {
       if (r.stars.has(b.id)) continue;
-      const sx = b.x + b.w / 2, sy = GY - b.h - (b.tower ? 42 : 20);   // where the star floats
-      const nx = Math.max(r.x + 4, Math.min(sx, r.x + r.w - 4));   // nearest bit of me
+      const sy = starY(b);
+      if (sy === null) continue;
+      const sx = b.x + b.w / 2;                                  // where the star floats
+      const nx = Math.max(r.x + 4, Math.min(sx, r.x + r.w - 4)); // nearest bit of me
       const ny = Math.max(r.y,     Math.min(sy, r.y + r.h));
       const dx = sx - nx, dy = sy - ny;
       if (dx * dx + dy * dy < 16 * 16) grabStar(r, b);
     }
 
     for (const b of blocks) {
-      const by = GY - b.h;           // the top of the box
-      if (!(r.x + 6 < b.x + b.w && r.x + r.w - 6 > b.x)) {
-        if (!r.passed.has(b.id) && b.x + b.w < r.x) { r.passed.add(b.id); r.score += 1; }
-        continue;
+      const overlap = r.x + 6 < b.x + b.w && r.x + r.w - 6 > b.x;
+
+      if (overlap && b.kind === "bird") {
+        // no landing on a bird — clip it at all and it swats you down
+        if (r.y < b.y + BIRD_H && r.y + r.h > b.y) birdHit(r);
+
+      } else if (overlap && b.kind !== "pit") {
+        const by = obsTop(b), bh = obsThick(b);
+        if (r.vy >= 0 && r.y + r.h >= by && wasBottom <= by + LAND_GRACE) {
+          // ---- LANDED NEATLY ON TOP: that's a star, not a crash ----
+          r.y = by - r.h; r.vy = 0; r.onGround = true; r.boosts = BOOSTS_MAX;
+          grabStar(r, b);
+        } else if (r.y + 8 < by + bh && r.y + r.h > by) {
+          bonk(r, by);                 // smacked into the side: lose a heart
+        }
       }
 
-      if (r.vy >= 0 && r.y + r.h >= by && wasBottom <= by + LAND_GRACE) {
-        // ---- LANDED NEATLY ON TOP: that's a star, not a crash ----
-        r.y = by - r.h; r.vy = 0; r.onGround = true; r.boosts = BOOSTS_MAX;
-        grabStar(r, b);
-      } else if (r.y + 8 < by + b.h && r.y + r.h > by) {
-        bonk(r, b);                  // smacked into the side: lose a heart
-      }
-
-      // ---- ONE POINT for every box you get safely past ----
+      // ---- ONE POINT for everything you get safely past ----
       if (!r.passed.has(b.id) && b.x + b.w < r.x) { r.passed.add(b.id); r.score += 1; }
     }
 
@@ -694,30 +748,72 @@ function update(dt) {
   }
 }
 
+// The top edge of a solid block right now (platforms slide up and down).
+function obsTop(b) {
+  return b.kind === "plat"
+    ? GY - (b.h + Math.sin(worldX / 90 + b.phase) * b.range)
+    : GY - b.h;
+}
+
+// How tall the solid part is (a platform is a thin slab, not a pillar).
+function obsThick(b) { return b.kind === "plat" ? PLAT_T : b.h; }
+
+// Where this block's star floats. null = it carries no star (birds don't).
+function starY(b) {
+  if (b.kind === "bird") return null;
+  if (b.kind === "pit")  return GY - PIT_STAR;
+  return obsTop(b) - (b.kind === "tower" ? 42 : 20);
+}
+
 // Grab a star: brushing it is enough, no landing required.
 function grabStar(r, b) {
   if (r.stars.has(b.id)) return;
+  const sy = starY(b);
+  if (sy === null) return;
   r.stars.add(b.id);
-  r.starCount += b.tower ? TOWER_STARS : STAR_BONUS;
+  r.starCount += b.kind === "tower" ? TOWER_STARS : STAR_BONUS;
   SFX.star();
-  const sx = b.x + b.w / 2, sy = GY - b.h - (b.tower ? 42 : 20);
+  const sx = b.x + b.w / 2;
   for (let i = 0; i < 12; i++) {            // sparkle burst right where the star was
     const a = Math.random() * Math.PI * 2;
     r.sparks.push({ x: sx, y: sy, vx: Math.cos(a) * 95, vy: Math.sin(a) * 95 - 40, life: 1 });
   }
 }
 
-// A bump costs one heart, not the whole race.
-// You get shoved on top of the box and blink for a moment where nothing can hurt you.
-function bonk(r, b) {
-  if (r.invuln > 0) return;          // still blinking from the last one
-  r.lives--;
-  r.invuln = SAFE_TIME;
+// ---- the three ways to get hurt ----
+// All of them cost one heart, never the whole race.
 
-  SFX.bonk();
-  r.y = GY - b.h - r.h;              // pop up on top of the box you clipped
+// Smacked the side of a box, tower or platform: shoved up on top of it.
+function bonk(r, topY) {
+  if (r.invuln > 0) return;          // still blinking from the last one
+  r.y = topY - r.h;                  // pop up on top of the thing you clipped
   r.vy = -260;                       // with a little ouch-bounce
   r.onGround = false;
+  loseHeart(r);
+}
+
+// Clipped a bird: it swats you downwards.
+function birdHit(r) {
+  if (r.invuln > 0) return;
+  r.vy = Math.max(r.vy, 200);
+  loseHeart(r);
+}
+
+// Dropped down a hole. You always scramble back out — otherwise you'd fall
+// forever — but it only costs a heart if you weren't already blinking.
+function fallInPit(r) {
+  const wasSafe = r.invuln > 0;
+  r.y = GY - r.h;
+  r.vy = -300;
+  r.onGround = false;
+  r.boosts = BOOSTS_MAX;
+  if (!wasSafe) loseHeart(r);
+}
+
+function loseHeart(r) {
+  r.lives--;
+  r.invuln = SAFE_TIME;
+  SFX.bonk();
 
   for (let i = 0; i < 14; i++) {     // red sparks so you can see what happened
     const a = Math.random() * Math.PI * 2;
@@ -829,31 +925,66 @@ function drawLane(r) {
   const off = (worldX / scale) % 60;
   for (let x = -60; x < LW + 60; x += 60) ctx.fillRect(x - off, GY + 22, 22, 4);
 
+  // holes first — they are cut out of the ground we just painted
   for (const b of blocks) {
-    const by = GY - b.h;
-    ctx.fillStyle = b.tower ? "#8E7A66" : css("--block");
-    ctx.fillRect(b.x, by, b.w, b.h);
+    if (b.kind !== "pit") continue;
+    ctx.fillStyle = "#241811";                       // dark all the way down
+    ctx.fillRect(b.x, GY, b.w, LH - GY);
+    ctx.fillStyle = "rgba(0,0,0,.4)";                // a lip of shadow at the mouth
+    ctx.fillRect(b.x, GY, b.w, 8);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(b.x, GY);         ctx.lineTo(b.x, LH);
+    ctx.moveTo(b.x + b.w, GY);   ctx.lineTo(b.x + b.w, LH);
+    ctx.stroke();
+  }
 
-    if (b.tower) {                                   // bricks, windows and a flag
-      ctx.fillStyle = "rgba(255,255,255,0.16)";
-      for (let y = by + 8; y < GY - 6; y += 16) ctx.fillRect(b.x + 3, y, b.w - 6, 3);
-      ctx.fillStyle = "#FFD98A";
-      for (let y = by + 20; y < GY - 24; y += 42) {
-        ctx.fillRect(b.x + 10, y, 11, 15);
-        ctx.fillRect(b.x + b.w - 21, y, 11, 15);
+  for (const b of blocks) {
+    // pits are already carved out of the ground above — they just need their star
+    if (b.kind === "bird") {
+      drawBird(b);
+    } else if (b.kind !== "pit") {
+      const by = obsTop(b), bh = obsThick(b);
+
+      ctx.fillStyle = b.kind === "tower" ? "#8E7A66"
+                    : b.kind === "plat"  ? "#7BC6E8"
+                    : css("--block");
+      ctx.fillRect(b.x, by, b.w, bh);
+
+      if (b.kind === "tower") {                      // bricks, windows and a flag
+        ctx.fillStyle = "rgba(255,255,255,0.16)";
+        for (let y = by + 8; y < GY - 6; y += 16) ctx.fillRect(b.x + 3, y, b.w - 6, 3);
+        ctx.fillStyle = "#FFD98A";
+        for (let y = by + 20; y < GY - 24; y += 42) {
+          ctx.fillRect(b.x + 10, y, 11, 15);
+          ctx.fillRect(b.x + b.w - 21, y, 11, 15);
+        }
+        ctx.fillStyle = "#E2445C";                   // flag on the roof
+        ctx.fillRect(b.x + b.w / 2 - 1, by - 26, 2.5, 26);
+        ctx.beginPath();
+        ctx.moveTo(b.x + b.w / 2 + 1.5, by - 26);
+        ctx.lineTo(b.x + b.w / 2 + 22, by - 20);
+        ctx.lineTo(b.x + b.w / 2 + 1.5, by - 14);
+        ctx.closePath(); ctx.fill();
       }
-      ctx.fillStyle = "#E2445C";                     // flag on the roof
-      ctx.fillRect(b.x + b.w / 2 - 1, by - 26, 2.5, 26);
-      ctx.beginPath();
-      ctx.moveTo(b.x + b.w / 2 + 1.5, by - 26);
-      ctx.lineTo(b.x + b.w / 2 + 22, by - 20);
-      ctx.lineTo(b.x + b.w / 2 + 1.5, by - 14);
-      ctx.closePath(); ctx.fill();
+
+      if (b.kind === "plat") {                       // little arrows: this one moves
+        ctx.fillStyle = "rgba(255,255,255,.8)";
+        for (let ax = b.x + 13; ax < b.x + b.w - 9; ax += 20) {
+          ctx.beginPath();
+          ctx.moveTo(ax, by + 3.5); ctx.lineTo(ax + 5, by + 10); ctx.lineTo(ax - 5, by + 10);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
+      ctx.strokeRect(b.x, by, b.w, bh);
     }
 
-    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3;
-    ctx.strokeRect(b.x, by, b.w, b.h);
-    if (!r.stars.has(b.id)) drawStar(b.x + b.w / 2, by - (b.tower ? 42 : 20), b.tower ? 13 : 9);
+    if (!r.stars.has(b.id)) {
+      const sy = starY(b);
+      if (sy !== null) drawStar(b.x + b.w / 2, sy, b.kind === "tower" ? 13 : 9);
+    }
   }
 
   for (const k of r.sparks) {                 // sparkles from collecting a star
@@ -962,6 +1093,38 @@ function drawGhost(r) {
   ctx.beginPath(); ctx.ellipse(x, y + 6, 3.2, 2.2, 0, 0, 7); ctx.fill();
 
   ctx.restore();
+}
+
+// A chunky little bird parked in mid-air, facing the way you're coming from.
+// The wings flap off worldX, so it looks alive without the hitbox ever moving —
+// what you see really is what you can hit.
+function drawBird(b) {
+  const cx = b.x + b.w / 2, cy = b.y + BIRD_H / 2;
+  const flap = Math.sin(worldX / 9 + b.x) * 8;
+
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2.5;
+
+  ctx.fillStyle = "#6C5CE7";                       // wings
+  for (const d of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.quadraticCurveTo(cx + d * 15, cy - 6 - flap, cx + d * 22, cy + 2 - flap * 0.5);
+    ctx.quadraticCurveTo(cx + d * 13, cy + 5, cx, cy + 3);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+
+  ctx.fillStyle = "#8E7CFF";                       // body
+  ctx.beginPath(); ctx.ellipse(cx, cy, 11, 8.5, 0, 0, 7); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = "#FF9A2E";                       // beak
+  ctx.beginPath();
+  ctx.moveTo(cx - 9, cy - 1); ctx.lineTo(cx - 19, cy + 2); ctx.lineTo(cx - 9, cy + 4.5);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = "#fff";                          // eye
+  ctx.beginPath(); ctx.arc(cx - 3.5, cy - 2.5, 3.2, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = css("--ink");
+  ctx.beginPath(); ctx.arc(cx - 4.4, cy - 2.5, 1.5, 0, 7); ctx.fill();
 }
 
 // a five-pointed star, floating above a box
