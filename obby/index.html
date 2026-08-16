@@ -31,11 +31,11 @@
     border:0; border-radius:0; box-shadow:none; }
   #stage.big #gl, #stage.big #hud { object-fit:contain; }
 
-  #fsBtn, #soundBtn {
+  #fsBtn, #soundBtn, #musicBtn {
     position:absolute; top:9px; z-index:8; font-size:15px; padding:4px 10px;
     border-width:3px; border-radius:10px; background:#fff; box-shadow:0 3px 0 var(--ink); min-width:0;
   }
-  #fsBtn { right:9px; } #soundBtn { right:62px; }
+  #fsBtn { right:9px; } #soundBtn { right:62px; } #musicBtn { right:115px; }
 
   /* align-items:flex-start + margin:auto keeps tall screens scrollable instead
      of clipping their top and bottom the way plain centering does */
@@ -126,6 +126,7 @@
 <div id="stage">
   <canvas id="gl" width="1280" height="720"></canvas>
   <canvas id="hud" width="1280" height="720"></canvas>
+  <button id="musicBtn" title="Music">🎵</button>
   <button id="soundBtn" title="Sound">🔊</button>
   <button id="fsBtn" title="Fullscreen (F)">⛶</button>
 
@@ -165,6 +166,7 @@
         <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
+        <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
         <tr><td>Phone / tablet</td><td>joystick + jump button, drag the right side to look</td></tr>
         <tr><td colspan="2" style="padding-top:9px;color:#9BE58A"><b>🐌 In Killer Snail only</b></td></tr>
         <tr><td>Throw salt</td><td><b>Z</b> — costs salt, aims itself at the snail</td></tr>
@@ -489,10 +491,10 @@ function loadSave() {
       orbs: r.orbs|0, lifetimeOrbs: r.lifetimeOrbs|0, skin: r.skin || 'kid',
       owned: Array.isArray(r.owned) && r.owned.length ? r.owned.slice() : ['kid'],
       cleared: Object.assign({}, r.cleared), best: Object.assign({}, r.best),
-      sound: r.sound !== false
+      sound: r.sound !== false, music: r.music !== false
     };
   } catch (e) {}
-  return { orbs:0, lifetimeOrbs:0, skin:'kid', owned:['kid'], cleared:{}, best:{}, sound:true };
+  return { orbs:0, lifetimeOrbs:0, skin:'kid', owned:['kid'], cleared:{}, best:{}, sound:true, music:true };
 }
 const save = loadSave();
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
@@ -516,6 +518,7 @@ const Sound = (function(){
     o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime + dur + .02);
   }
   return {
+    ctx,
     jump: ()=>tone(360,.12,'square',.04,620),
     orb:  ()=>tone(880,.10,'triangle',.055,1400),
     pad:  ()=>tone(240,.20,'sawtooth',.05,900),
@@ -535,12 +538,105 @@ const Sound = (function(){
 })();
 
 /* =========================================================================
+   6b. MUSIC — one song per level, played by a little step sequencer.
+   No audio files: every note is an oscillator, so it stays a single HTML file.
+   Notes are MIDI numbers, 0 means rest, 16 steps to the bar.
+   ========================================================================= */
+const SONGS = {
+  // dreamy and slow — a warm-up level
+  angel: { bpm:92, vol:.055, lead:'triangle', bassW:'sine',
+    lead1:[76,0,79,0, 81,0,79,0, 76,0,72,0, 74,0,0,0,  77,0,81,0, 84,0,81,0, 79,0,76,0, 72,0,0,0],
+    bass: [48,0,0,0, 0,0,55,0, 45,0,0,0, 0,0,52,0,     53,0,0,0, 0,0,60,0, 48,0,0,0, 0,0,55,0] },
+  // Inu's own level: bouncy hero music
+  inu:   { bpm:126, vol:.05, lead:'square', bassW:'square',
+    lead1:[72,74,76,77, 79,0,77,79, 81,0,79,77, 76,0,74,0,  72,74,76,79, 81,0,84,0, 83,81,79,77, 76,0,0,0],
+    bass: [48,0,48,0, 55,0,55,0, 53,0,53,0, 50,0,50,0,      48,0,48,0, 57,0,57,0, 53,0,53,0, 55,0,55,0] },
+  // dark, fast, minor — hell
+  devil: { bpm:148, vol:.045, lead:'sawtooth', bassW:'sawtooth',
+    lead1:[74,0,74,77, 74,0,80,0, 79,0,77,0, 74,0,0,0,      74,0,74,77, 79,0,80,0, 82,0,80,79, 77,0,0,0],
+    bass: [38,38,38,38, 38,38,38,38, 36,36,36,36, 36,36,36,36, 41,41,41,41, 41,41,41,41, 38,38,38,38, 37,37,37,37] },
+  // the chase: tense and stabby
+  garden:{ bpm:116, vol:.045, lead:'square', bassW:'triangle',
+    lead1:[69,0,0,69, 0,72,0,0, 71,0,0,71, 0,74,0,0,        69,0,0,69, 0,72,0,0, 76,0,74,0, 72,0,71,0],
+    bass: [45,0,45,0, 45,0,45,0, 43,0,43,0, 43,0,43,0,      41,0,41,0, 41,0,41,0, 45,0,45,0, 44,0,44,0] },
+  // falling forever: everything walks downwards
+  void:  { bpm:88, vol:.05, lead:'sine', bassW:'sine',
+    lead1:[84,0,82,0, 80,0,78,0, 76,0,74,0, 72,0,0,0,       82,0,80,0, 78,0,76,0, 74,0,72,0, 70,0,0,0],
+    bass: [36,0,0,0, 0,0,0,0, 34,0,0,0, 0,0,0,0,            32,0,0,0, 0,0,0,0, 30,0,0,0, 0,0,0,0] },
+  // the menu hums quietly to itself
+  menu:  { bpm:84, vol:.035, lead:'triangle', bassW:'sine',
+    lead1:[72,0,0,76, 0,0,79,0, 0,76,0,0, 74,0,0,0,         71,0,0,74, 0,0,79,0, 0,77,0,0, 76,0,0,0],
+    bass: [48,0,0,0, 0,0,0,0, 43,0,0,0, 0,0,0,0,            45,0,0,0, 0,0,0,0, 47,0,0,0, 0,0,0,0] }
+};
+
+const Music = (function(){
+  let timer = null, song = null, name = null, step = 0, nextAt = 0;
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+
+  function note(c, midi, at, len, wave, vol) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = wave;
+    o.frequency.setValueAtTime(hz(midi), at);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + 0.015);      // soft attack, no clicks
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    o.connect(g); g.connect(c.destination);
+    o.start(at); o.stop(at + len + 0.03);
+  }
+
+  function tick() {
+    const c = Sound.ctx();
+    if (!c || !song) return;
+    const beat = 60 / song.bpm / 4;                        // one 16th note
+    while (nextAt < c.currentTime + 0.2) {                 // schedule a little ahead
+      if (nextAt > c.currentTime - 0.05) {
+        const i = step % song.lead1.length;
+        const m = song.lead1[i], b = song.bass[i % song.bass.length];
+        if (m) note(c, m, nextAt, beat * 1.7, song.lead, song.vol);
+        if (b) note(c, b, nextAt, beat * 2.6, song.bassW, song.vol * 1.15);
+      }
+      nextAt += beat;
+      step++;
+    }
+  }
+
+  return {
+    play(which) {
+      if (!save.music || !SONGS[which]) { this.stop(); return; }
+      if (name === which && timer) return;                 // already playing this one
+      this.stop();
+      const c = Sound.ctx();
+      if (!c) return;
+      song = SONGS[which]; name = which; step = 0;
+      nextAt = c.currentTime + 0.08;
+      timer = setInterval(tick, 45);
+      tick();
+    },
+    stop() {
+      if (timer) clearInterval(timer);
+      timer = null; song = null; name = null;
+    },
+    current() { return name; },
+    // called when the music toggle flips
+    refresh(which) { save.music ? this.play(which) : this.stop(); }
+  };
+})();
+// which song belongs to the thing you are playing right now
+function songFor() {
+  if (game.screen !== 'play' && game.screen !== 'pause') return 'menu';
+  if (game.mode === 'snail') return 'garden';
+  if (game.mode === 'infinity') return 'void';
+  const L = LEVELS.find(l => l.id === game.levelId);
+  return L ? L.theme : 'menu';
+}
+
+/* =========================================================================
    7. SKINS
    ========================================================================= */
 const SKINS = [
   { id:'kid',     name:'Aura Kid',   price:0,   em:'🧒', body:'#5B8DEF', head:'#F7C59F', desc:'The classic.' },
   { id:'angel',   name:'Angel',      price:40,  em:'😇', body:'#FFFFFF', head:'#FFE9C9', desc:'Halo and wings.' },
-  { id:'inu',     name:'Inu',        price:90,  em:'🐕', body:'#E5A55C', head:'#F0C48A', desc:'Good boy.' },
+  { id:'inu',     name:'Inu',        price:90,  em:'👦', body:'#3FBF7F', head:'#F7C59F', desc:'The hero of the Inu Level.' },
   { id:'devil',   name:'Devil',      price:160, em:'😈', body:'#E23B3B', head:'#FF7A6B', desc:'Horns and a tail.' },
   { id:'ghost',   name:'Ghost',      price:120, em:'👻', body:'#D6E2FF', head:'#EEF4FF', desc:'Pale and floaty.' },
   { id:'rainbow', name:'Rainbow',    price:320, em:'🌈', body:'#FF00FF', head:'#FFFFFF', desc:'Colour-shifting aura.' },
@@ -650,6 +746,18 @@ if (TOUCH) touchWrap.classList.add('on');
 function box(cx,cy,cz, hx,hy,hz, color, kind) {
   return { cx,cy,cz, hx,hy,hz, color: color || '#8FA3C8', kind: kind || 'plat' };
 }
+// Spikes are drawn as a grid of pyramids that taper to a point, so a box the size
+// of the whole patch kills you while you are still visibly clear of the points.
+// The box below keeps the drawn size, but carries a smaller c* box for collision:
+// inset at the sides, and only as tall as the fat lower half of each spike.
+function spikeBox(x, y, z, w, dep) {
+  const b = box(x, y + 0.3, z, w/2, 0.3, dep/2, '#C7D0E8', 'spike');
+  b.ccy = y + 0.16;
+  b.chx = Math.max(0.12, w/2 - 0.42);
+  b.chy = 0.16;
+  b.chz = Math.max(0.12, dep/2 - 0.42);
+  return b;
+}
 const aabb = (a,b) =>
   Math.abs(a.cx-b.cx) < a.hx+b.hx && Math.abs(a.cy-b.cy) < a.hy+b.hy && Math.abs(a.cz-b.cz) < a.hz+b.hz;
 
@@ -700,7 +808,7 @@ function builder(W, rng, d) {
       return this;
     },
     lava(x,y,z, w,dep,h) { W.hazards.push(Object.assign(box(x, y-(h||2)/2, z, w/2, (h||2)/2, dep/2, '#FF4A10', 'lava'))); return this; },
-    spikes(x,y,z, w,dep) { W.hazards.push(box(x, y+0.3, z, w/2, 0.3, dep/2, '#C7D0E8', 'spike')); return this; },
+    spikes(x,y,z, w,dep) { W.hazards.push(spikeBox(x, y, z, w, dep)); return this; },
     fire(x,y,z, bx,by,bz, spd) {
       // hitbox is smaller than the fireball looks, so near misses feel fair
       W.hazards.push(Object.assign(box(x,y,z, .45,.45,.45, '#FF9A2E', 'fire'), { ax:x, ay:y, az:z, bx, by, bz, spd, t:rng() }));
@@ -904,7 +1012,7 @@ const POOL = {
 const LEVELS = [
   { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:9,
     blurb:'Soft clouds and easy jumps. A warm-up.' },
-  { id:'inu',   name:'Inu Level',   emoji:'🐕', theme:'inu',   seed:4242, d:0.55, chunks:12,
+  { id:'inu',   name:'Inu Level',   emoji:'👦', theme:'inu',   seed:4242, d:0.55, chunks:12,
     blurb:'Movers, spinners and crumbling wood.' },
   { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:0.95, chunks:14,
     blurb:'Lava, fire and a devil at the gate.' }
@@ -1046,7 +1154,7 @@ function addShaftLayer(W) {
       const near = Math.abs(sx-hx) < hs+2.4 && Math.abs(sz-hz) < hs+2.4;
       const underDrop = drop && Math.abs(sx-drop.x) < drop.s+3.5 && Math.abs(sz-drop.z) < drop.s+3.5;
       if (near || underDrop) continue;
-      W.hazards.push(box(sx, y+0.3, sz, 1.9, 0.3, 1.9, '#C7D0E8', 'spike'));
+      W.hazards.push(spikeBox(sx, y, sz, 3.8, 3.8));
       break;
     }
   }
@@ -1245,6 +1353,10 @@ function hitHazards() {
     if (h.kind === 'fire') {
       const k = 0.5 - 0.5*Math.cos(h.t * Math.PI * 2);
       const c = { cx: lerp(h.ax,h.bx,k), cy: lerp(h.ay,h.by,k), cz: lerp(h.az,h.bz,k), hx:h.hx, hy:h.hy, hz:h.hz };
+      if (aabb(t, c)) return true;
+    } else if (h.kind === 'spike') {
+      // use the forgiving inner box, not the drawn one
+      const c = { cx:h.cx, cy:h.ccy, cz:h.cz, hx:h.chx, hy:h.chy, hz:h.chz };
       if (aabb(t, c)) return true;
     } else if (aabb(t, h)) return true;
   }
@@ -1863,13 +1975,14 @@ function drawCharacter(x, y, z, yaw, skinId, walk, squash, airborne) {
     drawMesh(meshes.cube, TMP_D, hex('#C22B2B'));
   }
   if (skinId === 'inu') {
-    for (const s of [-1,1]) {
-      m4translate(TMP_D, x, base + 1.8, z);
-      m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
-      m4translate(TMP_B, s*0.2, 0, 0); m4mul(TMP_D, MODEL, TMP_B);
-      m4scale(TMP_B, 0.18, 0.26, 0.12); m4mul(MODEL, TMP_D, TMP_B);
-      drawMesh(meshes.pyr, MODEL, hex('#C98A4F'));
-    }
+    // Inu is a person, not a dog — short hair and a cap brim.
+    compose(MODEL, x, base + 1.78, z, ry, 0, 0.66, 0.2, 0.66);
+    drawMesh(meshes.cube, MODEL, hex('#2E2A26'));
+    m4translate(TMP_D, x, base + 1.72, z);
+    m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, 0, 0, 0.42); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.62, 0.09, 0.36); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, hex('#2FA96C'));
   }
   if (skinId === 'snail') {
     compose(MODEL, x, base + 1.0, z, ry, 0, 1.1, 1.1, 1.1);
@@ -2490,6 +2603,7 @@ const screens = {
 function showScreen(name) {
   game.screen = name;
   touchWrap.classList.toggle('war', game.mode === 'snail');   // salt/swing/teleport buttons
+  Music.play(songFor());                                      // each level has its own song
   if (name === 'play') { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   for (const k in screens) screens[k].classList.toggle('on', k === name);
@@ -2576,6 +2690,11 @@ document.getElementById('fsBtn').onclick = toggleFull;
 const soundBtn = document.getElementById('soundBtn');
 const paintSound = () => soundBtn.textContent = save.sound ? '🔊' : '🔇';
 soundBtn.onclick = () => { save.sound = !save.sound; persist(); paintSound(); };
+
+const musicBtn = document.getElementById('musicBtn');
+const paintMusic = () => { musicBtn.style.opacity = save.music ? '1' : '.4'; };
+musicBtn.onclick = () => { save.music = !save.music; persist(); paintMusic(); Music.refresh(songFor()); };
+paintMusic();
 paintSound();
 
 showScreen('menu');
