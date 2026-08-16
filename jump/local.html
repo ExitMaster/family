@@ -501,6 +501,7 @@ function gameOver() {
   }
   startBtn.textContent = "Play again";
   for (const r of runners) looks[r.hero].stars += r.starCount;
+  saveProgress();
   drawShop();
   overlay.classList.remove("hidden");
   updateBoard();
@@ -1274,6 +1275,57 @@ function repaintHero(i) {
   draw();
 }
 
+// ---------- 별·옷·최고점 기억하기 ----------
+// 한 기기 버전은 닉네임을 입력받지 않고 이름이 고정되어 있으므로, 저장도 그냥 이
+// 기기 안에 통째로 둔다. (온라인 버전은 banks/{닉네임}에 두어 기기를 넘나든다)
+const SAVE_KEY = "jump-local";
+
+function saveProgress() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      v: 1,
+      bests: bests,
+      looks: looks.map(L => ({ stars: L.stars, owned: L.owned,
+                               hat: L.hat, cape: L.cape, trail: L.trail, color: L.color }))
+    }));
+  } catch (e) { /* 시크릿 모드 등 — 저장만 안 될 뿐 이번 판은 그대로 된다 */ }
+}
+
+// 저장된 게 깨져 있거나 옛날 것이어도 게임이 안 뜨는 일은 없어야 한다.
+// 그래서 통째로 갈아끼우지 않고, 알아볼 수 있는 값만 하나씩 옮겨 담는다.
+function loadProgress() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "null"); }
+  catch (e) { return; }
+  if (!saved || typeof saved !== "object") return;
+
+  if (Array.isArray(saved.bests)) {
+    for (let i = 0; i < bests.length; i++) {
+      const n = saved.bests[i];
+      if (typeof n === "number" && isFinite(n) && n >= 0) bests[i] = n;
+    }
+  }
+
+  if (Array.isArray(saved.looks)) {
+    saved.looks.forEach((old, i) => {
+      const L = looks[i];                       // 이름이 늘거나 줄어도 안 깨진다
+      if (!L || !old || typeof old !== "object") return;
+
+      if (typeof old.stars === "number" && isFinite(old.stars) && old.stars >= 0) {
+        L.stars = Math.floor(old.stars);
+      }
+      if (Array.isArray(old.owned)) {           // 지금 상점에 있는 물건만 인정
+        for (const id of old.owned) {
+          if (ITEMS.some(it => it.id === id) && !L.owned.includes(id)) L.owned.push(id);
+        }
+      }
+      for (const slot of ["hat", "cape", "trail", "color"]) {
+        if (L.owned.includes(old[slot])) L[slot] = old[slot];   // 가진 것만 입는다
+      }
+    });
+  }
+}
+
 let shopWho = 0;
 const whoTabs = document.getElementById("whoTabs");
 const shopItems = document.getElementById("shopItems");
@@ -1323,6 +1375,7 @@ function drawShop() {
         L.owned.push(it.id);
       }
       L[it.slot] = it.id;
+      saveProgress();
       if (it.slot === "color") repaintHero(shopWho);
       drawShop();
     };
@@ -1496,6 +1549,7 @@ window.addEventListener("pointerup", letGo);
 window.addEventListener("pointercancel", letGo);
 
 // ---------- first screen ----------
+loadProgress();
 buildPicker();
 buildBoard();
 drawShop();
