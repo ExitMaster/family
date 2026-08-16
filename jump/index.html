@@ -253,7 +253,7 @@ const firebaseConfig = {
 //  numbers, or the track and the scores won't match. If you change
 //  any of these, bump GAME_VERSION so old tabs get warned.
 // ============================================================
-const GAME_VERSION = 4;
+const GAME_VERSION = 5;
 
 const JUMP_POWER  = 620;   // the pop you get the instant you press
 const HOLD_EASE   = 0.35;  // gravity while you keep holding (smaller = floatier)
@@ -277,7 +277,7 @@ const SAFE_TIME   = 1.4;   // seconds of blinking "can't be hurt" after a bonk
 // These three shares are rolled per obstacle; whatever is left over is a plain
 // box. They must be identical on every device or the tracks drift apart.
 const PIT_CHANCE  = 0.18;  // a hole in the ground you have to clear
-const BIRD_CHANCE = 0.20;  // a bird parked in mid-air
+const BIRD_CHANCE = 0.10;  // a bird parked in mid-air (halved — they were too hard)
 const PLAT_CHANCE = 0.15;  // a platform that slides up and down
 const BIRD_W = 34, BIRD_H = 24;   // how much room a bird takes up
 const PLAT_T = 14;                // how thick a floating platform is
