@@ -636,7 +636,7 @@ function songFor() {
 const SKINS = [
   { id:'kid',     name:'Aura Kid',   price:0,   em:'🧒', body:'#5B8DEF', head:'#F7C59F', desc:'The classic.' },
   { id:'angel',   name:'Angel',      price:40,  em:'😇', body:'#FFFFFF', head:'#FFE9C9', desc:'Halo and wings.' },
-  { id:'inu',     name:'Inu',        price:90,  em:'👦', body:'#3FBF7F', head:'#F7C59F', desc:'The hero of the Inu Level.' },
+  { id:'inu',     name:'Inu',        price:90,  em:'👦', body:'#3FBF7F', head:'#F7C59F', desc:'The hero of the story.' },
   { id:'devil',   name:'Devil',      price:160, em:'😈', body:'#E23B3B', head:'#FF7A6B', desc:'Horns and a tail.' },
   { id:'ghost',   name:'Ghost',      price:120, em:'👻', body:'#D6E2FF', head:'#EEF4FF', desc:'Pale and floaty.' },
   { id:'rainbow', name:'Rainbow',    price:320, em:'🌈', body:'#FF00FF', head:'#FFFFFF', desc:'Colour-shifting aura.' },
@@ -1012,7 +1012,8 @@ const POOL = {
 const LEVELS = [
   { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:9,
     blurb:'Soft clouds and easy jumps. A warm-up.' },
-  { id:'inu',   name:'Inu Level',   emoji:'👦', theme:'inu',   seed:4242, d:0.55, chunks:12,
+  // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
+  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.55, chunks:12,
     blurb:'Movers, spinners and crumbling wood.' },
   { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:0.95, chunks:14,
     blurb:'Lava, fire and a devil at the gate.' }

@@ -32,11 +32,14 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | Level | What is in it |
 |---|---|
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
-| 👦 **Inu** | Spinning bars, crumbling wood, ferries, spike patches |
+| 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
 
-**Inu is a name, not a dog.** The level and the unlockable skin are a boy in a green
-cap — if you ever see dog ears on him again, that is a bug.
+Angel, human, devil — the three levels are the difficulty ladder.
+
+**Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
+His level id is still `inu` in the code so saved clear times survive the rename, but
+the level is shown as **Normal Level**. If you ever see dog ears on him, that is a bug.
 
 Devil unlocks after Inu, Inu after Angel. Clearing a level the first time pays a
 **+25 aura bonus**.
@@ -94,7 +97,7 @@ the game is still one HTML file you can email to someone.
 |---|---|
 | Menu | slow and quiet |
 | 😇 Angel | dreamy, major, 92 bpm |
-| 👦 Inu | bouncy hero music, 126 bpm |
+| 👦 Normal | bouncy hero music, 126 bpm |
 | 😈 Devil | dark minor sawtooth, 148 bpm |
 | 🐌 Killer Snail | tense and stabby, 116 bpm |
 | ♾️ Infinity | everything walking downwards, 88 bpm |
