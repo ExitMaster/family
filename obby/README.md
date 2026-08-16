@@ -32,11 +32,14 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | Level | What is in it |
 |---|---|
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
-| 👦 **Inu** | Spinning bars, crumbling wood, ferries, spike patches |
+| 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
 
-**Inu is a name, not a dog.** The level and the unlockable skin are a boy in a green
-cap — if you ever see dog ears on him again, that is a bug.
+Angel, human, devil — the three levels are the difficulty ladder.
+
+**Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
+His level id is still `inu` in the code so saved clear times survive the rename, but
+the level is shown as **Normal Level**. If you ever see dog ears on him, that is a bug.
 
 Devil unlocks after Inu, Inu after Angel. Clearing a level the first time pays a
 **+25 aura bonus**.
@@ -94,7 +97,7 @@ the game is still one HTML file you can email to someone.
 |---|---|
 | Menu | slow and quiet |
 | 😇 Angel | dreamy, major, 92 bpm |
-| 👦 Inu | bouncy hero music, 126 bpm |
+| 👦 Normal | bouncy hero music, 126 bpm |
 | 😈 Devil | dark minor sawtooth, 148 bpm |
 | 🐌 Killer Snail | tense and stabby, 116 bpm |
 | ♾️ Infinity | everything walking downwards, 88 bpm |
@@ -110,8 +113,11 @@ Everything is in `index.html`.
   sphere), directional light + fog. Static level geometry is baked into a single
   vertex buffer and drawn in one call; only moving things get their own draw call.
 * **Physics** — axis-aligned boxes, resolved one axis at a time. Coyote time and
-  jump buffering are in, so jumps feel forgiving. The camera walks the same boxes
-  and pulls in when a wall would otherwise end up between it and you.
+  jump buffering are in, so jumps feel forgiving. Landing with no direction held
+  zeroes your horizontal speed on the spot: friction alone takes about 0.15s to
+  stop you, which is a whole platform-width of slide and walks you off narrow
+  ledges. The camera walks the same boxes and pulls in when a wall would otherwise
+  end up between it and you.
 * **Spikes** are the one hazard whose hit box is *not* what you see. They are drawn
   as pyramids that taper to a point, so a box the size of the patch kills you while
   you are still clearly above the tips. `spikeBox()` keeps the drawn size but carries
