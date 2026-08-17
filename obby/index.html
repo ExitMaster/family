@@ -1305,9 +1305,9 @@ const CHUNKS = {
 const POOL = {
   angel: [ch_straight, ch_gap, ch_steps, ch_zigzag, ch_bounce, ch_moverSide, ch_beam, ch_gap, ch_straight],
   inu:   [ch_gap, ch_doubleGap, ch_zigzag, ch_moverSide, ch_moverLong, ch_lift, ch_crumble, ch_spikes,
-          ch_spinner, ch_beam, ch_bounce, ch_steps, ch_pillars],
+          ch_spinner, ch_beam, ch_bounce, ch_steps, ch_pillars, ch_fireRun, ch_spinnerPair],
   devil: [ch_doubleGap, ch_crumble, ch_pillars, ch_fireRun, ch_lava, ch_spinner, ch_spinnerPair,
-          ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam],
+          ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam, ch_blink, ch_crossfire, ch_blinkRun],
   // slippery, so the courses are wide and the hazards are few — the floor is the enemy
   // no beams or pillars here: sliding off a narrow ledge you cannot stop on is not fun
   ice:   [ch_straight, ch_gap, ch_moverLong, ch_steps, ch_gap, ch_lift, ch_straight,
@@ -1325,15 +1325,15 @@ const LEVELS = [
   { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:18,
     blurb:'Soft clouds and easy jumps. Long, but gentle all the way.' },
   // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
-  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.55, chunks:12,
-    blurb:'Movers, spinners and crumbling wood.' },
-  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:0.95, chunks:14,
-    blurb:'Lava, fire and a devil at the gate.' },
+  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.78, chunks:15,
+    blurb:'Movers, spinners, crumbling wood and fire.' },
+  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:19,
+    blurb:'Lava, fire, blinking platforms and a devil at the gate.' },
   { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.3, chunks:13,
     slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
   { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:14,
     gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
-  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, chunks:16,
+  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, chunks:21,
     troll:true, blurb:'Blinking platforms. Nobody has ever finished it. Try anyway.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
@@ -1863,7 +1863,7 @@ function playerInSafe() {
   return Math.abs(p.x-s.x) < s.hx && Math.abs(p.z-s.z) < s.hz && Math.abs(p.y-s.y) < s.hy;
 }
 function spawnSnail(wave) {
-  const a = Math.random()*Math.PI*2, hp = 120 + (wave-1)*70;
+  const a = Math.random()*Math.PI*2, hp = 120 + (wave-1)*115;
   return {
     x: Math.sin(a)*27, y: 2.2, z: Math.cos(a)*27,
     spd:1.2, stun:0, wob:0, yaw:0, hp, maxHp:hp,
@@ -2176,7 +2176,7 @@ function updateInfinity(dt) {
   game.depth = Math.max(game.depth, Math.round(W.startY - p.y));
   while (-6 - (W.nextLayer-1)*LAYER > p.y - 90) addShaftLayer(W);
 
-  const spd = clamp(1.6 + game.depth*0.0035, 1.6, 7.5);
+  const spd = clamp(1.85 + game.depth*0.0045, 1.85, 8.5);
   W.crusherY -= spd*dt;
   if (W.crusherY > p.y + 30) W.crusherY = p.y + 30;      // never lag too far behind
 

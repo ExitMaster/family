@@ -33,8 +33,8 @@ sections, so dying sends you back a little, not to the start.
 | Level | What is in it |
 |---|---|
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The longest gentle course — 18 sections, about 350 units |
-| 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
-| 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
+| 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches, fireball runs |
+| 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
@@ -361,9 +361,14 @@ Full levels, played by the bot end to end:
 | Level | Time | Deaths |
 |---|---|---|
 | Angel | 50s | 0 |
-| Normal | 70s | 5 |
-| Devil | 54s | 0 |
+| Normal | 70s | 3 |
+| Devil | 80s | 2 |
 | Ice | 56s | 6 |
+
+Difficulty is set per level by `d` (0 to 1) plus the chunk pool and the chunk count.
+**`d` must not go above 1** — the chunk geometry is only verified to there, and past it
+the zigzag's diagonal hop stops fitting inside the jump arc. To make a level harder
+beyond that, lengthen it or put nastier chunks in its pool instead.
 
 Killer Snail is checked the same way — a bot that only runs away survives ~93s
 before it gets cornered, a bot that stands still is stabbed to death in ~25s, and
