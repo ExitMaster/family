@@ -871,8 +871,11 @@ const POWERS = [
   { id:'doublejump', name:'Double Jump', price:150, em:'⏫',
     desc:'Press jump again in mid-air. Comes back when you land.' },
   { id:'speed', name:'Speed Boots', price:200, em:'👟',
-    desc:'Run 35% faster in every mode. Jumps carry further too.' }
+    desc:'Run 35% faster in every mode. Jumps carry further too.' },
+  { id:'wings', name:'Aura Wings', price:5000, em:'🪽',
+    desc:'Hold jump as you fall and you glide instead of dropping. The big one.' }
 ];
+const GLIDE_FALL = 2.6;      // how slowly you sink while gliding, units/sec
 const SPEED_BOOST = 1.35;
 // top speed, boots included — used for the run cap AND by anything that has to
 // stay ahead of you, like the Nightmare portal
@@ -1515,7 +1518,7 @@ function makePlayer(sp) {
   return {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
-    coyote:0, buffer:0, jumpHeld:false, airJumps:0, yaw:0, walk:0, squash:0,
+    coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
   };
 }
@@ -1623,6 +1626,13 @@ function stepPlayer(dt) {
   if (p.vy <= 0) p.jumpHeld = false;
 
   p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
+  // Aura Wings: holding jump on the way down turns a fall into a long slow glide.
+  // Falling only — it cannot push you back up, so it never becomes flying.
+  p.gliding = false;
+  if (hasPower('wings') && !p.onGround && p.vy < 0 && input.jump && p.buffer <= 0) {
+    p.vy = Math.max(p.vy, -GLIDE_FALL);
+    p.gliding = true;
+  }
 
   const wasGround = p.onGround;
   p.onGround = false; p.standing = null;
@@ -2334,6 +2344,23 @@ function drawCharacter(x, y, z, yaw, skinId, walk, squash, airborne) {
   }
 
   // skin extras
+  // Aura Wings, if you have bought them. They spread wide while you glide and fold
+  // back in when you do not, so you can see the power working.
+  if (hasPower('wings')) {
+    const p = game.player;
+    const glide = p && p.gliding;
+    const flap = Math.sin(performance.now()/(glide ? 260 : 150));
+    for (const side of [-1,1]) {
+      m4translate(TMP_D, x, base + 1.15, z);
+      m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+      m4translate(TMP_B, side*(glide ? 0.72 : 0.46), 0, -0.34); m4mul(TMP_D, MODEL, TMP_B);
+      m4rotY(TMP_B, side*(glide ? 1.15 : 0.55) + flap*0.22*side); m4mul(MODEL, TMP_D, TMP_B);
+      m4rotZ(TMP_B, side*(glide ? -0.15 : 0.25)); m4mul(TMP_D, MODEL, TMP_B);
+      m4scale(TMP_B, glide ? 1.35 : 0.8, 0.82, 0.09); m4mul(MODEL, TMP_D, TMP_B);
+      drawMesh(meshes.cube, MODEL, hex(glide ? '#C9A0FF' : '#8C6BFF'), glide ? 0.85 : 0.5);
+    }
+  }
+
   if (skinId === 'angel') {
     compose(MODEL, x, base + 2.02, z, ry, 0, 0.62, 0.09, 0.62);
     drawMesh(meshes.cube, MODEL, hex('#FFD86B'), 0.7);
@@ -2864,7 +2891,7 @@ function drawDebug() {
   if (p) lines.push(
     'pos ' + n(p.x) + n(p.y) + n(p.z),
     'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
-    'ground ' + (p.onGround ? 'yes' : 'no ') + '   airJumps ' + p.airJumps +
+    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.gliding ? '  GLIDING' : '') + '   airJumps ' + p.airJumps +
       '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
     'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
   lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));
