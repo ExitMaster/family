@@ -187,10 +187,15 @@
         <label for="nameIn" style="font-size:14px">Playing as</label>
         <input id="nameIn" maxlength="10" placeholder="your name">
       </div>
+      <div class="rowbtns" style="gap:6px">
+        <button class="ghost" id="btnBoardOnline" style="font-size:14px;min-width:0;padding:6px 14px">🌍 Online</button>
+        <button class="ghost" id="btnBoardLocal" style="font-size:14px;min-width:0;padding:6px 14px">📱 This device</button>
+      </div>
+      <div id="boardWhere" style="font-size:12px;opacity:.7">—</div>
       <div id="boardList" style="width:100%"></div>
       <div class="rowbtns">
         <button class="ghost" id="btnBoardBack">⬅ Back</button>
-        <button class="ghost" id="btnBoardClear" style="font-size:14px">🗑️ Clear scores</button>
+        <button class="ghost" id="btnBoardClear" style="font-size:14px">🗑️ Clear my device</button>
       </div>
     </div>
 
@@ -250,6 +255,62 @@
 
 <footer>Real-time 3D in one HTML file — no engine, no build, no server. Progress saves in this browser.</footer>
 
+<script>
+/* =========================================================================
+   ONLINE LEADERBOARD (optional). Loads the Firebase SDK and signs in
+   anonymously. If any of that fails — no internet, blocked network, rules not
+   published yet — window.__cloud simply never appears and the game falls back
+   to the scores kept on this device. Nothing else waits on it.
+
+   For a grown-up: these values are an address label, not a password. They are
+   meant to ship inside a web page. The security is in the database rules, which
+   are in obby/README.md.
+   ========================================================================= */
+</script>
+<script type="module">
+const SDK = 'https://www.gstatic.com/firebasejs/10.12.5/';
+const firebaseConfig = {
+  apiKey:      "AIzaSyDNETb44pue8Kg9tYWqna7y6N7MlCoMpU0",
+  authDomain:  "unimai-game-hub.firebaseapp.com",
+  databaseURL: "https://unimai-game-hub-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:   "unimai-game-hub",
+  appId:       "1:527407328515:web:751f851d2a00e0a2980d36"
+};
+try {
+  const [appMod, authMod, dbMod] = await Promise.all([
+    import(SDK + 'firebase-app.js'),
+    import(SDK + 'firebase-auth.js'),
+    import(SDK + 'firebase-database.js')
+  ]);
+  const { ref, get, set, serverTimestamp } = dbMod;
+  const app = appMod.initializeApp(firebaseConfig);
+  const db = dbMod.getDatabase(app);
+  await authMod.signInAnonymously(authMod.getAuth(app));
+
+  window.__cloud = {
+    // one row per player per board, so the node stays small and each person
+    // is on the list once with their best
+    async top(board) {
+      const snap = await get(ref(db, 'obbyScores/' + board));
+      const raw = snap.val() || {};
+      return Object.keys(raw)
+        .filter(k => raw[k] && typeof raw[k].v === 'number')
+        .map(k => ({ n: String(raw[k].n || k), v: raw[k].v }));
+    },
+    async submit(board, key, name, value, lower) {
+      const node = ref(db, 'obbyScores/' + board + '/' + key);
+      const cur = (await get(node)).val();
+      if (cur && typeof cur.v === 'number' && (lower ? cur.v <= value : cur.v >= value)) return false;
+      await set(node, { n: name, v: value, at: serverTimestamp() });
+      return true;
+    }
+  };
+  window.dispatchEvent(new Event('cloud-ready'));
+} catch (e) {
+  window.__cloudError = (e && e.message) || String(e);
+  window.dispatchEvent(new Event('cloud-fail'));
+}
+</script>
 <script>
 (function () {
 'use strict';
@@ -764,6 +825,22 @@ function playerName() {
   const n = (save.name || '').trim();
   return n || 'Player';
 }
+// Realtime Database keys cannot contain . $ # [ ] / — and one row per person per
+// board keeps the node small, so the player's name is the key.
+function nameKey() {
+  const k = playerName().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 12);
+  return k || 'player';
+}
+const cloudId = id => id.replace(/:/g, '-');
+const cloud = () => window.__cloud || null;
+
+// local always, online too when it is there
+function postScore(id, value, lower) {
+  const rank = Scores.add(id, playerName(), value, lower);
+  const c = cloud();
+  if (c) c.submit(cloudId(id), nameKey(), playerName(), value, lower).catch(() => {});
+  return rank;
+}
 // every board: what it is called, how to print it, and which way is better
 function boardList() {
   const rows = LEVELS.filter(L => !L.troll).map(L =>
@@ -1231,8 +1308,8 @@ const POOL = {
 };
 
 const LEVELS = [
-  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:9,
-    blurb:'Soft clouds and easy jumps. A warm-up.' },
+  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:18,
+    blurb:'Soft clouds and easy jumps. Long, but gentle all the way.' },
   // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
   { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.55, chunks:12,
     blurb:'Movers, spinners and crumbling wood.' },
@@ -2059,7 +2136,7 @@ function endRun() {
     if (isBest) save.best[game.levelId] = game.time;
     if (first) { save.orbs += 25; save.lifetimeOrbs += 25; }
     persist();
-    const rank = cfg.troll ? 0 : Scores.add('lvl:'+game.levelId, playerName(), game.time, true);
+    const rank = cfg.troll ? 0 : postScore('lvl:'+game.levelId, game.time, true);
     const next = LEVELS[levelIndex(game.levelId)+1];
     showResult('🎉 ' + cfg.name + ' clear!',
       '⏱ ' + fmtTime(game.time) + (isBest ? '  <b>NEW BEST!</b>' : '') +
@@ -2076,8 +2153,8 @@ function endRun() {
     if (t >= 60 && !ownsSkin('snail')) { save.owned.push('snail'); unlocked = true; Sound.unlock(); }
     persist();
     if (game.kills > (save.best.kills || 0)) save.best.kills = game.kills;
-    const rank = Scores.add('snail:time', playerName(), t, false);
-    const kRank = game.kills > 0 ? Scores.add('snail:kills', playerName(), game.kills, false) : 0;
+    const rank = postScore('snail:time', t, false);
+    const kRank = game.kills > 0 ? postScore('snail:kills', game.kills, false) : 0;
     showResult('🔪 The snail got you!',
       '⏱ Survived <b>' + fmtTime(t) + '</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
       rankLine(rank) + rankLine(kRank, 'for snails beaten') +
@@ -2091,7 +2168,7 @@ function endRun() {
     const d = game.depth, isBest = d > (save.best.depth || 0);
     if (isBest) save.best.depth = d;
     persist();
-    const rank = Scores.add('inf:depth', playerName(), d, false);
+    const rank = postScore('inf:depth', d, false);
     showResult('♾️ Squashed!',
       '📉 Depth reached: <b>' + d + ' m</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
       rankLine(rank) +
@@ -2995,18 +3072,59 @@ function rankLine(rank, what) {
   return '<br>' + medal + ' <b>' + ord + ' on this device</b>' + (what ? ' ' + what : '');
 }
 
+let boardMode = 'online';          // flips to 'local' on its own if the cloud is not there
+let boardCache = null;             // last online fetch, so switching back is instant
+
 function renderBoard() {
   const nameIn = document.getElementById('nameIn');
   nameIn.value = save.name || '';
+  const where = document.getElementById('boardWhere');
+  const online = boardMode === 'online';
+  document.getElementById('btnBoardOnline').style.opacity = online ? '1' : '.5';
+  document.getElementById('btnBoardLocal').style.opacity = online ? '.5' : '1';
+
+  if (online) {
+    if (!cloud()) {
+      where.textContent = window.__cloudError
+        ? '🌍 offline — showing this device instead'
+        : '🌍 connecting…';
+      paintBoard(null);
+      return;
+    }
+    where.textContent = '🌍 everyone, from every device';
+    paintBoard(boardCache);
+    Promise.all(boardList().map(b => cloud().top(cloudId(b.id)).catch(() => null)))
+      .then(res => {
+        boardCache = {};
+        boardList().forEach((b, i) => { boardCache[b.id] = res[i]; });
+        if (game.screen === 'board' && boardMode === 'online') paintBoard(boardCache);
+      });
+  } else {
+    where.textContent = '📱 only the scores set on this device';
+    paintBoard(null);
+  }
+}
+
+// rows = null means read from the local store
+function paintBoard(rows) {
   const box = document.getElementById('boardList');
   box.innerHTML = '';
   boardList().forEach(b => {
-    const rows = Scores.top(b.id);
+    const src = rows ? rows[b.id] : Scores.top(b.id);
+    const list = (src || []).slice().sort((a, c) => b.lower ? a.v - c.v : c.v - a.v).slice(0, 5);
+    renderOneBoard(box, b, list, rows && !src);
+  });
+}
+
+function renderOneBoard(box, b, rows, loading) {
+  {
     const d = document.createElement('div');
     d.style.cssText = 'background:rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;margin:8px 0;text-align:left';
     let html = '<div style="font-weight:bold;font-size:15px">' + b.name +
       ' <span style="opacity:.65;font-weight:normal;font-size:12px">' + b.sub + '</span></div>';
-    if (!rows.length) {
+    if (loading) {
+      html += '<div style="opacity:.5;font-size:13px;padding:4px 0">loading…</div>';
+    } else if (!rows.length) {
       html += '<div style="opacity:.5;font-size:13px;padding:4px 0">nobody yet — go and set one</div>';
     } else {
       html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
@@ -3021,7 +3139,7 @@ function renderBoard() {
     }
     d.innerHTML = html;
     box.appendChild(d);
-  });
+  }
 }
 
 function renderShop() {
@@ -3085,8 +3203,16 @@ document.getElementById('btnHelp').onclick = () => showScreen('help');
 document.getElementById('btnBoard').onclick = () => showScreen('board');
 document.getElementById('btnBoardBack').onclick = () => showScreen('menu');
 document.getElementById('btnBoardClear').onclick = () => {
-  if (confirm('Clear every score on this device?')) { Scores.clear(); renderBoard(); }
+  if (confirm('Clear the scores kept on this device? The online board is not touched.')) {
+    Scores.clear(); renderBoard();
+  }
 };
+document.getElementById('btnBoardOnline').onclick = () => { boardMode = 'online'; renderBoard(); };
+document.getElementById('btnBoardLocal').onclick  = () => { boardMode = 'local';  renderBoard(); };
+// the SDK finishes loading after the menu is already up
+for (const ev of ['cloud-ready','cloud-fail']) {
+  addEventListener(ev, () => { if (game.screen === 'board') renderBoard(); });
+}
 document.getElementById('nameIn').oninput = e => {
   save.name = e.target.value.slice(0, 10); persist();
 };

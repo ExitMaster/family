@@ -32,7 +32,7 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 
 | Level | What is in it |
 |---|---|
-| 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
+| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The longest gentle course — 18 sections, about 350 units |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide courses and effectively no grip — let go and you coast about two platform lengths before stopping |
@@ -103,7 +103,53 @@ has no board, because nobody can finish it.
 Finish a run and the result screen tells you where you landed — "🥇 1st on this
 device". Your own rows show in gold on the board.
 
-This is per-device, not online. Two tablets keep two separate lists.
+**🌍 Online** shows everyone from every device; **📱 This device** shows only what was
+set here. The device list keeps working with no internet, so the game never waits on
+the network — if the cloud cannot be reached the screen says so and falls back.
+
+Online scores keep **one row per player per board**: submitting only overwrites your
+own row, and only when the new score is better. So the list is one line per person
+with their best, and it cannot grow without limit.
+
+#### Turning the online board on (a grown-up does this once)
+
+It uses the same **Unimai Game Hub** Firebase project as `jump/` and `bunny/`, and
+needs one rule added. Firebase console → Realtime Database → 규칙, keeping whatever
+is already there:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "$room.matches(/^[A-Z0-9]{3,6}$/)"
+      }
+    },
+    "banks": {
+      "$who": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "$who.matches(/^[a-z0-9_-]{1,14}$/)"
+      }
+    },
+    "obbyScores": {
+      "$board": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$who": {
+          ".validate": "newData.hasChildren(['n','v']) && newData.child('v').isNumber() && newData.child('n').isString() && newData.child('n').val().length <= 12"
+        }
+      }
+    }
+  }
+}
+```
+
+`exitmaster.github.io` must also be an authorised domain and anonymous sign-in must
+be on — both already done for `jump/`. Until the rule is published, writes are
+refused and the game quietly shows the device board instead.
 
 ### 🛍️ Aura Shop
 
@@ -255,7 +301,7 @@ Full levels, played by the bot end to end:
 
 | Level | Time | Deaths |
 |---|---|---|
-| Angel | 28s | 0 |
+| Angel | 47s | 0 |
 | Inu | 45s | 0 |
 | Devil | 54s | 0 |
 
