@@ -35,7 +35,7 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
-| 🧊 **Ice** | Wide courses, but almost no grip — you slide when you stop steering, and landing does not stop you |
+| 🧊 **Ice** | Wide courses and effectively no grip — let go and you coast about two platform lengths before stopping |
 | 🚀 **Space** | Gravity at 0.62, so you float. Jumps go about 2.9 up and 8.6 along |
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
@@ -162,7 +162,7 @@ Two levels bend these numbers per level, set on the level and read in `stepPlaye
 
 | Field | Level | What it does |
 |---|---|---|
-| `slip: 1` | Ice | Ground friction × 0.18 and acceleration × 0.55, and landing no longer stops you |
+| `slip: 1` | Ice | Ground friction × `ICE_FRIC` (0.038) and acceleration × `ICE_ACC` (0.55), and landing no longer stops you. From a full run that is about **11 units of coasting**, or two platform lengths. Steering still works — braking does not |
 | `gravity: 0.62` | Space | Jumps reach ~2.9 up and ~8.6 along instead of 1.77 and 5.3 |
 
 Both make their level *easier* to cross and harder to control, which is the point.
