@@ -155,7 +155,9 @@ refused and the game quietly shows the device board instead.
 
 ### 🛍️ Aura Shop
 
-💠 Aura orbs are saved forever, in every mode.
+💠 Aura orbs are saved forever, in every mode. **One orb is worth 30 aura**
+(`ORB_VALUE`). The counter on the HUD still shows orbs *found* — "9 / 21" — while the
+shop counts aura.
 
 **Powers** are bought once and stay on for good — no equipping:
 
