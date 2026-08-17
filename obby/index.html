@@ -879,7 +879,8 @@ const GLIDE_FALL = 2.6;      // how slowly you sink while gliding, units/sec
 // Jetpack. Fuel is what keeps this from being free flight: you get WING_FUEL
 // seconds of thrust per trip into the air, refilled the moment you touch ground,
 // so the most you can ever climb in one go is about WING_MAX_UP * WING_FUEL.
-const WING_FUEL = 1.6, WING_LIFT = 55, WING_MAX_UP = 7.0;
+const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
+const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
 const SPEED_BOOST = 1.35;
 // top speed, boots included — used for the run cap AND by anything that has to
 // stay ahead of you, like the Nightmare portal
@@ -1374,7 +1375,7 @@ function buildCourse(cfg) {
   // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
   // a jump is 1.8, a double jump about 3.5, and the wings only ever slow a fall.
   // So it just hangs there, in plain sight, forever out of reach.
-  W.goal = { x:0, y: cfg.troll ? 46 : 0, z: b.z - 5 };
+  W.goal = { x:0, y: cfg.troll ? 70 : 0, z: b.z - 5 };
   W.endZ = b.z;
   // The Nightmare portal runs away from you (see updateObby). Nobody finishes it.
   W.troll = !!cfg.troll;
@@ -1590,11 +1591,15 @@ function stepPlayer(dt) {
 
   // ice cuts your grip: you get up to speed slowly and you do not stop when you stop steering
   const slip = W.slip || 0;
-  const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : AIR_ACC) * dt;
+  // The jetpack is decided here rather than after gravity, because the speed cap and
+  // the air acceleration below both need to know about it — that is what turns
+  // "hover upward" into "fly forward".
+  const jetting = hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0 && p.fuel > 0;
+  const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
     const sp = Math.hypot(p.vx, p.vz);
-    const top = runMax();
+    const top = runMax() * (jetting ? JET_SPEED : 1);
     if (sp > top) { p.vx = p.vx/sp*top; p.vz = p.vz/sp*top; }
     p.yaw = angLerp(p.yaw, Math.atan2(wx, wz), 1 - Math.pow(0.0001, dt));
   } else if (p.onGround) {
@@ -1639,7 +1644,7 @@ function stepPlayer(dt) {
   // then it turns into a slow glide. Fuel comes back when you land.
   p.gliding = false; p.thrusting = false;
   if (hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0) {
-    if (p.fuel > 0) {
+    if (jetting) {
       p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
       p.fuel = Math.max(0, p.fuel - dt);
       p.thrusting = true; p.gliding = true;

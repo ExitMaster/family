@@ -40,24 +40,25 @@ sections, so dying sends you back a little, not to the start.
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
 **Nightmare is a troll level and that is deliberate, not a bug.** Its portal hangs
-**46 units up in the sky** and never moves. You reach the end, look up, and there it
+**70 units up in the sky** and never moves. You reach the end, look up, and there it
 is — visible, and out of reach. `troll:true` puts the goal in the sky (see
 `buildCourse`) and fires the taunts (see `updateObby`).
 
-46 was picked against the best climb anything in the game can manage:
+70 was picked against the best climb anything in the game can manage:
 
 | | Height |
 |---|---|
 | Jump | 1.8 |
 | Double jump | ~3.5 |
 | Bounce pad | 4.9 (and Nightmare's chunk pool has none) |
-| Jetpack, full tank | ~11 |
-| **Everything at once, measured** | **14.35** |
+| Jetpack, full tank | ~23 |
+| **Everything at once, measured** | **31.9** |
 
-Tested with wings, boots and double jump all bought, 30 seconds of jumping and
-flying under it: best height 14.35 against a portal at 46. **If the jetpack's fuel or
-lift ever goes up, check this number still holds.** If someone reports "the last
-level is broken", this is why.
+Tested with wings, boots and double jump all bought, 40 seconds of jumping and
+flying under it: best height 31.9 against a portal at 70. **If the jetpack's fuel or
+lift ever goes up, check this number still holds** — it has already had to be raised
+once, from 46, when the wings became a jetpack. If someone reports "the last level is
+broken", this is why.
 
 **Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
 His level id is still `inu` in the code so saved clear times survive the rename, but
@@ -182,9 +183,13 @@ shop counts aura.
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
 | 🪽 **Aura Wings** | 500 | A jetpack. Hold jump in the air to fly upward, then glide down |
 
-The wings hold **1.6 seconds of fuel**, refilled the instant you touch the ground.
-Hold jump in the air and you climb at up to 7 a second — about **11 units per tank**.
+The wings hold **2.8 seconds of fuel**, refilled the instant you touch the ground.
+Hold jump in the air and you fly: up to **9 a second upward** (about 23 units on a
+full tank) and **1.5× your running speed forward**, with much sharper air steering.
 Run dry and it becomes a glide instead, sinking 2.6 a second rather than 22.
+
+Measured over 2.5 seconds of holding forward in mid-air: coasting travels 17 forward
+and drops 29; thrusting travels **26 forward and climbs 21**.
 
 Fuel is the whole design. Without it this would be free flight and every course
 would be pointless; with it, a flight is a resource you spend and have to land to get
