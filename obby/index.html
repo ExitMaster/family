@@ -873,11 +873,13 @@ const POWERS = [
   { id:'speed', name:'Speed Boots', price:200, em:'👟',
     desc:'Run 35% faster in every mode. Jumps carry further too.' },
   { id:'wings', name:'Aura Wings', price:500, em:'🪽',
-    desc:'Jetpack with unlimited fuel. Hold jump in the air and fly wherever you like.' }
+    desc:'Jetpack. Hold jump in the air to fly up, then glide down. Refuels on landing.' }
 ];
-// Jetpack, unlimited. Hold jump in the air and you keep climbing for as long as you
-// like. This is deliberately overpowered — it is the top item in the shop.
-const WING_LIFT = 55, WING_MAX_UP = 9.0;
+const GLIDE_FALL = 2.6;      // how slowly you sink while gliding, units/sec
+// Jetpack. Fuel is what keeps this from being free flight: you get WING_FUEL
+// seconds of thrust per trip into the air, refilled the moment you touch ground,
+// so the most you can ever climb in one go is about WING_MAX_UP * WING_FUEL.
+const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
 const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
 const SPEED_BOOST = 1.35;
 // top speed, boots included — used for the run cap AND by anything that has to
@@ -1370,8 +1372,9 @@ function buildCourse(cfg) {
     if ((i+1) % (cfg.checkEvery || 2) === 0 && i < cfg.chunks-1) b.check();
   }
   b.plat(9, 10);
-  // The Nightmare portal sits far up in the sky, plainly visible and apparently
-  // out of reach.
+  // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
+  // a jump is 1.8, a double jump about 3.5, and the wings only ever slow a fall.
+  // So it just hangs there, in plain sight, forever out of reach.
   W.goal = { x:0, y: cfg.troll ? 70 : 0, z: b.z - 5 };
 
   W.endZ = b.z;
@@ -1525,8 +1528,9 @@ function makePlayer(sp) {
   return {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
-    coyote:0, buffer:0, jumpHeld:false, airJumps:0, thrusting:false,
-    yaw:0, walk:0, squash:0,
+    coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false,
+    ascending:false,
+    fuel:WING_FUEL, yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
   };
 }
@@ -1592,7 +1596,12 @@ function stepPlayer(dt) {
   // The jetpack is decided here rather than after gravity, because the speed cap and
   // the air acceleration below both need to know about it — that is what turns
   // "hover upward" into "fly forward".
-  const jetting = hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0;
+  // THE NIGHTMARE SECRET: stand on the last deck of the troll level and the jetpack
+  // stops burning fuel, which is the only way anyone ever reaches that portal at 70.
+  // Nothing in the game says so. Do not sign-post it.
+  const endlessFuel = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
+  const jetting = hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0 &&
+                  (p.fuel > 0 || endlessFuel);
   const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
@@ -1638,14 +1647,32 @@ function stepPlayer(dt) {
   if (p.vy <= 0) p.jumpHeld = false;
 
   p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
-  // Aura Wings, as a jetpack: hold jump in the air and you climb, for as long as you
-  // hold it. There is no fuel and no glide state — holding jump always flies.
-  p.thrusting = false;
-  if (jetting) {
-    p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
-    p.thrusting = true;
-    if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
+  // Aura Wings, as a jetpack: hold jump in the air and you climb while fuel lasts,
+  // then it turns into a slow glide. Fuel comes back when you land.
+  p.gliding = false; p.thrusting = false;
+  if (hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0) {
+    if (jetting) {
+      p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
+      if (!endlessFuel) p.fuel = Math.max(0, p.fuel - dt);
+      p.thrusting = true; p.gliding = true;
+      if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
+    } else if (p.vy < 0) {
+      p.vy = Math.max(p.vy, -GLIDE_FALL);            // out of fuel: glide down
+      p.gliding = true;
+    }
   }
+  // The final Nightmare ascent is on rails: once you are climbing you cannot steer,
+  // you only go up. It also eases you onto the portal's x/z — without that you could
+  // lift off from the back of the deck and rise past it forever, unable to correct.
+  if (endlessFuel && !p.onGround && p.y > 3) {
+    const k = 1 - Math.pow(0.06, dt);
+    p.x = lerp(p.x, W.goal.x, k);
+    p.z = lerp(p.z, W.goal.z, k);
+    p.vx = 0; p.vz = 0;
+    p.ascending = true;
+  } else p.ascending = false;
+
+  if (p.onGround) p.fuel = WING_FUEL;
 
   const wasGround = p.onGround;
   p.onGround = false; p.standing = null;
@@ -2355,20 +2382,21 @@ function drawCharacter(x, y, z, yaw, skinId, walk, squash, airborne) {
   }
 
   // skin extras
-  // Aura Wings, if you have bought them. They spread wide under thrust and fold
+  // Aura Wings, if you have bought them. They spread wide while you glide and fold
   // back in when you do not, so you can see the power working.
   if (hasPower('wings')) {
     const p = game.player;
+    const glide = p && p.gliding;
     const jet = p && p.thrusting;
-    const flap = Math.sin(performance.now()/(jet ? 260 : 150));
+    const flap = Math.sin(performance.now()/(glide ? 260 : 150));
     for (const side of [-1,1]) {
       m4translate(TMP_D, x, base + 1.15, z);
       m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
-      m4translate(TMP_B, side*(jet ? 0.72 : 0.46), 0, -0.34); m4mul(TMP_D, MODEL, TMP_B);
-      m4rotY(TMP_B, side*(jet ? 1.15 : 0.55) + flap*0.22*side); m4mul(MODEL, TMP_D, TMP_B);
-      m4rotZ(TMP_B, side*(jet ? -0.15 : 0.25)); m4mul(TMP_D, MODEL, TMP_B);
-      m4scale(TMP_B, jet ? 1.35 : 0.8, 0.82, 0.09); m4mul(MODEL, TMP_D, TMP_B);
-      drawMesh(meshes.cube, MODEL, hex(jet ? '#FFFFFF' : '#8C6BFF'), jet ? 1 : 0.5);
+      m4translate(TMP_B, side*(glide ? 0.72 : 0.46), 0, -0.34); m4mul(TMP_D, MODEL, TMP_B);
+      m4rotY(TMP_B, side*(glide ? 1.15 : 0.55) + flap*0.22*side); m4mul(MODEL, TMP_D, TMP_B);
+      m4rotZ(TMP_B, side*(glide ? -0.15 : 0.25)); m4mul(TMP_D, MODEL, TMP_B);
+      m4scale(TMP_B, glide ? 1.35 : 0.8, 0.82, 0.09); m4mul(MODEL, TMP_D, TMP_B);
+      drawMesh(meshes.cube, MODEL, hex(jet ? '#FFFFFF' : glide ? '#C9A0FF' : '#8C6BFF'), jet ? 1 : glide ? 0.85 : 0.5);
     }
   }
 
@@ -2695,6 +2723,21 @@ function drawHUD(t) {
   H.fillStyle = '#fff';
   H.fillText(game.mode === 'obby' ? game.runOrbs + ' / ' + game.world.totalOrbs : String(game.runOrbs), 58, 39);
 
+  // jetpack fuel, only shown once you own the wings
+  if (hasPower('wings') && game.player) {
+    const f = clamp((game.player.fuel || 0) / WING_FUEL, 0, 1);
+    H.fillStyle = 'rgba(18,16,31,.55)';
+    rr2(14, 54, 150, 16, 8); H.fill();
+    H.fillStyle = 'rgba(255,255,255,.18)';
+    rr2(20, 59, 112, 6, 3); H.fill();
+    H.fillStyle = f > 0.25 ? '#C9A0FF' : '#FF8A8A';
+    rr2(20, 59, 112*f, 6, 3); H.fill();
+    H.font = 'bold 10px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.8)';
+    H.textAlign = 'left';
+    H.fillText('🪽', 138, 67);
+  }
+
   let label = 'TIME', big = fmtTime(game.time);
   if (game.mode === 'snail') label = 'SURVIVED';
   if (game.mode === 'infinity') { label = 'DEPTH'; big = game.depth + ' m'; }
@@ -2902,8 +2945,8 @@ function drawDebug() {
   if (p) lines.push(
     'pos ' + n(p.x) + n(p.y) + n(p.z),
     'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
-    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.thrusting ? '  JET' : '') +
-      '   airJumps ' + p.airJumps +
+    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.ascending ? '  ASCENT' : p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
+      '  fuel ' + (p.fuel||0).toFixed(2) + '   airJumps ' + p.airJumps +
       '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
     'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
   lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));
