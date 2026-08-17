@@ -154,6 +154,9 @@
     <div class="screen" id="scrShop">
       <h2>🛍️ Aura Shop</h2>
       <div class="orbcount">💠 <span id="shopOrbs">0</span> aura</div>
+      <p style="margin-top:2px"><b>⚡ Powers</b> — bought once, on forever</p>
+      <div class="cards" id="shopPowers"></div>
+      <p style="margin-top:6px"><b>👕 Skins</b></p>
       <div class="cards" id="shopCards"></div>
       <button class="ghost" id="btnShopBack">⬅ Back</button>
     </div>
@@ -163,7 +166,7 @@
       <table class="keys">
         <tr><td>Move</td><td><b>W A S D</b> or <b>arrow keys</b> (camera relative)</td></tr>
         <tr><td>Jump</td><td><b>SPACE</b> — hold longer to jump higher</td></tr>
-        <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air — one per jump, back when you land</td></tr>
+        <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air — <b>buy it in the Aura Shop</b> first</td></tr>
         <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
@@ -493,10 +496,12 @@ function loadSave() {
       orbs: r.orbs|0, lifetimeOrbs: r.lifetimeOrbs|0, skin: r.skin || 'kid',
       owned: Array.isArray(r.owned) && r.owned.length ? r.owned.slice() : ['kid'],
       cleared: Object.assign({}, r.cleared), best: Object.assign({}, r.best),
-      sound: r.sound !== false, music: r.music !== false
+      sound: r.sound !== false, music: r.music !== false,
+      powers: Array.isArray(r.powers) ? r.powers.slice() : []
     };
   } catch (e) {}
-  return { orbs:0, lifetimeOrbs:0, skin:'kid', owned:['kid'], cleared:{}, best:{}, sound:true, music:true };
+  return { orbs:0, lifetimeOrbs:0, skin:'kid', owned:['kid'], cleared:{}, best:{},
+           sound:true, music:true, powers:[] };
 }
 const save = loadSave();
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
@@ -566,6 +571,14 @@ const SONGS = {
   void:  { bpm:88, vol:.05, lead:'sine', bassW:'sine',
     lead1:[84,0,82,0, 80,0,78,0, 76,0,74,0, 72,0,0,0,       82,0,80,0, 78,0,76,0, 74,0,72,0, 70,0,0,0],
     bass: [36,0,0,0, 0,0,0,0, 34,0,0,0, 0,0,0,0,            32,0,0,0, 0,0,0,0, 30,0,0,0, 0,0,0,0] },
+  // glassy and bright
+  ice:   { bpm:104, vol:.05, lead:'sine', bassW:'triangle',
+    lead1:[88,0,86,0, 84,0,86,0, 88,0,91,0, 88,0,0,0,        86,0,84,0, 83,0,84,0, 86,0,88,0, 84,0,0,0],
+    bass: [52,0,0,0, 59,0,0,0, 48,0,0,0, 55,0,0,0,           53,0,0,0, 60,0,0,0, 52,0,0,0, 59,0,0,0] },
+  // slow, wide and weightless
+  space: { bpm:78, vol:.05, lead:'triangle', bassW:'sine',
+    lead1:[69,0,0,0, 76,0,0,0, 81,0,0,76, 0,0,74,0,          71,0,0,0, 78,0,0,0, 83,0,0,78, 0,0,76,0],
+    bass: [33,0,0,0, 0,0,45,0, 0,0,0,0, 40,0,0,0,            35,0,0,0, 0,0,47,0, 0,0,0,0, 42,0,0,0] },
   // after the devil: fast, cold and mechanical
   nightmare:{ bpm:160, vol:.042, lead:'sawtooth', bassW:'square',
     lead1:[73,0,73,76, 80,0,76,0, 73,0,71,0, 68,0,0,0,        73,0,73,76, 80,0,83,0, 81,0,80,76, 73,0,0,0],
@@ -651,6 +664,13 @@ const SKINS = [
 ];
 const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
 const ownsSkin = id => save.owned.indexOf(id) >= 0;
+
+/* Powers are bought once and stay on for good — no equipping, no slots. */
+const POWERS = [
+  { id:'doublejump', name:'Double Jump', price:150, em:'⏫',
+    desc:'Press jump again in mid-air. Comes back when you land.' }
+];
+const hasPower = id => save.powers.indexOf(id) >= 0;
 
 /* =========================================================================
    8. INPUT — keyboard, drag-to-look, touch stick
@@ -783,7 +803,9 @@ const THEMES = {
   devil: { sky:'#2B0B18', fog:'#5A1220', top:'#5A3A4A', side:'#33202C', accent:'#FF6B3D', light:[.3,1,.4] },
   garden:{ sky:'#9BE07A', fog:'#CDF0B8', top:'#7BC96F', side:'#4E8B49', accent:'#FFD166', light:[.4,1,.4] },
   void:  { sky:'#150E2E', fog:'#241645', top:'#6B57A8', side:'#3A2A66', accent:'#A46BFF', light:[.3,1,.35] },
-  nightmare:{ sky:'#05040D', fog:'#120A22', top:'#2A2140', side:'#171029', accent:'#00E5FF', light:[.3,1,.35] }
+  nightmare:{ sky:'#05040D', fog:'#120A22', top:'#2A2140', side:'#171029', accent:'#00E5FF', light:[.3,1,.35] },
+  ice:   { sky:'#BFE6F2', fog:'#DFF3FA', top:'#DCF3FF', side:'#8FC4DC', accent:'#5BE7FF', light:[.4,1,.35] },
+  space: { sky:'#07061A', fog:'#0E0B2E', top:'#4A6BC8', side:'#2A3A78', accent:'#FFD166', light:[.35,1,.4] }
 };
 
 /* ---- level builder: chunks are strung along +Z and always line up ---- */
@@ -1066,6 +1088,13 @@ const POOL = {
           ch_spinner, ch_beam, ch_bounce, ch_steps, ch_pillars],
   devil: [ch_doubleGap, ch_crumble, ch_pillars, ch_fireRun, ch_lava, ch_spinner, ch_spinnerPair,
           ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam],
+  // slippery, so the courses are wide and the hazards are few — the floor is the enemy
+  // no beams or pillars here: sliding off a narrow ledge you cannot stop on is not fun
+  ice:   [ch_straight, ch_gap, ch_moverLong, ch_steps, ch_spinner, ch_gap, ch_lift,
+          ch_doubleGap, ch_moverSide, ch_straight, ch_spinnerPair, ch_steps],
+  // low gravity, so long floaty hops and tall towers
+  space: [ch_doubleGap, ch_pillars, ch_zigzag, ch_bounce, ch_lift, ch_crossfire,
+          ch_moverLong, ch_steps, ch_gap, ch_blink, ch_beam, ch_spinner, ch_pillars],
   // after the devil: everything at once, plus platforms that will not stay put
   nightmare: [ch_blink, ch_blinkRun, ch_crossfire, ch_spinnerPair, ch_pillars, ch_lava,
               ch_crumble, ch_blink, ch_fireRun, ch_moverLong, ch_zigzag, ch_spinner,
@@ -1080,6 +1109,10 @@ const LEVELS = [
     blurb:'Movers, spinners and crumbling wood.' },
   { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:0.95, chunks:14,
     blurb:'Lava, fire and a devil at the gate.' },
+  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.7, chunks:13,
+    slip:1, blurb:'Everything is slippery. You do not stop when you want to.' },
+  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.85, chunks:14,
+    gravity:0.62, blurb:'Low gravity. You float, and so does everything else.' },
   { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, chunks:16,
     troll:true, blurb:'Blinking platforms. Nobody has ever finished it. Try anyway.' }
 ];
@@ -1123,6 +1156,8 @@ function buildCourse(cfg) {
   W.endZ = b.z;
   // The Nightmare portal runs away from you (see updateObby). Nobody finishes it.
   W.troll = !!cfg.troll;
+  W.slip = cfg.slip || 0;                         // 1 = ice: barely any grip
+  W.gravity = cfg.gravity || 1;                   // < 1 = space: floaty jumps
   W.totalOrbs = W.orbs.length;
   return W;
 }
@@ -1328,14 +1363,17 @@ function stepPlayer(dt) {
   if (wl > 1) { wx /= wl; wz /= wl; }
   const moving = wl > 0.05;
 
-  const acc = (p.onGround ? ACC : AIR_ACC) * dt;
+  // ice cuts your grip: you get up to speed slowly and you do not stop when you stop steering
+  const slip = W.slip || 0;
+  const grip = 1 - slip*0.45;
+  const acc = (p.onGround ? ACC*grip : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
     const sp = Math.hypot(p.vx, p.vz);
     if (sp > RUN) { p.vx = p.vx/sp*RUN; p.vz = p.vz/sp*RUN; }
     p.yaw = angLerp(p.yaw, Math.atan2(wx, wz), 1 - Math.pow(0.0001, dt));
   } else if (p.onGround) {
-    const f = FRIC*dt, sp = Math.hypot(p.vx, p.vz);
+    const f = FRIC*(1 - slip*0.82)*dt, sp = Math.hypot(p.vx, p.vz);
     if (sp <= f) { p.vx = 0; p.vz = 0; }
     else { p.vx -= p.vx/sp*f; p.vz -= p.vz/sp*f; }
   }
@@ -1350,7 +1388,7 @@ function stepPlayer(dt) {
       p.vy = JUMP_V; p.buffer = 0; p.coyote = 0; p.airJumps = 0;
       p.onGround = false; p.standing = null; p.jumpHeld = true; p.squash = -0.3;
       Sound.jump(); puff(p.x, p.y - PHY, p.z, 5);
-    } else if (p.airJumps < AIR_JUMPS) {
+    } else if (p.airJumps < (hasPower('doublejump') ? AIR_JUMPS : 0)) {
       // set vy rather than add it, so it saves you even in a long fall
       p.airJumps++;
       p.vy = JUMP_V * DBL_JUMP; p.buffer = 0; p.jumpHeld = true; p.squash = -0.3;
@@ -1366,7 +1404,7 @@ function stepPlayer(dt) {
   if (p.jumpHeld && !input.jump) { if (p.vy > 0) p.vy *= CUT_JUMP; p.jumpHeld = false; }
   if (p.vy <= 0) p.jumpHeld = false;
 
-  p.vy = Math.max(-MAX_FALL, p.vy - GRAV*dt);
+  p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
 
   const wasGround = p.onGround;
   p.onGround = false; p.standing = null;
@@ -1377,8 +1415,9 @@ function stepPlayer(dt) {
     p.squash = 0.3; puff(p.x, p.y-PHY, p.z, 3);
     // Land and stop. Friction alone takes ~0.15s to kill your speed, which slides
     // you a whole platform-width after a jump and walks you off narrow ledges.
-    // If you are not actually steering when you touch down, you stop dead.
-    if (!moving) { p.vx = 0; p.vz = 0; }
+    // If you are not actually steering when you touch down, you stop dead —
+    // except on ice, where sliding is the whole point of the level.
+    if (!moving && !slip) { p.vx = 0; p.vz = 0; }
   }
 
   // blinking platforms — solid, warning, gone, back again, forever on their own clock
@@ -2760,6 +2799,26 @@ function renderLevels() {
 
 function renderShop() {
   document.getElementById('shopOrbs').textContent = save.orbs;
+
+  const powEl = document.getElementById('shopPowers');
+  powEl.innerHTML = '';
+  POWERS.forEach(pw => {
+    const owned = hasPower(pw.id);
+    const d = document.createElement('div');
+    d.className = 'card' + (owned ? ' equipped' : '');
+    d.innerHTML = '<div class="em">' + pw.em + '</div>' +
+      '<div class="nm">' + pw.name + '</div>' +
+      '<div class="sub">' + pw.desc + '</div>' +
+      '<div class="sub">' + (owned ? '✅ unlocked' : '💠 ' + pw.price) + '</div>';
+    if (!owned) d.onclick = () => {
+      if (save.orbs >= pw.price) {
+        save.orbs -= pw.price; save.powers.push(pw.id);
+        persist(); Sound.unlock(); renderShop();
+      } else d.animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], 220);
+    };
+    powEl.appendChild(d);
+  });
+
   const boxEl = document.getElementById('shopCards');
   boxEl.innerHTML = '';
   SKINS.forEach(sk => {
