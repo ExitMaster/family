@@ -27,8 +27,8 @@ never have to touch it.
 
 ### 🧗 Obby Mode
 
-Three courses that get harder each time. Reach the glowing portal at the end.
-You get checkpoints along the way, so dying sends you back a little, not to the start.
+Six courses. Reach the glowing portal at the end. Checkpoints land every two
+sections, so dying sends you back a little, not to the start.
 
 | Level | What is in it |
 |---|---|
@@ -44,14 +44,16 @@ of the portal and it runs away at 1.06× your top speed, drifting up and out ove
 void, then taunts you. `troll:true` on the level turns this on; the code is in
 `updateObby`. If someone reports "the last level is broken", this is why.
 
-Angel, human, devil — the three levels are the difficulty ladder.
-
 **Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
 His level id is still `inu` in the code so saved clear times survive the rename, but
 the level is shown as **Normal Level**. If you ever see dog ears on him, that is a bug.
 
-Devil unlocks after Inu, Inu after Angel. Clearing a level the first time pays a
-**+25 aura bonus**.
+Each level unlocks the one after it, in the order above. Clearing one for the first
+time pays a **+25 aura bonus**.
+
+Ice and Space sit after Devil on purpose: they are the odd ones rather than the
+hardest, and Nightmare has to stay last because it can never be cleared — anything
+placed after it would be locked forever.
 
 ### 🐌 Killer Snail (not an obby)
 
