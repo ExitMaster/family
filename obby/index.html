@@ -1529,6 +1529,7 @@ function makePlayer(sp) {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
     coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false,
+    ascending:false,
     fuel:WING_FUEL, yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
   };
@@ -1660,6 +1661,17 @@ function stepPlayer(dt) {
       p.gliding = true;
     }
   }
+  // The final Nightmare ascent is on rails: once you are climbing you cannot steer,
+  // you only go up. It also eases you onto the portal's x/z — without that you could
+  // lift off from the back of the deck and rise past it forever, unable to correct.
+  if (endlessFuel && !p.onGround && p.y > 3) {
+    const k = 1 - Math.pow(0.06, dt);
+    p.x = lerp(p.x, W.goal.x, k);
+    p.z = lerp(p.z, W.goal.z, k);
+    p.vx = 0; p.vz = 0;
+    p.ascending = true;
+  } else p.ascending = false;
+
   if (p.onGround) p.fuel = WING_FUEL;
 
   const wasGround = p.onGround;
@@ -2933,7 +2945,7 @@ function drawDebug() {
   if (p) lines.push(
     'pos ' + n(p.x) + n(p.y) + n(p.z),
     'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
-    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
+    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.ascending ? '  ASCENT' : p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
       '  fuel ' + (p.fuel||0).toFixed(2) + '   airJumps ' + p.airJumps +
       '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
     'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));

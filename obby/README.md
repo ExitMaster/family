@@ -51,6 +51,12 @@ anyone reaches the portal: buy the Aura Wings, walk to the end, and hold jump. S
 `endlessFuel` in `stepPlayer` — it is on when `troll` is set and you are within 12 of
 the goal's z.
 
+Once you are climbing there, **steering is switched off** — you only go up. The climb
+also eases you onto the portal's x/z. That is not decoration: without it you could
+lift off from the back of the deck and rise straight past the portal forever with no
+way to correct. Verified from all four corners of the deck, and while actively
+holding a direction to fight it: every one of them reaches the portal.
+
 Nothing in the game hints at it. The blurb still says nobody has finished it, the
 gatekeeper still says nobody gets past him, and there is no marker in the sky. Keep
 it that way.
