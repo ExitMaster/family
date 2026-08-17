@@ -157,8 +157,16 @@ refused and the game quietly shows the device board instead.
 
 💠 Aura orbs are saved forever, in every mode.
 
-**Powers** are bought once and stay on for good — no equipping. Right now that is
-**⏫ Double Jump (150)**.
+**Powers** are bought once and stay on for good — no equipping:
+
+| | | |
+|---|---|---|
+| ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
+| 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
+
+`runMax()` is the one place top speed is decided, so anything that has to stay ahead
+of the player reads it too — the Nightmare portal retreats at `runMax() * 1.06`, and
+still cannot be caught while wearing the boots.
 
 **Skins** are cosmetic:
 Angel (40), Inu (90), Ghost (120), Devil (160), Rainbow (320). Snail King is not
