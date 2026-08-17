@@ -11,7 +11,7 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 |---|---|
 | Move | `W A S D` or arrow keys (relative to the camera) |
 | Jump | `SPACE` — **hold longer to jump higher** |
-| Double jump | `SPACE` again in mid-air — one per jump, refilled on landing |
+| Double jump | `SPACE` again in mid-air — **buy it in the Aura Shop first**, then one per jump, refilled on landing |
 | Turn the camera | drag the screen, or `Q` / `E` |
 | Back to checkpoint | `R` |
 | Pause | `ESC` or `P` |
@@ -35,6 +35,8 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, one moving platform |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
+| 🧊 **Ice** | Wide courses, but almost no grip — you slide when you stop steering, and landing does not stop you |
+| 🚀 **Space** | Gravity at 0.62, so you float. Jumps go about 2.9 up and 8.6 along |
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
 **Nightmare is a troll level and that is deliberate, not a bug.** Get within 15 units
@@ -90,7 +92,12 @@ Your **depth in metres** is the score, and your best depth is saved.
 
 ### 🛍️ Aura Shop
 
-💠 Aura orbs are saved forever, in every mode. Spend them on skins:
+💠 Aura orbs are saved forever, in every mode.
+
+**Powers** are bought once and stay on for good — no equipping. Right now that is
+**⏫ Double Jump (150)**.
+
+**Skins** are cosmetic:
 Angel (40), Inu (90), Ghost (120), Devil (160), Rainbow (320). Snail King is not
 for sale — you have to earn it in Killer Snail.
 
@@ -105,6 +112,8 @@ the game is still one HTML file you can email to someone.
 | Menu | slow and quiet |
 | 😇 Angel | dreamy, major, 92 bpm |
 | 👦 Normal | bouncy hero music, 126 bpm |
+| 🧊 Ice | glassy and bright, 104 bpm |
+| 🚀 Space | slow and weightless, 78 bpm |
 | 😈 Devil | dark minor sawtooth, 148 bpm |
 | 🐌 Killer Snail | tense and stabby, 116 bpm |
 | ♾️ Infinity | everything walking downwards, 88 bpm |
@@ -145,9 +154,20 @@ AIR_JUMPS 1   DBL_JUMP 0.85      ->  with the second jump, roughly 3.0 high and 
 ```
 
 The chunks were all tuned around the **single** jump, so the double jump is pure
-slack: every gap in the game is now clearable with room to spare, and the bonus
-ledges are easy to reach. That is deliberate — it is meant to feel good, not to be
-balanced. Set `AIR_JUMPS` to `0` to put the old difficulty back.
+slack: every gap becomes clearable with room to spare. That is why it costs 150 aura
+in the shop instead of being free — the levels play at their designed difficulty
+until you choose to buy your way out of it.
+
+Two levels bend these numbers per level, set on the level and read in `stepPlayer`:
+
+| Field | Level | What it does |
+|---|---|---|
+| `slip: 1` | Ice | Ground friction × 0.18 and acceleration × 0.55, and landing no longer stops you |
+| `gravity: 0.62` | Space | Jumps reach ~2.9 up and ~8.6 along instead of 1.77 and 5.3 |
+
+Both make their level *easier* to cross and harder to control, which is the point.
+Ice deliberately has no beams or thin pillars in its pool — sliding off a ledge you
+cannot stop on is annoying, not fun.
 
 Every gap in every chunk is inside that arc on purpose. If you change `GRAV`,
 `JUMP_V` or `RUN`, gaps that used to be fair can become impossible — so re-run the
