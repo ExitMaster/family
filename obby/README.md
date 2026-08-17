@@ -35,8 +35,8 @@ You get checkpoints along the way, so dying sends you back a little, not to the 
 | 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The longest gentle course — 18 sections, about 350 units |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars — and **a devil at the gate who says WELCOME TO HELL** |
-| 🧊 **Ice** | Wide courses and effectively no grip — let go and you coast about two platform lengths before stopping |
-| 🚀 **Space** | Gravity at 0.62, so you float. Jumps go about 2.9 up and 8.6 along |
+| 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
+| 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
 **Nightmare is a troll level and that is deliberate, not a bug.** Get within 15 units
@@ -235,9 +235,12 @@ Two levels bend these numbers per level, set on the level and read in `stepPlaye
 | `slip: 1` | Ice | Ground friction × `ICE_FRIC` (0.038) and acceleration × `ICE_ACC` (0.55), and landing no longer stops you. From a full run that is about **11 units of coasting**, or two platform lengths. Steering still works — braking does not |
 | `gravity: 0.62` | Space | Jumps reach ~2.9 up and ~8.6 along instead of 1.77 and 5.3 |
 
-Both make their level *easier* to cross and harder to control, which is the point.
-Ice deliberately has no beams or thin pillars in its pool — sliding off a ledge you
-cannot stop on is annoying, not fun.
+Ice deliberately has no beams, thin pillars or spinners in its pool — being knocked
+about when you cannot brake is annoying, not fun. Space drops the pillars, blinkers
+and crossfire for the same reason: they punish exactly the floaty landing the level
+is built around.
+
+Checkpoints land every **2 chunks** in every level (`checkEvery` overrides per level).
 
 Every gap in every chunk is inside that arc on purpose. If you change `GRAV`,
 `JUMP_V` or `RUN`, gaps that used to be fair can become impossible — so re-run the
@@ -301,9 +304,10 @@ Full levels, played by the bot end to end:
 
 | Level | Time | Deaths |
 |---|---|---|
-| Angel | 47s | 0 |
-| Inu | 45s | 0 |
+| Angel | 50s | 0 |
+| Normal | 70s | 5 |
 | Devil | 54s | 0 |
+| Ice | 56s | 6 |
 
 Killer Snail is checked the same way — a bot that only runs away survives ~93s
 before it gets cornered, a bot that stands still is stabbed to death in ~25s, and
