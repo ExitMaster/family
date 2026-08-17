@@ -11,6 +11,7 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 |---|---|
 | Move | `W A S D` or arrow keys (relative to the camera) |
 | Jump | `SPACE` — **hold longer to jump higher** |
+| Double jump | `SPACE` again in mid-air — one per jump, refilled on landing |
 | Turn the camera | drag the screen, or `Q` / `E` |
 | Back to checkpoint | `R` |
 | Pause | `ESC` or `P` |
@@ -140,7 +141,13 @@ The chunks are tuned around these constants:
 
 ```
 GRAV 26   JUMP_V 9.6   RUN 7.2   ->  jump is 1.77 high, 0.74s long, ~5.3 far
+AIR_JUMPS 1   DBL_JUMP 0.85      ->  with the second jump, roughly 3.0 high and 9 far
 ```
+
+The chunks were all tuned around the **single** jump, so the double jump is pure
+slack: every gap in the game is now clearable with room to spare, and the bonus
+ledges are easy to reach. That is deliberate — it is meant to feel good, not to be
+balanced. Set `AIR_JUMPS` to `0` to put the old difficulty back.
 
 Every gap in every chunk is inside that arc on purpose. If you change `GRAV`,
 `JUMP_V` or `RUN`, gaps that used to be fair can become impossible — so re-run the
