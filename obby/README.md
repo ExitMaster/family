@@ -41,28 +41,32 @@ sections, so dying sends you back a little, not to the start.
 
 **Nightmare looks like a troll level, and that is deliberate.** Its portal hangs
 **70 units up in the sky** and never moves. You reach the end, look up, and there it
-is — visible, and apparently out of reach. `troll:true` puts the goal in the sky (see
-`buildCourse`) and fires the taunts (see `updateObby`).
+is — visible, and apparently out of reach. `troll:true` puts the goal in the sky, in
+`buildCourse`, and fires the taunts in `updateObby`.
 
-**It is secretly beatable.** Buy the Aura Wings and fly straight up. Nothing in the
-game hints at this — the blurb still says nobody has ever finished it, the gatekeeper
-still says nobody gets past him, and there is no marker in the sky. That is on
-purpose: it is a secret, not a feature to advertise. **Do not add a hint.**
+#### The secret — do not sign-post this
 
-Without the jetpack it stays impossible. Everything else in the game tops out well
-short of 70:
+**Standing on the last deck, the jetpack stops burning fuel.** That is the only way
+anyone reaches the portal: buy the Aura Wings, walk to the end, and hold jump. See
+`endlessFuel` in `stepPlayer` — it is on when `troll` is set and you are within 12 of
+the goal's z.
 
-| | Height |
-|---|---|
-| Jump | 1.8 |
-| Double jump | ~3.5 |
-| Bounce pad | 4.9 (and Nightmare's chunk pool has none) |
-| **Jetpack** | **as high as you hold it** |
+Nothing in the game hints at it. The blurb still says nobody has finished it, the
+gatekeeper still says nobody gets past him, and there is no marker in the sky. Keep
+it that way.
 
-Verified both ways: flying straight up with the wings reaches the portal and wins;
-with speed and double jump but no wings, 30 seconds of trying tops out at **4.14**
-against a portal at 70. If someone reports "the last level is broken" and they have
-not bought the wings, that is why.
+Everywhere else the tank is the normal 2.8 seconds, so the level stays impossible for
+anyone who has not bought the wings and thought to fly:
+
+| | Highest reached | Wins |
+|---|---|---|
+| Wings, on the last deck | **66** | **yes** |
+| Wings, at the start of Nightmare | 28.1 | no |
+| Wings, any normal level | 28.1 | no |
+| No wings, on the last deck | 2.9 | no |
+
+If someone reports "the last level is broken" and has not bought the wings, this is
+why.
 
 **Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
 His level id is still `inu` in the code so saved clear times survive the rename, but
@@ -185,14 +189,15 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack with **unlimited fuel**. Hold jump in the air and fly anywhere |
+| 🪽 **Aura Wings** | 500 | A jetpack. Hold jump in the air to fly upward, then glide down |
 
-Hold jump in the air and you fly: up to **9 a second upward** and **1.5x your
-running speed forward**, with much sharper air steering. There is no fuel and no
-limit — hold it as long as you like.
+The wings hold **2.8 seconds of fuel**, refilled the instant you touch the ground.
+Hold jump in the air and you fly: up to **9 a second upward** (about 23 units on a
+full tank) and **1.5× your running speed forward**, with much sharper air steering.
+Run dry and it becomes a glide instead, sinking 2.6 a second rather than 22.
 
-This is deliberately overpowered. It is the top item in the shop and it lets you fly
-over any course in the game, which is the point of buying it.
+Measured over 2.5 seconds of holding forward in mid-air: coasting travels 17 forward
+and drops 29; thrusting travels **26 forward and climbs 21**.
 
 Fuel is the whole design. Without it this would be free flight and every course
 would be pointless; with it, a flight is a resource you spend and have to land to get
