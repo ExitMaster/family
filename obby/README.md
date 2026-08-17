@@ -39,10 +39,25 @@ sections, so dying sends you back a little, not to the start.
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
-**Nightmare is a troll level and that is deliberate, not a bug.** Get within 15 units
-of the portal and it runs away at 1.06× your top speed, drifting up and out over the
-void, then taunts you. `troll:true` on the level turns this on; the code is in
-`updateObby`. If someone reports "the last level is broken", this is why.
+**Nightmare is a troll level and that is deliberate, not a bug.** Its portal hangs
+**46 units up in the sky** and never moves. You reach the end, look up, and there it
+is — visible, and out of reach. `troll:true` puts the goal in the sky (see
+`buildCourse`) and fires the taunts (see `updateObby`).
+
+46 was picked against the best climb anything in the game can manage:
+
+| | Height |
+|---|---|
+| Jump | 1.8 |
+| Double jump | ~3.5 |
+| Bounce pad | 4.9 (and Nightmare's chunk pool has none) |
+| Jetpack, full tank | ~11 |
+| **Everything at once, measured** | **14.35** |
+
+Tested with wings, boots and double jump all bought, 30 seconds of jumping and
+flying under it: best height 14.35 against a portal at 46. **If the jetpack's fuel or
+lift ever goes up, check this number still holds.** If someone reports "the last
+level is broken", this is why.
 
 **Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
 His level id is still `inu` in the code so saved clear times survive the rename, but
@@ -165,12 +180,16 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | Hold jump on the way down and you glide instead of falling |
+| 🪽 **Aura Wings** | 500 | A jetpack. Hold jump in the air to fly upward, then glide down |
 
-Wings only ever slow a **fall** — they cannot push you upward, so it is a glide and
-never flight. Falling drops you ~22 units a second; gliding is 2.6. The wings are
-drawn on your character and spread wide while you are actually gliding, so you can
-see the thing you paid for.
+The wings hold **1.6 seconds of fuel**, refilled the instant you touch the ground.
+Hold jump in the air and you climb at up to 7 a second — about **11 units per tank**.
+Run dry and it becomes a glide instead, sinking 2.6 a second rather than 22.
+
+Fuel is the whole design. Without it this would be free flight and every course
+would be pointless; with it, a flight is a resource you spend and have to land to get
+back. The gauge sits under the orb counter, and the wings flare white while the
+thrust is on.
 
 `runMax()` is the one place top speed is decided, so anything that has to stay ahead
 of the player reads it too — the Nightmare portal retreats at `runMax() * 1.06`, and
