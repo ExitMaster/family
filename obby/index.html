@@ -873,7 +873,7 @@ const POWERS = [
   { id:'speed', name:'Speed Boots', price:200, em:'👟',
     desc:'Run 35% faster in every mode. Jumps carry further too.' },
   { id:'wings', name:'Aura Wings', price:500, em:'🪽',
-    desc:'Jetpack. Hold jump in the air to fly up, then glide down. Refuels on landing.' }
+    desc:'They only stir in one place, and it is not down here.' }
 ];
 const GLIDE_FALL = 2.6;      // how slowly you sink while gliding, units/sec
 // Jetpack. Fuel is what keeps this from being free flight: you get WING_FUEL
@@ -1596,11 +1596,16 @@ function stepPlayer(dt) {
   // The jetpack is decided here rather than after gravity, because the speed cap and
   // the air acceleration below both need to know about it — that is what turns
   // "hover upward" into "fly forward".
-  // THE NIGHTMARE SECRET: stand on the last deck of the troll level and the jetpack
-  // stops burning fuel, which is the only way anyone ever reaches that portal at 70.
-  // Nothing in the game says so. Do not sign-post it.
+  // The wings only work in Nightmare. Everywhere else they are dead weight, which is
+  // the point: flight would let you skip straight over any course, so the courses are
+  // protected and the wings become the key to one specific place.
+  //
+  // THE NIGHTMARE SECRET: on the last deck of that level the jetpack also stops
+  // burning fuel, which is what makes the portal at 70 reachable at all.
+  // Nothing in the game says any of this. Do not sign-post it.
+  const canFly = hasPower('wings') && !!W.troll;
   const endlessFuel = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
-  const jetting = hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0 &&
+  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0 &&
                   (p.fuel > 0 || endlessFuel);
   const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
   if (moving) {
@@ -1650,7 +1655,7 @@ function stepPlayer(dt) {
   // Aura Wings, as a jetpack: hold jump in the air and you climb while fuel lasts,
   // then it turns into a slow glide. Fuel comes back when you land.
   p.gliding = false; p.thrusting = false;
-  if (hasPower('wings') && !p.onGround && input.jump && p.buffer <= 0) {
+  if (canFly && !p.onGround && input.jump && p.buffer <= 0) {
     if (jetting) {
       p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
       if (!endlessFuel) p.fuel = Math.max(0, p.fuel - dt);
@@ -2724,7 +2729,7 @@ function drawHUD(t) {
   H.fillText(game.mode === 'obby' ? game.runOrbs + ' / ' + game.world.totalOrbs : String(game.runOrbs), 58, 39);
 
   // jetpack fuel, only shown once you own the wings
-  if (hasPower('wings') && game.player) {
+  if (hasPower('wings') && game.player && game.world && game.world.troll) {
     const f = clamp((game.player.fuel || 0) / WING_FUEL, 0, 1);
     H.fillStyle = 'rgba(18,16,31,.55)';
     rr2(14, 54, 150, 16, 8); H.fill();

@@ -195,20 +195,31 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack. Hold jump in the air to fly upward, then glide down |
+| 🪽 **Aura Wings** | 500 | A jetpack — **but only inside Nightmare**. Dead weight in every other level |
 
-The wings hold **2.8 seconds of fuel**, refilled the instant you touch the ground.
-Hold jump in the air and you fly: up to **9 a second upward** (about 23 units on a
-full tank) and **1.5× your running speed forward**, with much sharper air steering.
-Run dry and it becomes a glide instead, sinking 2.6 a second rather than 22.
+**The wings only work in the Nightmare Level.** `canFly` in `stepPlayer` requires
+`W.troll`; anywhere else, holding jump in mid-air does nothing at all. The fuel gauge
+is hidden outside that level too — a gauge where the wings are inert would be a
+puzzle with no answer.
 
-Measured over 2.5 seconds of holding forward in mid-air: coasting travels 17 forward
-and drops 29; thrusting travels **26 forward and climbs 21**.
+That restriction is the design, not a limitation. Flight skips straight over any
+course, so letting it work everywhere would quietly delete every level in the game.
+Confined to one level it stops being a cheat and becomes a key.
 
-Fuel is the whole design. Without it this would be free flight and every course
-would be pointless; with it, a flight is a resource you spend and have to land to get
-back. The gauge sits under the orb counter, and the wings flare white while the
-thrust is on.
+Inside Nightmare it is a real jetpack: **9 a second upward**, **1.5× running speed
+forward**, sharper air steering, on a **2.8 second tank** that refills when you land.
+The wings flare white under thrust.
+
+The shop description is deliberately vague — *"They only stir in one place, and it is
+not down here."* It explains why nothing happens in a normal level without giving
+away where it does.
+
+| | Rise above the deck | Wins |
+|---|---|---|
+| Wings, on Nightmare's last deck | **64.8** | **yes** |
+| Wings, elsewhere in Nightmare | 26.9 | no |
+| Wings, in Angel / Devil / Space | **1.7** — just a jump | no |
+| No wings, on the last deck | 1.7 | no |
 
 `runMax()` is the one place top speed is decided, so anything that has to stay ahead
 of the player reads it too — the Nightmare portal retreats at `runMax() * 1.06`, and
