@@ -15,8 +15,8 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 | Turn the camera | drag the screen, or `Q` / `E` |
 | Back to checkpoint | `R` |
 | Pause | `ESC` or `P` |
-| Fullscreen | `F` or the ⛶ button |
-| Music / sound | 🎵 and 🔊 buttons, top right |
+| Fullscreen | `F` or the ⛶ button — real fullscreen, so the address bar goes too |
+| Music / sound | 🎵 and 🔊 buttons, top right. They work **while you are playing** |
 | Phone / tablet | joystick bottom-left, JUMP bottom-right, drag to look around |
 | **Killer Snail only** | `Z` throw salt · `K` swing · `T` teleport to the safehouse |
 
@@ -100,6 +100,15 @@ Your **depth in metres** is the score, and your best depth is saved.
 **Skins** are cosmetic:
 Angel (40), Inu (90), Ghost (120), Devil (160), Rainbow (320). Snail King is not
 for sale — you have to earn it in Killer Snail.
+
+### Don't start a camera drag on top of a control
+
+Dragging anywhere on the stage turns the camera, and it calls `setPointerCapture` so
+the drag survives leaving the element. That capture also eats the `click` on anything
+underneath — which is why the ⛶ / 🔊 / 🎵 buttons were dead the entire time you were
+playing. The `pointerdown` handler now bails out on `e.target.closest('button')` and
+on the touch-control ids. Any new control needs to be a `<button>` or be added to
+that list.
 
 ## Music
 

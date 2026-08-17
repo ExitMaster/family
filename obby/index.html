@@ -27,9 +27,18 @@
   #gl, #hud { position:absolute; inset:0; width:100%; height:100%; display:block; }
   #hud { pointer-events:none; }
 
+  /* .big is the fallback for browsers with no element fullscreen (iPhone Safari).
+     The :fullscreen rules are kept separate on purpose — one unsupported selector
+     in a comma list would throw the whole rule away. */
   #stage.big { position:fixed; inset:0; z-index:100; max-width:none; aspect-ratio:auto;
     border:0; border-radius:0; box-shadow:none; }
   #stage.big #gl, #stage.big #hud { object-fit:contain; }
+  #stage:fullscreen { max-width:none; aspect-ratio:auto; border:0; border-radius:0;
+    box-shadow:none; background:#12101F; }
+  #stage:fullscreen #gl, #stage:fullscreen #hud { width:100%; height:100%; object-fit:contain; }
+  #stage:-webkit-full-screen { max-width:none; aspect-ratio:auto; border:0; border-radius:0;
+    box-shadow:none; background:#12101F; }
+  #stage:-webkit-full-screen #gl, #stage:-webkit-full-screen #hud { width:100%; height:100%; object-fit:contain; }
 
   #fsBtn, #soundBtn, #musicBtn {
     position:absolute; top:9px; z-index:8; font-size:15px; padding:4px 10px;
@@ -718,6 +727,10 @@ function readKeys() {
 let dragId = null, dragX = 0, dragY = 0;
 stage.addEventListener('pointerdown', e => {
   if (game.screen !== 'play') return;
+  // Anything you can press is not a place to start a camera drag. Without this the
+  // stage captures the pointer and the ⛶ / 🔊 / 🎵 buttons never get their click,
+  // so they are unpressable the whole time you are playing.
+  if (e.target.closest && e.target.closest('button')) return;
   if (['knob','stick','tJ','tZ','tK','tT'].includes(e.target.id)) return;
   dragId = e.pointerId; dragX = e.clientX; dragY = e.clientY;
   stage.setPointerCapture(e.pointerId);
@@ -2871,11 +2884,33 @@ document.getElementById('btnResNext').onclick = () => {
   if (game.mode === 'obby' && LEVELS[i+1]) startLevel(LEVELS[i+1].id); else showScreen('menu');
 };
 
+// Real fullscreen where the browser has it, so the address bar and system chrome go
+// away too. iPhone Safari has no element fullscreen, so it falls back to .big, which
+// only fills the browser window.
+function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+function lockLandscape() {
+  if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{});
+}
 function toggleFull() {
-  stage.classList.toggle('big');
-  if (stage.classList.contains('big') && screen.orientation && screen.orientation.lock) {
-    screen.orientation.lock('landscape').catch(()=>{});
+  if (fsElement()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) exit.call(document);
+    stage.classList.remove('big');
+    return;
   }
+  if (stage.classList.contains('big')) { stage.classList.remove('big'); return; }
+  const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+  if (req) {
+    const r = req.call(stage);
+    if (r && r.then) r.then(lockLandscape).catch(() => { stage.classList.add('big'); });
+    else lockLandscape();
+  } else {
+    stage.classList.add('big');                 // no element fullscreen here
+  }
+}
+// Esc or the system gesture can leave fullscreen without going through the button
+for (const ev of ['fullscreenchange','webkitfullscreenchange']) {
+  document.addEventListener(ev, () => { if (!fsElement()) stage.classList.remove('big'); });
 }
 document.getElementById('fsBtn').onclick = toggleFull;
 const soundBtn = document.getElementById('soundBtn');
