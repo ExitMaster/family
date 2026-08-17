@@ -163,7 +163,7 @@ refused and the game quietly shows the device board instead.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 5000 | Hold jump on the way down and you glide instead of falling |
+| 🪽 **Aura Wings** | 1200 | Hold jump on the way down and you glide instead of falling |
 
 Wings only ever slow a **fall** — they cannot push you upward, so it is a glide and
 never flight. Falling drops you ~22 units a second; gliding is 2.6. The wings are
