@@ -157,6 +157,7 @@
         <button class="wide" id="btnSnail">🐌 KILLER SNAIL</button>
         <button class="wide" id="btnInf">♾️ INFINITY CHALLENGE</button>
         <button class="wide ghost" id="btnShop">🛍️ AURA SHOP</button>
+        <button class="wide ghost" id="btnBoard">🏆 LEADERBOARD</button>
         <button class="wide ghost" id="btnHelp">❓ HOW TO PLAY</button>
       </div>
     </div>
@@ -176,6 +177,21 @@
       <p style="margin-top:6px"><b>👕 Skins</b></p>
       <div class="cards" id="shopCards"></div>
       <button class="ghost" id="btnShopBack">⬅ Back</button>
+    </div>
+
+    <div class="screen" id="scrBoard">
+      <h2>🏆 Leaderboard</h2>
+      <p>Top 5 on this device. Everyone who plays here can get on it — put your name
+         in before you play.</p>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <label for="nameIn" style="font-size:14px">Playing as</label>
+        <input id="nameIn" maxlength="10" placeholder="your name">
+      </div>
+      <div id="boardList" style="width:100%"></div>
+      <div class="rowbtns">
+        <button class="ghost" id="btnBoardBack">⬅ Back</button>
+        <button class="ghost" id="btnBoardClear" style="font-size:14px">🗑️ Clear scores</button>
+      </div>
     </div>
 
     <div class="screen" id="scrHelp">
@@ -556,11 +572,12 @@ function loadSave() {
       owned: Array.isArray(r.owned) && r.owned.length ? r.owned.slice() : ['kid'],
       cleared: Object.assign({}, r.cleared), best: Object.assign({}, r.best),
       sound: r.sound !== false, music: r.music !== false,
-      powers: Array.isArray(r.powers) ? r.powers.slice() : []
+      powers: Array.isArray(r.powers) ? r.powers.slice() : [],
+      name: typeof r.name === 'string' ? r.name : ''
     };
   } catch (e) {}
   return { orbs:0, lifetimeOrbs:0, skin:'kid', owned:['kid'], cleared:{}, best:{},
-           sound:true, music:true, powers:[] };
+           sound:true, music:true, powers:[], name:'' };
 }
 const save = loadSave();
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
@@ -707,6 +724,54 @@ function songFor() {
   if (game.mode === 'infinity') return 'void';
   const L = LEVELS.find(l => l.id === game.levelId);
   return L ? L.theme : 'menu';
+}
+
+/* =========================================================================
+   6c. LEADERBOARD — top 5 per board, kept on this device. Each entry carries a
+   name, so everyone playing on the same tablet competes on the same list.
+   ========================================================================= */
+const SCORE_KEY = 'obby3d-scores-v1';
+const Scores = (function () {
+  let data = null;
+  function all() {
+    if (data) return data;
+    try {
+      const r = JSON.parse(localStorage.getItem(SCORE_KEY));
+      if (r && r.boards) { data = r; return data; }
+    } catch (e) {}
+    data = { v:1, boards:{} };
+    return data;
+  }
+  function write() { try { localStorage.setItem(SCORE_KEY, JSON.stringify(all())); } catch (e) {} }
+  return {
+    top(id) { return (all().boards[id] || []).slice(); },
+    // returns the placing (1..5) if it made the board, otherwise 0
+    add(id, name, value, lower) {
+      const b = all().boards;
+      const row = b[id] || (b[id] = []);
+      const entry = { n: name, v: value };
+      row.push(entry);
+      row.sort((a, c) => lower ? a.v - c.v : c.v - a.v);
+      if (row.length > 5) row.length = 5;
+      write();
+      const i = row.indexOf(entry);
+      return i < 0 ? 0 : i + 1;
+    },
+    clear() { data = { v:1, boards:{} }; write(); }
+  };
+})();
+function playerName() {
+  const n = (save.name || '').trim();
+  return n || 'Player';
+}
+// every board: what it is called, how to print it, and which way is better
+function boardList() {
+  const rows = LEVELS.filter(L => !L.troll).map(L =>
+    ({ id:'lvl:'+L.id, name:L.emoji + ' ' + L.name, sub:'fastest clear', lower:true, fmt:fmtTime }));
+  rows.push({ id:'snail:time', name:'🐌 Killer Snail', sub:'longest survival', lower:false, fmt:fmtTime });
+  rows.push({ id:'snail:kills', name:'🔪 Killer Snail', sub:'most snails beaten', lower:false, fmt:v => v + '' });
+  rows.push({ id:'inf:depth', name:'♾️ Infinity', sub:'deepest', lower:false, fmt:v => v + ' m' });
+  return rows;
 }
 
 /* =========================================================================
@@ -1994,9 +2059,11 @@ function endRun() {
     if (isBest) save.best[game.levelId] = game.time;
     if (first) { save.orbs += 25; save.lifetimeOrbs += 25; }
     persist();
+    const rank = cfg.troll ? 0 : Scores.add('lvl:'+game.levelId, playerName(), game.time, true);
     const next = LEVELS[levelIndex(game.levelId)+1];
     showResult('🎉 ' + cfg.name + ' clear!',
       '⏱ ' + fmtTime(game.time) + (isBest ? '  <b>NEW BEST!</b>' : '') +
+      rankLine(rank) +
       '<br>💠 ' + game.runOrbs + ' / ' + game.world.totalOrbs + ' aura orbs' +
       '<br>💀 ' + game.deaths + ' deaths' +
       (first ? '<br><b>+25 bonus aura for the first clear!</b>' : '') +
@@ -2009,8 +2076,11 @@ function endRun() {
     if (t >= 60 && !ownsSkin('snail')) { save.owned.push('snail'); unlocked = true; Sound.unlock(); }
     persist();
     if (game.kills > (save.best.kills || 0)) save.best.kills = game.kills;
+    const rank = Scores.add('snail:time', playerName(), t, false);
+    const kRank = game.kills > 0 ? Scores.add('snail:kills', playerName(), game.kills, false) : 0;
     showResult('🔪 The snail got you!',
       '⏱ Survived <b>' + fmtTime(t) + '</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
+      rankLine(rank) + rankLine(kRank, 'for snails beaten') +
       '<br>🐌 Snails defeated: <b>' + game.kills + '</b>  (reached wave ' + game.wave + ')' +
       '<br>🏆 Best time: ' + fmtTime(save.best.snail || 0) + ' · most snails: ' + (save.best.kills || 0) +
       '<br>💠 ' + game.runOrbs + ' aura collected' +
@@ -2021,8 +2091,10 @@ function endRun() {
     const d = game.depth, isBest = d > (save.best.depth || 0);
     if (isBest) save.best.depth = d;
     persist();
+    const rank = Scores.add('inf:depth', playerName(), d, false);
     showResult('♾️ Squashed!',
       '📉 Depth reached: <b>' + d + ' m</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
+      rankLine(rank) +
       '<br>🏆 Best depth: ' + (save.best.depth || 0) + ' m' +
       '<br>💠 ' + game.runOrbs + ' aura collected', null);
   }
@@ -2882,6 +2954,7 @@ const panel = document.getElementById('panel');
 const screens = {
   menu: document.getElementById('scrMenu'), levels: document.getElementById('scrLevels'),
   shop: document.getElementById('scrShop'), help: document.getElementById('scrHelp'),
+  board: document.getElementById('scrBoard'),
   pause: document.getElementById('scrPause'), result: document.getElementById('scrResult')
 };
 function showScreen(name) {
@@ -2894,6 +2967,7 @@ function showScreen(name) {
   if (name === 'menu') document.getElementById('menuOrbs').textContent = save.orbs;
   if (name === 'levels') renderLevels();
   if (name === 'shop') renderShop();
+  if (name === 'board') renderBoard();
 }
 function resume() { showScreen('play'); }
 
@@ -2910,6 +2984,43 @@ function renderLevels() {
       '<div class="sub">' + (save.cleared[L.id] ? '✅ cleared' : '—') + (best ? ' · ⏱ ' + fmtTime(best) : '') + '</div>';
     if (un) d.onclick = () => startLevel(L.id);
     boxEl.appendChild(d);
+  });
+}
+
+// "🏆 2nd on this device" under a result, or nothing if it missed the top 5
+function rankLine(rank, what) {
+  if (!rank) return '';
+  const medal = ['🥇','🥈','🥉','4️⃣','5️⃣'][rank-1] || '';
+  const ord = ['1st','2nd','3rd','4th','5th'][rank-1];
+  return '<br>' + medal + ' <b>' + ord + ' on this device</b>' + (what ? ' ' + what : '');
+}
+
+function renderBoard() {
+  const nameIn = document.getElementById('nameIn');
+  nameIn.value = save.name || '';
+  const box = document.getElementById('boardList');
+  box.innerHTML = '';
+  boardList().forEach(b => {
+    const rows = Scores.top(b.id);
+    const d = document.createElement('div');
+    d.style.cssText = 'background:rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;margin:8px 0;text-align:left';
+    let html = '<div style="font-weight:bold;font-size:15px">' + b.name +
+      ' <span style="opacity:.65;font-weight:normal;font-size:12px">' + b.sub + '</span></div>';
+    if (!rows.length) {
+      html += '<div style="opacity:.5;font-size:13px;padding:4px 0">nobody yet — go and set one</div>';
+    } else {
+      html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+      rows.forEach((r, i) => {
+        const me = r.n === playerName();
+        html += '<tr style="' + (me ? 'color:#FFD166;font-weight:bold' : '') + '">' +
+          '<td style="padding:2px 0;width:26px">' + (['🥇','🥈','🥉','4','5'][i] || '') + '</td>' +
+          '<td>' + String(r.n).replace(/[<>&]/g, '') + '</td>' +
+          '<td style="text-align:right">' + b.fmt(r.v) + '</td></tr>';
+      });
+      html += '</table>';
+    }
+    d.innerHTML = html;
+    box.appendChild(d);
   });
 }
 
@@ -2971,6 +3082,14 @@ document.getElementById('btnSnail').onclick = startSnail;
 document.getElementById('btnInf').onclick = startInfinity;
 document.getElementById('btnShop').onclick = () => showScreen('shop');
 document.getElementById('btnHelp').onclick = () => showScreen('help');
+document.getElementById('btnBoard').onclick = () => showScreen('board');
+document.getElementById('btnBoardBack').onclick = () => showScreen('menu');
+document.getElementById('btnBoardClear').onclick = () => {
+  if (confirm('Clear every score on this device?')) { Scores.clear(); renderBoard(); }
+};
+document.getElementById('nameIn').oninput = e => {
+  save.name = e.target.value.slice(0, 10); persist();
+};
 document.getElementById('btnLvlBack').onclick = () => showScreen('menu');
 document.getElementById('btnShopBack').onclick = () => showScreen('menu');
 document.getElementById('btnHelpBack').onclick = () => showScreen('menu');
@@ -3036,7 +3155,7 @@ window.OBBY = {
   game, save, cam, input, LEVELS, SKINS, CHUNKS, POOL, update, readKeys, bakeStatic, resetRun,
   buildCourse, buildArena, buildShaft, addShaftLayer,
   startLevel, startSnail, startInfinity, showScreen, persist,
-  shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, project, cam,
+  shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, project, cam, endRun, Scores,
   consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
 };
 

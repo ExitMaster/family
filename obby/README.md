@@ -90,6 +90,21 @@ so you can never stop and rest.
 
 Your **depth in metres** is the score, and your best depth is saved.
 
+### 🏆 Leaderboard
+
+Top 5 per board, kept **on this device** under `localStorage['obby3d-scores-v1']`.
+Every entry carries a name, so a tablet the family shares becomes one shared
+scoreboard — type your name into "Playing as" before you play.
+
+Seven boards: fastest clear for each of the five finishable levels, plus longest
+survival and most snails beaten in Killer Snail, and deepest in Infinity. Nightmare
+has no board, because nobody can finish it.
+
+Finish a run and the result screen tells you where you landed — "🥇 1st on this
+device". Your own rows show in gold on the board.
+
+This is per-device, not online. Two tablets keep two separate lists.
+
 ### 🛍️ Aura Shop
 
 💠 Aura orbs are saved forever, in every mode.
