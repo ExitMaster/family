@@ -869,8 +869,14 @@ const ownsSkin = id => save.owned.indexOf(id) >= 0;
 /* Powers are bought once and stay on for good — no equipping, no slots. */
 const POWERS = [
   { id:'doublejump', name:'Double Jump', price:150, em:'⏫',
-    desc:'Press jump again in mid-air. Comes back when you land.' }
+    desc:'Press jump again in mid-air. Comes back when you land.' },
+  { id:'speed', name:'Speed Boots', price:200, em:'👟',
+    desc:'Run 35% faster in every mode. Jumps carry further too.' }
 ];
+const SPEED_BOOST = 1.35;
+// top speed, boots included — used for the run cap AND by anything that has to
+// stay ahead of you, like the Nightmare portal
+function runMax() { return RUN * (hasPower('speed') ? SPEED_BOOST : 1); }
 const hasPower = id => save.powers.indexOf(id) >= 0;
 
 /* =========================================================================
@@ -1576,7 +1582,8 @@ function stepPlayer(dt) {
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
     const sp = Math.hypot(p.vx, p.vz);
-    if (sp > RUN) { p.vx = p.vx/sp*RUN; p.vz = p.vz/sp*RUN; }
+    const top = runMax();
+    if (sp > top) { p.vx = p.vx/sp*top; p.vz = p.vz/sp*top; }
     p.yaw = angLerp(p.yaw, Math.atan2(wx, wz), 1 - Math.pow(0.0001, dt));
   } else if (p.onGround) {
     const f = FRIC*(slip ? ICE_FRIC : 1)*dt, sp = Math.hypot(p.vx, p.vz);
@@ -1770,7 +1777,7 @@ function updateObby(dt) {
   if (W.troll && !game.won) {
     const d = W.goal.z - p.z;
     if (d < 15) {
-      W.goal.z += RUN * 1.06 * dt;
+      W.goal.z += runMax() * 1.06 * dt;
       W.goal.y += (d < 9 ? 0.9 : 0) * dt;                 // and it drifts up out of reach
       if (!W.taunt1 && W.goal.z > W.endZ + 2) {
         W.taunt1 = 1;
