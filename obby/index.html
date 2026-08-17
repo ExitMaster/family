@@ -1367,7 +1367,10 @@ function buildCourse(cfg) {
     if ((i+1) % (cfg.checkEvery || 2) === 0 && i < cfg.chunks-1) b.check();
   }
   b.plat(9, 10);
-  W.goal = { x:0, y:0, z:b.z - 5 };
+  // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
+  // a jump is 1.8, a double jump about 3.5, and the wings only ever slow a fall.
+  // So it just hangs there, in plain sight, forever out of reach.
+  W.goal = { x:0, y: cfg.troll ? 46 : 0, z: b.z - 5 };
   W.endZ = b.z;
   // The Nightmare portal runs away from you (see updateObby). Nobody finishes it.
   W.troll = !!cfg.troll;
@@ -1783,23 +1786,19 @@ function updateObby(dt) {
     }
   }
 
-  // The Nightmare portal is a joke: get close and it runs, always a shade faster
-  // than you can move, straight out over the void. This level cannot be finished
-  // and that is on purpose.
+  // Nightmare taunts you when you get to the end and find the portal in the sky.
+  // It does not move — you simply cannot get up there. That is the joke.
   if (W.troll && !game.won) {
-    const d = W.goal.z - p.z;
-    if (d < 15) {
-      W.goal.z += runMax() * 1.06 * dt;
-      W.goal.y += (d < 9 ? 0.9 : 0) * dt;                 // and it drifts up out of reach
-      if (!W.taunt1 && W.goal.z > W.endZ + 2) {
-        W.taunt1 = 1;
-        game.banner = { text:'💀 THE PORTAL IS RUNNING AWAY', t:3 };
-        Sound.devil();
-      }
-      if (!W.taunt2 && W.goal.z > W.endZ + 22) {
-        W.taunt2 = 1;
-        game.speech = { text:'TOLD YOU. NOBODY GETS PAST ME', t:5, x:W.goal.x, y:W.goal.y+4, z:W.goal.z };
-      }
+    const d = Math.abs(W.goal.z - p.z);
+    if (!W.taunt1 && d < 12) {
+      W.taunt1 = 1;
+      game.banner = { text:'💀 IT IS UP THERE. IT WAS ALWAYS UP THERE', t:3.4 };
+      Sound.devil();
+    }
+    if (!W.taunt2 && d < 12 && game.time > 3 && p.onGround) {
+      W.taunt2 = 1;
+      game.speech = { text:'TOLD YOU. NOBODY GETS PAST ME', t:5,
+                      x:W.goal.x, y:W.goal.y - 8, z:W.goal.z };
     }
   }
 

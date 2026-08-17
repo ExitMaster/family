@@ -39,10 +39,16 @@ sections, so dying sends you back a little, not to the start.
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
 | 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
-**Nightmare is a troll level and that is deliberate, not a bug.** Get within 15 units
-of the portal and it runs away at 1.06× your top speed, drifting up and out over the
-void, then taunts you. `troll:true` on the level turns this on; the code is in
-`updateObby`. If someone reports "the last level is broken", this is why.
+**Nightmare is a troll level and that is deliberate, not a bug.** Its portal hangs
+**46 units up in the sky** and never moves. You reach the end, look up, and it is
+right there — and nothing in the game gains height: a jump is 1.8, a double jump
+about 3.5, a bounce pad 4.9, and the wings only ever slow a fall. So it can be
+admired and never touched. `troll:true` on the level puts the goal in the sky (see
+`buildCourse`) and fires the taunts (see `updateObby`).
+
+Tested with wings, boots and double jump all bought, jumping for 20 seconds under
+it: best height reached 2.04, portal at 46. If someone reports "the last level is
+broken", this is why.
 
 **Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
 His level id is still `inu` in the code so saved clear times survive the rename, but
