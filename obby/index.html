@@ -1296,11 +1296,11 @@ const POOL = {
           ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam],
   // slippery, so the courses are wide and the hazards are few — the floor is the enemy
   // no beams or pillars here: sliding off a narrow ledge you cannot stop on is not fun
-  ice:   [ch_straight, ch_gap, ch_moverLong, ch_steps, ch_spinner, ch_gap, ch_lift,
-          ch_doubleGap, ch_moverSide, ch_straight, ch_spinnerPair, ch_steps],
+  ice:   [ch_straight, ch_gap, ch_moverLong, ch_steps, ch_gap, ch_lift, ch_straight,
+          ch_moverSide, ch_doubleGap, ch_steps, ch_straight, ch_gap],
   // low gravity, so long floaty hops and tall towers
-  space: [ch_doubleGap, ch_pillars, ch_zigzag, ch_bounce, ch_lift, ch_crossfire,
-          ch_moverLong, ch_steps, ch_gap, ch_blink, ch_beam, ch_spinner, ch_pillars],
+  space: [ch_doubleGap, ch_gap, ch_zigzag, ch_bounce, ch_lift, ch_straight,
+          ch_moverLong, ch_steps, ch_gap, ch_beam, ch_bounce, ch_straight],
   // after the devil: everything at once, plus platforms that will not stay put
   nightmare: [ch_blink, ch_blinkRun, ch_crossfire, ch_spinnerPair, ch_pillars, ch_lava,
               ch_crumble, ch_blink, ch_fireRun, ch_moverLong, ch_zigzag, ch_spinner,
@@ -1315,10 +1315,10 @@ const LEVELS = [
     blurb:'Movers, spinners and crumbling wood.' },
   { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:0.95, chunks:14,
     blurb:'Lava, fire and a devil at the gate.' },
-  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.7, chunks:13,
-    slip:1, blurb:'Everything is slippery. You do not stop when you want to.' },
-  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.85, chunks:14,
-    gravity:0.62, blurb:'Low gravity. You float, and so does everything else.' },
+  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.3, chunks:13,
+    slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
+  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:14,
+    gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
   { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, chunks:16,
     troll:true, blurb:'Blinking platforms. Nobody has ever finished it. Try anyway.' }
 ];
@@ -1355,7 +1355,7 @@ function buildCourse(cfg) {
     do { fn = pool[Math.floor(rng()*pool.length)]; guard++; } while (fn === last && guard < 8);
     last = fn;
     fn(b, cfg.d);
-    if ((i+1) % 4 === 0 && i < cfg.chunks-1) b.check();
+    if ((i+1) % (cfg.checkEvery || 2) === 0 && i < cfg.chunks-1) b.check();
   }
   b.plat(9, 10);
   W.goal = { x:0, y:0, z:b.z - 5 };
@@ -1584,6 +1584,11 @@ function stepPlayer(dt) {
     else { p.vx -= p.vx/sp*f; p.vz -= p.vz/sp*f; }
   }
 
+  // In low gravity a normal kick would fly 8.6 units and sail clean over anything
+  // small. Scaling by sqrt(gravity) keeps the jump the same HEIGHT everywhere and
+  // only stretches the hang time, which is the floaty part worth keeping.
+  const gScale = Math.sqrt(W.gravity || 1);
+
   // jump, then one more in mid-air
   if (input.jumpPressed) { p.buffer = BUFFER; input.jumpPressed = false; }
   p.buffer -= dt;
@@ -1591,13 +1596,13 @@ function stepPlayer(dt) {
   if (p.onGround) p.airJumps = 0;
   if (p.buffer > 0) {
     if (p.coyote > 0) {
-      p.vy = JUMP_V; p.buffer = 0; p.coyote = 0; p.airJumps = 0;
+      p.vy = JUMP_V * gScale; p.buffer = 0; p.coyote = 0; p.airJumps = 0;
       p.onGround = false; p.standing = null; p.jumpHeld = true; p.squash = -0.3;
       Sound.jump(); puff(p.x, p.y - PHY, p.z, 5);
     } else if (p.airJumps < (hasPower('doublejump') ? AIR_JUMPS : 0)) {
       // set vy rather than add it, so it saves you even in a long fall
       p.airJumps++;
-      p.vy = JUMP_V * DBL_JUMP; p.buffer = 0; p.jumpHeld = true; p.squash = -0.3;
+      p.vy = JUMP_V * DBL_JUMP * gScale; p.buffer = 0; p.jumpHeld = true; p.squash = -0.3;
       Sound.dbl();
       for (let i=0;i<10;i++) {                       // a little ring of dust
         const a = i/10 * 6.283;
@@ -1651,7 +1656,10 @@ function stepPlayer(dt) {
     if (p.vy <= 0 &&
         Math.abs(p.x-pad.x) < pad.hx+p.hx && Math.abs(p.z-pad.z) < pad.hz+p.hz &&
         Math.abs((p.y-p.hy) - pad.y) < 0.6) {
-      p.y = pad.y + p.hy + 0.1; p.vy = PAD_V;
+      // height is v²/2g, so scale the kick by sqrt(gravity) and a pad throws you the
+      // same distance up in every level. Without this the Space pad overshoots its
+      // own ledge by miles and drops you in the gap past it.
+      p.y = pad.y + p.hy + 0.1; p.vy = PAD_V * Math.sqrt(W.gravity || 1);
       p.jumpHeld = false; p.onGround = false; p.standing = null; p.airJumps = 0;
       pad.t = 1; p.squash = -0.45; Sound.pad(); puff(pad.x, pad.y, pad.z, 10, '#FFC53D');
     }
