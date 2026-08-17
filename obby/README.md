@@ -186,6 +186,43 @@ Watch the **diagonal** ones especially. A zigzag hop costs
 `sqrt(gap² + (2 × sideways offset)²)`, not just the gap — that is how the hardest
 zigzag once ended up needing 5.4 units of a 5.3 unit jump.
 
+## When something breaks
+
+Same idea as `jump/`: you cannot open a browser console on a tablet, so the game
+shows you instead.
+
+**The red bar.** Any uncaught error or failed promise puts a red bar across the top
+of the page with the message and line number. Tap it to hide it. The same fault
+repeating every frame is only shown three times, so it cannot bury the game.
+
+**The game loop cannot be killed.** `frame()` wraps its work in a try/catch. Without
+that, one throw ends `requestAnimationFrame` and the game just freezes with no
+explanation. Now it reports and keeps running.
+
+**Debug overlay.** `F3` or backtick, or the **🐞 Debug info** button on the pause
+screen (that one matters on a tablet, where there is no F3). Bottom-left corner:
+
+```
+fps 60   step 8.3ms
+mode obby / ice   screen play
+world course  solids 41  hazards 0  parts 0
+slip 1   gravity 1
+pos  0.00 0.80 3.00
+vel  0.00 0.00 0.00   speed 0.00
+ground yes   airJumps 0/0   coyote 0.11
+stand plat   yaw  0.00
+cam yaw  3.14  pitch  0.38  dist 9.5
+z 3.0 / 281.2   orbs 0/15   deaths 0
+aura 0   skin kid   powers -
+```
+
+It grows per mode: snail shows the snail's hp, distance, wave, your hearts, ammo and
+shield; infinity shows depth, crusher gap and layer count. If any error has happened
+this session, the last one is pinned to the bottom of the panel in red.
+
+So a bug report can be "it says `ERRORS 1: ...`" or a photo of the overlay, instead
+of "it broke".
+
 ## Testing
 
 The game exposes `window.OBBY` (state, level builders, `update(dt)`, `CHUNKS`) so

@@ -40,6 +40,14 @@
     box-shadow:none; background:#12101F; }
   #stage:-webkit-full-screen #gl, #stage:-webkit-full-screen #hud { width:100%; height:100%; object-fit:contain; }
 
+  /* Errors have to be visible on a tablet, where you cannot open a console.
+     Same idea as the red bar in jump/. */
+  #oops {
+    position:fixed; top:0; left:0; right:0; z-index:9999; cursor:pointer; display:none;
+    background:#E2445C; color:#fff; font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px; padding:8px 12px; line-height:1.45; border-bottom:4px solid #9B1F33;
+    white-space:pre-wrap; word-break:break-word; max-height:40vh; overflow:auto;
+  }
   #fsBtn, #soundBtn, #musicBtn {
     position:absolute; top:9px; z-index:8; font-size:15px; padding:4px 10px;
     border-width:3px; border-radius:10px; background:#fff; box-shadow:0 3px 0 var(--ink); min-width:0;
@@ -200,6 +208,7 @@
         <button class="wide" id="btnResume">▶ Resume</button>
         <button class="wide ghost" id="btnRetry">🔁 Restart</button>
         <button class="wide ghost" id="btnQuit">🏠 Main menu</button>
+        <button class="wide ghost" id="btnDebug" style="font-size:14px">🐞 Debug info</button>
       </div>
     </div>
 
@@ -228,6 +237,43 @@
 <script>
 (function () {
 'use strict';
+
+/* =========================================================================
+   0. OOPS BAR — you cannot open a console on a tablet, so anything that
+   breaks gets shown on the screen instead. Tap it to hide it.
+   ========================================================================= */
+const Oops = (function () {
+  let bar = null;
+  const seen = Object.create(null);
+  const log = [];
+  function el() {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'oops';
+      bar.addEventListener('click', () => { bar.style.display = 'none'; });
+      document.body.appendChild(bar);
+    }
+    return bar;
+  }
+  return {
+    report(text) {
+      text = String(text);
+      seen[text] = (seen[text] || 0) + 1;
+      if (seen[text] === 1) log.push(text);
+      if (seen[text] > 3) return;                       // the same fault every frame is not news
+      const b = el();
+      b.style.display = 'block';
+      b.textContent = '⚠️ ' + text + (seen[text] > 1 ? '  ×' + seen[text] : '') + '\n(tap to hide)';
+    },
+    total() { let n = 0; for (const k in seen) n += seen[k]; return n; },
+    last() { return log.length ? log[log.length-1] : null; },
+    log() { return log.slice(); }
+  };
+})();
+addEventListener('error', e =>
+  Oops.report((e.message || 'something broke') + '  — line ' + (e.lineno || '?')));
+addEventListener('unhandledrejection', e =>
+  Oops.report('promise failed: ' + ((e.reason && e.reason.message) || e.reason)));
 
 /* =========================================================================
    1. MATH — just enough 4x4 matrix code to drive a camera
@@ -706,6 +752,7 @@ addEventListener('keydown', e => {
   else if (e.code === 'Escape' || e.code === 'KeyP') {
     if (game.screen === 'play') showScreen('pause'); else if (game.screen === 'pause') resume();
   } else if (e.code === 'KeyF') toggleFull();
+  else if (e.code === 'F3' || e.code === 'Backquote') { e.preventDefault(); toggleDebug(); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -1309,6 +1356,7 @@ const game = {
   time:0, runOrbs:0, deaths:0, dead:0, won:false, depth:0,
   banner:null, flash:0, shake:0, particles:[], snail:null, salts:[], orbTimer:0, speech:null,
   // killer-snail war: hearts, salt ammo, soldiers, safehouse shield
+  debug:false,
   hp:3, maxHp:3, iframe:0, ammo:0, bullets:[], soldiers:[], wave:1, kills:0,
   shield:1, inSafe:false, tpCd:0, shootCd:0, meleeCd:0, swing:0, snailRespawn:0
 };
@@ -2634,6 +2682,50 @@ function drawHUD(t) {
     H.fillText(TOUCH ? 'joystick to move · JUMP to jump · drag the screen to look around'
                      : 'W A S D to move · SPACE to jump · drag or Q/E to turn the camera', HW/2, HH-24);
   }
+
+  if (game.debug) drawDebug();
+}
+
+/* ---- debug overlay: F3, or the 🐞 button on the pause screen ---- */
+function drawDebug() {
+  const p = game.player, W = game.world;
+  const n = v => (v >= 0 ? ' ' : '') + v.toFixed(2);
+  const lines = [
+    'fps ' + fps + '   step ' + (STEP*1000).toFixed(1) + 'ms',
+    'mode ' + game.mode + (game.levelId ? ' / ' + game.levelId : '') + '   screen ' + game.screen
+  ];
+  if (W) lines.push('world ' + W.kind + '  solids ' + W.solids.length +
+      '  hazards ' + W.hazards.length + '  parts ' + game.particles.length,
+    'slip ' + (W.slip||0) + '   gravity ' + (W.gravity||1) + (W.troll ? '   TROLL' : ''));
+  if (p) lines.push(
+    'pos ' + n(p.x) + n(p.y) + n(p.z),
+    'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
+    'ground ' + (p.onGround ? 'yes' : 'no ') + '   airJumps ' + p.airJumps +
+      '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
+    'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
+  lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));
+  if (game.mode === 'obby') lines.push('z ' + (p ? p.z.toFixed(1) : '-') + ' / ' + (W && W.endZ || 0) +
+    '   orbs ' + game.runOrbs + '/' + (W && W.totalOrbs) + '   deaths ' + game.deaths);
+  if (game.mode === 'snail' && game.snail) lines.push(
+    'snail hp ' + Math.ceil(game.snail.hp) + '/' + game.snail.maxHp +
+    '  dist ' + Math.hypot(p.x-game.snail.x, p.z-game.snail.z).toFixed(1) +
+    '  wave ' + game.wave, 'hp ' + game.hp + '  ammo ' + game.ammo +
+    '  shield ' + game.shield.toFixed(2) + '  safe ' + (game.inSafe ? 'yes' : 'no'));
+  if (game.mode === 'infinity' && W) lines.push('depth ' + game.depth +
+    '   crusher gap ' + (W.crusherY - p.y).toFixed(1) + '   layers ' + W.nextLayer);
+  lines.push('aura ' + save.orbs + '   skin ' + save.skin + '   powers ' + (save.powers.join(',') || '-'));
+  const errs = Oops.total();
+  if (errs) lines.push('ERRORS ' + errs + ': ' + Oops.last());
+
+  H.textAlign = 'left';
+  H.font = '12px ui-monospace, Menlo, Consolas, monospace';
+  const w = 300, h = lines.length*15 + 12;
+  H.fillStyle = 'rgba(0,0,0,.62)';
+  rr2(8, HH - h - 8, w, h, 8); H.fill();
+  lines.forEach((s, i) => {
+    H.fillStyle = s.indexOf('ERRORS') === 0 ? '#FF9A9A' : '#9BE58A';
+    H.fillText(s, 16, HH - h + 8 + i*15);
+  });
 }
 
 /* =========================================================================
@@ -2748,12 +2840,20 @@ function update(dt) {
 }
 
 const STEP = 1/120;
-let acc = 0, last = 0;
+let acc = 0, last = 0, fps = 0, fpsT = 0, fpsN = 0;
 function frame(ts) {
   requestAnimationFrame(frame);
+  // A throw in here would kill requestAnimationFrame and freeze the game with no
+  // clue why. Catch it, put it on the screen, and keep the loop alive.
+  try { step(ts); } catch (err) { Oops.report('loop: ' + (err && err.message || err)); }
+}
+function step(ts) {
   if (!last) last = ts;
   let dt = (ts - last)/1000; last = ts;
   if (dt > 0.25) dt = 0.25;
+
+  fpsN++; fpsT += dt;
+  if (fpsT >= 0.5) { fps = Math.round(fpsN/fpsT); fpsN = 0; fpsT = 0; }
 
   if (game.screen === 'play') {
     readKeys();
@@ -2912,6 +3012,12 @@ function toggleFull() {
 for (const ev of ['fullscreenchange','webkitfullscreenchange']) {
   document.addEventListener(ev, () => { if (!fsElement()) stage.classList.remove('big'); });
 }
+function toggleDebug() {
+  game.debug = !game.debug;
+  const b = document.getElementById('btnDebug');
+  if (b) b.textContent = game.debug ? '🐞 Debug info: ON' : '🐞 Debug info';
+}
+document.getElementById('btnDebug').onclick = toggleDebug;
 document.getElementById('fsBtn').onclick = toggleFull;
 const soundBtn = document.getElementById('soundBtn');
 const paintSound = () => soundBtn.textContent = save.sound ? '🔊' : '🔇';
