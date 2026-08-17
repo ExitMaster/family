@@ -1512,6 +1512,7 @@ const game = {
   shield:1, inSafe:false, tpCd:0, shootCd:0, meleeCd:0, swing:0, snailRespawn:0
 };
 const MAX_AMMO = 30;
+const ORB_VALUE = 30;    // what one 💠 orb is worth in aura
 const SNAIL_SPEED = 4.2;      // constant, every wave — you can always outrun it
 
 function makePlayer(sp) {
@@ -1710,7 +1711,8 @@ function collectOrbs() {
   for (const o of game.world.orbs) {
     if (o.got) continue;
     if (Math.abs(p.x-o.x) < 1.5 && Math.abs(p.y-o.y) < 1.9 && Math.abs(p.z-o.z) < 1.5) {
-      o.got = true; game.runOrbs++; save.orbs++; save.lifetimeOrbs++;
+      o.got = true; game.runOrbs++;
+      save.orbs += ORB_VALUE; save.lifetimeOrbs += ORB_VALUE;
       persist(); Sound.orb(); burst(o.x, o.y, o.z, 14);
     }
   }
@@ -2166,7 +2168,8 @@ function endRun() {
     showResult('🎉 ' + cfg.name + ' clear!',
       '⏱ ' + fmtTime(game.time) + (isBest ? '  <b>NEW BEST!</b>' : '') +
       rankLine(rank) +
-      '<br>💠 ' + game.runOrbs + ' / ' + game.world.totalOrbs + ' aura orbs' +
+      '<br>💠 ' + game.runOrbs + ' / ' + game.world.totalOrbs + ' aura orbs  (+' +
+        (game.runOrbs * ORB_VALUE) + ' aura)' +
       '<br>💀 ' + game.deaths + ' deaths' +
       (first ? '<br><b>+25 bonus aura for the first clear!</b>' : '') +
       (first && next ? '<br>🔓 <b>' + next.name + ' unlocked!</b>' : ''),
@@ -2185,7 +2188,7 @@ function endRun() {
       rankLine(rank) + rankLine(kRank, 'for snails beaten') +
       '<br>🐌 Snails defeated: <b>' + game.kills + '</b>  (reached wave ' + game.wave + ')' +
       '<br>🏆 Best time: ' + fmtTime(save.best.snail || 0) + ' · most snails: ' + (save.best.kills || 0) +
-      '<br>💠 ' + game.runOrbs + ' aura collected' +
+      '<br>💠 ' + (game.runOrbs * ORB_VALUE) + ' aura collected (' + game.runOrbs + ' orbs)' +
       (unlocked ? '<br>🎁 <b>Snail King skin unlocked!</b>'
                 : (t < 60 ? '<br><span style="opacity:.7">Survive 60s to unlock the Snail King skin.</span>' : '')),
       null);
@@ -2198,7 +2201,7 @@ function endRun() {
       '📉 Depth reached: <b>' + d + ' m</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
       rankLine(rank) +
       '<br>🏆 Best depth: ' + (save.best.depth || 0) + ' m' +
-      '<br>💠 ' + game.runOrbs + ' aura collected', null);
+      '<br>💠 ' + (game.runOrbs * ORB_VALUE) + ' aura collected (' + game.runOrbs + ' orbs)', null);
   }
 }
 
