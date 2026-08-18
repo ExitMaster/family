@@ -1,0 +1,34 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "firestore.indexes.json",
+      ".firebaserc",
+      ".gitignore",
+      "README.md",
+      "package.json",
+      "config.example.js",
+      "preview.html",
+      "private/**",
+      "scripts/**",
+      "supabase/**",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [{"source": "**", "destination": "/index.html"}],
+    "headers": [{
+      "source": "**",
+      "headers": [
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Referrer-Policy", "value": "no-referrer"},
+        {"key": "X-Frame-Options", "value": "DENY"}
+      ]
+    }]
+  }
+}
