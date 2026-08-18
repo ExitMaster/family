@@ -1582,23 +1582,23 @@ const POOL = {
 };
 
 const LEVELS = [
-  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:18,
+  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:36,
     blurb:'Soft clouds and easy jumps. Long, but gentle all the way.' },
   // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
-  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.78, chunks:15,
+  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.78, chunks:30,
     blurb:'Movers, spinners, crumbling wood and fire.' },
-  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:19,
+  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:38,
     blurb:'Lava, fire, blinking platforms and a devil at the gate.' },
-  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.3, chunks:13,
+  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.3, chunks:26,
     slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
-  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:14,
+  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:28,
     gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
   // Nightmare is not a course of its own — it is every obstacle in the game shuffled
   // into one level. Each chunk is drawn from a different course at random and brings
   // that course's floor with it: a hell lava run, then an ice slide, then a floaty
   // low-gravity hop, in whatever order the seed says. See W.zones in buildCourse.
   { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true,
-    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' },
+    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare' },
     blurb:'Every obstacle in the game, shuffled, with the floor changing under you. Nobody has ever finished it. Try anyway.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
@@ -2099,6 +2099,63 @@ function killPlayer() {
   Sound.die(); burst(p.x, p.y, p.z, 24, '#FF5B5B');
   if (game.mode !== 'obby') endRun();
 }
+/* Dying changes the dance, never the floor.
+
+   Platforms, gaps, spikes and lava stay exactly where they were — your checkpoint
+   has to still mean what it meant, and a course that rearranged its own geometry
+   would be unlearnable rather than exciting. What gets re-rolled is everything that
+   MOVES: where each ferry is on its path and which way it is going, which way the
+   spinners turn, which way the fireballs fly, and the beat the blinkers are on. So
+   the run you just failed is not the run you are about to try.
+
+   Only ahead of where you respawn — changing what is behind you is work nobody sees.
+   And only some of it: a course where everything changed every time would be noise.
+
+   ONE RULE THAT MATTERS: every blinking platform shifts by the SAME amount. Their
+   phases relative to each other are the whole reason a blinkRun can be crossed at
+   all (see the README on ch_blinkRun), and re-rolling them one by one would quietly
+   rebuild the impossible version of that chunk. Shift them together and the pattern
+   is identical, just starting somewhere else. */
+function shuffleObstacles() {
+  const W = game.world, p = game.player;
+  if (!W || !p || !p.respawn) return;
+  const from = p.respawn.z - 4;
+  const ahead = o => (o.cz !== undefined ? o.cz : o.z) > from;
+  const some = () => Math.random() < 0.45;
+  const wobble = () => 0.8 + Math.random()*0.4;      // speeds move a little, never a lot
+  const flip = () => Math.random() < 0.5 ? 1 : -1;
+  const blinkShift = Math.random() * 4;              // one offset, shared by every blinker
+  let changed = 0;
+
+  for (const s of W.solids) {
+    if (!ahead(s)) continue;
+    if (s.kind === 'move' && some()) {
+      s.t = Math.random();                           // somewhere else along its path
+      s.spd = Math.abs(s.spd) * wobble() * flip();
+      changed++;
+    } else if (s.kind === 'blink') {
+      s.bt = (s.bt + blinkShift) % s.cycle;
+      changed++;
+    }
+  }
+  for (const sp of W.spinners) {
+    if (!ahead(sp) || !some()) continue;
+    sp.ang = Math.random() * 6.283;
+    sp.spd = Math.abs(sp.spd) * wobble() * flip();
+    changed++;
+  }
+  for (const h of W.hazards) {
+    if (h.kind !== 'fire' || !ahead(h) || !some()) continue;
+    h.t = Math.random();
+    const ax = h.ax, ay = h.ay, az = h.az;           // send it back the other way
+    h.ax = h.bx; h.ay = h.by; h.az = h.bz;
+    h.bx = ax;   h.by = ay;   h.bz = az;
+    changed++;
+  }
+  if (changed) game.banner = { text:'🔀 THE COURSE SHIFTED', t:1.6 };
+  return changed;
+}
+
 function afterDeath() {
   const p = game.player;
   if (game.mode !== 'obby') return;
@@ -2106,6 +2163,7 @@ function afterDeath() {
   p.vx = p.vy = p.vz = 0; p.onGround = false; p.standing = null;
   p.saves = 1;                       // a fresh life gets a fresh recovery
   for (const s of game.world.solids) if (s.kind === 'crumble') { s.gone = 0; s.timer = 0; }
+  shuffleObstacles();                // it is not quite the same course any more
   snapCamera();
 }
 function respawnOrRestart() { if (game.mode === 'obby') killPlayer(); else restartCurrent(); }
@@ -3846,7 +3904,7 @@ window.OBBY = {
   startLevel, startSnail, startInfinity, showScreen, persist,
   shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, emergencySave, project, cam, endRun, Scores,
   Profiles, useProfile, mergeSave, snapshot, get profileKey() { return profileKey; },
-  GAME_KEYS, wrongKey,
+  GAME_KEYS, wrongKey, shuffleObstacles,
   consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
 };
 

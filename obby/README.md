@@ -31,9 +31,22 @@ never have to touch it.
 Six courses. Reach the glowing portal at the end. Checkpoints land every two
 sections, so dying sends you back a little, not to the start.
 
+Every level is **twice as long as it used to be** — the chunk counts were doubled, so
+Angel is 36 sections and Devil is 38. Saved best times from before that change are
+not comparable with times set now; they were set on courses half the size.
+
+| Level | Sections | Length | Orbs |
+|---|---|---|---|
+| Angel | 36 | 744 | 42 |
+| Normal | 30 | 775 | 42 |
+| Devil | 38 | 915 | 54 |
+| Ice | 26 | 473 | 29 |
+| Space | 28 | 680 | 37 |
+| Nightmare | 54 | 1771 | 67 |
+
 | Level | What is in it |
 |---|---|
-| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The longest gentle course — 18 sections, about 350 units |
+| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The gentle one — 36 sections, about 744 units |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches, fireball runs |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
@@ -49,10 +62,10 @@ a `chunks` count:
 shuffle: { from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' }
 ```
 
-`buildCourse` rolls **27 sections of one chunk each**, and every one of them picks a
+`buildCourse` rolls **54 sections of one chunk each**, and every one of them picks a
 course at random. Not six blocks in order — properly mixed, so a run of the 1313 seed
 goes ice, ice, devil, nightmare, space, nightmare, ice, devil, angel, devil… About
-800 units, more than twice any other level.
+**1771 units**, more than twice any other level, and around five minutes of running.
 
 A chunk brings **everything** from the course it came from: its obstacles, its
 difficulty, its colours (the builder reads `W.pal` as it goes, so each chunk bakes
@@ -90,7 +103,7 @@ is — visible, and apparently out of reach. `troll:true` puts the goal in the s
 #### The secret — do not sign-post this
 
 **On the last deck, under the portal, the tank stops draining.** That is the only way
-anyone reaches the portal: buy the Aura Wings, walk the 27 chunks, and hold jump at
+anyone reaches the portal: buy the Aura Wings, walk all 54 chunks, and hold jump at
 the end. See `atEnd` in `stepPlayer` — it is on when `troll` is set and you are within
 12 of the goal's z.
 
@@ -109,7 +122,7 @@ gatekeeper still says nobody gets past him, and there is no marker in the sky. K
 it that way.
 
 Outside Nightmare holding jump does nothing at all, so the level stays impossible for
-anyone who has not bought the wings, walked all 27 chunks, and thought to fly:
+anyone who has not bought the wings, walked all 54 chunks, and thought to fly:
 
 | | Rise above the deck | Wins |
 |---|---|---|
@@ -131,6 +144,31 @@ time pays a **+25 aura bonus**.
 Ice and Space sit after Devil on purpose: they are the odd ones rather than the
 hardest, and Nightmare has to stay last because it can never be cleared — anything
 placed after it would be locked forever.
+
+### 🔀 Dying shuffles the course
+
+`shuffleObstacles`, called from `afterDeath`, re-rolls the moving parts every time you
+die, in every level. The run you just failed is not the run you are about to try.
+
+**The floor never changes.** Platforms, gaps, spikes and lava stay exactly where they
+were — your checkpoint has to keep meaning what it meant, and geometry that rearranged
+itself would be unlearnable rather than exciting. What changes is everything that
+moves: where each ferry sits on its path and which way it travels, which way the
+spinners turn, which way the fireballs fly, and the beat the blinkers are on.
+
+Only **ahead of your respawn** (changing what is behind you is work nobody sees) and
+only **some** of it — a 45% roll per obstacle, because a course where everything
+changed every time would be noise rather than a shuffle.
+
+**The one rule that must not be broken:** every blinking platform shifts by the *same*
+amount. Their phases relative to each other are the whole reason a `blinkRun` is
+crossable (see the timing table further down); re-rolling them one at a time would
+quietly rebuild the impossible version of that chunk. The test asserts this directly —
+`blinkRelativeSame` compares every consecutive phase gap before and after a shuffle.
+
+Verified: geometry and static hazards byte-identical after a shuffle, movers, blinkers,
+spinners and fireballs all moved, relative blink phases unchanged, and the bot still
+runs a course to 99% after eight shuffles in a row.
 
 ### x_x The wrong key kills you
 
@@ -503,16 +541,22 @@ mistiming the hop, not an unfair course.
 
 Full levels, played by the bot end to end:
 
-| Level | Time | Deaths |
-|---|---|---|
-| Angel | 50s | 0 |
-| Normal | 70s | 3 |
-| Devil | 80s | 2 |
-| Ice | 56s | 6 |
-| Nightmare, all 27 chunks, no powers | 151s | 4 |
+| Level | Time | Deaths | Finished |
+|---|---|---|---|
+| Angel | 102s | 0 | yes, 99% |
+| Normal | 129s | 3 | yes, 99% |
+| Devil | 169s | 7 | yes, 99% |
+| Ice | — | 7 | no — stalls around z 180 |
+| Space | — | 5 | no — stalls around z 170 |
+| Nightmare, all 54 chunks, no powers | 289s | 2 | walked 100% of 1771 |
+
+Ice and Space are the two the bot has never finished, and both stall at the same
+**absolute** distance they always did — doubling the length did not move the wall, it
+only made the percentage look worse. Both stalls are the bot mistiming a hop onto a
+moving platform.
 
 That last row is the one to re-run after touching the shuffle, the chunk pools or the
-physics. It walks the whole 800 units on foot — through every floor change — and
+physics. It walks the whole 1771 units on foot — through every floor change — and
 reaching 100% of `endZ` is the proof that the level can still be crossed at all. It
 does not *win*: the portal is 70 up, which is the point.
 
