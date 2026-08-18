@@ -159,12 +159,14 @@
       <div class="big-title">AURA OBBY 3D</div>
       <p>Run the obby in full 3D. Collect aura orbs. Do not let the snail touch you.</p>
       <div class="orbcount">💠 <span id="menuOrbs">0</span> aura</div>
+      <div id="menuWho" style="font-size:13px;opacity:.75;margin-top:-4px">not saving yet</div>
       <div class="rowbtns" style="flex-direction:column;align-items:center;">
         <button class="wide" id="btnObby">🧗 OBBY MODE</button>
         <button class="wide" id="btnSnail">🐌 KILLER SNAIL</button>
         <button class="wide" id="btnInf">♾️ INFINITY CHALLENGE</button>
         <button class="wide ghost" id="btnShop">🛍️ AURA SHOP</button>
         <button class="wide ghost" id="btnBoard">🏆 LEADERBOARD</button>
+        <button class="wide ghost" id="btnProfile">👤 NICKNAME</button>
         <button class="wide ghost" id="btnHelp">❓ HOW TO PLAY</button>
       </div>
     </div>
@@ -206,6 +208,22 @@
       </div>
     </div>
 
+    <div class="screen" id="scrProfile">
+      <h2>👤 Nickname</h2>
+      <p>Put in a nickname and your game saves under it — aura, levels, skins and
+         powers. Type the same nickname on a different computer to carry on there.</p>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <input id="profIn" maxlength="10" placeholder="your nickname">
+        <button id="btnProfUse" style="font-size:14px;min-width:0;padding:8px 16px">💾 Play as this</button>
+      </div>
+      <div id="profWhere" style="font-size:13px;opacity:.8;margin-top:8px;min-height:18px">—</div>
+      <div id="profList" style="width:100%"></div>
+      <p style="font-size:12px;opacity:.6;margin-top:10px">Loading a nickname never
+         throws anything away — you keep the best of both. A nickname is a name,
+         not a password.</p>
+      <button class="ghost" id="btnProfBack">⬅ Back</button>
+    </div>
+
     <div class="screen" id="scrHelp">
       <h2>❓ How to play</h2>
       <table class="keys">
@@ -223,7 +241,10 @@
         <tr><td>Swing</td><td><b>K</b> — big damage, but you must be right next to it</td></tr>
         <tr><td>Teleport home</td><td><b>T</b> — jump straight to the safehouse (16s cooldown)</td></tr>
       </table>
-      <p><b>💠 Aura orbs</b> are saved forever — spend them in the Aura Shop.<br>
+      <p><b>👤 Nickname</b> — put one in from the menu and your aura, levels, skins and
+         powers save under it. Type the same nickname on another computer and your
+         game is waiting there.<br>
+         <b>💠 Aura orbs</b> are saved forever — spend them in the Aura Shop.<br>
          <b>🐌 Killer Snail</b> flies through walls with a knife. You get <b>3 hearts</b> — fight back with
          salt (<b>Z</b>) and swings (<b>K</b>), and let the <b>soldiers</b> shoot it. Hide in the
          <b>🏠 safehouse</b> (<b>T</b>) — but the shield only lasts about 11 seconds, so you cannot camp.<br>
@@ -262,7 +283,7 @@
   </div>
 </div>
 
-<footer>Real-time 3D in one HTML file — no engine, no build, no server. Progress saves in this browser.</footer>
+<footer>Real-time 3D in one HTML file — no engine, no build, no server. Put in a nickname and your progress follows you.</footer>
 
 <script>
 /* =========================================================================
@@ -311,6 +332,16 @@ try {
       const cur = (await get(node)).val();
       if (cur && typeof cur.v === 'number' && (lower ? cur.v <= value : cur.v >= value)) return false;
       await set(node, { n: name, v: value, at: serverTimestamp() });
+      return true;
+    },
+    // ---- progress saves: one node per nickname, so you can pick your game
+    // back up on a different computer ----
+    async getSave(key) {
+      const snap = await get(ref(db, 'obbySaves/' + key));
+      return snap.val() || null;
+    },
+    async putSave(key, data) {
+      await set(ref(db, 'obbySaves/' + key), Object.assign({}, data, { at: serverTimestamp() }));
       return true;
     }
   };
@@ -650,7 +681,166 @@ function loadSave() {
            sound:true, music:true, powers:[], name:'' };
 }
 const save = loadSave();
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
+function persistLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
+function persist() {
+  persistLocal();
+  scheduleSync();                     // and under your nickname, if you set one
+}
+
+/* =========================================================================
+   5b. NICKNAME PROFILES — your progress lives under a nickname, so more than
+   one person can play on the same tablet and so you can pick your game back up
+   on a different computer. Two rules keep it safe:
+
+     * merging never takes anything away. If the copy on the internet has more
+       aura and this computer has more levels cleared, you end up with both.
+     * a nickname is a name, not a password. Anyone who types yours gets that
+       progress. Fine for a family; it is not a bank.
+
+   With no nickname set, none of this runs and the game behaves exactly as it
+   did before: progress in this browser only.
+   ========================================================================= */
+const PROFILE_KEY = 'obby3d-profiles-v1';
+
+// what travels between computers. sound and music stay put — they are settings
+// for the machine you are sitting at, not things you earned.
+function snapshot() {
+  return {
+    orbs: save.orbs|0, lifetimeOrbs: save.lifetimeOrbs|0, skin: save.skin,
+    owned: save.owned.slice(), powers: save.powers.slice(),
+    cleared: Object.assign({}, save.cleared), best: Object.assign({}, save.best),
+    name: save.name || ''
+  };
+}
+// in save.best, level ids hold times (faster wins) and these three hold scores
+const bestIsTime = k => k !== 'snail' && k !== 'kills' && k !== 'depth';
+
+// the whole safety of this feature is in here: every field takes the better of
+// the two, so a merge can only ever hand you more than you walked in with.
+function mergeSave(a, b) {
+  if (!a) return b ? Object.assign({}, b) : null;
+  if (!b) return Object.assign({}, a);
+  const union = (x, y) => {
+    const out = [];
+    (x || []).concat(y || []).forEach(v => { if (out.indexOf(v) < 0) out.push(v); });
+    return out;
+  };
+  const out = {
+    orbs:         Math.max(a.orbs|0, b.orbs|0),
+    lifetimeOrbs: Math.max(a.lifetimeOrbs|0, b.lifetimeOrbs|0),
+    owned:        union(a.owned, b.owned),
+    powers:       union(a.powers, b.powers),
+    cleared:      {}, best: {},
+    name:         b.name || a.name || ''
+  };
+  for (const k in (a.cleared || {})) if (a.cleared[k]) out.cleared[k] = true;
+  for (const k in (b.cleared || {})) if (b.cleared[k]) out.cleared[k] = true;
+  const keys = Object.assign({}, a.best || {}, b.best || {});
+  for (const k in keys) {
+    const x = a.best && a.best[k], y = b.best && b.best[k];
+    out.best[k] = (typeof x === 'number' && typeof y === 'number')
+      ? (bestIsTime(k) ? Math.min(x, y) : Math.max(x, y))
+      : (typeof x === 'number' ? x : y);
+  }
+  // never leave you wearing a skin the merged list says you do not own
+  out.skin = out.owned.indexOf(a.skin) >= 0 ? a.skin
+           : out.owned.indexOf(b.skin) >= 0 ? b.skin : 'kid';
+  return out;
+}
+function applySave(o) {
+  if (!o) return;
+  save.orbs = o.orbs|0;
+  save.lifetimeOrbs = o.lifetimeOrbs|0;
+  save.owned   = (o.owned && o.owned.length) ? o.owned.slice() : ['kid'];
+  save.powers  = (o.powers || []).slice();
+  save.cleared = Object.assign({}, o.cleared);
+  save.best    = Object.assign({}, o.best);
+  save.skin    = o.skin || 'kid';
+  if (o.name) save.name = o.name;
+  persist();
+}
+
+// every nickname ever used on this computer, newest first
+const Profiles = (function () {
+  let data = null;
+  function all() {
+    if (data) return data;
+    try {
+      const r = JSON.parse(localStorage.getItem(PROFILE_KEY));
+      if (r && r.slots) { data = r; return data; }
+    } catch (e) {}
+    data = { v:1, slots:{} };
+    return data;
+  }
+  function write() { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(all())); } catch (e) {} }
+  return {
+    list() {
+      const s = all().slots;
+      return Object.keys(s).map(k => ({ key:k, name:s[k].name || k, at:s[k].at || 0 }))
+                           .sort((x, y) => y.at - x.at);
+    },
+    read(k) { const s = all().slots[k]; return s ? s.data : null; },
+    put(k, name, d) { all().slots[k] = { name, data:d, at: Date.now() }; write(); },
+    remove(k) { delete all().slots[k]; write(); }
+  };
+})();
+
+/* Saving happens on its own. Every persist() writes the nickname's copy on this
+   computer straight away; the copy on the internet follows a moment later, so a
+   run that collects thirty orbs sends one update instead of thirty. */
+let syncTimer = 0, syncState = 'none';   // none | local | saving | saved | offline
+
+/* Which nickname we are writing to. Deliberately NOT whatever is in the name
+   box this instant: typing "inu" letter by letter would otherwise leave saves
+   called i, in and inu behind. A nickname is only taken up when you commit it,
+   by pressing the button or leaving the box. */
+let profileKey = save.name ? nameKey() : '';
+
+function localSync() {
+  if (!profileKey) { syncState = 'none'; return false; }
+  Profiles.put(profileKey, (save.name || '').trim() || profileKey, snapshot());
+  return true;
+}
+function cloudSync() {
+  if (!localSync()) return;
+  const c = cloud();
+  if (!c) { syncState = 'offline'; paintProfile(); return; }
+  syncState = 'saving'; paintProfile();
+  c.putSave(profileKey, snapshot())
+   .then(() => { syncState = 'saved'; }, () => { syncState = 'offline'; })
+   .then(() => paintProfile());
+}
+function scheduleSync() {
+  if (!localSync()) return;
+  if (syncState !== 'saving') { syncState = 'local'; paintProfile(); }
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(cloudSync, 1500);
+}
+
+/* Switching to a nickname:
+     it already has progress  -> load it (this computer's copy merged with the
+                                 internet's), replacing what is on screen
+     it is brand new          -> it claims what you are playing right now, which
+                                 is what you want the first time you type a name
+   Only reachable from the menu, so nothing lands in the middle of a run. */
+function useProfile(name, done) {
+  const n = String(name || '').trim().slice(0, 10);
+  if (!n) return;
+  const carried = snapshot();
+  save.name = n;
+  profileKey = nameKey();
+  const mine = Profiles.read(profileKey);
+  const finish = (remote) => {
+    const stored = mergeSave(mine, remote);
+    applySave(Object.assign(stored || carried, { name: n }));
+    cloudSync();
+    if (done) done(!!stored);
+  };
+  const c = cloud();
+  if (!c) { finish(null); return; }
+  syncState = 'saving'; paintProfile();
+  c.getSave(profileKey).then(finish, () => finish(null));
+}
 
 /* =========================================================================
    6. SOUND
@@ -3180,7 +3370,7 @@ const panel = document.getElementById('panel');
 const screens = {
   menu: document.getElementById('scrMenu'), levels: document.getElementById('scrLevels'),
   shop: document.getElementById('scrShop'), help: document.getElementById('scrHelp'),
-  board: document.getElementById('scrBoard'),
+  board: document.getElementById('scrBoard'), profile: document.getElementById('scrProfile'),
   pause: document.getElementById('scrPause'), result: document.getElementById('scrResult')
 };
 function showScreen(name) {
@@ -3190,10 +3380,16 @@ function showScreen(name) {
   if (name === 'play') { panel.classList.add('hidden'); return; }
   panel.classList.remove('hidden');
   for (const k in screens) screens[k].classList.toggle('on', k === name);
-  if (name === 'menu') document.getElementById('menuOrbs').textContent = save.orbs;
+  if (name === 'menu') {
+    document.getElementById('menuOrbs').textContent = save.orbs;
+    document.getElementById('menuWho').textContent = (save.name || '').trim()
+      ? '👤 saving as ' + save.name.trim()
+      : 'not saving under a nickname yet';
+  }
   if (name === 'levels') renderLevels();
   if (name === 'shop') renderShop();
   if (name === 'board') renderBoard();
+  if (name === 'profile') renderProfile();
 }
 function resume() { showScreen('play'); }
 
@@ -3219,6 +3415,68 @@ function rankLine(rank, what) {
   const medal = ['🥇','🥈','🥉','4️⃣','5️⃣'][rank-1] || '';
   const ord = ['1st','2nd','3rd','4th','5th'][rank-1];
   return '<br>' + medal + ' <b>' + ord + ' on this device</b>' + (what ? ' ' + what : '');
+}
+
+/* ---- nickname screen ------------------------------------------------- */
+// names are typed by people and can come back from the internet, so they never
+// go into innerHTML as-is
+const safeName = n => String(n).replace(/[<>&]/g, '');
+
+function profileStatus() {
+  const n = (save.name || '').trim();
+  if (!n || !profileKey) return 'No nickname yet. Put one in and this game becomes yours.';
+  if (syncState === 'saving')  return '⏳ saving ' + n + '…';
+  if (syncState === 'saved')   return '🌍 saved as ' + n + ' — type that on any computer to carry on';
+  if (syncState === 'offline') return '📱 saved as ' + n + ' on this computer (the internet copy is not reachable)';
+  return '📱 saved as ' + n + ' on this computer';
+}
+// safe to call at any time — the sync code calls it whether or not you are looking
+function paintProfile() {
+  const el = document.getElementById('profWhere');
+  if (el) el.textContent = profileStatus();
+  const who = document.getElementById('menuWho');
+  if (who) who.textContent = (save.name || '').trim()
+    ? '👤 saving as ' + save.name.trim() : 'not saving under a nickname yet';
+}
+function renderProfile() {
+  document.getElementById('profIn').value = save.name || '';
+  paintProfile();
+  const box = document.getElementById('profList');
+  box.innerHTML = '';
+  const rows = Profiles.list();
+  if (!rows.length) return;
+  const head = document.createElement('div');
+  head.style.cssText = 'font-size:12px;opacity:.6;margin:12px 0 4px';
+  head.textContent = 'nicknames used on this computer';
+  box.appendChild(head);
+  rows.forEach(r => {
+    const d = Profiles.read(r.key) || {};
+    const levels = Object.keys(d.cleared || {}).filter(k => d.cleared[k]).length;
+    const here = r.key === profileKey;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(255,255,255,' +
+      (here ? '.16' : '.08') + ');border-radius:12px;padding:8px 12px;margin:6px 0;text-align:left';
+    row.innerHTML = '<div style="flex:1"><b>' + (here ? '👤 ' : '') + safeName(r.name) + '</b>' +
+      '<div style="font-size:12px;opacity:.7">💠 ' + (d.orbs|0) + ' aura · ' +
+      levels + ' level' + (levels === 1 ? '' : 's') + ' cleared</div></div>';
+    const use = document.createElement('button');
+    use.textContent = here ? 'playing' : 'play as';
+    use.style.cssText = 'font-size:13px;min-width:0;padding:6px 12px';
+    use.disabled = here;
+    if (here) use.style.opacity = '.5';
+    use.onclick = () => useProfile(r.name, () => renderProfile());
+    const del = document.createElement('button');
+    del.className = 'ghost';
+    del.textContent = '🗑️';
+    del.style.cssText = 'font-size:13px;min-width:0;padding:6px 10px';
+    del.onclick = () => {
+      if (!confirm('Forget "' + r.name + '" on this computer? If it was saved on the internet you can get it back by typing the nickname again.')) return;
+      Profiles.remove(r.key);
+      renderProfile();
+    };
+    row.appendChild(use); row.appendChild(del);
+    box.appendChild(row);
+  });
 }
 
 let boardMode = 'online';          // flips to 'local' on its own if the cloud is not there
@@ -3281,7 +3539,7 @@ function renderOneBoard(box, b, rows, loading) {
         const me = r.n === playerName();
         html += '<tr style="' + (me ? 'color:#FFD166;font-weight:bold' : '') + '">' +
           '<td style="padding:2px 0;width:26px">' + (['🥇','🥈','🥉','4','5'][i] || '') + '</td>' +
-          '<td>' + String(r.n).replace(/[<>&]/g, '') + '</td>' +
+          '<td>' + safeName(r.n) + '</td>' +
           '<td style="text-align:right">' + b.fmt(r.v) + '</td></tr>';
       });
       html += '</table>';
@@ -3360,10 +3618,29 @@ document.getElementById('btnBoardOnline').onclick = () => { boardMode = 'online'
 document.getElementById('btnBoardLocal').onclick  = () => { boardMode = 'local';  renderBoard(); };
 // the SDK finishes loading after the menu is already up
 for (const ev of ['cloud-ready','cloud-fail']) {
-  addEventListener(ev, () => { if (game.screen === 'board') renderBoard(); });
+  addEventListener(ev, () => {
+    if (game.screen === 'board') renderBoard();
+    // a returning player: now that the internet is there, go and get their save
+    if (profileKey && game.screen !== 'play') useProfile(save.name, () => {
+      if (game.screen === 'profile') renderProfile();
+    });
+    else paintProfile();
+  });
 }
+// typing is not committing — the name only becomes the save slot when you leave
+// the box or press enter, so half-typed names never claim one
 document.getElementById('nameIn').oninput = e => {
-  save.name = e.target.value.slice(0, 10); persist();
+  save.name = e.target.value.slice(0, 10); persistLocal();
+};
+document.getElementById('nameIn').onchange = e => useProfile(e.target.value, () => renderBoard());
+
+document.getElementById('btnProfile').onclick  = () => showScreen('profile');
+document.getElementById('btnProfBack').onclick = () => showScreen('menu');
+document.getElementById('btnProfUse').onclick  = () => {
+  useProfile(document.getElementById('profIn').value, () => renderProfile());
+};
+document.getElementById('profIn').onkeydown = e => {
+  if (e.key === 'Enter') document.getElementById('btnProfUse').click();
 };
 document.getElementById('btnLvlBack').onclick = () => showScreen('menu');
 document.getElementById('btnShopBack').onclick = () => showScreen('menu');
@@ -3431,6 +3708,7 @@ window.OBBY = {
   buildCourse, buildArena, buildShaft, addShaftLayer,
   startLevel, startSnail, startInfinity, showScreen, persist,
   shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, emergencySave, project, cam, endRun, Scores,
+  Profiles, useProfile, mergeSave, snapshot, get profileKey() { return profileKey; },
   consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
 };
 
