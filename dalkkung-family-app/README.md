@@ -7,7 +7,8 @@
 - **Firebase project:** `salmon-logs`
 - **Firebase Authentication:** 이메일/비밀번호 + 이메일 인증
 - **Cloud Firestore:** 장부, 정산, 간병, 항암, 건강상태 기록
-- **Firebase Hosting:** PWA 배포
+- **Firebase Hosting site:** `kkoongs`
+- **Production URL:** `https://kkoongs.web.app`
 - **Google Drive:** 의료 첨부파일 원본 보관
 
 의료파일은 Firebase에 업로드하지 않습니다. 앱에는 **Drive URL과 자료명만 저장**합니다. 의료파일 비밀번호와 기존 금융 비밀번호는 앱·Firestore·GitHub 어디에도 저장하지 않습니다.
@@ -30,11 +31,27 @@ admins: ["관리자이메일@example.com"]
 
 ## 배포
 
-프로젝트 연결은 `.firebaserc`에 `salmon-logs`로 설정되어 있습니다.
+프로젝트와 Hosting target은 `.firebaserc`에 다음과 같이 고정되어 있습니다.
+
+- Firebase project: `salmon-logs`
+- Hosting target/site: `kkoongs`
+
+배포:
 
 ```bash
-firebase login
-firebase deploy --only firestore:rules,hosting
+firebase deploy --only firestore:rules,hosting:kkoongs --project salmon-logs
+```
+
+또는:
+
+```bash
+npm run deploy
+```
+
+배포 URL:
+
+```text
+https://kkoongs.web.app
 ```
 
 Firebase Hosting 배포본에서는 `/__/firebase/init.json`으로 Web App 설정을 자동으로 읽으므로 production용 `config.js`는 필요하지 않습니다.
