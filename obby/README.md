@@ -38,28 +38,49 @@ sections, so dying sends you back a little, not to the start.
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
-| 💀 **Nightmare** | **Every level above, pressed together** — a slice of Angel, then Normal, then Devil, then Ice, then Space, then the nightmare itself — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
+| 💀 **Nightmare** | **Every obstacle in the game, shuffled into one level**, with the floor going slippery or low-gravity under you as you cross — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
-#### Nightmare is a gauntlet
+#### Nightmare is everything, shuffled
 
-It is not a course of its own. `LEVELS.nightmare` carries a `gauntlet` list instead
-of a `chunks` count, and `buildCourse` walks it section by section: 4 chunks of
-Angel, 4 of Normal, 5 of Devil, 4 of Ice, 4 of Space, 6 of Nightmare — 27 chunks and
-about 713 units, roughly twice any other level.
+It is not a course of its own. `LEVELS.nightmare` carries a `shuffle` spec instead of
+a `chunks` count:
 
-Each section keeps **everything** about the level it came from: its chunk pool, its
-difficulty, its colours (the builder reads `W.pal` as it goes, so each section bakes
-its own), its song, and its physics. `W.zones` records the z range of each one and
-`updateZone` hands the right `slip` and `gravity` to `stepPlayer` as you cross, so
-the floor really does turn slippery when you enter the ice and the gravity really
-does drop when you enter space. A banner names each section as you arrive.
+```js
+shuffle: { from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' }
+```
 
-Every section is separated by a **wide flat deck with a checkpoint on it**. That is
-not decoration: the physics change at that line, and landing a jump into gravity you
-could not have planned for is not a fair death.
+`buildCourse` rolls **27 sections of one chunk each**, and every one of them picks a
+course at random. Not six blocks in order — properly mixed, so a run of the 1313 seed
+goes ice, ice, devil, nightmare, space, nightmare, ice, devil, angel, devil… About
+800 units, more than twice any other level.
 
-An ordinary level is simply a gauntlet of one section, so it runs the same code and
-behaves exactly as it always did.
+A chunk brings **everything** from the course it came from: its obstacles, its
+difficulty, its colours (the builder reads `W.pal` as it goes, so each chunk bakes
+its own) and its physics. `W.zones` records the z range of each one and `updateZone`
+hands the right `slip` and `gravity` to `stepPlayer` as you cross, so the floor
+really does go slippery for four chunks of that run and the gravity really does drop
+for five others.
+
+Three rules keep it from turning into a mess:
+
+**A chunk is always paired with its own level's floor.** That is what keeps it fair
+rather than random — the ice pool has no beams, thin ledges or spinners in it, and
+the space pool has no blinkers or crossfire, precisely because those combinations are
+miserable. Rolling the course and then taking its chunk *and* its physics together
+means those pairings can never come up by accident.
+
+**A deck goes wherever the floor changes, and only there.** A wide flat platform with
+a checkpoint on it: landing a jump into gravity you could not have planned for is not
+a fair death. Where two chunks in a row share a floor there is no deck — only the
+colours change and you run straight on. That run of 27 needs 12 decks.
+
+**The banner fires on floor changes, not chunk changes** (`floorName` in
+`updateZone`), and the song is fixed for the whole level by `shuffle.song`. Colours
+change every few seconds in here; a sign and a new song every few seconds would be
+noise, but walking onto ice without being told is a cheap death.
+
+An ordinary level is simply a shuffle of one section that never rolls, so it runs the
+same code and behaves exactly as it always did.
 
 **Nightmare looks like a troll level, and that is deliberate.** Its portal hangs
 **70 units up in the sky** and never moves. You reach the end, look up, and there it
@@ -69,7 +90,7 @@ is — visible, and apparently out of reach. `troll:true` puts the goal in the s
 #### The secret — do not sign-post this
 
 **The jetpack only works on the last deck, under the portal.** Nowhere else — not in
-any other level, and not during the gauntlet either. All 27 chunks have to be run on
+any other level, and not on the way there either. All 27 chunks have to be run on
 foot. Reach the end, hold jump, and the wings finally start, with nothing to run out
 of. See `atEnd` in `stepPlayer`: `troll` is set and you are within 12 of the goal's z.
 
@@ -87,13 +108,13 @@ gatekeeper still says nobody gets past him, and there is no marker in the sky. K
 it that way.
 
 Everywhere else holding jump does nothing at all, so the level stays impossible for
-anyone who has not bought the wings, walked the whole gauntlet, and thought to fly:
+anyone who has not bought the wings, walked all 27 chunks, and thought to fly:
 
 | | Rise above the deck | Wins |
 |---|---|---|
 | Wings, on the last deck | **64.8** | **yes** |
 | Wings, at the start of Nightmare | 1.7 — just a jump | no |
-| Wings, halfway through the gauntlet | 1.7 | no |
+| Wings, halfway through Nightmare | 1.7 | no |
 | Wings, in Angel or Devil | 1.7 | no |
 | No wings, on the last deck | 1.7 | no |
 
@@ -247,10 +268,10 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack — **but only at the very end of Nightmare**. Dead weight everywhere else, the whole gauntlet included |
+| 🪽 **Aura Wings** | 500 | A jetpack — **but only at the very end of Nightmare**. Dead weight everywhere else, the whole walk there included |
 
 **The wings only work on the last deck of the Nightmare Level.** `canFly` in
-`stepPlayer` requires `atEnd`; anywhere else — including every step of the gauntlet —
+`stepPlayer` requires `atEnd`; anywhere else — including every one of its 27 chunks —
 holding jump in mid-air does nothing at all.
 
 That restriction is the design, not a limitation. Flight skips straight over any
@@ -378,8 +399,8 @@ decides everything:
 
 It shipped at `+0.9` for a long time and nobody noticed, because the jetpack used to
 fly over it and the bot was assumed to be at fault. Once the jetpack was locked to
-the very end of Nightmare that chunk became the only way through, and it turned out
-not to be a way at all. **A timing chunk needs its window measured, not eyeballed.**
+the very end of Nightmare, that chunk became something you had to actually cross, and
+it turned out not to be crossable. **A timing chunk needs its window measured, not eyeballed.**
 
 ## When something breaks
 
@@ -439,6 +460,12 @@ Full levels, played by the bot end to end:
 | Normal | 70s | 3 |
 | Devil | 80s | 2 |
 | Ice | 56s | 6 |
+| Nightmare, all 27 chunks, no powers | 151s | 4 |
+
+That last row is the one to re-run after touching the shuffle, the chunk pools or the
+physics. It walks the whole 800 units on foot — through every floor change — and
+reaching 100% of `endZ` is the proof that the level can still be crossed at all. It
+does not *win*: the portal is 70 up, which is the point.
 
 Difficulty is set per level by `d` (0 to 1) plus the chunk pool and the chunk count.
 **`d` must not go above 1** — the chunk geometry is only verified to there, and past it
