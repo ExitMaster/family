@@ -1,5 +1,12 @@
 {
   "projects": {
     "default": "salmon-logs"
+  },
+  "targets": {
+    "salmon-logs": {
+      "hosting": {
+        "kkoongs": ["kkoongs"]
+      }
+    }
   }
 }
