@@ -194,6 +194,13 @@ is already there:
           ".validate": "newData.hasChildren(['n','v']) && newData.child('v').isNumber() && newData.child('n').isString() && newData.child('n').val().length <= 12"
         }
       }
+    },
+    "obbySaves": {
+      "$who": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "$who.matches(/^[a-z0-9_-]{1,12}$/) && newData.hasChildren(['orbs'])"
+      }
     }
   }
 }
@@ -410,3 +417,40 @@ in the safehouse for 10 seconds costs 0 hearts and drains the shield to 9%.
 
 Progress lives in this browser under `localStorage['obby3d-save-v1']` — aura,
 skins, cleared levels, best times, best depth. Clearing site data resets it.
+
+### Nicknames
+
+Put a nickname in from the menu (👤 NICKNAME) and the same progress is also kept
+under that name, in two places:
+
+| where | key | what it is for |
+|---|---|---|
+| this browser | `localStorage['obby3d-profiles-v1']` | more than one person on one tablet |
+| Firebase | `obbySaves/<nickname>` | picking your game up on another computer |
+
+Three decisions hold this together, and none of them should be undone casually:
+
+**Merging never subtracts.** `mergeSave(a, b)` takes the better of every field —
+max aura, union of skins and powers, union of cleared levels, *fastest* level times
+but *biggest* depth and survival (`bestIsTime`). So a stale copy can only ever hand
+you more than you walked in with, and two computers playing the same nickname
+converge instead of clobbering each other. Do not "simplify" this to last-write-wins.
+
+**A nickname is only claimed when you commit it** — the button, Enter, or leaving
+the box. `profileKey` holds the committed one and is deliberately *not* recomputed
+from the input box on every keystroke; otherwise typing `inu` would leave saves
+called `i` and `in` behind.
+
+**A new nickname claims what you are playing.** Type a name that has no save
+anywhere and it adopts your current progress — which is what you want the first
+time. A name that *does* have a save loads it instead, replacing what is on screen.
+
+Sound and music settings stay on the device — they are settings for the machine
+you are sitting at, not things you earned, so `snapshot()` leaves them out.
+
+A nickname is a name, not a password: anyone who types yours gets that progress.
+Fine for a family. If that ever stops being fine, the fix is a short code appended
+to the key, not encryption.
+
+Until a grown-up publishes the `obbySaves` rule above, the cloud half quietly fails
+and nicknames still work on the device they were made on.
