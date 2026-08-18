@@ -438,9 +438,9 @@ AIR_JUMPS 1   DBL_JUMP 0.85      ->  with the second jump, roughly 3.0 high and 
 ### SPEED_MUL — read this before touching it
 
 `SPEED_MUL` multiplies `RUN`, and `ACC` / `AIR_ACC` / `FRIC` with it so that getting
-going and stopping still *feel* the same. It is currently **18.9**, at the player's
-request — a top speed of **136 units a second** against courses built for 7.2. This is
-a joyride setting, not a difficulty setting, and it is meant to be.
+going and stopping still *feel* the same. It is currently **4.0**, at the player's
+request — a top speed of **28.8** against courses built for 7.2. That is a joyride
+setting rather than a difficulty setting, and it is meant to be.
 
 What it does, measured with the bot on the doubled-length courses:
 
@@ -448,7 +448,7 @@ What it does, measured with the bot on the doubled-length courses:
 |---|---|---|---|---|---|
 | 1 | 7.2 | **won**, 102s | **won**, 129s | **won**, 169s | walked 100% |
 | 4 | 28.8 | 15% | 14% | 19% | 2% |
-| 18.9 | 136 | on the ground about a quarter of the time | | | |
+| 18.9 | 136 | on the ground about a quarter of the time — was set here briefly | | | |
 
 The reason is not the running, it is the jumping. A jump lasts 0.74s no matter how
 fast you are going, so at 4× it carries you about **21 units** instead of 5.3, while
@@ -456,10 +456,14 @@ fast you are going, so at 4× it carries you about **21 units** instead of 5.3, 
 the platform on the other side of them. Ice is the exception at 4× (it stays
 winnable), because its courses are wide and forgiving by design.
 
-At 18.9 you cover **2.3 units per frame** at 60fps. Platforms are 4 to 6 deep, so the
-floor still catches you, but walls and other `THICK` (0.6) geometry are thinner than a
-single frame of travel and are not guaranteed to. If someone reports passing through
-something solid, this is the first thing to suspect.
+Frame travel is the thing to watch if it goes back up. At 4.0 you cover 0.48 units per
+frame at 60fps, comfortably under the 0.6 thickness of a wall. At 18.9 it was **2.3**,
+four times thicker than the walls, so nothing guaranteed you would not pass straight
+through one. If someone reports going through something solid, check this number first.
+
+The wings needed two speed-proof fixes to survive that experiment, and both are worth
+keeping: the end zone is measured in time rather than distance, and `ASCENT_DRIFT`
+bounds the climb. See the Nightmare section.
 
 If the levels need to be playable again, `SPEED_MUL = 1` restores exactly the tuning
 every chunk was verified against. Anything above about 1.5 starts costing levels.
