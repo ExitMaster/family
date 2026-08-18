@@ -46,8 +46,17 @@ function friendlyError(err){const c=err?.code||'';if(c.includes('invalid-credent
 async function loadFamily(){
   try{
     const access=await getDoc(accessRef());if(!access.exists())return renderUnauthorized('가족 접근 목록이 아직 설정되지 않았습니다.');state.allowlist=access.data();
-    const email=normEmail(state.user.email);state.isAdmin=(state.allowlist.admins||[]).includes(email);if(!(state.allowlist.emails||[]).includes(email))return renderUnauthorized('이 이메일은 가족 사용자로 승인되지 않았습니다.');
-    let fsnap=await getDoc(familyRef());if(!fsnap.exists()){if(!state.isAdmin)return renderUnauthorized('가족 공간 초기 설정이 아직 완료되지 않았습니다.');await setDoc(familyRef(),{name:APP_NAME,created_at:serverTimestamp(),updated_at:serverTimestamp()});await ensureDefaults();fsnap=await getDoc(familyRef());}
+    const email=normEmail(state.user.email);
+    const approvedEmails=(state.allowlist.emails||[]).map(normEmail);
+    const adminEmails=(state.allowlist.admins||[]).map(normEmail);
+    state.isAdmin=adminEmails.includes(email);
+    if(!approvedEmails.includes(email))return renderUnauthorized('이 이메일은 가족 사용자로 승인되지 않았습니다.');
+    let fsnap=await getDoc(familyRef());
+    if(!fsnap.exists()){
+      await setDoc(familyRef(),{name:APP_NAME,created_at:serverTimestamp(),updated_at:serverTimestamp()});
+      await ensureDefaults();
+      fsnap=await getDoc(familyRef());
+    }
     state.family={id:fsnap.id,...fsnap.data()};if(state.isAdmin)await ensureDefaults();
     const msnap=await getDoc(subdoc('members',state.user.uid));if(!msnap.exists())return renderMemberSetup();state.membership={user_id:msnap.id,...msnap.data()};await refreshData();render();startRealtime();
   }catch(err){console.error(err);if(err?.code==='permission-denied')return renderUnauthorized('이 계정은 allowlist에 없거나 이메일 인증/Firestore Rules 설정이 완료되지 않았습니다.');$('#app').innerHTML=`<div class="auth"><div class="auth-card"><h1>연결 오류</h1><div class="notice error">${esc(err?.message||err)}</div><button id="logout" class="btn ghost">로그아웃</button></div></div>`;$('#logout').onclick=()=>signOut(state.auth);}
