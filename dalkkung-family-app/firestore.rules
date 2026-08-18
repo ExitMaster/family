@@ -15,10 +15,6 @@ service cloud.firestore {
       return verified() && request.auth.token.email in allowlist().emails;
     }
 
-    function admin() {
-      return approved() && request.auth.token.email in allowlist().admins;
-    }
-
     match /access/allowlist {
       allow get: if verified() && request.auth.token.email in resource.data.emails;
       allow list: if false;
@@ -31,10 +27,12 @@ service cloud.firestore {
     }
 
     match /families/{familyId} {
-      allow read, write: if approved();
+      allow read, create, update: if approved() && familyId == 'dalkkung';
+      allow delete: if false;
 
       match /{document=**} {
-        allow read, write: if approved();
+        allow read, create, update: if approved() && familyId == 'dalkkung';
+        allow delete: if false;
       }
     }
 
