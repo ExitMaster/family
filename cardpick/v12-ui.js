@@ -11,6 +11,7 @@ const imageByCard={
   '서울지방변호사회 로이어스 삼성카드':new URL('./assets/cards/samsung-lawyers.webp',import.meta.url).href
 };
 const classLabel={primary:'주사용',dormant:'휴면·비주력','family-backup':'가족·백업'};
+let enhanceTimer=null;
 
 function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function controls(){try{return JSON.parse(localStorage.getItem(V12_CONTROL_KEY)||'{}')}catch{return{}}}
@@ -96,10 +97,14 @@ function addRecommendationMeta(){
 }
 
 function enhance(){ensureStyles();addCardGroups();addCardBadgesAndNotes();enrichV12Details();fixInformationalLabels();addFinderBadges();addRecommendationMeta()}
+function scheduleEnhance(){clearTimeout(enhanceTimer);enhanceTimer=setTimeout(enhance,0)}
 
 document.addEventListener('change',e=>{
-  const select=e.target.closest?.('.tier-select');if(!select)return;const id=select.dataset.cardId;if(!['samsung-happy-v2','samsung-lawyers'].includes(id))return;
-  const ctl=controls();if(id==='samsung-happy-v2')ctl.familyTierMonth=V12_CURRENT_MONTH;if(id==='samsung-lawyers')ctl.lawyersActiveMonth=select.value==='40+'?V12_CURRENT_MONTH:null;saveControls(ctl);setTimeout(enhance,0);
+  const select=e.target.closest?.('.tier-select');
+  if(select){const id=select.dataset.cardId;if(['samsung-happy-v2','samsung-lawyers'].includes(id)){const ctl=controls();if(id==='samsung-happy-v2')ctl.familyTierMonth=V12_CURRENT_MONTH;if(id==='samsung-lawyers')ctl.lawyersActiveMonth=select.value==='40+'?V12_CURRENT_MONTH:null;saveControls(ctl)}}
+  scheduleEnhance();
 },true);
+document.addEventListener('click',scheduleEnhance,true);
+document.addEventListener('submit',scheduleEnhance,true);
 
-const observer=new MutationObserver(()=>queueMicrotask(enhance));observer.observe(app,{childList:true,subtree:true});enhance();
+enhance();
