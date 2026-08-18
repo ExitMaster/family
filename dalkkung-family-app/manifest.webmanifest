@@ -1,0 +1,11 @@
+{
+  "name": "딸꿍또꿍아꿍",
+  "short_name": "딸꿍또꿍",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f6f2",
+  "theme_color": "#f7f6f2",
+  "icons": [
+    {"src":"./assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
