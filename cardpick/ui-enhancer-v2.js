@@ -8,6 +8,7 @@ for(const card of DEFAULT_STATE.cards)for(const benefit of card.benefits)byName.
 let pathLabels=[];
 let homeSelections={channel:null,paymentMethod:null};
 let enhanceTimer=null;
+const imageBlobCache=new Map();
 
 function ensureImageStyles(){
   if(document.querySelector('#card-result-image-style'))return;
@@ -18,6 +19,21 @@ function ensureImageStyles(){
     @media(max-width:420px){.hero-result.with-card-image{padding-right:108px}.card-result-image{width:80px;height:88px;top:16px;right:14px}}
   `;
   document.head.appendChild(style);
+}
+
+function imageSource(src){
+  if(!src?.startsWith('data:'))return src;
+  if(imageBlobCache.has(src))return imageBlobCache.get(src);
+  try{
+    const comma=src.indexOf(',');
+    const meta=src.slice(5,comma),payload=src.slice(comma+1);
+    const mime=meta.split(';')[0]||'image/webp';
+    const binary=atob(payload),bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:mime}));
+    imageBlobCache.set(src,url);
+    return url;
+  }catch{return src}
 }
 
 function topLabels(){return new Set(BROWSE_TREE.map(x=>x.label))}
@@ -75,7 +91,7 @@ function enrichRecommendationImage(){
   const src=CARD_IMAGES[cardName];
   if(!src)return;
   const img=document.createElement('img');
-  img.className='card-result-image';img.src=src;img.alt=`${cardName} 카드 이미지`;img.loading='eager';img.decoding='async';
+  img.className='card-result-image';img.src=imageSource(src);img.alt=`${cardName} 카드 이미지`;img.loading='eager';img.decoding='async';
   result.classList.add('with-card-image');result.appendChild(img);
 }
 
@@ -101,9 +117,6 @@ function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','
 function enhance(){restoreHomeSelections();fixBenefitFinder();enrichBenefitFinder();enrichCardTab();enrichRecommendationImage()}
 function scheduleEnhance(){clearTimeout(enhanceTimer);enhanceTimer=setTimeout(enhance,0)}
 
-// The app re-renders synchronously on navigation/form actions. Run enhancement
-// once after the user action instead of observing every DOM mutation. This avoids
-// observer feedback loops that can hang Chromium in Benefit Finder.
 document.addEventListener('submit',e=>{
   if(e.target?.id==='recommendForm')rememberHomeSelections(e.target);
   scheduleEnhance();
