@@ -51,13 +51,17 @@ async function importSeedData(seed){
   const householdByName=Object.fromEntries(state.households.map(h=>[h.name,h.id]));
   const catByName=Object.fromEntries(state.categories.map(c=>[`${c.type}:${c.name}`,c.id]));
   const batch=writeBatch(state.db);let writes=0;
+  const commitMaybe=async force=>{if(force&&writes){await batch.commit();}};
   for(const x of seed.transactions||[]){const r=doc(subcol('transactions'));batch.set(r,{txn_date:x.date,type:x.type,category_id:catByName[`${x.type}:${x.category}`]||null,description:x.description||'',amount:Number(x.amount||0),household_id:x.household?householdByName[x.household]||null:null,payment_method:x.payment_method||null,receipt_shared:x.receipt_shared||null,memo:x.memo||null,created_by:state.user.uid,created_at:serverTimestamp()});writes++;}
   for(const s of seed.settlements||[]){const sr=doc(subcol('settlements'));batch.set(sr,{settlement_date:s.date,description:s.description||'',total_amount:Number(s.total_amount||0),payer_household_id:householdByName[s.payer]||null,memo:s.memo||null,is_example:!!s.is_example,created_by:state.user.uid,created_at:serverTimestamp()});writes++;for(const [name,v] of Object.entries(s.shares||{})){const sh=doc(subcol('settlement_shares'));batch.set(sh,{settlement_id:sr.id,household_id:householdByName[name]||null,amount:Number(v.amount||0),status:v.status||'unpaid',created_by:state.user.uid,created_at:serverTimestamp()});writes++;}}
   for(const [i,x] of (seed.care_events||[]).entries()){const r=doc(subcol('care_events'));batch.set(r,{event_date:x.date,event_type:x.event_type||null,place:x.place||null,doctor:x.doctor||null,companions:x.companions||null,content:x.content||null,memo:x.memo||null,medication:x.medication||null,chemo_cycle:x.chemo_cycle||null,sort_order:i,created_by:state.user.uid,created_at:serverTimestamp()});writes++;}
   for(const x of seed.chemo_cycles||[]){batch.set(subdoc('chemo_cycles',x.cycle_number),{cycle_number:Number(x.cycle_number),cycle_date:x.cycle_date||null,hospital:x.hospital||null,medication:x.medication||null,condition_summary:x.condition_summary||null,notes:x.notes||null,updated_by:state.user.uid,updated_at:serverTimestamp()},{merge:true});writes++;}
   for(const x of seed.payout_accounts||[]){const hid=householdByName[x.household];if(!hid)continue;batch.set(subdoc('payout_accounts',hid),{household_id:hid,bank_name:x.bank_name||null,account_number:x.account_number||null,updated_at:serverTimestamp()},{merge:true});writes++;}
+  for(const x of seed.health_logs||[]){const r=doc(subcol('health_logs'));batch.set(r,{log_date:x.date||x.log_date,weight_kg:x.weight_kg??null,wbc:x.wbc??null,anc:x.anc??null,neuropathy_score:x.neuropathy_score??null,fatigue_score:x.fatigue_score??null,meal_memo:x.meal_memo||null,created_by:state.user.uid,created_at:serverTimestamp()});writes++;}
+  for(const x of seed.attachments||[]){if(!x.drive_url||!/^https:\/\/(drive|docs)\.google\.com\//i.test(x.drive_url))continue;const r=doc(subcol('attachments'));batch.set(r,{care_event_id:x.care_event_id||null,drive_url:x.drive_url,label:x.label||'Google Drive 자료',password_protected:x.password_protected!==false,created_by:state.user.uid,created_at:serverTimestamp()});writes++;}
+  if(seed.emergency_guidance){batch.set(familyRef(),{emergency_guidance:String(seed.emergency_guidance),updated_at:serverTimestamp()},{merge:true});writes++;}
   if(writes>450) throw new Error(`이관 데이터가 ${writes}개 write로 너무 큽니다. 현재 도구는 450개 이하 seed를 전제로 합니다.`);
-  if(writes) await batch.commit();
+  await commitMaybe(true);
 }
 
 async function done(){state.modal=null;await refreshData();render();}
