@@ -310,9 +310,59 @@ function toggleMute() {
   if (!muted) sfx('key');
 }
 
+
+// ── 스톱워치 ─────────────────────────────────────────────────
+//  퀴즈를 통과한 순간 출발해서, 임무를 완수(영상 끝 + 체크리스트 전부)하면 멈춘다.
+//  기록은 ARCHIVE 에 남는다.
+function swMs() { return state.t0 ? ((state.tEnd || Date.now()) - state.t0) : 0; }
+function swText(ms) {
+  const t = Math.max(0, Math.floor(ms / 100));
+  const m = Math.floor(t / 600), sec = Math.floor(t / 10) % 60, d = t % 10;
+  return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0') + '.' + d;
+}
+function swStart() {
+  state.t0 = Date.now(); state.tEnd = 0; state.doneAt = 0;
+  clearInterval(state.swTimer);
+  state.swTimer = setInterval(() => {
+    const el = document.getElementById('sw');
+    if (el && !state.tEnd) el.textContent = swText(swMs());
+  }, 100);
+}
+function swStop() { if (state.t0 && !state.tEnd) state.tEnd = Date.now(); clearInterval(state.swTimer); state.swTimer = null; }
+
+// ── 임무 체크리스트 ──────────────────────────────────────────
+//  작전을 보면서 하나씩 눌러 확인한다. 전부 확인 + 영상 끝 = 임무 완수.
+function buildTasks(m) {
+  return [
+    { t: '경보 확인 — 층 ' + m.floor,               done: false },
+    { t: m.squadA + ' / ' + m.squadB + ' 출동 확인', done: false },
+    { t: m.threat.n + ' 접촉 보고',                  done: false },
+    { t: m.weapon + ' 사격 완료',                    done: false },
+    { t: '도토리 창고 이상 없음',                    done: false }
+  ];
+}
+function taskDone() { return (state.tasks || []).filter(t => t.done).length; }
+function missionComplete() { return state.reelDone && state.tasks && taskDone() === state.tasks.length; }
+function checkTask(i) {
+  const t = state.tasks[i];
+  if (t.done) return;
+  t.done = true; sfx('key');
+  finishIfDone();
+  render();
+}
+function finishIfDone() {
+  if (!missionComplete() || state.doneAt) return false;
+  swStop(); state.doneAt = state.tEnd || Date.now();
+  sfx('win');
+  speak('Mission complete, trooper. ' + Math.round(swMs() / 1000) + ' seconds. Splendid work.');
+  remember();
+  return true;
+}
+
 // ── 재생기 ───────────────────────────────────────────────────
 const app = document.getElementById('app');
-let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false, quiz:null, qi:0, qmsg:'', qok:false, attempt:0 };
+let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false, quiz:null, qi:0, qmsg:'', qok:false, attempt:0,
+                t0:0, tEnd:0, swTimer:null, tasks:null, reelDone:false, doneAt:0 };
 function unlocked() { try { return sessionStorage.getItem(K_UNLOCK) === '1'; } catch (e) { return false; } }
 
 function css(){ return `
@@ -339,6 +389,20 @@ function css(){ return `
       box-shadow:0 6px 0 #2f8b54;cursor:pointer;letter-spacing:.04em}
   .go:active{transform:translateY(4px);box-shadow:0 2px 0 #2f8b54}
   .go small{display:block;font-size:12px;letter-spacing:.16em;opacity:.75;margin-bottom:6px}
+  .swrow{display:flex;align-items:baseline;gap:10px;justify-content:center;margin:2px 0 10px}
+  .swrow #sw{font-size:30px;color:#5fd08a;letter-spacing:.04em}
+  .swrow #sw.stopped{color:#ffdc4a}
+  .swlab{font-size:11px;color:#8aa0b4;letter-spacing:.12em}
+  .list{border:1px solid #2c3b47;border-radius:12px;background:#0e1318;padding:12px 14px;margin-top:14px}
+  .list h3{margin:0 0 8px;font-size:13px;letter-spacing:.1em;color:#5fd08a}
+  .task{display:flex;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px dashed #222c35;cursor:pointer;font-size:13px;color:#dfe9f0}
+  .task b{color:#8aa0b4;font-size:15px;width:16px;text-align:center}
+  .task.on{color:#6f8598;text-decoration:line-through}
+  .task.on b{color:#5fd08a}
+  .task:last-of-type{border-bottom:none}
+  .hint{font-size:11.5px;color:#8aa0b4;margin-top:8px;line-height:1.6}
+  .cleared{margin-top:10px;text-align:center;color:#ffdc4a;font-size:16px;line-height:1.7;border:1px solid #6b5a1c;border-radius:10px;padding:10px}
+  .cleared small{color:#8aa0b4;font-size:11px;letter-spacing:.08em}
   .pin{display:flex;gap:10px;justify-content:center;margin:18px 0 6px}
   .pin i{width:46px;height:56px;border:2px solid #35505f;border-radius:10px;background:#0e1318;display:flex;
          align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:26px;color:#5fd08a;font-style:normal}
@@ -563,6 +627,8 @@ function answer(v) {
   }
   state.quiz = null; sfx('go');
   speak('All three correct. Very good indeed. M.S.G., you are cleared for the mission.');
+  state.tasks = buildTasks(state.mission); state.reelDone = false;
+  swStart();
   state.started = true; state.i = 0; state.cued = -1; play();
 }
 
@@ -610,6 +676,9 @@ function render() {
       '<svg viewBox="0 0 640 360">' + s.draw(m) + '</svg><div class="scan"></div></div>' +
     '<div class="cap mono" id="cap">' + s.cap + '</div>' +
     '<div class="bar"><i id="bar" style="width:' + Math.round((state.i+1)/sh.length*100) + '%"></i></div>' +
+    '<div class="swrow mono"><span class="swlab">임무 시간</span>' +
+      '<span id="sw" class="' + (state.doneAt ? 'stopped' : '') + '">' + swText(swMs()) + '</span>' +
+      '<span class="swlab">' + (state.doneAt ? '⏹ 정지' : '⏱ 측정 중') + '</span></div>' +
     '<div class="row">' +
       '<button class="p tapbtn" id="play">' + (state.playing ? '‖ PAUSE' : (state.i >= sh.length-1 ? '↺ REPLAY' : '▶ PLAY')) + '</button>' +
       '<button class="tapbtn" id="prev">◀ PREV</button>' +
@@ -618,6 +687,13 @@ function render() {
       '<button class="tapbtn" id="brief">▣ 브리핑</button>' +
       '<button class="tapbtn" id="mute">' + muteLabel() + '</button>' +
     '</div>' +
+    (state.tasks ? '<div class="list mono"><h3>임무 체크리스트 ' + taskDone() + ' / ' + state.tasks.length + '</h3>' +
+      state.tasks.map((t, i) => '<div class="task' + (t.done ? ' on' : '') + '" data-t="' + i + '">' +
+        '<b>' + (t.done ? '✓' : '□') + '</b><span>' + t.t + '</span></div>').join('') +
+      (state.doneAt
+        ? '<div class="cleared mono">임무 완수 — ' + swText(swMs()) + '<br><small>ARCHIVE 에 기록되었다.</small></div>'
+        : '<div class="hint mono">' + (state.reelDone ? '영상 끝. 남은 항목을 확인하면 시계가 멈춘다.' : '작전을 보면서 하나씩 눌러 확인한다.') + '</div>') +
+    '</div>' : '') +
     '<div class="meta mono">SHOT <b>' + (state.i+1) + '/' + sh.length + '</b> · DATE <b>' + m.key + '</b><br>' +
       'FLOOR <b>' + m.floor + '</b> · SECTOR <b>' + m.sector + '</b> · THREAT <b>' + m.threat.n + '</b><br>' +
       'SQUADS <b>' + m.squadA + ' / ' + m.squadB + '</b> · ARMS <b>' + m.weapon + '</b> · STRENGTH <b>' + m.soldiers + '</b></div>' +
@@ -629,12 +705,13 @@ function render() {
   document.getElementById('full').onclick = () => { toggleFull(); setTimeout(render, 120); };
   document.getElementById('brief').onclick = () => { pause(); state.started = false; render(); };
   document.getElementById('mute').onclick = () => { toggleMute(); render(); };
+  app.querySelectorAll('.task').forEach(el => el.onclick = () => checkTask(Number(el.dataset.t)));
 }
 function go(i) {
   const n = shots(state.mission).length;
   state.i = Math.max(0, Math.min(n - 1, i));
   state.cued = -1;
-  if (state.i === n - 1) remember();
+  if (state.i === n - 1) { state.reelDone = true; finishIfDone(); remember(); }
   render();
 }
 function play() {
@@ -647,7 +724,7 @@ function tick() {
   const sh = shots(state.mission);
   state.timer = setTimeout(() => {
     if (!state.playing) return;
-    if (state.i >= sh.length - 1) { state.playing = false; render(); remember(); return; }
+    if (state.i >= sh.length - 1) { state.playing = false; state.reelDone = true; finishIfDone(); render(); remember(); return; }
     state.i++; render(); tick();
   }, sh[state.i].ms);
 }
@@ -656,22 +733,42 @@ function pause() { hush(); state.playing = false; clearTimeout(state.timer); ren
 function loadLog() { try { return JSON.parse(localStorage.getItem(K_STORE)) || []; } catch (e) { return []; } }
 function remember() {
   const m = state.mission, log = loadLog();
-  if (!log.some(x => x.key === m.key)) {
-    log.unshift({ key:m.key, fileNo:m.fileNo, threat:m.threat.n, floor:m.floor, result:m.outcome.t });
-    try { localStorage.setItem(K_STORE, JSON.stringify(log.slice(0, 60))); } catch (e) {}
+  const rec = {
+    key: m.key, fileNo: m.fileNo, threat: m.threat.n, floor: m.floor, result: m.outcome.t,
+    ms: state.doneAt ? swMs() : 0,
+    tasks: taskDone(), tasksAll: state.tasks ? state.tasks.length : 0,
+    tries: state.attempt || 0,
+    clear: !!state.doneAt
+  };
+  const at = log.findIndex(x => x.key === m.key);
+  // 같은 날은 한 줄만. 더 좋은 기록(완수 우선, 그 다음 빠른 시간)일 때만 덮어쓴다.
+  if (at < 0) log.unshift(rec);
+  else {
+    const old = log[at];
+    const better = (rec.clear && !old.clear) || (rec.clear && old.clear && rec.ms < old.ms) || (!old.clear && rec.tasks > old.tasks);
+    if (better) log[at] = rec;
   }
+  try { localStorage.setItem(K_STORE, JSON.stringify(log.slice(0, 60))); } catch (e) {}
 }
 function archive() {
   if (!unlocked()) return renderLock();
   pause();
   const log = loadLog();
+  const cleared = log.filter(x => x.clear);
+  const best = cleared.length ? cleared.reduce((a, b) => (a.ms && a.ms < b.ms ? a : b)) : null;
   const rows = log.length
-    ? log.map(x => '<div style="padding:8px 0;border-bottom:1px solid #222c35">' + x.key + ' · ' + x.fileNo +
-        '<br><span style="color:#8aa0b4">FLOOR ' + x.floor + ' · ' + x.threat + ' · ' + x.result + '</span></div>').join('')
-    : '<p style="color:#8aa0b4">NO FILES ON RECORD. WATCH TODAY’S OPERATION TO THE END.</p>';
+    ? log.map(x => '<div style="padding:9px 0;border-bottom:1px solid #222c35">' +
+        (x.clear ? '<span style="color:#ffdc4a">✓ </span>' : '<span style="color:#6f8598">· </span>') + x.key + ' · ' + x.fileNo +
+        '<br><span style="color:#8aa0b4">FLOOR ' + x.floor + ' · ' + x.threat + ' · ' + x.result + '</span>' +
+        '<br><span style="color:#5fd08a">⏱ ' + (x.ms ? swText(x.ms) : '--:--.-') + '</span>' +
+        '<span style="color:#8aa0b4"> · ☑ ' + (x.tasks || 0) + '/' + (x.tasksAll || 5) + ' · 심사 ' + (x.tries || 1) + '회</span>' +
+        (best && best === x ? '<span style="color:#ffdc4a"> · 최고 기록</span>' : '') +
+      '</div>').join('')
+    : '<p style="color:#8aa0b4">NO FILES ON RECORD. 임무를 완수하면 여기에 기록이 남는다.</p>';
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span><h1 class="mono">ARCHIVE</h1>' +
-    '<p class="sub mono">OPERATIONS ON RECORD: ' + log.length + '</p>' +
+    '<p class="sub mono">OPERATIONS ON RECORD: ' + log.length + ' · 완수 ' + cleared.length +
+      (best ? ' · 최고 기록 ' + swText(best.ms) : '') + '</p>' +
     '<div class="meta mono">' + rows + '</div>' +
     '<div class="row"><button class="p tapbtn" id="back">◀ BACK TO FILE</button></div></div>';
   document.getElementById('back').onclick = () => render();
