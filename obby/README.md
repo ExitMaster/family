@@ -110,6 +110,15 @@ the end. See `atEnd` in `stepPlayer` — it is on when `troll` is set and you ar
 Everywhere else in the level one tankful tops out at **27.8** against a portal at
 **70**, so that deck is the only place it can be done.
 
+Two numbers make that survive any `SPEED_MUL`. The end zone is
+`min(60, 12 + runMax() * 0.3)` rather than a flat 12, because at 136 a second a
+12-unit zone goes by in a tenth of a second and you shoot clean through the one place
+the wings work — which reads as "the wings are broken". And `ASCENT_DRIFT` caps how
+fast you may still move while riding up, at a **fixed** 6 that is deliberately not
+scaled: the portal's pull is a fraction of the remaining distance per second, so it
+can only win against a bounded speed. Arriving at 136 without that cap put the player
+**1818 units** into the void with the portal shrinking behind them.
+
 On that climb **you still fly it — you are not carried.** Your steering works the
 whole way up; the portal simply reels your x/z in harder than you can push away from
 it, so you always arrive. That pull is not decoration: without it you could lift off

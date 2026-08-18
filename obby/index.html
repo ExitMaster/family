@@ -1099,6 +1099,7 @@ const POWERS = [
 //            so the tank is what keeps the portal out of reach from anywhere but its
 //            own last deck. Do not raise it without re-measuring that.
 const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
+const ASCENT_DRIFT = 6;     // how fast you may still drift while riding up to the portal
 const GLIDE_FALL = 2.6;     // out of fuel: hold jump and you sink this slowly
 const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
 // One emergency recovery per life. Slip off an edge and you have about half a second
@@ -1921,7 +1922,12 @@ function stepPlayer(dt) {
   // draining. Anywhere else one tankful tops out around 25 and the portal is at 70,
   // so that deck is the only place anything reaches it.
   // Nothing in the game says any of this. Do not sign-post it.
-  const atEnd = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
+  // The end zone has to be measured in TIME, not just distance. At the tuned run
+  // speed 12 units is about two seconds of deck; at SPEED_MUL 18.9 the same 12 units
+  // go by in a tenth of a second and you shoot straight through the one place the
+  // wings work, which reads as "the wings are broken".
+  const endZone = Math.min(60, 12 + runMax() * 0.3);
+  const atEnd = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < endZone);
   const canFly = hasPower('wings') && !!W.troll;
   const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0 &&
                   (p.fuel > 0 || atEnd);
@@ -1988,12 +1994,17 @@ function stepPlayer(dt) {
   // you fly it, you are not carried. Your own steering still works; the portal just
   // reels your x/z in harder than you can push away from it, so you cannot lift off
   // the back of the deck and sail past it forever with no way to correct.
+  //
+  // ASCENT_DRIFT is a FIXED speed, deliberately not scaled by SPEED_MUL. The pull is
+  // a fraction of the remaining distance per second, so it can only ever win against
+  // a bounded velocity — leave the run speed uncapped here and arriving at 136 a
+  // second sends you 1800 units into the void with the portal shrinking behind you.
   if (atEnd && !p.onGround && p.y > 3) {
     const k = 1 - Math.pow(0.06, dt);
     p.x = lerp(p.x, W.goal.x, k);
     p.z = lerp(p.z, W.goal.z, k);
-    const drag = Math.pow(0.2, dt);
-    p.vx *= drag; p.vz *= drag;
+    const sp = Math.hypot(p.vx, p.vz);
+    if (sp > ASCENT_DRIFT) { p.vx = p.vx/sp*ASCENT_DRIFT; p.vz = p.vz/sp*ASCENT_DRIFT; }
     p.ascending = true;
   } else p.ascending = false;
 
