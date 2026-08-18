@@ -108,7 +108,8 @@ function buildMission(key) {
   return {
     key, fileNo, threat, floor, sector, squadA, squadB, weapon, verb, outcome, closer, soldiers, rounds,
     alarm: 'DANGER ON FLOOR ' + floor + '. ' + threat.n + ' INVASION!',
-    order: COMMANDER + ': "SQUAD ' + squadA + ', SQUAD ' + squadB + ' — ' + weapon + ' UP. ' + verb + '!"'
+    order: COMMANDER + ': "Right then. Squad ' + squadA + ', Squad ' + squadB + ' — ' + weapon.toLowerCase() + ' up, if you please. ' + verb + '!"',
+    orderSpoken: 'Right then. Squad ' + squadA + ' and Squad ' + squadB + '. ' + weapon.toLowerCase() + ' up, if you please. ' + verb + '!'
   };
 }
 
@@ -304,13 +305,14 @@ function muteLabel() { return muted ? '🔇 소리 켜기' : '🔊 소리 끄기
 function sfx(n) { const f = SFX[n]; if (f) try { f(); } catch (e) {} }
 function toggleMute() {
   muted = !muted;
+  if (muted) hush();
   try { localStorage.setItem(K_MUTE, muted ? '1' : '0'); } catch (e) {}
   if (!muted) sfx('key');
 }
 
 // ── 재생기 ───────────────────────────────────────────────────
 const app = document.getElementById('app');
-let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false };
+let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false, quiz:null, qi:0, qmsg:'', qok:false, attempt:0 };
 function unlocked() { try { return sessionStorage.getItem(K_UNLOCK) === '1'; } catch (e) { return false; } }
 
 function css(){ return `
@@ -398,6 +400,172 @@ function submitPin() {
   state.pin = ''; state.pinErr = true; sfx('wrong'); renderLock();
 }
 
+
+
+// ── 하람쥐 대장의 목소리 (영국식) ───────────────────────────
+//  SpeechSynthesis 로 en-GB 음성을 골라 대장 대사만 읽는다.
+//  en-GB 음성이 없는 기기에서는 조용히 넘어간다 — 자막은 그대로 영국식.
+let VOICE = null, voiceTried = false;
+function ukVoice() {
+  if (!window.speechSynthesis) return null;
+  const vs = speechSynthesis.getVoices();
+  if (!vs.length) return null;
+  return vs.find(v => /en[-_]GB/i.test(v.lang) && /daniel|arthur|male|george|oliver/i.test(v.name))
+      || vs.find(v => /en[-_]GB/i.test(v.lang))
+      || vs.find(v => /english.*(uk|british)/i.test(v.name))
+      || null;
+}
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { VOICE = ukVoice(); };
+function speak(text) {
+  if (muted || !window.speechSynthesis || !text) return;
+  if (!voiceTried) { VOICE = ukVoice(); voiceTried = true; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.85;
+    try { if (VOICE) u.voice = VOICE; } catch (e) {}
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function hush() { try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {} }
+
+// ── 임무 자격 심사 (퀴즈) ─────────────────────────────────────
+//  시작 버튼 → 문제 3개를 맞혀야 작전이 개시된다.
+//  틀려도 실패가 아니라 다시 풀면 된다 — 대장이 한 소리 할 뿐.
+const QUIZ_N = 3;
+const SCOLD = [
+  'Steady on, trooper. Count them again.',
+  'Not quite, I\u2019m afraid. Have another go.',
+  'Dear me. Read the briefing once more, would you.',
+  'Wrong, trooper. Chin up and try again.'
+];
+const PRAISE = [
+  'Jolly good, trooper.',
+  'Quite right. Carry on.',
+  'Splendid! Next question.',
+  'Good show. Onwards.'
+];
+
+function acornField(n, seed) {
+  const r = rng(seed);
+  let g = '', used = [];
+  for (let i = 0; i < n; i++) {
+    let x, y, tries = 0;
+    do { x = 40 + r() * 540; y = 40 + r() * 260; tries++; }
+    while (tries < 40 && used.some(u => Math.abs(u[0]-x) < 62 && Math.abs(u[1]-y) < 62));
+    used.push([x, y]);
+    g += '<g transform="translate(' + Math.round(x) + ',' + Math.round(y) + ') rotate(' + Math.round(r()*40-20) + ')">' +
+      '<ellipse cx="0" cy="6" rx="17" ry="20" fill="#c08a44"/>' +
+      '<path d="M-18 -6 A18 13 0 0 1 18 -6 Z" fill="#7a4a24"/>' +
+      '<rect x="-2.5" y="-16" width="5" height="8" rx="2" fill="#5c3618"/></g>';
+  }
+  return '<rect width="640" height="340" fill="#12161b"/>' + g;
+}
+// 4지선다 보기: 정답 + 가까운 오답들
+function choicesAround(r, ans, spread, min) {
+  const out = [ans];
+  let guard = 0;
+  while (out.length < 4 && guard++ < 60) {
+    const v = ans + (Math.floor(r() * spread * 2) - spread);
+    if (v >= (min === undefined ? 0 : min) && out.indexOf(v) < 0) out.push(v);
+  }
+  while (out.length < 4) out.push(Math.max(min || 0, ans + out.length));
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = out[i]; out[i] = out[j]; out[j] = t; }
+  return out;
+}
+const QUIZ_KINDS = [
+  // 도토리 세기
+  function (r, m) {
+    const n = ri(r, 5, 14), seed = hashStr('acorn|' + n + '|' + Math.floor(r() * 1e9));
+    return { q: '도토리가 몇 개일까?', art: acornField(n, seed), opts: choicesAround(r, n, 3, 1), ans: n };
+  },
+  // 창고 계산
+  function (r, m) {
+    const a = ri(r, 6, 20), b = ri(r, 3, 12), plus = r() < 0.55;
+    const ans = plus ? a + b : Math.max(a, b) - Math.min(a, b);
+    const q = plus
+      ? '창고에 도토리가 ' + a + '개. ' + b + '개를 더 모았다. 모두 몇 개?'
+      : '창고에 도토리가 ' + Math.max(a,b) + '개. ' + Math.min(a,b) + '개를 먹었다. 몇 개 남았나?';
+    return { q: q, art: acornField(Math.min(plus ? a : Math.max(a,b), 12), hashStr('calc|' + a + b)), opts: choicesAround(r, ans, 4, 0), ans: ans };
+  },
+  // 부대 편성
+  function (r, m) {
+    const sq = ri(r, 2, 5), per = ri(r, 3, 8), ans = sq * per;
+    return {
+      q: '부대 ' + sq + '개, 한 부대에 다람쥐 ' + per + '마리. 모두 몇 마리?',
+      art: '<rect width="640" height="340" fill="#12161b"/>' +
+        Array.from({length: sq}, (_, i) =>
+          Array.from({length: per}, (_, j) =>
+            squirrel(50 + j * 70, 40 + i * 70, 1.2, {helmet:1})).join('')).join(''),
+      opts: choicesAround(r, ans, 5, 1), ans: ans
+    };
+  },
+  // 브리핑 기억
+  function (r, m) {
+    const ans = Math.abs(m.floor);
+    return {
+      q: '오늘 작전은 지하 몇 층인가? (브리핑을 떠올려라)',
+      art: '<rect width="640" height="340" fill="#12161b"/>' +
+        '<text x="320" y="150" text-anchor="middle" class="mono" font-size="34" fill="#5fd08a">FLOOR ?</text>' +
+        '<text x="320" y="196" text-anchor="middle" class="mono" font-size="15" fill="#8aa0b4">SECTOR ' + m.sector + '</text>' +
+        squirrel(280, 210, 1.8, {cap:1}),
+      opts: choicesAround(r, ans, 6, 1), ans: ans, prefix: '-'
+    };
+  }
+];
+function buildQuiz(m) {
+  const r = rng(hashStr('quiz|' + m.key + '|' + (state.attempt || 0) + '|' + Math.floor(Math.random() * 1e9)));
+  const kinds = QUIZ_KINDS.slice();
+  const out = [];
+  while (out.length < QUIZ_N && kinds.length) out.push(kinds.splice(Math.floor(r() * kinds.length), 1)[0](r, m));
+  return out;
+}
+function startQuiz() {
+  state.attempt = (state.attempt || 0) + 1;
+  state.quiz = buildQuiz(state.mission);
+  state.qi = 0; state.qmsg = ''; state.qok = false;
+  renderQuiz();
+}
+function renderQuiz() {
+  const q = state.quiz[state.qi];
+  const dots = state.quiz.map((_, i) =>
+    '<i class="' + (i < state.qi ? 'on' : '') + '">' + (i < state.qi ? '✓' : (i === state.qi ? '?' : '')) + '</i>').join('');
+  app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
+    '<span class="badge mono">CLASSIFIED</span>' +
+    '<h1 class="mono">임무 자격 심사</h1>' +
+    '<p class="sub mono">' + QUIZ_N + '문제를 맞혀야 작전이 개시된다 — ' + (state.qi + 1) + ' / ' + QUIZ_N + '</p>' +
+    '<div class="screen"><svg viewBox="0 0 640 340">' + q.art + '</svg><div class="scan"></div></div>' +
+    '<div class="cap mono">' + q.q + '</div>' +
+    '<div class="pin">' + dots + '</div>' +
+    '<div class="err mono" style="color:' + (state.qok ? '#5fd08a' : '#ff6a5a') + '">' + state.qmsg + '</div>' +
+    '<div class="pad" style="grid-template-columns:repeat(2,1fr)">' +
+      q.opts.map(o => '<button class="tapbtn mono" data-a="' + o + '">' + (q.prefix || '') + o + '</button>').join('') +
+    '</div>' +
+    '<div class="row" style="justify-content:center;margin-top:14px">' +
+      '<button class="tapbtn mono" id="brief2">▣ 브리핑으로</button>' +
+      '<button class="tapbtn mono" id="mute">' + muteLabel() + '</button>' +
+    '</div>' +
+  '</div>';
+  app.querySelectorAll('.pad button').forEach(b => b.onclick = () => answer(Number(b.dataset.a)));
+  document.getElementById('brief2').onclick = () => { state.quiz = null; renderBrief(); };
+  document.getElementById('mute').onclick = () => { toggleMute(); renderQuiz(); };
+}
+function answer(v) {
+  const q = state.quiz[state.qi];
+  const r = rng(hashStr('msg' + v + state.qi + Date.now()));
+  if (v !== q.ans) {
+    state.qok = false; state.qmsg = pick(r, SCOLD);
+    sfx('wrong'); speak(state.qmsg); renderQuiz(); return;
+  }
+  sfx('unlock');
+  if (state.qi < state.quiz.length - 1) {
+    state.qi++; state.qok = true; state.qmsg = pick(r, PRAISE); speak(state.qmsg); renderQuiz(); return;
+  }
+  state.quiz = null; sfx('go');
+  speak('All three correct. Very good indeed. M.S.G., you are cleared for the mission.');
+  state.started = true; state.i = 0; state.cued = -1; play();
+}
+
 function renderBrief() {
   const m = state.mission;
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
@@ -410,6 +578,7 @@ function renderBrief() {
       '<p>적 <b style="color:#ff6a5a">' + m.threat.n + '</b> — ' + m.threat.d + '</p>' +
       '<p>부대 <b style="color:#cfe6d9">' + m.squadA + ' / ' + m.squadB + '</b> · 무장 <b style="color:#cfe6d9">' + m.weapon + '</b></p>' +
       '<button class="go tapbtn mono" id="go"><small>공군 하람쥐 대장3</small>임무 시작! 🚀</button>' +
+      '<p style="margin-top:10px;text-align:center">먼저 자격 심사 ' + QUIZ_N + '문제를 통과해야 한다.</p>' +
     '</div>' +
     '<div class="row">' +
       '<button class="tapbtn mono" id="full">' + fsLabel() + '</button>' +
@@ -417,7 +586,7 @@ function renderBrief() {
       '<button class="tapbtn mono" id="arch">▤ ARCHIVE</button>' +
     '</div>' +
   '</div>';
-  document.getElementById('go').onclick = () => { sfx('go'); state.started = true; state.i = 0; state.cued = -1; play(); };
+  document.getElementById('go').onclick = () => { sfx('key'); startQuiz(); };
   document.getElementById('full').onclick = () => { toggleFull(); setTimeout(renderBrief, 120); };
   document.getElementById('mute').onclick = () => { toggleMute(); renderBrief(); };
   document.getElementById('arch').onclick = archive;
@@ -425,9 +594,14 @@ function renderBrief() {
 
 function render() {
   if (!unlocked()) return renderLock();
+  if (state.quiz) return renderQuiz();
   if (!state.started) return renderBrief();
   const m = state.mission, sh = shots(m), s = sh[state.i];
-  if (state.cued !== state.i) { state.cued = state.i; sfx(s.sfx); }
+  if (state.cued !== state.i) {
+    state.cued = state.i; hush(); sfx(s.sfx);
+    if (s.sfx === 'order') speak(m.orderSpoken);
+    if (s.sfx === 'stamp') speak('File sealed. Well done, trooper. Same time tomorrow.');
+  }
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span>' +
     '<h1 class="mono">M.S.G. FILES</h1>' +
@@ -477,7 +651,7 @@ function tick() {
     state.i++; render(); tick();
   }, sh[state.i].ms);
 }
-function pause() { state.playing = false; clearTimeout(state.timer); render(); }
+function pause() { hush(); state.playing = false; clearTimeout(state.timer); render(); }
 
 function loadLog() { try { return JSON.parse(localStorage.getItem(K_STORE)) || []; } catch (e) { return []; } }
 function remember() {
