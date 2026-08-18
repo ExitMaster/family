@@ -39,7 +39,7 @@ const K_UNLOCK = 'family-msg-unlocked';
 // 코드마다 누구로 들어왔는지가 다르다.
 const PINS = {
   '1706': { who: '대장3', label: '공군 하람쥐 대장3', mode: 'main' },
-  '6767': { who: '주니어', label: '하람쥐 주니어 대원', mode: 'jr' }
+  '203':  { who: '주니어', label: '하람쥐 주니어 대원', mode: 'jr' }
 };
 const K_WHO = 'family-msg-who';
 
@@ -735,7 +735,7 @@ function renderLock() {
     '<h1 class="mono">M.S.G. FILES</h1>' +
     '<p class="sub mono">ACCESS CODE REQUIRED — 접근 코드를 입력하세요</p>' +
     '<div class="brief mono"><h2>🔒 기밀 파일</h2>' +
-      '<p>M.S.G. 대원만 열 수 있습니다. 네 자리 코드를 입력하세요.<br>대장 코드와 주니어 코드가 따로 있다.</p>' +
+      '<p>M.S.G. 대원만 열 수 있습니다. 코드를 입력하세요.<br>대장 코드와 주니어 코드가 따로 있다.</p>' +
       '<div class="pin">' + dots + '</div>' +
       '<div class="err mono">' + (state.pinErr ? '코드가 틀렸습니다. 다시.' : '') + '</div>' +
       '<div class="pad">' + keys.map(k => '<button class="tapbtn mono" data-k="' + k + '">' + k + '</button>').join('') + '</div>' +
@@ -748,7 +748,7 @@ function key(k) {
   if (k === '←') state.pin = state.pin.slice(0, -1);
   else if (k === '✓') return submitPin();
   else if (state.pin.length < 4) state.pin += k;
-  if (state.pin.length === 4) return submitPin();
+  if (PINS[state.pin] || state.pin.length === 4) return submitPin();
   renderLock();
 }
 function submitPin() {
