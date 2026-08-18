@@ -426,6 +426,28 @@ GRAV 26   JUMP_V 9.6   RUN 7.2   ->  jump is 1.77 high, 0.74s long, ~5.3 far
 AIR_JUMPS 1   DBL_JUMP 0.85      ->  with the second jump, roughly 3.0 high and 9 far
 ```
 
+### SPEED_MUL — read this before touching it
+
+`SPEED_MUL` multiplies `RUN`, and `ACC` / `AIR_ACC` / `FRIC` with it so that getting
+going and stopping still *feel* the same. It is currently **4**, at the player's
+request, and that number is far outside what the courses were built for.
+
+What it does, measured with the bot on the doubled-length courses:
+
+| SPEED_MUL | Angel | Normal | Devil | Nightmare |
+|---|---|---|---|---|
+| 1 | **won**, 102s | **won**, 129s | **won**, 169s | walked 100% |
+| 4 | 15% | 14% | 19% | 2% |
+
+The reason is not the running, it is the jumping. A jump lasts 0.74s no matter how
+fast you are going, so at 4× it carries you about **21 units** instead of 5.3, while
+`MAXGAP` is 4.2 and platforms are 4 to 6 deep. You do not clear gaps — you sail past
+the platform on the other side of them. Ice is the exception (it stays winnable),
+because its courses are wide and forgiving by design.
+
+If the levels need to be playable again, `SPEED_MUL = 1` restores exactly the tuning
+every chunk was verified against. Anything above about 1.5 starts costing levels.
+
 The chunks were all tuned around the **single** jump, so the double jump is pure
 slack: every gap becomes clearable with room to spare. That is why it costs 150 aura
 in the shop instead of being free — the levels play at their designed difficulty
