@@ -1,4 +1,4 @@
-const CACHE = 'dalkkung-firebase-v2';
+const CACHE = 'kkoongs-firebase-v3';
 const ASSETS = ['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/icon.svg','./assets/hero-family.svg','./runtime/app-part1.js','./runtime/app-part2.js','./runtime/app-part3.js','./runtime/app-part4.js'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))));
 self.addEventListener('activate', e => e.waitUntil(Promise.all([
