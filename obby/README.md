@@ -38,7 +38,28 @@ sections, so dying sends you back a little, not to the start.
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
-| 💀 **Nightmare** | Blinking platforms, crossfire, everything else at once — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
+| 💀 **Nightmare** | **Every level above, pressed together** — a slice of Angel, then Normal, then Devil, then Ice, then Space, then the nightmare itself — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
+
+#### Nightmare is a gauntlet
+
+It is not a course of its own. `LEVELS.nightmare` carries a `gauntlet` list instead
+of a `chunks` count, and `buildCourse` walks it section by section: 4 chunks of
+Angel, 4 of Normal, 5 of Devil, 4 of Ice, 4 of Space, 6 of Nightmare — 27 chunks and
+about 713 units, roughly twice any other level.
+
+Each section keeps **everything** about the level it came from: its chunk pool, its
+difficulty, its colours (the builder reads `W.pal` as it goes, so each section bakes
+its own), its song, and its physics. `W.zones` records the z range of each one and
+`updateZone` hands the right `slip` and `gravity` to `stepPlayer` as you cross, so
+the floor really does turn slippery when you enter the ice and the gravity really
+does drop when you enter space. A banner names each section as you arrive.
+
+Every section is separated by a **wide flat deck with a checkpoint on it**. That is
+not decoration: the physics change at that line, and landing a jump into gravity you
+could not have planned for is not a fair death.
+
+An ordinary level is simply a gauntlet of one section, so it runs the same code and
+behaves exactly as it always did.
 
 **Nightmare looks like a troll level, and that is deliberate.** Its portal hangs
 **70 units up in the sky** and never moves. You reach the end, look up, and there it
@@ -47,10 +68,13 @@ is — visible, and apparently out of reach. `troll:true` puts the goal in the s
 
 #### The secret — do not sign-post this
 
-**Standing on the last deck, the jetpack stops burning fuel.** That is the only way
-anyone reaches the portal: buy the Aura Wings, walk to the end, and hold jump. See
-`endlessFuel` in `stepPlayer` — it is on when `troll` is set and you are within 12 of
-the goal's z.
+**The jetpack only works on the last deck, under the portal.** Nowhere else — not in
+any other level, and not during the gauntlet either. All 27 chunks have to be run on
+foot. Reach the end, hold jump, and the wings finally start, with nothing to run out
+of. See `atEnd` in `stepPlayer`: `troll` is set and you are within 12 of the goal's z.
+
+There is no fuel any more. Where the wings work they work forever, and where they do
+not they do nothing, so there is nothing left for a gauge to say — it is gone.
 
 Once you are climbing there, **steering is switched off** — you only go up. The climb
 also eases you onto the portal's x/z. That is not decoration: without it you could
@@ -62,15 +86,16 @@ Nothing in the game hints at it. The blurb still says nobody has finished it, th
 gatekeeper still says nobody gets past him, and there is no marker in the sky. Keep
 it that way.
 
-Everywhere else the tank is the normal 2.8 seconds, so the level stays impossible for
-anyone who has not bought the wings and thought to fly:
+Everywhere else holding jump does nothing at all, so the level stays impossible for
+anyone who has not bought the wings, walked the whole gauntlet, and thought to fly:
 
-| | Highest reached | Wins |
+| | Rise above the deck | Wins |
 |---|---|---|
-| Wings, on the last deck | **66** | **yes** |
-| Wings, at the start of Nightmare | 28.1 | no |
-| Wings, any normal level | 28.1 | no |
-| No wings, on the last deck | 2.9 | no |
+| Wings, on the last deck | **64.8** | **yes** |
+| Wings, at the start of Nightmare | 1.7 — just a jump | no |
+| Wings, halfway through the gauntlet | 1.7 | no |
+| Wings, in Angel or Devil | 1.7 | no |
+| No wings, on the last deck | 1.7 | no |
 
 If someone reports "the last level is broken" and has not bought the wings, this is
 why.
@@ -222,20 +247,18 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack — **but only inside Nightmare**. Dead weight in every other level |
+| 🪽 **Aura Wings** | 500 | A jetpack — **but only at the very end of Nightmare**. Dead weight everywhere else, the whole gauntlet included |
 
-**The wings only work in the Nightmare Level.** `canFly` in `stepPlayer` requires
-`W.troll`; anywhere else, holding jump in mid-air does nothing at all. The fuel gauge
-is hidden outside that level too — a gauge where the wings are inert would be a
-puzzle with no answer.
+**The wings only work on the last deck of the Nightmare Level.** `canFly` in
+`stepPlayer` requires `atEnd`; anywhere else — including every step of the gauntlet —
+holding jump in mid-air does nothing at all.
 
 That restriction is the design, not a limitation. Flight skips straight over any
 course, so letting it work everywhere would quietly delete every level in the game.
 Confined to one level it stops being a cheat and becomes a key.
 
-Inside Nightmare it is a real jetpack: **9 a second upward**, **1.5× running speed
-forward**, sharper air steering, on a **2.8 second tank** that refills when you land.
-The wings flare white under thrust.
+On that deck it is a real jetpack: **9 a second upward**, **1.5× running speed
+forward**, sharper air steering, and no limit. The wings flare white under thrust.
 
 The shop description is deliberately vague — *"They only stir in one place, and it is
 not down here."* It explains why nothing happens in a normal level without giving
@@ -343,6 +366,20 @@ checks below afterwards.
 Watch the **diagonal** ones especially. A zigzag hop costs
 `sqrt(gap² + (2 × sideways offset)²)`, not just the gap — that is how the hardest
 zigzag once ended up needing 5.4 units of a 5.3 unit jump.
+
+Watch the **timed** ones too, in the same way. `ch_blinkRun` is four blinking slabs
+4.5 apart over lava, and at full speed you cross one every **0.64s**. Its phase step
+decides everything:
+
+| Phase step | Effect | Crossings out of 36 start times |
+|---|---|---|
+| `+0.9` per slab | the lit window travels backwards past you | **0** — impossible from every phase, walking or waiting |
+| `-0.3` per slab | the window drifts with you, 0.34s of slack lost per slab | **9** — a real 0.9s window to enter on |
+
+It shipped at `+0.9` for a long time and nobody noticed, because the jetpack used to
+fly over it and the bot was assumed to be at fault. Once the jetpack was locked to
+the very end of Nightmare that chunk became the only way through, and it turned out
+not to be a way at all. **A timing chunk needs its window measured, not eyeballed.**
 
 ## When something breaks
 
