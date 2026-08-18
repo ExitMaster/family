@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Sound Orb (3D)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#05060f; overscroll-behavior:none; }
+body { font-family:'Noto Sans',system-ui,sans-serif; color:#eaf0ff; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+#gl { display:block; width:100%; height:100%; }
+
+/* ── Top toolbar (fades out after a few seconds; touch the screen to bring it back) ── */
+#ui {
+  position:fixed; left:0; right:0; top:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+  background:linear-gradient(180deg, rgba(5,6,15,.72), rgba(5,6,15,0));
+  transition:opacity .45s ease, transform .45s ease; z-index:5;
+}
+#ui.hide { opacity:0; transform:translateY(-14px); pointer-events:none; }
+.btn {
+  font-family:inherit; font-size:15px; font-weight:700; color:#eaf0ff;
+  background:rgba(255,255,255,.10); border:2px solid rgba(255,255,255,.22);
+  border-radius:999px; padding:8px 15px; cursor:pointer; backdrop-filter:blur(6px);
+  white-space:nowrap; line-height:1;
+}
+.btn:active { transform:translateY(2px); }
+.btn.on { background:rgba(255,255,255,.92); color:#101425; border-color:#fff; }
+.btn.sm { font-size:14px; padding:7px 12px; }
+#themes { display:flex; gap:6px; }
+.swatch {
+  width:30px; height:30px; border-radius:50%; border:2px solid rgba(255,255,255,.35);
+  cursor:pointer; padding:0; background-clip:padding-box;
+}
+.swatch.on { border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.28); }
+#sens { width:92px; accent-color:#8ad6ff; }
+.lbl { font-size:12.5px; opacity:.75; letter-spacing:.5px; }
+
+/* ── Start screen ── */
+#start {
+  position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; text-align:center; padding:24px; z-index:10;
+  background:radial-gradient(circle at 50% 45%, rgba(60,90,200,.30), rgba(5,6,15,.92) 62%);
+}
+#start.hidden { display:none; }
+#start h1 { font-family:'Gaegu',cursive; font-size:clamp(38px,10vw,68px); margin:0; line-height:1;
+  text-shadow:0 0 26px rgba(120,170,255,.75); }
+#start p { margin:0; font-size:clamp(13px,3.2vw,16px); line-height:1.7; opacity:.85; max-width:440px; }
+.big {
+  font-family:'Gaegu',cursive; font-size:30px; font-weight:700; color:#101425;
+  background:linear-gradient(180deg,#fff,#cfe4ff); border:none; border-radius:999px;
+  padding:14px 40px; cursor:pointer; box-shadow:0 10px 34px rgba(120,170,255,.5);
+}
+.big:active { transform:translateY(3px); }
+.row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+#err {
+  max-width:460px; font-size:14px; line-height:1.65; background:rgba(255,90,110,.14);
+  border:2px solid rgba(255,90,110,.5); border-radius:14px; padding:12px 16px; display:none;
+}
+#err.show { display:block; }
+
+/* ── Loudness bar at the bottom ── */
+#meter {
+  position:fixed; left:50%; transform:translateX(-50%); bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  width:min(320px,70vw); height:8px; border-radius:999px; background:rgba(255,255,255,.13);
+  overflow:hidden; z-index:4; transition:opacity .45s ease;
+}
+#meter.hide { opacity:0; }
+#meterFill { height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg,#5ce1c6,#8ad6ff,#c39bff,#ff8ab0); transition:width .06s linear; }
+#hint {
+  position:fixed; left:0; right:0; bottom:calc(42px + env(safe-area-inset-bottom,0px)); text-align:center;
+  font-family:'Gaegu',cursive; font-size:24px; opacity:.0; z-index:4; transition:opacity .6s ease; pointer-events:none;
+  text-shadow:0 0 18px rgba(0,0,0,.8);
+}
+#hint.show { opacity:.85; }
+
+/* ── Done mode: every control disappears, leaving only a small corner button ── */
+#back {
+  position:fixed; top:calc(10px + env(safe-area-inset-top,0px)); right:12px; z-index:6;
+  width:38px; height:38px; border-radius:50%; display:none; align-items:center; justify-content:center;
+  font-size:17px; color:#eaf0ff; background:rgba(255,255,255,.07);
+  border:2px solid rgba(255,255,255,.16); cursor:pointer; opacity:.28; transition:opacity .3s ease;
+}
+#back.show { display:flex; }
+#back:hover, #back:active { opacity:1; }
+audio { display:none; }
+</style>
+</head>
+<body class="notranslate">
+
+<canvas id="gl"></canvas>
+
+<div id="ui" class="hide">
+  <button class="btn" id="mMic">🎤 Mic</button>
+  <button class="btn" id="mFile">🎵 Music</button>
+  <button class="btn" id="mDemo">🎹 Demo</button>
+  <input id="sens" type="range" min="0.3" max="3" step="0.05" value="1" title="Sensitivity">
+  <div id="themes"></div>
+  <button class="btn sm" id="bNet">🕸️</button>
+  <button class="btn sm" id="bFull">⛶</button>
+  <button class="btn sm" id="bDone">✅ Done!</button>
+</div>
+
+<button id="back" title="Show the controls again">⚙️</button>
+
+<div id="meter" class="hide"><div id="meterFill"></div></div>
+<div id="hint"></div>
+
+<div id="start">
+  <h1>🔮 Sound Orb</h1>
+  <p>Make a sound and the orb swells, wobbles and shifts colour.<br>Low notes make it billow; high notes make it spike.</p>
+  <button class="big" id="goMic">🎤 Start with the mic</button>
+  <div class="row">
+    <button class="btn" id="goFile">🎵 Play a music file</button>
+    <button class="btn" id="goDemo">🎹 Watch the demo sound</button>
+  </div>
+  <div id="err"></div>
+</div>
+
+<input id="file" type="file" accept="audio/*" style="display:none">
+<audio id="player" crossorigin="anonymous" loop></audio>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════════════════
+//  Sound Orb (3D) — drawn straight in WebGL, no libraries.
+//    Analyse the mic (or music) with an FFT → get bass/mid/treble energy,
+//    then push the sphere's vertices out with noise to deform it live.
+// ══════════════════════════════════════════════════════════════════════
+
+const K_STORE = 'orb-v1';
+
+// ── Themes (three orb colours + a background colour) ─────────────────
+//  a: base colour, b: colour of raised areas, c: rim (Fresnel) light, bg: background gradient
+const THEMES = [
+  { id:'aurora', name:'Aurora', a:[0.09,0.35,0.55], b:[0.25,0.95,0.78], c:[0.55,0.80,1.00], bg:[0.02,0.05,0.11] },
+  { id:'lava',   name:'Lava',   a:[0.35,0.05,0.05], b:[1.00,0.62,0.10], c:[1.00,0.35,0.20], bg:[0.09,0.02,0.02] },
+  { id:'candy',  name:'Candy', a:[0.45,0.20,0.55], b:[1.00,0.62,0.85], c:[0.70,0.90,1.00], bg:[0.07,0.03,0.10] },
+  { id:'deep',   name:'Deep',   a:[0.03,0.12,0.30], b:[0.20,0.55,1.00], c:[0.35,1.00,0.95], bg:[0.01,0.03,0.09] },
+  { id:'gold',   name:'Gold',   a:[0.30,0.20,0.02], b:[1.00,0.86,0.35], c:[1.00,0.95,0.65], bg:[0.06,0.05,0.02] }
+];
+
+// ── Settings (localStorage) ──────────────────────────────────────────
+const DEFAULTS = { theme:'aurora', sens:1, net:true };
+let CFG = (() => {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(K_STORE) || '{}') }; }
+  catch (e) { return { ...DEFAULTS }; }
+})();
+const saveCfg = () => { try { localStorage.setItem(K_STORE, JSON.stringify(CFG)); } catch (e) {} };
+const theme = () => THEMES.find(t => t.id === CFG.theme) || THEMES[0];
+
+// ══════════════════════════════════════════════════════════════════════
+//  1. Tiny matrix helpers (column-major 4x4 — the WebGL convention)
+// ══════════════════════════════════════════════════════════════════════
+function mIdent() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+function mMul(a, b) {                       // a * b
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    o[c*4+r] = a[r]*b[c*4] + a[4+r]*b[c*4+1] + a[8+r]*b[c*4+2] + a[12+r]*b[c*4+3];
+  }
+  return o;
+}
+function mPerspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+}
+function mLookAt(eye, at, up) {
+  const z = vNorm([eye[0]-at[0], eye[1]-at[1], eye[2]-at[2]]);
+  const x = vNorm(vCross(up, z));
+  const y = vCross(z, x);
+  return new Float32Array([
+    x[0],y[0],z[0],0,
+    x[1],y[1],z[1],0,
+    x[2],y[2],z[2],0,
+    -(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),
+    -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),
+    -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]), 1
+  ]);
+}
+function mRotY(t) { const c=Math.cos(t), s=Math.sin(t);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]); }
+function mRotX(t) { const c=Math.cos(t), s=Math.sin(t);
+  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); }
+function vCross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function vNorm(a){ const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l]; }
+
+// ══════════════════════════════════════════════════════════════════════
+//  2. A sphere made by subdividing an icosahedron (icosphere)
+//     Its triangles are evenly spread, so it distorts less than a UV sphere.
+// ══════════════════════════════════════════════════════════════════════
+function icosphere(sub) {
+  const t = (1 + Math.sqrt(5)) / 2;
+  let verts = [
+    [-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],
+    [0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],
+    [t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]
+  ].map(vNorm);
+  let faces = [
+    [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+    [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+    [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+    [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]
+  ];
+  const cache = new Map();
+  const mid = (a, b) => {                          // midpoint of two vertices, lifted onto the sphere (deduped)
+    const key = a < b ? a + ',' + b : b + ',' + a;
+    if (cache.has(key)) return cache.get(key);
+    const p = vNorm([(verts[a][0]+verts[b][0])/2, (verts[a][1]+verts[b][1])/2, (verts[a][2]+verts[b][2])/2]);
+    verts.push(p); cache.set(key, verts.length - 1); return verts.length - 1;
+  };
+  for (let i = 0; i < sub; i++) {
+    const next = [];
+    for (const [a,b,c] of faces) {
+      const ab = mid(a,b), bc = mid(b,c), ca = mid(c,a);
+      next.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]);
+    }
+    faces = next;
+  }
+  const pos = new Float32Array(verts.length * 3);
+  verts.forEach((v, i) => { pos[i*3]=v[0]; pos[i*3+1]=v[1]; pos[i*3+2]=v[2]; });
+  const idx = new Uint16Array(faces.length * 3);
+  faces.forEach((f, i) => { idx[i*3]=f[0]; idx[i*3+1]=f[1]; idx[i*3+2]=f[2]; });
+
+  // For the wireframe net — collect triangle edges without duplicates
+  const seen = new Set(), edges = [];
+  for (const [a,b,c] of faces) for (const [p,q] of [[a,b],[b,c],[c,a]]) {
+    const k = p < q ? p+','+q : q+','+p;
+    if (!seen.has(k)) { seen.add(k); edges.push(p, q); }
+  }
+  return { pos, idx, edges:new Uint16Array(edges), count:idx.length, edgeCount:edges.length };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  3. Shaders
+// ══════════════════════════════════════════════════════════════════════
+
+// 3D simplex noise (Ashima Arts, MIT) — the raw material for the bumps
+const SNOISE = `
+vec3 mod289(vec3 x){ return x - floor(x*(1.0/289.0))*289.0; }
+vec4 mod289(vec4 x){ return x - floor(x*(1.0/289.0))*289.0; }
+vec4 permute(vec4 x){ return mod289(((x*34.0)+1.0)*x); }
+vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314*r; }
+float snoise(vec3 v){
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+  vec3 i  = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy;
+  vec3 x3 = x0 - D.yyy;
+  i = mod289(i);
+  vec4 p = permute(permute(permute(
+             i.z + vec4(0.0, i1.z, i2.z, 1.0))
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+           + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  float n_ = 0.142857142857;
+  vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ *ns.x + ns.yyyy;
+  vec4 y = y_ *ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}`;
+
+// ── The orb itself ───────────────────────────────────────────────────
+//  disp(n): how far the surface bulges out along direction n.
+//    bass → big slow swells / mid → medium ridges / treble → fine fast spikes
+//  Normals come from two real neighbour samples crossed together (finite differences).
+const ORB_VS = SNOISE + `
+attribute vec3 aPos;
+uniform mat4 uProj, uView, uModel;
+uniform float uTime, uBass, uMid, uTre, uLevel, uBeat, uScale;
+varying vec3 vN, vW;
+varying float vD;
+
+float disp(vec3 n){
+  float t = uTime;
+  float d = 0.0;
+  d += snoise(n*1.5 + vec3(0.0, 0.0, t*0.46)) * (0.045 + uBass*0.30);
+  d += snoise(n*3.4 + vec3(t*0.72, 0.0, 0.0)) * (0.022 + uMid *0.15);
+  d += snoise(n*9.0 + vec3(0.0, t*2.00, 0.0)) * (0.008 + uTre *0.085);
+  return d;
+}
+float radiusAt(float d){ return (1.0 + d + uLevel*0.11 + uBeat*0.09) * uScale; }
+vec3 place(vec3 n){ return n * radiusAt(disp(n)); }
+
+void main(){
+  vec3 n = normalize(aPos);
+  vec3 up = abs(n.y) < 0.99 ? vec3(0.0,1.0,0.0) : vec3(1.0,0.0,0.0);
+  vec3 tx = normalize(cross(up, n));
+  vec3 ty = cross(n, tx);
+  float e = 0.03;
+  float d0 = disp(n);
+  vec3 p  = n * radiusAt(d0);
+  vec3 pa = place(normalize(n + tx*e));
+  vec3 pb = place(normalize(n + ty*e));
+  vec3 nrm = normalize(cross(pa - p, pb - p));
+  if (dot(nrm, n) < 0.0) nrm = -nrm;
+
+  vD = d0;
+  vec4 world = uModel * vec4(p, 1.0);
+  vW = world.xyz;
+  vN = normalize((uModel * vec4(nrm, 0.0)).xyz);
+  gl_Position = uProj * uView * world;
+}`;
+
+const ORB_FS = `
+precision highp float;
+uniform vec3 uColA, uColB, uColC, uCam;
+uniform float uLevel, uTre, uBeat, uAlpha;
+varying vec3 vN, vW;
+varying float vD;
+void main(){
+  vec3 V = normalize(uCam - vW);
+  float fres = pow(1.0 - clamp(dot(vN, V), 0.0, 1.0), 2.6);
+  vec3 L = normalize(vec3(0.45, 0.75, 0.55));
+  float lam = max(dot(vN, L), 0.0);
+  float spec = pow(max(dot(reflect(-L, vN), V), 0.0), 26.0);
+
+  vec3 base = mix(uColA, uColB, clamp(vD*2.6 + 0.45, 0.0, 1.0));
+  vec3 col  = base * (0.30 + 0.80*lam);
+  col += uColC * fres * (0.55 + uLevel*1.9 + uBeat*0.8);   // rim light — flares up as the sound gets louder
+  col += vec3(1.0) * spec * (0.35 + uTre*1.4);
+  col += vec3(1.0) * pow(fres, 7.0) * (uTre*1.1 + uBeat*0.5);
+  gl_FragColor = vec4(col, uAlpha);
+}`;
+
+// ── The net around the orb (same displacement, drawn as lines only) ──
+const NET_FS = `
+precision highp float;
+uniform vec3 uColC;
+uniform float uLevel, uBeat, uAlpha;
+varying vec3 vN, vW;
+varying float vD;
+void main(){
+  float g = 0.30 + uLevel*1.5 + uBeat*0.9 + max(vD,0.0)*1.2;
+  gl_FragColor = vec4(uColC * g, uAlpha);
+}`;
+
+// ── Background (stars + a soft gradient) ─────────────────────────────
+const QUAD_VS = `
+attribute vec2 aXY;
+varying vec2 vUV;
+void main(){ vUV = aXY; gl_Position = vec4(aXY, 0.0, 1.0); }`;
+
+const BG_FS = `
+precision highp float;
+uniform vec2 uRes;
+uniform vec3 uBg, uColC;
+uniform float uTime, uBass, uTre;
+varying vec2 vUV;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(41.7, 289.3))) * 43758.5453); }
+void main(){
+  vec2 q = vUV; q.x *= uRes.x / uRes.y;
+  float d = length(q);
+  vec3 col = uBg + uColC * (0.055 + uBass*0.16) * exp(-d*1.5);   // the background swells slightly with the bass
+  col *= 1.0 - 0.35*smoothstep(0.5, 1.5, d);                     // darken the edges (vignette)
+  // Stars: one per cell of a screen grid, twinkling with the treble
+  vec2 g = floor(vUV * uRes / 26.0);
+  float h = hash(g);
+  if (h > 0.972) {
+    vec2 c = (floor(vUV*uRes/26.0) + 0.5) * 26.0 / uRes;
+    float s = smoothstep(0.010, 0.0, length((vUV - c) * vec2(uRes.x/uRes.y, 1.0)));
+    col += vec3(0.75, 0.85, 1.0) * s * (0.35 + 0.65*abs(sin(uTime*1.7 + h*40.0))) * (0.6 + uTre*1.4);
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+// ── Halo of light layered behind the orb ─────────────────────────────
+const GLOW_FS = `
+precision highp float;
+uniform vec2 uRes;
+uniform vec3 uColC;
+uniform float uLevel, uBeat;
+varying vec2 vUV;
+void main(){
+  vec2 q = vUV; q.x *= uRes.x / uRes.y;
+  float d = length(q);
+  float r = 0.62 + uLevel*0.45 + uBeat*0.30;
+  float g = pow(max(1.0 - d/r, 0.0), 3.0) * (0.30 + uLevel*0.95 + uBeat*0.7);
+  gl_FragColor = vec4(uColC * g, 1.0);
+}`;
+
+// ── Light motes orbiting the orb ─────────────────────────────────────
+const DOT_VS = `
+attribute vec3 aDir;
+attribute vec2 aSeed;                       // x: extra radius, y: wobble speed
+uniform mat4 uProj, uView, uModel;
+uniform float uTime, uLevel, uShock, uRes;
+varying float vA;
+void main(){
+  float r = 1.45 + aSeed.x*1.15 + uLevel*0.55 + uShock*1.30
+          + sin(uTime*aSeed.y + aSeed.x*37.0) * 0.07;
+  vec4 world = uModel * vec4(aDir * r, 1.0);
+  vec4 eye = uView * world;
+  gl_Position = uProj * eye;
+  gl_PointSize = clamp(uRes * (0.9 + uShock*2.2) / max(-eye.z, 0.2), 1.0, 22.0);
+  vA = (0.30 + uLevel*0.8 + uShock*0.9) * (0.45 + 0.55*aSeed.x);
+}`;
+
+const DOT_FS = `
+precision highp float;
+uniform vec3 uColC;
+varying float vA;
+void main(){
+  float d = length(gl_PointCoord - 0.5);
+  if (d > 0.5) discard;
+  float f = pow(1.0 - d*2.0, 2.0);
+  gl_FragColor = vec4(uColC * f * vA, 1.0);
+}`;
+
+// ══════════════════════════════════════════════════════════════════════
+//  4. WebGL setup
+// ══════════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { alpha:false, antialias:true, depth:true, powerPreference:'high-performance' })
+        || canvas.getContext('experimental-webgl');
+if (!gl) {
+  document.getElementById('err').className = 'show';
+  document.getElementById('err').textContent = 'This browser cannot do 3D (WebGL). Please try another browser.';
+}
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + '\n' + src);
+  return s;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  // Look up uniform/attribute locations once up front
+  p.u = {}; p.a = {};
+  const nu = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < nu; i++) { const n = gl.getActiveUniform(p, i).name; p.u[n] = gl.getUniformLocation(p, n); }
+  const na = gl.getProgramParameter(p, gl.ACTIVE_ATTRIBUTES);
+  for (let i = 0; i < na; i++) { const n = gl.getActiveAttrib(p, i).name; p.a[n] = gl.getAttribLocation(p, n); }
+  return p;
+}
+function buffer(target, data) {
+  const b = gl.createBuffer();
+  gl.bindBuffer(target, b); gl.bufferData(target, data, gl.STATIC_DRAW);
+  return b;
+}
+
+let PROG = {}, BUF = {}, MESH = {}, ready = false;
+try {
+  PROG.orb  = program(ORB_VS, ORB_FS);
+  PROG.net  = program(ORB_VS, NET_FS);
+  PROG.bg   = program(QUAD_VS, BG_FS);
+  PROG.glow = program(QUAD_VS, GLOW_FS);
+  PROG.dot  = program(DOT_VS, DOT_FS);
+
+  // Keep two bodies — a fine one (20,480 triangles) and a coarse one (5,120) —
+  // and switch to the coarse one automatically if frames start dropping.
+  MESH.hi = icosphere(5);
+  MESH.lo = icosphere(4);
+  MESH.net = icosphere(3);                    // net: 1,920 lines — sits right on the surface
+  BUF.hiPos = buffer(gl.ARRAY_BUFFER, MESH.hi.pos);
+  BUF.hiIdx = buffer(gl.ELEMENT_ARRAY_BUFFER, MESH.hi.idx);
+  BUF.loPos = buffer(gl.ARRAY_BUFFER, MESH.lo.pos);
+  BUF.loIdx = buffer(gl.ELEMENT_ARRAY_BUFFER, MESH.lo.idx);
+  BUF.netPos = buffer(gl.ARRAY_BUFFER, MESH.net.pos);
+  BUF.netIdx = buffer(gl.ELEMENT_ARRAY_BUFFER, MESH.net.edges);
+  BUF.quad    = buffer(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]));  // one big triangle covering the screen
+
+  const N_DOT = 900;
+  const dir = new Float32Array(N_DOT*3), seed = new Float32Array(N_DOT*2);
+  for (let i = 0; i < N_DOT; i++) {
+    const u = Math.random()*2 - 1, a = Math.random()*Math.PI*2, s = Math.sqrt(1 - u*u);
+    dir[i*3] = s*Math.cos(a); dir[i*3+1] = u; dir[i*3+2] = s*Math.sin(a);
+    seed[i*2] = Math.random(); seed[i*2+1] = 0.6 + Math.random()*2.4;
+  }
+  BUF.dotDir = buffer(gl.ARRAY_BUFFER, dir);
+  BUF.dotSeed = buffer(gl.ARRAY_BUFFER, seed);
+  MESH.dots = N_DOT;
+  ready = true;
+} catch (e) {
+  console.error(e);
+  const el = document.getElementById('err');
+  el.className = 'show'; el.textContent = 'Could not start 3D: ' + e.message;
+}
+
+let W = 1, H = 1, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, Math.round(canvas.clientWidth  * DPR));
+  H = Math.max(1, Math.round(canvas.clientHeight * DPR));
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+  gl.viewport(0, 0, W, H);
+}
+window.addEventListener('resize', resize);
+
+// ══════════════════════════════════════════════════════════════════════
+//  5. Sound analysis — boil the FFT bins down to bass/mid/treble
+// ══════════════════════════════════════════════════════════════════════
+const AU = {
+  ctx:null, analyser:null, node:null, stream:null, mode:null,
+  freq:null, bass:0, mid:0, tre:0, level:0, beat:0, shock:0, peak:0
+};
+const BANDS = { bass:[20,180], mid:[180,2000], tre:[2000,9000] };
+let bassHist = [], lastBeat = 0;
+
+function ensureCtx() {
+  if (!AU.ctx) {
+    AU.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    AU.analyser = AU.ctx.createAnalyser();
+    AU.analyser.fftSize = 2048;
+    AU.analyser.smoothingTimeConstant = 0.55;   // lower = reacts to sound faster
+    AU.analyser.minDecibels = -95;
+    AU.analyser.maxDecibels = -12;
+    AU.freq = new Uint8Array(AU.analyser.frequencyBinCount);
+  }
+  if (AU.ctx.state === 'suspended') AU.ctx.resume();
+  return AU.ctx;
+}
+function disconnectSource() {
+  if (AU.node) { try { AU.node.disconnect(); } catch (e) {} AU.node = null; }
+  if (AU.stream) { AU.stream.getTracks().forEach(t => t.stop()); AU.stream = null; }
+  if (DEMO.timer) { clearInterval(DEMO.timer); DEMO.timer = null; }
+  player.pause();
+}
+
+// frequency (Hz) → FFT bin index
+const binOf = hz => Math.round(hz / (AU.ctx.sampleRate / 2) * AU.analyser.frequencyBinCount);
+function bandLevel(lo, hi) {
+  const a = Math.max(0, binOf(lo)), b = Math.min(AU.freq.length - 1, binOf(hi));
+  let sum = 0;
+  for (let i = a; i <= b; i++) sum += AU.freq[i];
+  return (sum / Math.max(1, b - a + 1)) / 255;
+}
+
+// rise fast, fall slow — keeps the punch, kills the flicker
+const follow = (cur, target, up, down) => cur + (target - cur) * (target > cur ? up : down);
+
+function analyse(dt) {
+  if (!AU.analyser) return;
+  AU.analyser.getByteFrequencyData(AU.freq);
+  const s = CFG.sens;
+  const b = Math.min(1, bandLevel(...BANDS.bass) * 1.35 * s);
+  const m = Math.min(1, bandLevel(...BANDS.mid)  * 2.20 * s);
+  const t = Math.min(1, bandLevel(...BANDS.tre)  * 3.20 * s);
+
+  AU.bass  = follow(AU.bass,  b, 0.78, 0.17);
+  AU.mid   = follow(AU.mid,   m, 0.74, 0.16);
+  AU.tre   = follow(AU.tre,   t, 0.85, 0.22);
+  AU.level = follow(AU.level, Math.min(1, (b*0.55 + m*0.30 + t*0.15) * 1.25), 0.80, 0.14);
+  AU.peak  = Math.max(AU.peak * 0.985, AU.level);
+
+  // Beat: if the bass right now is well above its recent average, fire one
+  bassHist.push(b); if (bassHist.length > 43) bassHist.shift();
+  const avg = bassHist.reduce((x, y) => x + y, 0) / bassHist.length;
+  const now = performance.now();
+  if (b > 0.16 && b > avg * 1.38 && now - lastBeat > 150) { lastBeat = now; AU.beat = 1; AU.shock = 1; }
+  AU.beat  = Math.max(0, AU.beat  - dt * 4.6);
+  AU.shock = Math.max(0, AU.shock - dt * 2.1);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  6. Where the sound comes from — mic / music file / built-in demo synth
+// ══════════════════════════════════════════════════════════════════════
+const player = document.getElementById('player');
+const fileInput = document.getElementById('file');
+const errBox = document.getElementById('err');
+const startScreen = document.getElementById('start');
+const hintEl = document.getElementById('hint');
+
+function showErr(msg) { errBox.textContent = msg; errBox.className = 'show'; }
+function clearErr() { errBox.className = ''; }
+function hint(msg, ms = 2600) {
+  hintEl.textContent = msg; hintEl.className = 'show';
+  clearTimeout(hint._t); hint._t = setTimeout(() => { hintEl.className = ''; }, ms);
+}
+function begin(mode) {
+  AU.mode = mode;
+  startScreen.className = 'hidden';
+  clearErr(); resize(); wakeLock();
+  document.querySelectorAll('#ui .btn').forEach(b => b.classList.remove('on'));
+  ({ mic:mMic, file:mFile, demo:mDemo })[mode].classList.add('on');
+  poke();
+}
+
+async function startMic() {
+  ensureCtx();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showErr(location.protocol === 'file:'
+      ? 'The mic does not work when the file is opened directly. Open it at https://exitmaster.github.io/family/orb/ instead, or try “Music file” / “Demo” below.'
+      : 'This browser cannot use the mic. Try a music file or the demo instead.');
+    return;
+  }
+  try {
+    // Turning off auto gain / noise suppression makes the changes far more visible
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+    });
+    disconnectSource();
+    AU.stream = stream;
+    AU.node = AU.ctx.createMediaStreamSource(stream);
+    AU.node.connect(AU.analyser);          // never routed to the speakers (prevents feedback)
+    begin('mic');
+    hint('Make some noise! 🎤');
+  } catch (e) {
+    const m = e && e.name === 'NotAllowedError'
+      ? 'Mic access was blocked. Allow the microphone from the padlock in the address bar, then press again.'
+      : e && e.name === 'NotFoundError'
+      ? 'No microphone found. Try a music file or the demo instead.'
+      : 'Could not start the mic (' + (e && e.name || e) + ').';
+    showErr(m); startScreen.className = '';
+  }
+}
+
+function startFile() { ensureCtx(); fileInput.click(); }
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files && fileInput.files[0];
+  if (!f) return;
+  ensureCtx(); disconnectSource();
+  player.src = URL.createObjectURL(f);
+  if (!AU.fileNode) { AU.fileNode = AU.ctx.createMediaElementSource(player); }  // can only be created once per element
+  AU.fileNode.connect(AU.analyser);
+  AU.analyser.connect(AU.ctx.destination);
+  AU.node = AU.fileNode;
+  player.play().then(() => { begin('file'); hint('🎵 ' + f.name); })
+               .catch(() => showErr('That file could not be played. Want to try a different one?'));
+});
+
+// Demo: synthesise sound with Web Audio so no mic is needed (kick + arpeggio)
+const DEMO = { timer:null, step:0, gain:null };
+const SCALE = [220, 277.18, 329.63, 440, 554.37, 659.25, 880];
+function startDemo() {
+  ensureCtx(); disconnectSource();
+  const g = AU.ctx.createGain(); g.gain.value = 0.5;
+  g.connect(AU.analyser); AU.analyser.connect(AU.ctx.destination);
+  DEMO.gain = g; AU.node = g;
+  DEMO.step = 0;
+  const tick = () => {
+    const t = AU.ctx.currentTime, s = DEMO.step++;
+    if (s % 4 === 0) {                                   // kick (bass)
+      const o = AU.ctx.createOscillator(), e = AU.ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+      e.gain.setValueAtTime(1.0, t); e.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      o.connect(e); e.connect(g); o.start(t); o.stop(t + 0.3);
+    }
+    if (s % 2 === 1) {                                   // hat (treble)
+      const len = 2205, buf = AU.ctx.createBuffer(1, len, AU.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random()*2 - 1) * (1 - i/len);
+      const src = AU.ctx.createBufferSource(), e = AU.ctx.createGain();
+      src.buffer = buf; e.gain.value = 0.22;
+      src.connect(e); e.connect(g); src.start(t);
+    }
+    const o = AU.ctx.createOscillator(), e = AU.ctx.createGain();  // melody
+    o.type = s % 8 < 4 ? 'triangle' : 'sawtooth';
+    o.frequency.value = SCALE[(s * 3) % SCALE.length] * (s % 16 < 8 ? 1 : 1.5);
+    e.gain.setValueAtTime(0.0001, t);
+    e.gain.linearRampToValueAtTime(0.30, t + 0.02);
+    e.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+    o.connect(e); e.connect(g); o.start(t); o.stop(t + 0.36);
+  };
+  tick();
+  DEMO.timer = setInterval(tick, 250);
+  begin('demo');
+  hint('🎹 Running on the demo sound');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  7. On-screen controls
+// ══════════════════════════════════════════════════════════════════════
+const ui = document.getElementById('ui'), meter = document.getElementById('meter');
+const meterFill = document.getElementById('meterFill');
+const mMic = document.getElementById('mMic'), mFile = document.getElementById('mFile'), mDemo = document.getElementById('mDemo');
+const sens = document.getElementById('sens'), bNet = document.getElementById('bNet'), bFull = document.getElementById('bFull');
+
+const bDone = document.getElementById('bDone'), backBtn = document.getElementById('back');
+
+let clean = false;                                  // done mode: nothing on screen but the orb
+function setClean(on) {
+  clean = on;
+  ui.classList.toggle('hide', on);
+  meter.classList.toggle('hide', on);
+  backBtn.classList.toggle('show', on);
+  if (on) { clearTimeout(uiTimer); hint('Done! Just the orb now ✨  (tap ⚙️ at the top right to come back)', 3200); }
+  else poke();
+}
+bDone.onclick = () => setClean(true);
+backBtn.onclick = (e) => { e.stopPropagation(); setClean(false); };
+
+let uiTimer = null;
+function poke() {                                   // touching the screen shows the toolbar for a moment
+  if (clean) return;                                // in done mode the toolbar stays away
+  ui.classList.remove('hide'); meter.classList.remove('hide');
+  clearTimeout(uiTimer);
+  uiTimer = setTimeout(() => {
+    if (startScreen.className !== 'hidden') return;
+    ui.classList.add('hide'); meter.classList.add('hide');
+  }, 3800);
+}
+['pointerdown','pointermove','keydown','wheel'].forEach(ev => window.addEventListener(ev, poke, { passive:true }));
+
+const themeBox = document.getElementById('themes');
+THEMES.forEach(t => {
+  const b = document.createElement('button');
+  b.className = 'swatch' + (t.id === CFG.theme ? ' on' : '');
+  b.title = t.name;
+  const rgb = c => `rgb(${c.map(v => Math.round(v*255)).join(',')})`;
+  b.style.background = `linear-gradient(140deg, ${rgb(t.b)}, ${rgb(t.a)})`;
+  b.onclick = () => {
+    CFG.theme = t.id; saveCfg();
+    themeBox.querySelectorAll('.swatch').forEach(s => s.classList.remove('on'));
+    b.classList.add('on'); hint(t.name);
+  };
+  themeBox.appendChild(b);
+});
+
+sens.value = CFG.sens;
+sens.addEventListener('input', () => { CFG.sens = parseFloat(sens.value); saveCfg(); });
+
+function paintNetBtn() { bNet.classList.toggle('on', CFG.net); }
+paintNetBtn();
+bNet.onclick = () => { CFG.net = !CFG.net; saveCfg(); paintNetBtn(); hint(CFG.net ? 'Net on 🕸️' : 'Net off'); };
+
+bFull.onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || (() => {})).call(document.documentElement);
+};
+
+document.getElementById('goMic').onclick = startMic;
+document.getElementById('goFile').onclick = startFile;
+document.getElementById('goDemo').onclick = startDemo;
+mMic.onclick = startMic; mFile.onclick = startFile; mDemo.onclick = startDemo;
+
+// Keep the screen awake (for long sessions on a TV or tablet)
+async function wakeLock() {
+  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wakeLock(); });
+
+// ══════════════════════════════════════════════════════════════════════
+//  8. Drawing
+// ══════════════════════════════════════════════════════════════════════
+const U = (p, n) => (p.u[n] !== undefined ? p.u[n] : null);
+
+function bindAttr(prog, name, buf, size) {
+  const loc = prog.a[name];
+  if (loc === undefined || loc < 0) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+}
+function drawFullQuad(prog, set) {
+  gl.useProgram(prog);
+  bindAttr(prog, 'aXY', BUF.quad, 2);
+  gl.uniform2f(U(prog,'uRes'), W, H);
+  set(prog);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function orbUniforms(prog, t, proj, view, model, eye, T) {
+  gl.uniformMatrix4fv(U(prog,'uProj'), false, proj);
+  gl.uniformMatrix4fv(U(prog,'uView'), false, view);
+  gl.uniformMatrix4fv(U(prog,'uModel'), false, model);
+  gl.uniform1f(U(prog,'uTime'), t);
+  gl.uniform1f(U(prog,'uBass'), AU.bass);
+  gl.uniform1f(U(prog,'uMid'),  AU.mid);
+  gl.uniform1f(U(prog,'uTre'),  AU.tre);
+  gl.uniform1f(U(prog,'uLevel'), AU.level);
+  gl.uniform1f(U(prog,'uBeat'), AU.beat);
+  gl.uniform3fv(U(prog,'uColA'), T.a);
+  gl.uniform3fv(U(prog,'uColB'), T.b);
+  gl.uniform3fv(U(prog,'uColC'), T.c);
+  gl.uniform3fv(U(prog,'uCam'), eye);
+}
+
+let spin = 0, tPrev = 0, ORB_STATE = null;
+
+// Drop to the coarse sphere on slow devices (one-way — never upgraded back)
+let hi = !(navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+let slowFrames = 0, checked = 0;
+function watchSpeed(dt) {
+  if (!hi || checked > 240) return;
+  checked++;
+  if (checked < 40) return;                     // skip the first few frames (shader warm-up) before counting
+  slowFrames += dt > 1/38 ? 1 : -0.5;
+  if (slowFrames > 30) { hi = false; }
+}
+function frame(nowMs) {
+  requestAnimationFrame(frame);
+  if (!ready) return;
+  const t = nowMs / 1000;
+  const dt = Math.min(0.05, tPrev ? t - tPrev : 0.016);
+  tPrev = t;
+
+  analyse(dt);
+  watchSpeed(dt);
+  if (!AU.mode) {                                  // no sound source yet — a calm breathing motion
+    AU.level = 0.05 + 0.035 * Math.sin(t * 0.8);
+    AU.bass  = 0.05 + 0.04  * Math.sin(t * 0.55);
+    AU.mid   = 0.03; AU.tre = 0.02;
+  }
+
+  resize();
+  const T = theme();
+  spin += dt * (0.22 + AU.level * 1.7 + AU.beat * 0.9);   // spins much faster when it is loud
+
+  // Pull the camera back far enough that the orb always fits (further on portrait)
+  const FOV = Math.PI / 4, aspect = W / H, MAX_R = 1.42;
+  const tanV = Math.tan(FOV / 2);
+  const dist = MAX_R / (tanV * Math.min(1, aspect)) * 1.03;
+  const eye = [Math.sin(t * 0.13) * dist * 0.12, (0.10 + Math.sin(t * 0.09) * 0.05) * dist, dist];
+  const proj = mPerspective(FOV, aspect, 0.1, 60);
+  const view = mLookAt(eye, [0, 0, 0], [0, 1, 0]);
+  const model = mMul(mRotY(spin), mRotX(Math.sin(t * 0.21) * 0.28));
+
+  gl.clearColor(T.bg[0], T.bg[1], T.bg[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  // (1) background
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+  drawFullQuad(PROG.bg, p => {
+    gl.uniform3fv(U(p,'uBg'), T.bg); gl.uniform3fv(U(p,'uColC'), T.c);
+    gl.uniform1f(U(p,'uTime'), t); gl.uniform1f(U(p,'uBass'), AU.bass); gl.uniform1f(U(p,'uTre'), AU.tre);
+  });
+
+  // (2) halo behind the orb (additive, no depth)
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  drawFullQuad(PROG.glow, p => {
+    gl.uniform3fv(U(p,'uColC'), T.c);
+    gl.uniform1f(U(p,'uLevel'), AU.level); gl.uniform1f(U(p,'uBeat'), AU.beat);
+  });
+
+  // (3) the orb body
+  gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+  gl.useProgram(PROG.orb);
+  bindAttr(PROG.orb, 'aPos', hi ? BUF.hiPos : BUF.loPos, 3);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, hi ? BUF.hiIdx : BUF.loIdx);
+  orbUniforms(PROG.orb, t, proj, view, model, eye, T);
+  gl.uniform1f(U(PROG.orb,'uScale'), 1.0);
+  gl.uniform1f(U(PROG.orb,'uAlpha'), 1.0);
+  gl.drawElements(gl.TRIANGLES, (hi ? MESH.hi : MESH.lo).count, gl.UNSIGNED_SHORT, 0);
+
+  // (4) the glowing net over the surface
+  if (CFG.net) {
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
+    gl.useProgram(PROG.net);
+    bindAttr(PROG.net, 'aPos', BUF.netPos, 3);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, BUF.netIdx);
+    orbUniforms(PROG.net, t, proj, view, model, eye, T);
+    gl.uniform1f(U(PROG.net,'uScale'), 1.012);
+    gl.uniform1f(U(PROG.net,'uAlpha'), 1.0);
+    gl.drawElements(gl.LINES, MESH.net.edgeCount, gl.UNSIGNED_SHORT, 0);
+  }
+
+  // (5) orbiting motes — shoved outward on every beat
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
+  gl.useProgram(PROG.dot);
+  bindAttr(PROG.dot, 'aDir', BUF.dotDir, 3);
+  bindAttr(PROG.dot, 'aSeed', BUF.dotSeed, 2);
+  gl.uniformMatrix4fv(U(PROG.dot,'uProj'), false, proj);
+  gl.uniformMatrix4fv(U(PROG.dot,'uView'), false, view);
+  gl.uniformMatrix4fv(U(PROG.dot,'uModel'), false, mMul(mRotY(-spin * 0.55), mRotX(t * 0.07)));
+  gl.uniform1f(U(PROG.dot,'uTime'), t);
+  gl.uniform1f(U(PROG.dot,'uLevel'), AU.level);
+  gl.uniform1f(U(PROG.dot,'uShock'), AU.shock);
+  gl.uniform1f(U(PROG.dot,'uRes'), H * 0.012);
+  gl.uniform3fv(U(PROG.dot,'uColC'), T.c);
+  gl.drawArrays(gl.POINTS, 0, MESH.dots);
+  gl.depthMask(true);
+
+  meterFill.style.width = Math.round(Math.min(1, AU.level) * 100) + '%';
+
+  // For verification/debugging — lets the console or a test inspect the live state
+  ORB_STATE = { t, mode:AU.mode, bass:AU.bass, mid:AU.mid, tre:AU.tre, level:AU.level,
+                beat:AU.beat, shock:AU.shock, peak:AU.peak, spin, theme:CFG.theme, net:CFG.net, clean,
+                hi, fps: Math.round(1/Math.max(dt, 0.001)),
+                tris:(hi ? MESH.hi : MESH.lo).count/3, dots:MESH.dots, w:W, h:H };
+}
+Object.defineProperty(window, 'ORB', { get: () => ORB_STATE });
+window.ORB_API = { startDemo, startMic, startFile, CFG, THEMES, AU };
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
