@@ -1,7 +1,16 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import * as FirebaseApp from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
+import * as FirebaseAuth from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
+import * as Firestore from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js';
+
 let config;
 try { config = await import('./config.js'); } catch { config = null; }
+
+const Firebase = { ...FirebaseApp, ...FirebaseAuth, ...Firestore };
 const paths = ['./runtime/app-part1.js','./runtime/app-part2.js','./runtime/app-part3.js','./runtime/app-part4.js'];
-const code = (await Promise.all(paths.map(async p => { const r = await fetch(p); if(!r.ok) throw new Error(`Failed to load ${p}`); return r.text(); }))).join('\n');
+const code = (await Promise.all(paths.map(async p => {
+  const r = await fetch(p);
+  if (!r.ok) throw new Error(`Failed to load ${p}`);
+  return r.text();
+}))).join('\n');
 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-await new AsyncFunction('createClient','config', code)(createClient, config);
+await new AsyncFunction('Firebase','config', code)(Firebase, config);
