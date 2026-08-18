@@ -1,16 +1,17 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en" translate="no">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>하람쥐와 주니어 — 매일 다람쥐 이야기</title>
+<title>Haramji &amp; Haramji Jr. — A New Story Every Day</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { margin:0; padding:0; min-height:100%; }
-body { font-family:'Noto Sans KR',sans-serif; background:#efeae1; color:#2f2a24; }
+body { font-family:'Inter',system-ui,sans-serif; background:#efeae1; color:#2f2a24; }
 @keyframes tailSway { 0%,100%{transform:rotate(-5deg)} 50%{transform:rotate(5deg)} }
 @keyframes bob      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
 @keyframes tapPop   { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
@@ -19,7 +20,7 @@ body { font-family:'Noto Sans KR',sans-serif; background:#efeae1; color:#2f2a24;
 ::-webkit-scrollbar { width:0; height:0; }
 </style>
 </head>
-<body>
+<body class="notranslate">
 <div id="app"></div>
 <script>
 // ── 하람쥐와 주니어: 매일 다람쥐 이야기 ────────────────────────────────────────
@@ -50,103 +51,109 @@ const pickN = (r, arr, n) => {
 };
 
 // ── 재료 ─────────────────────────────────────────────────────
-const DAD = '하람쥐';
-const KID = '하람쥐 주니어';
+const ELDER = 'Haramji';
+const YOUNGER = 'Haramji Jr.';   // 문장 끝에 그대로 놓이므로 마침표를 이름이 갖고 있다
 const PLACES = [
-  {n:'참나무 언덕',    d:'해가 제일 먼저 닿는'},
-  {n:'안개 낀 자작나무 숲', d:'아침마다 하얀 이불이 덮이는'},
-  {n:'개울가 돌다리',  d:'물소리가 종일 재잘거리는'},
-  {n:'버려진 나무 우체통', d:'아무도 편지를 찾아가지 않는'},
-  {n:'도시 공원 벤치 아래', d:'사람 발소리가 파도처럼 오가는'},
-  {n:'솔방울이 굴러다니는 비탈', d:'가을이면 온통 갈색이 되는'},
-  {n:'오래된 등대 뒷마당', d:'밤이면 빛이 한 바퀴씩 도는'},
-  {n:'눈 덮인 전나무 골짜기', d:'발자국이 오래 남는'},
-  {n:'다락방 창턱',     d:'먼지 냄새가 포근한'},
-  {n:'무너진 돌담 아래', d:'이끼가 초록 담요처럼 깔린'}
+  {n:'Oakridge Hill',        d:'the first slope the sun touches'},
+  {n:'the birch stand',      d:'where a white fog lies down every morning'},
+  {n:'the stepping stones',  d:'where the creek talks all day long'},
+  {n:'the abandoned mailbox',d:'that nobody has opened in years'},
+  {n:'the bench in the city park', d:'where footsteps come and go like surf'},
+  {n:'the pinecone slope',   d:'that turns entirely brown in autumn'},
+  {n:'the old lighthouse yard', d:'where a light swings around once a minute at night'},
+  {n:'the fir hollow',       d:'where footprints last a long time under snow'},
+  {n:'the attic windowsill', d:'where the smell of dust is somehow comforting'},
+  {n:'the fallen stone wall',d:'laid over with moss like a green blanket'}
 ];
-const SEASONS = ['이슬이 마르기 전 이른 봄','매미가 목청을 높이던 한여름','바람이 도토리를 떨구던 가을','첫눈이 소복이 쌓인 겨울','비가 사흘째 내리던 장마','별이 유난히 많던 초여름 밤'];
-// 하람쥐의 그날 컨디션 / 주니어의 그날 엉뚱함
-const DAD_MOODS = [
-  '어제 모아 둔 도토리 개수가 자꾸 헷갈려서 아침부터 세 번이나 다시 세고 있었다',
-  '허리가 좀 뻐근했지만 티를 내지 않았다',
-  '아침 해가 좋아서 기분이 아주 괜찮았다',
-  '주니어가 또 무슨 일을 벌일까 싶어 미리 한숨을 한 번 쉬어 두었다',
-  '오늘은 꼭 낮잠을 자겠다고 마음먹은 참이었다',
-  '겨울 창고 문이 잘 닫히는지 확인하느라 바빴다'
+const SEASONS = [
+  'Early spring, before the dew had burned off',
+  'Midsummer, with the cicadas at full volume',
+  'Autumn, with the wind knocking acorns loose',
+  'Winter, after the first snow had settled',
+  'The third straight day of rain',
+  'An early summer night with far too many stars'
 ];
-const KID_QUIRKS = [
-  '도토리보다 반짝이는 돌멩이를 더 좋아했다',
-  '뭐든 "왜?"라고 세 번 묻는 버릇이 있었다',
-  '아빠 꼬리를 목도리처럼 두르는 걸 제일 좋아했다',
-  '높은 데를 무서워하면서도 꼭 제일 높은 가지를 올려다봤다',
-  '주머니에 뭘 넣었는지 자기도 몰랐다',
-  '한 번 뛰기 시작하면 멈추는 법을 자꾸 잊어버렸다',
-  '처음 보는 벌레마다 이름을 지어 줬다'
+// 그날 형(하람쥐)의 상태 / 동생(주니어)의 그날 엉뚱함
+const ELDER_MOODS = [
+  'had already recounted yesterday\u2019s acorns three times and gotten a different number each time',
+  'had a stiff back and was not about to mention it',
+  'was in a genuinely good mood, on account of the light',
+  'had sighed once in advance, on the assumption that Jr. would start something',
+  'had promised himself a nap and meant it',
+  'was busy checking whether the winter store still closed properly'
+];
+const YOUNGER_QUIRKS = [
+  'liked shiny pebbles considerably more than acorns',
+  'asked "why" exactly three times about everything',
+  'liked wearing his brother\u2019s tail as a scarf best of all',
+  'was afraid of heights and kept looking up at the tallest branch anyway',
+  'did not himself know what was in his cheek pouches',
+  'kept forgetting how to stop once he started running',
+  'gave a name to every insect he had not met before'
 ];
 const WANTS = [
-  '겨울을 날 도토리 백 개를 채우는 것',
-  '주니어에게 개울 건너는 법을 가르치는 것',
-  '숲에서 제일 높은 가지까지 함께 올라가 보는 것',
-  '아무도 못 찾을 비밀 창고를 새로 만드는 것',
-  '이사 간 이웃에게 편지를 전하는 것',
-  '한밤중에 들리는 이상한 소리의 정체를 밝히는 것',
-  '주니어가 잃어버린 반짝이는 돌멩이를 되찾는 것',
-  '첫서리가 오기 전에 지붕을 고치는 것'
+  'fill out a hundred acorns for the winter',
+  'teach Jr. how to cross the creek',
+  'get up to the highest branch in the woods together',
+  'dig a new store nobody would ever find',
+  'deliver a letter to the neighbours who had moved away',
+  'find out what was making that noise in the middle of the night',
+  'recover the shiny pebble Jr. had lost',
+  'patch the roof before the first frost'
 ];
 const TROUBLES = [
-  '까치 한 마리가 자꾸 뒤를 따라왔다',
-  '지난밤 비에 길이 통째로 사라져 있었다',
-  '모아 둔 도토리가 하룻밤 새 절반으로 줄어 있었다',
-  '안개가 너무 짙어 앞발도 보이지 않았다',
-  '나뭇가지가 우지끈, 하고 반으로 갈라졌다',
-  '낯선 발자국이 창고 앞까지 이어져 있었다',
-  '해가 생각보다 훨씬 빨리 기울고 있었다',
-  '주니어가 한눈판 사이에 저만치 앞서가 버렸다'
+  'a magpie kept following a few lengths behind them',
+  'last night\u2019s rain had taken the whole path with it',
+  'half the stored acorns had gone missing overnight',
+  'the fog came in thick enough to hide their own front paws',
+  'a branch went over with a crack, straight down the middle',
+  'a strange set of tracks ran right up to the store',
+  'the sun was going down considerably faster than expected',
+  'Jr. got well out in front while nobody was watching'
 ];
 const FRIENDS = [
-  {n:'느긋한 두더지 할아버지', h:'땅속 지름길'},
-  {n:'말이 빠른 박새',        h:'하늘에서 본 지도'},
-  {n:'말없는 고슴도치',       h:'가시 사이에 숨겨 둔 열매'},
-  {n:'길 잃은 새끼 고양이',   h:'무서운 것 앞에서도 웃는 법'},
-  {n:'책을 읽는 올빼미',      h:'밤에 길 찾는 별자리'},
-  {n:'수줍은 청개구리',       h:'비가 올지 아는 코'}
+  {n:'an unhurried old mole',      s:'The mole',      h:'a shortcut underground'},
+  {n:'a fast-talking chickadee',   s:'The chickadee', h:'what the place looked like from above'},
+  {n:'a hedgehog who said nothing',s:'The hedgehog',  h:'about the berries kept in among his spines'},
+  {n:'a lost kitten',              s:'The kitten',    h:'how to keep smiling at a frightening thing'},
+  {n:'an owl who read',            s:'The owl',       h:'which stars to steer by after dark'},
+  {n:'a shy tree frog',            s:'The frog',      h:'how to smell rain before it arrives'}
 ];
 const TWISTS = [
-  '도토리를 가져간 건 도둑이 아니라, 주니어가 "나중에 먹으려고" 따로 숨겨 둔 것이었다',
-  '무서운 소리의 정체는 바람에 흔들리던 낡은 우체통 뚜껑이었다',
-  '사라진 길 아래에 아무도 모르던 오래된 계단이 드러나 있었다',
-  '따라오던 까치는 주니어가 떨어뜨린 돌멩이를 물어다 주려던 참이었다',
-  '가장 높은 가지에서 보인 건 멋진 풍경이 아니라, 자기 집 지붕이었다',
-  '주니어는 이미 길을 알고 있었다. 아빠가 걱정할까 봐 모르는 척했을 뿐이었다',
-  '편지는 이미 도착해 있었다. 답장이 오지 않았을 뿐이었다'
+  'the acorns had not been stolen at all \u2014 Jr. had hidden them separately, for later',
+  'the noise was the lid of the old mailbox knocking in the wind',
+  'under the washed-out path lay a set of old stone steps nobody had known about',
+  'the magpie had been trying to return the pebble Jr. had dropped',
+  'what you could see from the highest branch was not a view, but their own roof',
+  'Jr. had known the way the whole time, and pretended otherwise so his brother would not worry',
+  'the letter had arrived long ago. Only the reply never came'
 ];
 const LESSONS = [
-  '무섭다고 멈추면, 무서운 게 얼마나 작은지 영영 모른다는 것',
-  '혼자 백 개를 모으는 것보다 둘이 쉰 개씩 나누는 게 더 배부르다는 것',
-  '길을 잃는 것도 길을 아는 방법 중 하나라는 것',
-  '아이는 생각보다 빨리 자란다는 것',
-  '가장 먼 곳까지 가 보고서야 집이 좋다는 걸 알게 된다는 것',
-  '작은 발로도 하루면 꽤 멀리 갈 수 있다는 것',
-  '기다림도 무언가를 하는 일이라는 것'
+  'stop because a thing is frightening and you never learn how small it was',
+  'fifty acorns each between two of you fills you up better than a hundred alone',
+  'getting lost is one of the ways of learning a place',
+  'a younger brother grows up faster than you expect',
+  'you have to go the whole distance out before home means anything',
+  'small feet still cover a fair amount of ground in one day',
+  'waiting is also a way of doing something'
 ];
 const ENDINGS = [
-  '그날 밤 둘은 배가 부른 채로, 하람쥐의 꼬리를 이불처럼 덮고 잠들었다.',
-  '해가 완전히 지기 전에 둘은 집 앞에 도착했다. 늦었지만, 늦지 않았다.',
-  '주니어는 도토리 하나를 문 앞에 두고 왔다. 다음에 올 누군가를 위해서.',
-  '이튿날 아침, 숲에는 둘이 함께 만든 작은 이정표가 하나 늘어 있었다.',
-  '하람쥐는 그 이야기를 아무에게도 하지 않았다. 대신 매일 그 길로 다녔다.',
-  '"내일도 같이 가?" 주니어가 물었다. 하람쥐는 대답 대신 꼬리로 등을 툭 쳤다.'
+  'That night the two of them slept full, under Haramji\u2019s tail like a blanket.',
+  'They reached the door before the sun was all the way down. Late, but not too late.',
+  'Jr. left one acorn outside the door, for whoever came along next.',
+  'By morning there was one more small trail marker in the woods, built by the two of them.',
+  'Haramji never told anyone about it. He simply took that path every day afterwards.',
+  '"Are we going together tomorrow?" Jr. asked. Haramji answered by knocking his tail against his brother\u2019s back.'
 ];
-const OPENERS = ['%S%, ','아직 아무도 깨지 않은 새벽, ','비 냄새가 나던 그날, ','모두가 낮잠에 든 오후, '];
-const HEADINGS = ['하람쥐와 주니어, %P%','하람쥐 부자(父子)의 하루','%P%에서 생긴 일','주니어가 앞장선 날','하람쥐와 %F%'];
-// ── 조사 붙이기 ──────────────────────────────────────────────
-//  마지막 글자의 받침 유무로 은/는, 이/가, 을/를을 자동으로 고른다.
-function hasJong(word) {
-  const c = word.charCodeAt(word.length - 1);
-  if (c < 0xAC00 || c > 0xD7A3) return false;   // 한글이 아니면 받침 없음으로 취급
-  return (c - 0xAC00) % 28 !== 0;
-}
-const josa = (w, withJong, without) => w + (hasJong(w) ? withJong : without);
+const OPENERS = ['%S%, ','Before anything else was awake, ','On a day that smelled like rain, ','In the afternoon, with everyone else asleep, '];
+const HEADINGS = ['Haramji and Jr. at %P%','A Day in the Life of the Haramji Brothers','What Happened at %P%','The Day Jr. Went First','Haramji and %F%'];
+
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+// 제목용: 관사·전치사만 소문자로 남기는 통상적인 영문 제목 표기.
+const SMALL = new Set(['the','a','an','in','on','at','of','and','by','where']);
+const titleCase = t => t.split(' ')
+  .map((w, i) => SMALL.has(w.toLowerCase()) ? w.toLowerCase() : cap(w))   // 문장 중간에 끼워 넣으므로 첫 관사도 소문자
+  .join(' ');
 
 // ── 이야기 생성 ──────────────────────────────────────────────
 function dayKey(d) {
@@ -157,8 +164,8 @@ function makeStory(key) {
   const r = rng(hashStr('haramji|'+key));
   const place  = pick(r, PLACES);
   const season = pick(r, SEASONS);
-  const dadMood= pick(r, DAD_MOODS);
-  const quirk  = pick(r, KID_QUIRKS);
+  const elderMood= pick(r, ELDER_MOODS);
+  const quirk  = pick(r, YOUNGER_QUIRKS);
   const want   = pick(r, WANTS);
   const [t1,t2]= pickN(r, TROUBLES, 2);
   const friend = pick(r, FRIENDS);
@@ -167,16 +174,16 @@ function makeStory(key) {
   const ending = pick(r, ENDINGS);
   const opener = pick(r, OPENERS).replace('%S%', season);
   const heading = pick(r, HEADINGS)
-    .replace('%P%', place.n)
+    .replace('%P%', titleCase(place.n))
     .replace('%F%', friend.n);
 
   const paras = [
-    `${place.d} ${place.n}에는 다람쥐 ${DAD}와 아들 ${KID}가 산다. 주니어는 ${quirk}.`,
-    `${opener}${DAD}는 ${dadMood}. 오늘 둘이 할 일은 하나였다. 바로 ${want}. 주니어는 벌써 문 앞에서 꼬리를 흔들고 있었다.`,
-    `그런데 얼마 못 가 문제가 생겼다. ${t1}. 잠깐 멈춰 서서 숨을 골랐지만, 이번에는 ${t2}. ${DAD}는 주니어의 앞발을 꼭 잡았다.`,
-    `그때 ${josa(friend.n, '이', '가')} 나타났다. "이쪽으로 와 봐." ${josa(friend.n, '은', '는')} ${josa(friend.h, '을', '를')} 알고 있었다. 셋은 함께 걸었고, 길은 생각보다 짧았다.`,
-    `그리고 둘은 알게 되었다. ${twist}. 주니어는 웃었고, ${DAD}는 웃음을 참는 척하다가 결국 같이 웃었다.`,
-    `그날 ${DAD}가 주니어에게 알려 준 건 이거였다. ${lesson}.`,
+    `At ${place.n}, ${place.d}, live two squirrel brothers, ${ELDER} and ${YOUNGER} The younger of the two ${quirk}.`,
+    `${opener}${ELDER} ${elderMood}. There was one thing to do that day: ${want}. Jr. was already at the door with his tail going.`,
+    `They did not get far before there was a problem. ${cap(t1)}. They stopped to get their breath back, and then ${t2}. ${ELDER} took hold of his brother\u2019s paw.`,
+    `That was when ${friend.n} turned up. "Come round this way." ${friend.s} knew ${friend.h}. The three of them walked on, and the way turned out shorter than it had looked.`,
+    `And so they found out: ${twist}. Jr. laughed. ${ELDER} pretended not to, and then did.`,
+    `What ${ELDER} told his brother that day was this: ${lesson}.`,
     ending
   ];
   return { key, heading, paras, season };
@@ -194,181 +201,48 @@ function lightenHex(hex, amt) {
 }
 
 
-// ── 이야기 영상 (캔버스 애니메이션) ──────────────────────────
-//  문단 하나 = 장면 하나. 계절에 따라 하늘·날씨·바닥색이 바뀌고
-//  하람쥐 부자가 스크롤되는 숲을 걸어간다. 전부 캔버스 실시간 렌더.
-const SCENE_MS = 6200;
-const SEASON_ART = {
-  '봄':   {sky:['#8fb2cc','#d8e4d2'], haze:'#cdd9cf', hill:'#6d8560', ground:'#5f6b45', litter:'#7a8450', weather:'petal',   particle:'#e8dcc8'},
-  '여름': {sky:['#6f9dc4','#cfe0d4'], haze:'#c2d2c6', hill:'#4a6b45', ground:'#415433', litter:'#586b38', weather:'firefly', particle:'#f2e6a8'},
-  '가을': {sky:['#a9a08a','#e2d3b4'], haze:'#d8c8a8', hill:'#7d6438', ground:'#6b512f', litter:'#8a6431', weather:'leaf',    particle:'#a8652c'},
-  '겨울': {sky:['#8e9db0','#dfe6ec'], haze:'#dbe3ea', hill:'#7d8794', ground:'#c9d3dc', litter:'#aab6c2', weather:'snow',    particle:'#f4f8fb'},
-  '장마': {sky:['#6f7c85','#b8c3c4'], haze:'#b3bdbd', hill:'#4f5f4c', ground:'#47543a', litter:'#5b6742', weather:'rain',    particle:'#c6d6de'},
-  '밤':   {sky:['#141c30','#31405c'], haze:'#2b3852', hill:'#1d2537', ground:'#232b3a', litter:'#2c3547', weather:'star',    particle:'#e8e2c4'}
+// ── 슬라이드쇼 재생기 ────────────────────────────────────────
+//  그림은 assets/scenes/ 에 미리 구워 둔 이미지를 쓴다 (scripts/render-scenes.js).
+//  여기서는 그 이미지를 캔버스에 얹고 아주 느리게 밀거나 당기면서(켄 번스)
+//  컷 사이를 암전으로 넘기고, 자막을 얹는다.
+const SLIDE_MS = 6800;
+const DIP_MS = 620;
+const SEASON_SLUG = {
+  '봄':'spring', '여름':'summer', '가을':'autumn', '겨울':'winter', '장마':'rain', '밤':'night'
 };
 function seasonOf(seasonLine) {
-  if (/첫눈|겨울/.test(seasonLine)) return '겨울';
-  if (/장마/.test(seasonLine)) return '장마';
-  if (/밤/.test(seasonLine)) return '밤';
-  if (/한여름|매미/.test(seasonLine)) return '여름';
-  if (/가을/.test(seasonLine)) return '가을';
+  if (/[Ww]inter|snow/.test(seasonLine)) return '겨울';
+  if (/rain/.test(seasonLine)) return '장마';
+  if (/night|stars/.test(seasonLine)) return '밤';
+  if (/[Mm]idsummer|cicada/.test(seasonLine)) return '여름';
+  if (/[Aa]utumn/.test(seasonLine)) return '가을';
   return '봄';
 }
+// 컷마다 다른 방향으로 아주 천천히 움직인다. 정지 이미지에 숨을 넣는 정도.
+const MOVES = [
+  {z0:1.02, z1:1.12, x0:  0, x1:-14, y0: 0, y1:  4},
+  {z0:1.14, z1:1.04, x0:-12, x1:  6, y0: 3, y1: -2},
+  {z0:1.06, z1:1.18, x0:  8, x1: -8, y0:-2, y1:  5},
+  {z0:1.16, z1:1.06, x0: -6, x1: 10, y0: 4, y1: -3},
+  {z0:1.04, z1:1.14, x0: 10, x1: -6, y0:-3, y1:  3},
+  {z0:1.20, z1:1.08, x0: -8, x1:  8, y0: 2, y1: -4},
+  {z0:1.06, z1:1.16, x0:  6, x1:-10, y0:-2, y1:  4}
+];
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
 function createPlayer(canvas, story, onEnd) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
-  const r = rng(hashStr('art|' + story.key));
-  const furs = ['#8a6a4d','#6f5a44','#9a7350','#7b6350','#a1794f','#5f5044'];  // 실제 청설모/다람쥐 털색
-  const fur = furs[Math.floor(r() * furs.length)];
-  const kidFur = lightenHex(fur, .16);
-  const season = seasonOf(story.season || '');
-  const A = SEASON_ART[season];
-  const total = story.paras.length * SCENE_MS;
+  const slug = SEASON_SLUG[seasonOf(story.season || '')] || 'spring';
+  const total = story.paras.length * SLIDE_MS;
 
-  // 배경 요소를 미리 뿌려 둔다 (매 프레임 난수 금지 — 깜빡임 방지)
-  const trees = Array.from({length: 26}, (_, i) => ({
-    x: i * 120 + (i % 3) * 37, h: 90 + (i % 5) * 26, layer: i % 2, w: 16 + (i % 3) * 5
-  }));
-  const bits = Array.from({length: 70}, (_, i) => ({
-    x: Math.random() * W, y: Math.random() * H,
-    sp: 0.4 + Math.random() * 1.6, sw: Math.random() * 6.28, sz: 1.5 + Math.random() * 3
-  }));
+  const slides = story.paras.map((_, i) => {
+    const img = new Image();
+    img.src = `assets/scenes/${slug}-${i % 7}.jpg`;
+    return img;
+  });
 
   let t0 = null, raf = null, elapsed = 0, playing = false;
-
-  // 사실적인 다람쥐 (옆모습, 오른쪽을 봄).
-  //  털 결은 짧은 선을 결 방향으로 얹어서 표현하고, 명암은 그라디언트로 준다.
-  function furStrands(cx, cy, rx, ry, n, color, len, seedOff) {
-    ctx.strokeStyle = color; ctx.lineWidth = 0.7;
-    for (let i = 0; i < n; i++) {
-      const a = (i * 2.399 + seedOff) % 6.283;
-      const rr = 0.55 + ((i * 0.37) % 0.45);
-      const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(px + Math.cos(a) * len, py + Math.sin(a) * len * 0.8);
-      ctx.stroke();
-    }
-  }
-
-  function drawSquirrel(x, y, k, f, phase) {
-    const dark  = shade(f, -0.34), mid = shade(f, -0.15);
-    const light = lightenHex(f, 0.30), belly = lightenHex(f, 0.62);
-    const bob = Math.sin(phase) * 2.2 * k;
-    ctx.save();
-    ctx.translate(x, y + bob);
-    ctx.scale(k, k);
-    ctx.lineJoin = 'round';
-
-    // 땅 그림자 (몸 아래로 눌린 타원)
-    ctx.fillStyle = 'rgba(30,22,12,.22)';
-    ctx.beginPath(); ctx.ellipse(4, 2 - bob / k, 34, 5.5, 0, 0, 6.29); ctx.fill();
-
-    // ── 꼬리: 뒤쪽에 크게. 겉털(밝음) 위에 속털(어두움)을 겹친다.
-    ctx.save();
-    ctx.translate(-24, -14);
-    ctx.rotate(Math.sin(phase * 0.7) * 0.10);
-    const tg = ctx.createLinearGradient(-30, -40, 10, 10);
-    tg.addColorStop(0, light); tg.addColorStop(0.55, f); tg.addColorStop(1, dark);
-    ctx.fillStyle = tg;
-    ctx.beginPath();
-    ctx.moveTo(6, 6);
-    ctx.bezierCurveTo(-34, 8, -46, -34, -22, -62);
-    ctx.bezierCurveTo(-6, -78, 16, -70, 20, -52);
-    ctx.bezierCurveTo(6, -62, -12, -54, -14, -34);
-    ctx.bezierCurveTo(-16, -16, -2, -6, 8, -2);
-    ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.clip();
-    furStrands(-12, -36, 22, 30, 34, 'rgba(255,255,255,.20)', 7, 0.6);
-    furStrands(-6, -22, 20, 26, 26, 'rgba(40,26,14,.22)', 6, 2.1);
-    ctx.restore();
-    ctx.restore();
-
-    // ── 뒷다리(허벅지) → 몸통 → 앞다리 순으로 겹친다.
-    ctx.fillStyle = mid;
-    ctx.beginPath(); ctx.ellipse(-8, -16, 17, 15, -0.15, 0, 6.29); ctx.fill();   // 허벅지
-    ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(-4, -3, 11, 4.5, -0.12, 0, 6.29); ctx.fill();   // 뒷발
-
-    const bg2 = ctx.createLinearGradient(0, -40, 0, -2);
-    bg2.addColorStop(0, mid); bg2.addColorStop(0.62, f); bg2.addColorStop(1, belly);
-    ctx.fillStyle = bg2;
-    ctx.beginPath();
-    ctx.moveTo(-20, -12);
-    ctx.bezierCurveTo(-22, -34, -6, -44, 10, -40);   // 등
-    ctx.bezierCurveTo(22, -37, 26, -24, 24, -14);    // 가슴
-    ctx.bezierCurveTo(20, -4, -8, -2, -20, -12);     // 배
-    ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.clip();
-    furStrands(0, -26, 20, 16, 30, 'rgba(40,26,14,.16)', 5, 1.2);
-    furStrands(8, -14, 16, 10, 18, 'rgba(255,255,255,.22)', 4, 3.4);
-    ctx.restore();
-
-    ctx.fillStyle = mid;                                                          // 앞다리
-    ctx.beginPath();
-    ctx.moveTo(18, -22); ctx.bezierCurveTo(24, -16, 24, -8, 21, -3);
-    ctx.bezierCurveTo(17, -2, 15, -8, 14, -18); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(21, -2.5, 5, 2.6, 0, 0, 6.29); ctx.fill();       // 앞발
-
-    // ── 머리: 주둥이가 앞으로 나온 쐐기 모양.
-    const hg = ctx.createLinearGradient(10, -58, 10, -30);
-    hg.addColorStop(0, mid); hg.addColorStop(1, f);
-    ctx.fillStyle = hg;
-    ctx.beginPath();
-    ctx.moveTo(8, -34);
-    ctx.bezierCurveTo(6, -50, 18, -58, 28, -55);     // 이마
-    ctx.bezierCurveTo(38, -52, 42, -45, 41, -41);    // 코끝
-    ctx.bezierCurveTo(38, -36, 30, -32, 20, -32);    // 턱
-    ctx.closePath(); ctx.fill();
-
-    ctx.fillStyle = belly;                                                        // 목·뺨 밝은 털
-    ctx.beginPath(); ctx.ellipse(24, -36, 9, 4.5, -0.15, 0, 6.29); ctx.fill();
-
-    ctx.fillStyle = f;                                                            // 귀 + 귀털
-    ctx.beginPath(); ctx.ellipse(16, -55, 4.5, 7, -0.25, 0, 6.29); ctx.fill();
-    ctx.fillStyle = shade(f, -0.45);
-    ctx.beginPath(); ctx.ellipse(16, -54, 2.2, 4.2, -0.25, 0, 6.29); ctx.fill();
-    ctx.strokeStyle = light; ctx.lineWidth = 0.9;
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath(); ctx.moveTo(15 + i * 2, -61); ctx.lineTo(14 + i * 2.6, -67); ctx.stroke();
-    }
-
-    ctx.save();                                                                   // 머리 털결
-    ctx.beginPath();
-    ctx.moveTo(8, -34); ctx.bezierCurveTo(6, -50, 18, -58, 28, -55);
-    ctx.bezierCurveTo(38, -52, 42, -45, 41, -41);
-    ctx.bezierCurveTo(38, -36, 30, -32, 20, -32); ctx.closePath(); ctx.clip();
-    furStrands(22, -45, 12, 9, 16, 'rgba(40,26,14,.16)', 4, 0.9);
-    ctx.restore();
-
-    ctx.fillStyle = 'rgba(255,255,255,.30)';                                      // 눈 둘레 밝은 털
-    ctx.beginPath(); ctx.ellipse(27, -48, 4.4, 3.9, 0, 0, 6.29); ctx.fill();
-    ctx.fillStyle = '#14100c';                                                    // 눈
-    ctx.beginPath(); ctx.ellipse(27, -48, 2.4, 2.3, 0, 0, 6.29); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.75)';
-    ctx.beginPath(); ctx.arc(27.8, -48.8, 0.7, 0, 6.29); ctx.fill();
-
-    ctx.fillStyle = '#2b1d14';                                                    // 코
-    ctx.beginPath(); ctx.ellipse(41, -42, 1.9, 1.5, 0.3, 0, 6.29); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 0.6;                // 수염
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath(); ctx.moveTo(39, -41 + i * 0.9);
-      ctx.quadraticCurveTo(50, -44 + i * 3.2, 58, -40 + i * 5.2); ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // 색을 검정 쪽으로 섞어 그늘색을 만든다 (amt<0 만 사용).
-  function shade(hex, amt) {
-    const h = hex.replace('#', ''), m = Math.abs(amt);
-    const f = i => {
-      const c = parseInt(h.slice(i, i + 2), 16);
-      return Math.round(c * (1 - m)).toString(16).padStart(2, '0');
-    };
-    return '#' + f(0) + f(2) + f(4);
-  }
 
   function wrap(text, maxW) {
     const words = text.split(' '), lines = [];
@@ -383,128 +257,41 @@ function createPlayer(canvas, story, onEnd) {
   }
 
   function frame(ms) {
-    const idx = Math.min(story.paras.length - 1, Math.floor(ms / SCENE_MS));
-    const local = (ms % SCENE_MS) / SCENE_MS;
-    const scroll = ms / 26;
+    const idx = Math.min(story.paras.length - 1, Math.floor(ms / SLIDE_MS));
+    const local = (ms % SLIDE_MS) / SLIDE_MS;
+    const mv = MOVES[idx % MOVES.length];
+    const e = easeInOut(local);
+    const zoom = mv.z0 + (mv.z1 - mv.z0) * e;
+    const dx = mv.x0 + (mv.x1 - mv.x0) * e;
+    const dy = mv.y0 + (mv.y1 - mv.y0) * e;
 
-    const g = ctx.createLinearGradient(0, 0, 0, H * 0.72);          // 하늘
-    g.addColorStop(0, A.sky[0]); g.addColorStop(1, A.sky[1]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#0d0b09'; ctx.fillRect(0, 0, W, H);
 
-    if (season === '밤') {
-      ctx.fillStyle = 'rgba(240,236,214,.85)';
-      ctx.beginPath(); ctx.arc(W - 78, 58, 21, 0, 6.29); ctx.fill();
-      ctx.fillStyle = 'rgba(240,236,214,.10)';
-      ctx.beginPath(); ctx.arc(W - 78, 58, 40, 0, 6.29); ctx.fill();
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,.28)';                      // 낮은 구름층
-      for (let i = 0; i < 4; i++) {
-        const cx = (((i * 260 - scroll * 0.12) % (W + 340)) + W + 340) % (W + 340) - 170;
-        ctx.beginPath(); ctx.ellipse(cx, 46 + i * 13, 100, 15, 0, 0, 6.29); ctx.fill();
-      }
+    const img = slides[idx];
+    if (img && img.complete && img.naturalWidth) {
+      ctx.save();
+      ctx.translate(W / 2 + dx, H / 2 + dy);
+      ctx.scale(zoom, zoom);
+      ctx.drawImage(img, -W / 2, -H / 2, W, H);
+      ctx.restore();
     }
 
-    // 원경: 안개에 잠긴 나무 실루엣 세 겹. 뒤로 갈수록 흐리게 (대기원근).
-    for (let d = 0; d < 3; d++) {
-      const depth = 1 - d * 0.3;
-      ctx.globalAlpha = 0.20 + d * 0.20;
-      ctx.fillStyle = A.hill;
-      const baseY = H * (0.52 + d * 0.05);
-      const sp = 0.06 + d * 0.10;
-      ctx.beginPath(); ctx.moveTo(0, H);
-      for (let x = -40; x <= W + 40; x += 14) {
-        const n = Math.sin((x + scroll * sp) / 37) + Math.sin((x + scroll * sp) / 91) * 1.6;
-        ctx.lineTo(x, baseY - n * 11 * depth - (Math.abs(Math.sin((x + d * 50) / 23)) > 0.86 ? 26 * depth : 0));
-      }
-      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    ctx.fillStyle = A.haze; ctx.globalAlpha = 0.35;                 // 안개 띠
-    ctx.fillRect(0, H * 0.50, W, H * 0.18); ctx.globalAlpha = 1;
+    const inMs = ms % SLIDE_MS, outMs = SLIDE_MS - inMs;         // 컷 전환 암전
+    const dip = Math.max(
+      idx === 0 ? 0 : Math.max(0, 1 - inMs / DIP_MS),
+      idx === story.paras.length - 1 ? 0 : Math.max(0, 1 - outMs / DIP_MS)
+    );
+    if (dip > 0) { ctx.fillStyle = `rgba(0,0,0,${dip})`; ctx.fillRect(0, 0, W, H); }
 
-    // 중경/근경 나무: 줄기 명암 + 불규칙한 잎 덩어리
-    for (const layer of [0, 1]) {
-      const sp = layer ? 1 : 0.42;
-      const span = 120 * 26;
-      const leafBase = season === '겨울' ? '#8d9aa6' : (season === '가을' ? '#8a6a34' : '#3f5e39');
-      for (const tr of trees) {
-        if (tr.layer !== layer) continue;
-        let x = ((tr.x - scroll * sp) % span + span) % span - 60;
-        if (x < -110 || x > W + 110) continue;
-        const base = H * (layer ? 0.74 : 0.64);
-        const hh = tr.h * (layer ? 1 : 0.72);
-        ctx.globalAlpha = layer ? 1 : 0.5;
-        const bark = ctx.createLinearGradient(x - tr.w / 2, 0, x + tr.w / 2, 0);
-        bark.addColorStop(0, '#3d2f22'); bark.addColorStop(0.45, '#5c4632'); bark.addColorStop(1, '#2f2417');
-        ctx.fillStyle = bark;
-        ctx.beginPath();
-        ctx.moveTo(x - tr.w / 2.4, base);
-        ctx.lineTo(x - tr.w / 4.5, base - hh * 0.62);
-        ctx.lineTo(x + tr.w / 4.5, base - hh * 0.62);
-        ctx.lineTo(x + tr.w / 2.4, base); ctx.closePath(); ctx.fill();
-        if (season !== '겨울' || layer === 0) {
-          for (let c = 0; c < 5; c++) {                              // 잎 덩어리
-            const a = c * 1.7 + tr.x;
-            ctx.fillStyle = c % 2 ? leafBase : shade(leafBase, -0.22);
-            ctx.beginPath();
-            ctx.ellipse(x + Math.cos(a) * tr.w * 1.5, base - hh * (0.66 + Math.abs(Math.sin(a)) * 0.28),
-                        tr.w * 1.5, tr.w * 1.15, a, 0, 6.29);
-            ctx.fill();
-          }
-        }
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    // 바닥: 흙 그라디언트 + 낙엽/풀 잔결
-    const gg = ctx.createLinearGradient(0, H * 0.70, 0, H);
-    gg.addColorStop(0, A.ground); gg.addColorStop(1, shade(A.ground, -0.30));
-    ctx.fillStyle = gg; ctx.fillRect(0, H * 0.70, W, H * 0.30);
-    ctx.strokeStyle = A.litter; ctx.lineWidth = 1.1; ctx.globalAlpha = 0.55;
-    for (let i = 0; i < 90; i++) {
-      const gx = ((i * 71 - scroll) % (W + 60) + W + 60) % (W + 60) - 30;
-      const gy = H * 0.71 + ((i * 37) % Math.round(H * 0.28));
-      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + ((i % 5) - 2) * 2, gy - 4 - (i % 4)); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    const walk = ms / 150;                                    // 주인공 둘
-    drawSquirrel(W * 0.28, H * 0.715, 1.30, fur, walk);
-    drawSquirrel(W * 0.55, H * 0.695, 0.82, kidFur, walk + 1.6);
-
-    for (const b of bits) {                                   // 날씨 입자
-      ctx.fillStyle = A.particle;
-      if (A.weather === 'rain') {
-        const y = (b.y + ms * b.sp * 0.55) % H;
-        ctx.globalAlpha = .55; ctx.fillRect(b.x, y, 1.6, 12); ctx.globalAlpha = 1;
-      } else if (A.weather === 'star' || A.weather === 'firefly') {
-        const tw = 0.4 + 0.6 * Math.abs(Math.sin(ms / 500 + b.sw));
-        ctx.globalAlpha = tw;
-        const y = A.weather === 'star' ? b.y * 0.6 : b.y * 0.9;
-        ctx.beginPath(); ctx.arc(b.x, y, b.sz * 0.7, 0, 6.29); ctx.fill();
-        ctx.globalAlpha = 1;
-      } else {
-        const y = (b.y + ms * b.sp * 0.06) % H;
-        const x = b.x + Math.sin(ms / 700 + b.sw) * 18;
-        ctx.globalAlpha = .85;
-        ctx.beginPath(); ctx.ellipse(x, y, b.sz, b.sz * (A.weather === 'snow' ? 1 : 0.6), b.sw, 0, 6.29); ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.30)');
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-
-    const fade = Math.min(1, local * 6) * Math.min(1, (1 - local) * 8);   // 자막
-    const text = story.paras[idx];
-    ctx.font = '600 17px "Noto Sans KR", sans-serif';
-    const lines = wrap(text, W - 80);
+    const fade = Math.min(1, local * 6) * Math.min(1, (1 - local) * 8);
+    ctx.font = '500 17px "Inter", system-ui, sans-serif';
+    const lines = wrap(story.paras[idx], W - 80);
     const boxH = lines.length * 26 + 26;
-    ctx.globalAlpha = fade;
+    ctx.globalAlpha = fade * (1 - dip);
     ctx.fillStyle = 'rgba(8,8,10,.55)';
+    const bx = 26, by = H - boxH - 26, bw = W - 52, rad = 10;
     ctx.beginPath();
-    const bx = 26, by = H - boxH - 26, bw = W - 52, rad = 14;
     ctx.moveTo(bx + rad, by); ctx.arcTo(bx + bw, by, bx + bw, by + boxH, rad);
     ctx.arcTo(bx + bw, by + boxH, bx, by + boxH, rad);
     ctx.arcTo(bx, by + boxH, bx, by, rad); ctx.arcTo(bx, by, bx + bw, by, rad);
@@ -513,8 +300,8 @@ function createPlayer(canvas, story, onEnd) {
     lines.forEach((ln, i) => ctx.fillText(ln, bx + 18, by + 14 + i * 26));
     ctx.globalAlpha = 1;
 
-    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(0, H - 5, W, 5);   // 진행바
-    ctx.fillStyle = '#ffb454'; ctx.fillRect(0, H - 5, W * (ms / total), 5);
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, H - 4, W, 4);
+    ctx.fillStyle = '#c8a266'; ctx.fillRect(0, H - 4, W * (ms / total), 4);
   }
 
   function loop(now) {
@@ -529,11 +316,12 @@ function createPlayer(canvas, story, onEnd) {
   function stop()  { playing = false; if (raf) cancelAnimationFrame(raf); raf = null; }
   function reset() { stop(); elapsed = 0; frame(0); }
 
+  // 첫 장이 도착하면 표지로 한 번 그려 준다.
+  slides[0].addEventListener('load', () => { if (!playing) frame(0); });
   frame(0);
-  return {
-    play, stop, reset, get playing() { return playing; }, totalMs: total,
-    toggle() { playing ? stop() : play(); }
-  };
+
+  return { play, stop, reset, get playing() { return playing; }, totalMs: total,
+           toggle() { playing ? stop() : play(); } };
 }
 
 // ── 상태 ─────────────────────────────────────────────────────
@@ -552,10 +340,11 @@ function currentKey() {
   return dayKey(d);
 }
 function label(key) {
-  if (offset === 0) return '오늘';
-  if (offset === 1) return '어제';
-  const [y,m,dd] = key.split('-');
-  return `${Number(m)}월 ${Number(dd)}일`;
+  if (offset === 0) return 'today';
+  if (offset === 1) return 'yesterday';
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [, m, dd] = key.split('-');
+  return `${MON[Number(m) - 1]} ${Number(dd)}`;
 }
 
 // ── 렌더 ─────────────────────────────────────────────────────
@@ -568,47 +357,47 @@ function render() {
   document.getElementById('app').innerHTML = `
   <div style="max-width:620px; margin:0 auto; padding:22px 18px 56px;">
     <div style="text-align:center; margin-bottom:6px;">
-      <div style="font-family:'Noto Serif KR',serif; font-size:26px; font-weight:700; letter-spacing:-.02em; color:#2f2a24;">하람쥐와 주니어</div>
-      <div style="font-size:12px; color:#8b8377; margin-top:4px; letter-spacing:.08em;">${key} · ${label(key)}의 이야기</div>
+      <div style="font-family:'Noto Serif',Georgia,serif; font-size:26px; font-weight:700; letter-spacing:-.02em; color:#2f2a24;">Haramji &amp; Haramji Jr.</div>
+      <div style="font-size:12px; color:#8b8377; margin-top:4px; letter-spacing:.08em;">${key} · the story for ${label(key)}</div>
     </div>
 
     <div style="position:relative; margin:12px 0 4px; border-radius:18px; overflow:hidden;
                 border:1px solid #ded7cb; box-shadow:0 2px 10px rgba(60,50,35,.10); background:#000;">
       <canvas id="vid" width="640" height="360" style="display:block; width:100%; height:auto;"></canvas>
-      <button id="playbig" class="tapbtn" aria-label="재생"
+      <button id="playbig" class="tapbtn" aria-label="play"
         style="position:absolute; inset:0; margin:auto; width:74px; height:74px; border:none; border-radius:50%;
                background:rgba(250,248,244,.92); color:#3b352d; font-size:26px; cursor:pointer;">▶</button>
     </div>
     <div style="display:flex; gap:8px; margin-bottom:14px;">
       <button id="play" class="tapbtn" style="flex:1; padding:11px; font-size:15px; font-weight:700; font-family:inherit;
-        border:none; border-radius:12px; background:#4a4238; color:#f4f1ea; cursor:pointer;">▶ 영상 재생</button>
+        border:none; border-radius:12px; background:#4a4238; color:#f4f1ea; cursor:pointer;">▶ Play</button>
       <button id="replay" class="tapbtn" style="padding:11px 16px; font-size:15px; font-weight:700; font-family:inherit;
         border:none; border-radius:12px; background:#e4ded3; color:#3b352d; cursor:pointer;">↺</button>
       <button id="save" class="tapbtn" style="padding:11px 16px; font-size:15px; font-weight:700; font-family:inherit;
-        border:none; border-radius:12px; background:#e4ded3; color:#3b352d; cursor:pointer;">⬇ 저장</button>
+        border:none; border-radius:12px; background:#e4ded3; color:#3b352d; cursor:pointer;">⬇ Save</button>
     </div>
 
     <div style="background:#faf8f4; border:1px solid #ded7cb; border-radius:6px; padding:26px 22px;
                 box-shadow:0 2px 10px rgba(60,50,35,.07); animation:fadeUp .35s ease both;">
-      <div style="font-family:'Noto Serif KR',serif; font-size:22px; font-weight:700; color:#2f2a24; text-align:center; margin-bottom:18px; line-height:1.45;">
+      <div style="font-family:'Noto Serif',Georgia,serif; font-size:22px; font-weight:700; color:#2f2a24; text-align:center; margin-bottom:18px; line-height:1.45;">
         ${s.heading}
       </div>
-      ${s.paras.map(p => `<p style="font-family:'Noto Serif KR',serif; font-size:16px; line-height:2.0; margin:0 0 16px; color:#3b352d;">${p}</p>`).join('')}
-      <div style="text-align:center; font-size:12px; color:#a49b8d; margin-top:10px; letter-spacing:.3em;">끝</div>
+      ${s.paras.map(p => `<p style="font-family:'Noto Serif',Georgia,serif; font-size:16px; line-height:2.0; margin:0 0 16px; color:#3b352d;">${p}</p>`).join('')}
+      <div style="text-align:center; font-size:12px; color:#a49b8d; margin-top:10px; letter-spacing:.3em;">END</div>
     </div>
 
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button id="prev" class="tapbtn" style="flex:1; padding:14px; font-size:16px; font-weight:700; font-family:inherit;
-        border:none; border-radius:14px; background:#e4ded3; color:#3b352d; cursor:pointer;">← 지난 이야기</button>
+        border:none; border-radius:14px; background:#e4ded3; color:#3b352d; cursor:pointer;">← Earlier</button>
       <button id="next" class="tapbtn" ${offset===0?'disabled':''} style="flex:1; padding:14px; font-size:16px; font-weight:700; font-family:inherit;
         border:none; border-radius:14px; cursor:${offset===0?'default':'pointer'};
-        background:${offset===0?'#eae5dc':'#e4ded3'}; color:${offset===0?'#b6afa3':'#3b352d'};">다음 →</button>
+        background:${offset===0?'#eae5dc':'#e4ded3'}; color:${offset===0?'#b6afa3':'#3b352d'};">Next →</button>
     </div>
     <button id="copy" class="tapbtn" style="width:100%; margin-top:10px; padding:14px; font-size:16px; font-weight:700; font-family:inherit;
-      border:none; border-radius:14px; background:#4a4238; color:#f4f1ea; cursor:pointer;">📋 이야기 복사하기</button>
+      border:none; border-radius:14px; background:#4a4238; color:#f4f1ea; cursor:pointer;">📋 Copy story</button>
 
     <div style="text-align:center; font-size:13px; color:#a4907a; margin-top:18px;">
-      지금까지 읽은 이야기 ${readCount}개 · 매일 자정에 새 이야기가 나와요
+      ${readCount} ${readCount === 1 ? 'story' : 'stories'} read · a new one arrives at midnight
     </div>
   </div>`;
 
@@ -617,7 +406,7 @@ function render() {
   const playBig = document.getElementById('playbig');
   const playBtn = document.getElementById('play');
   const syncBtn = () => {
-    playBtn.textContent = player.playing ? '⏸ 일시정지' : '▶ 영상 재생';
+    playBtn.textContent = player.playing ? '⏸ Pause' : '▶ Play';
     playBig.style.display = player.playing ? 'none' : 'block';
   };
   const player = createPlayer(canvas, s, syncBtn);
@@ -629,7 +418,13 @@ function render() {
   // 저장: 캔버스를 실시간으로 녹화해 webm으로 내려받는다 (영상 길이만큼 걸림).
   document.getElementById('save').onclick = (ev) => {
     if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
-      ev.target.textContent = '미지원'; return;
+      ev.target.textContent = 'unsupported'; return;
+    }
+    // file:// 로 열면 이미지가 캔버스를 오염시켜 녹화가 막힌다 (서버로 열면 정상).
+    try { canvas.captureStream(1); } catch (err) {
+      ev.target.textContent = 'needs http';
+      setTimeout(() => { ev.target.textContent = '⬇ Save'; }, 2200);
+      return;
     }
     const btn = ev.target;
     btn.disabled = true;
@@ -639,13 +434,13 @@ function render() {
     rec.onstop = () => {
       const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
       const a = document.createElement('a');
-      a.href = url; a.download = `하람쥐-${key}.webm`;
+      a.href = url; a.download = `haramji-${key}.webm`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
-      btn.disabled = false; btn.textContent = '⬇ 저장';
+      btn.disabled = false; btn.textContent = '⬇ Save';
     };
     player.reset(); rec.start(); player.play(); syncBtn();
-    btn.textContent = '녹화중…';
+    btn.textContent = 'recording…';
     setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, player.totalMs + 400);
   };
 
@@ -653,7 +448,7 @@ function render() {
   document.getElementById('next').onclick = () => { if (offset > 0) { offset--; render(); window.scrollTo(0,0); } };
   document.getElementById('copy').onclick = (e) => {
     const text = `${s.heading}\n(${key})\n\n` + s.paras.join('\n\n');
-    const done = () => { e.target.textContent = '복사했어요! ✅'; setTimeout(() => { e.target.textContent = '📋 이야기 복사하기'; }, 1500); };
+    const done = () => { e.target.textContent = 'Copied ✅'; setTimeout(() => { e.target.textContent = '📋 Copy story'; }, 1500); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
     else {
       const ta = document.createElement('textarea');
