@@ -5,6 +5,7 @@ const app=document.querySelector('#app');
 const byName=new Map();
 for(const card of DEFAULT_STATE.cards)for(const benefit of card.benefits)byName.set(benefit.name,{card,benefit});
 let pathLabels=[];
+let homeSelections={channel:null,paymentMethod:null};
 
 function topLabels(){return new Set(BROWSE_TREE.map(x=>x.label))}
 function fixBenefitFinder(){
@@ -52,8 +53,34 @@ function enrichCardTab(){
   });
 }
 
+function rememberHomeSelections(form=document.querySelector('#recommendForm')){
+  if(!form)return;
+  const channel=form.querySelector('[name="channel"]');
+  const paymentMethod=form.querySelector('[name="paymentMethod"]');
+  if(channel)homeSelections.channel=channel.value;
+  if(paymentMethod)homeSelections.paymentMethod=paymentMethod.value;
+}
+
+function restoreHomeSelections(){
+  const form=document.querySelector('#recommendForm');
+  if(!form)return;
+  const channel=form.querySelector('[name="channel"]');
+  const paymentMethod=form.querySelector('[name="paymentMethod"]');
+  if(channel&&homeSelections.channel)channel.value=homeSelections.channel;
+  if(paymentMethod&&homeSelections.paymentMethod)paymentMethod.value=homeSelections.paymentMethod;
+  if(!homeSelections.channel||!homeSelections.paymentMethod)rememberHomeSelections(form);
+}
+
 function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function enhance(){fixBenefitFinder();enrichBenefitFinder();enrichCardTab()}
+function enhance(){restoreHomeSelections();fixBenefitFinder();enrichBenefitFinder();enrichCardTab()}
+
+// Preserve recommendation form choices before app-v2 synchronously re-renders the form.
+document.addEventListener('submit',e=>{
+  if(e.target?.id==='recommendForm')rememberHomeSelections(e.target);
+},true);
+document.addEventListener('change',e=>{
+  if(e.target?.closest?.('#recommendForm')&&(e.target.name==='channel'||e.target.name==='paymentMethod'))rememberHomeSelections(e.target.form);
+},true);
 
 // Track Benefit Finder navigation labels in capture phase, before app re-renders.
 document.addEventListener('click',e=>{
