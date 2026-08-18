@@ -132,6 +132,29 @@ Ice and Space sit after Devil on purpose: they are the odd ones rather than the
 hardest, and Nightmare has to stay last because it can never be cleared — anything
 placed after it would be locked forever.
 
+### x_x The wrong key kills you
+
+While you are **playing**, every key that is not a control kills you on the spot.
+No warning shot, no grace period. `GAME_KEYS` in the input section is the whole
+allow-list, and `wrongKey` does the rest — banner naming the key you pressed, then
+straight into `killPlayer`. In an obby that costs you the run back to the checkpoint;
+in Killer Snail and Infinity it ends the run.
+
+**If you bind a new control, add its code to `GAME_KEYS` in the same edit.** Miss it
+and the key you just added will kill whoever presses it.
+
+Three deliberate exemptions:
+
+| | Why |
+|---|---|
+| Anything with **Ctrl / Cmd / Alt held** | Refreshing the page should refresh the page, not kill you halfway through the combination. Devtools still open |
+| Any screen that is **not `play`** | Menus, the pause screen and the nickname box. Typing your name must not be fatal |
+| Key **repeats** | Holding a key down is one press, not fifty deaths |
+
+Everything else is fair game, including **Shift** and **Tab** — those two are the
+most likely accidental deaths, and that is the joke. Tab is also `preventDefault`ed
+so focus cannot escape the game on the way out.
+
 ### 🆘 The one save
 
 Slip off an edge and you have **one** emergency recovery: press `G` while falling and

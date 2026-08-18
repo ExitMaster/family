@@ -235,6 +235,7 @@
         <tr><td>Save yourself</td><td><b>G</b> while falling — <b>one per life</b>, and you must be quick</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
         <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
+        <tr><td style="color:#FF8A8A"><b>Any other key</b></td><td style="color:#FF8A8A"><b>x_x you die.</b> The keys above are the only ones the game will let you touch while you are playing</td></tr>
         <tr><td>Phone / tablet</td><td>joystick + jump button, drag the right side to look</td></tr>
         <tr><td colspan="2" style="padding-top:9px;color:#9BE58A"><b>🐌 In Killer Snail only</b></td></tr>
         <tr><td>Throw salt</td><td><b>Z</b> — costs salt, aims itself at the snail</td></tr>
@@ -1098,8 +1099,43 @@ const input = { fwd:0, side:0, jump:false, jumpPressed:false, look:0, lookPitch:
 const keys = {};
 const stage = document.getElementById('stage');
 
+/* Every key the game actually uses. Anything else, while you are playing, kills
+   you — see wrongKey below. Add a new control here the moment you bind it, or it
+   will kill the player who presses it. */
+const GAME_KEYS = new Set([
+  'KeyW','KeyA','KeyS','KeyD',
+  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+  'Space',                       // jump
+  'KeyQ','KeyE',                 // turn the camera
+  'KeyR',                        // back to the checkpoint
+  'KeyG',                        // the one save
+  'KeyZ','KeyK','KeyT',          // salt, swing, teleport — Killer Snail
+  'Escape','KeyP',               // pause
+  'KeyF',                        // fullscreen
+  'F3','Backquote'               // debug overlay
+]);
+// KeyJ -> J, Digit5 -> 5, ShiftLeft -> SHIFT, everything else as it comes
+function keyLabel(code) {
+  return code.replace(/^Key|^Digit|^Numpad/, '').replace(/(Left|Right)$/, '').toUpperCase();
+}
+/* Touch one key that is not in the game and you are dead. No warning shot, no
+   grace period — that is the whole joke. Held Ctrl/Cmd/Alt is let through so the
+   browser's own shortcuts still work: refreshing the page should refresh the page,
+   not kill you halfway through the combination. */
+function wrongKey(code) {
+  if (game.dead > 0 || game.won) return;
+  game.banner = { text:'x_x  WRONG KEY — ' + keyLabel(code), t:2.2 };
+  killPlayer();
+}
+
 addEventListener('keydown', e => {
   if (e.repeat) { if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault(); return; }
+  if (game.screen === 'play' && !GAME_KEYS.has(e.code) &&
+      !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.code === 'Tab') e.preventDefault();      // do not let focus escape the game
+    wrongKey(e.code);
+    return;
+  }
   keys[e.code] = true;
   if (e.code === 'Space') { input.jumpPressed = true; e.preventDefault(); }
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
@@ -3772,6 +3808,7 @@ window.OBBY = {
   startLevel, startSnail, startInfinity, showScreen, persist,
   shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, emergencySave, project, cam, endRun, Scores,
   Profiles, useProfile, mergeSave, snapshot, get profileKey() { return profileKey; },
+  GAME_KEYS, wrongKey,
   consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
 };
 
