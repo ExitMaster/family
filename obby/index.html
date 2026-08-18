@@ -1084,9 +1084,15 @@ const POWERS = [
   { id:'wings', name:'Aura Wings', price:500, em:'🪽',
     desc:'They only stir in one place, and it is not down here.' }
 ];
-// Jetpack. What keeps this from being free flight is not fuel any more but WHERE
-// it works: only on the last deck of Nightmare, under the portal. See stepPlayer.
-const WING_LIFT = 55, WING_MAX_UP = 9.0;
+// Jetpack. TWO things keep it from deleting the game, and both matter:
+//   WHERE  — only inside Nightmare. Flight would skip straight over any course, so
+//            everywhere else the wings are dead weight and the courses are safe.
+//   FUEL   — WING_FUEL seconds of thrust per trip into the air, refilled the moment
+//            you land. One tankful climbs about 27, and Nightmare's portal is at 70,
+//            so the tank is what keeps the portal out of reach from anywhere but its
+//            own last deck. Do not raise it without re-measuring that.
+const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
+const GLIDE_FALL = 2.6;     // out of fuel: hold jump and you sink this slowly
 const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
 // One emergency recovery per life. Slip off an edge and you have about half a second
 // to hit G before you are too far down for the boost to bring you back — miss the
@@ -1831,6 +1837,7 @@ function makePlayer(sp) {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
     coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false, saves:1,
+    fuel:WING_FUEL,
     ascending:false,
     yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
@@ -1903,12 +1910,14 @@ function stepPlayer(dt) {
   // to be run on foot. Flight would skip straight over a course, so this is what
   // protects them; the wings are a key to one place, not a way around the game.
   //
-  // THE NIGHTMARE SECRET: on the last deck, under the portal, they finally start,
-  // and there they never run out. That is the only way anything reaches 70.
+  // THE NIGHTMARE SECRET: on the last deck, under the portal, the tank stops
+  // draining. Anywhere else one tankful tops out around 25 and the portal is at 70,
+  // so that deck is the only place anything reaches it.
   // Nothing in the game says any of this. Do not sign-post it.
   const atEnd = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
-  const canFly = hasPower('wings') && atEnd;
-  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0;
+  const canFly = hasPower('wings') && !!W.troll;
+  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0 &&
+                  (p.fuel > 0 || atEnd);
   const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
@@ -1954,24 +1963,34 @@ function stepPlayer(dt) {
   if (p.vy <= 0) p.jumpHeld = false;
 
   p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
-  // Aura Wings, as a jetpack: hold jump in the air on the last deck and you climb.
-  // There is no fuel any more — where they work at all, they work forever.
+  // Aura Wings, as a jetpack: hold jump in the air and you climb while the tank
+  // lasts, then it turns into a slow glide. The tank refills when you land.
   p.gliding = false; p.thrusting = false;
-  if (jetting) {
-    p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
-    p.thrusting = true; p.gliding = true;
-    if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
+  if (canFly && !p.onGround && input.jump && p.buffer <= 0) {
+    if (jetting) {
+      p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
+      if (!atEnd) p.fuel = Math.max(0, p.fuel - dt);
+      p.thrusting = true; p.gliding = true;
+      if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
+    } else if (p.vy < 0) {
+      p.vy = Math.max(p.vy, -GLIDE_FALL);            // out of fuel: glide down
+      p.gliding = true;
+    }
   }
-  // The final Nightmare ascent is on rails: once you are climbing you cannot steer,
-  // you only go up. It also eases you onto the portal's x/z — without that you could
-  // lift off from the back of the deck and rise past it forever, unable to correct.
+  // The final Nightmare climb still ends at the portal no matter what you do — but
+  // you fly it, you are not carried. Your own steering still works; the portal just
+  // reels your x/z in harder than you can push away from it, so you cannot lift off
+  // the back of the deck and sail past it forever with no way to correct.
   if (atEnd && !p.onGround && p.y > 3) {
     const k = 1 - Math.pow(0.06, dt);
     p.x = lerp(p.x, W.goal.x, k);
     p.z = lerp(p.z, W.goal.z, k);
-    p.vx = 0; p.vz = 0;
+    const drag = Math.pow(0.2, dt);
+    p.vx *= drag; p.vz *= drag;
     p.ascending = true;
   } else p.ascending = false;
+
+  if (p.onGround) p.fuel = WING_FUEL;
 
   const wasGround = p.onGround;
   p.onGround = false; p.standing = null;
@@ -3069,8 +3088,21 @@ function drawHUD(t) {
   H.fillStyle = '#fff';
   H.fillText(game.mode === 'obby' ? game.runOrbs + ' / ' + game.world.totalOrbs : String(game.runOrbs), 58, 39);
 
-  // No fuel gauge any more: the wings are either dead or endless, and a bar that
-  // only ever reads full or empty tells you nothing. The white flare is the tell.
+  // jetpack fuel — only in the one level the wings work in. A gauge sitting there
+  // in a level where nothing happens would be a puzzle with no answer.
+  if (hasPower('wings') && game.player && game.world && game.world.troll) {
+    const f = clamp((game.player.fuel || 0) / WING_FUEL, 0, 1);
+    H.fillStyle = 'rgba(18,16,31,.55)';
+    rr2(14, 54, 150, 16, 8); H.fill();
+    H.fillStyle = 'rgba(255,255,255,.18)';
+    rr2(20, 59, 112, 6, 3); H.fill();
+    H.fillStyle = f > 0.25 ? '#C9A0FF' : '#FF8A8A';
+    rr2(20, 59, 112*f, 6, 3); H.fill();
+    H.font = 'bold 10px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.8)';
+    H.textAlign = 'left';
+    H.fillText('🪽', 138, 67);
+  }
 
   // the one emergency recovery, lit while you still have it
   if (game.player) {
@@ -3293,7 +3325,7 @@ function drawDebug() {
     'pos ' + n(p.x) + n(p.y) + n(p.z),
     'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
     'ground ' + (p.onGround ? 'yes' : 'no ') + (p.ascending ? '  ASCENT' : p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
-      '  airJumps ' + p.airJumps +
+      '  fuel ' + (p.fuel||0).toFixed(2) + '   airJumps ' + p.airJumps +
       '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
     'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
   lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));

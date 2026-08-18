@@ -89,33 +89,33 @@ is — visible, and apparently out of reach. `troll:true` puts the goal in the s
 
 #### The secret — do not sign-post this
 
-**The jetpack only works on the last deck, under the portal.** Nowhere else — not in
-any other level, and not on the way there either. All 27 chunks have to be run on
-foot. Reach the end, hold jump, and the wings finally start, with nothing to run out
-of. See `atEnd` in `stepPlayer`: `troll` is set and you are within 12 of the goal's z.
+**On the last deck, under the portal, the tank stops draining.** That is the only way
+anyone reaches the portal: buy the Aura Wings, walk the 27 chunks, and hold jump at
+the end. See `atEnd` in `stepPlayer` — it is on when `troll` is set and you are within
+12 of the goal's z.
 
-There is no fuel any more. Where the wings work they work forever, and where they do
-not they do nothing, so there is nothing left for a gauge to say — it is gone.
+Everywhere else in the level one tankful tops out at **27.8** against a portal at
+**70**, so that deck is the only place it can be done.
 
-Once you are climbing there, **steering is switched off** — you only go up. The climb
-also eases you onto the portal's x/z. That is not decoration: without it you could
-lift off from the back of the deck and rise straight past the portal forever with no
-way to correct. Verified from all four corners of the deck, and while actively
-holding a direction to fight it: every one of them reaches the portal.
+On that climb **you still fly it — you are not carried.** Your steering works the
+whole way up; the portal simply reels your x/z in harder than you can push away from
+it, so you always arrive. That pull is not decoration: without it you could lift off
+from the back of the deck and rise straight past the portal forever with no way to
+correct. Verified from five spots across the deck while actively holding a direction
+to fight it — all five reach the portal, all five win.
 
 Nothing in the game hints at it. The blurb still says nobody has finished it, the
 gatekeeper still says nobody gets past him, and there is no marker in the sky. Keep
 it that way.
 
-Everywhere else holding jump does nothing at all, so the level stays impossible for
+Outside Nightmare holding jump does nothing at all, so the level stays impossible for
 anyone who has not bought the wings, walked all 27 chunks, and thought to fly:
 
 | | Rise above the deck | Wins |
 |---|---|---|
 | Wings, on the last deck | **64.8** | **yes** |
-| Wings, at the start of Nightmare | 1.7 — just a jump | no |
-| Wings, halfway through Nightmare | 1.7 | no |
-| Wings, in Angel or Devil | 1.7 | no |
+| Wings, anywhere else in Nightmare | 27.8 at most, swept across the whole course | no |
+| Wings, in Angel / Devil / Ice / Space | 1.8 — just a jump, and no glide either | no |
 | No wings, on the last deck | 1.7 | no |
 
 If someone reports "the last level is broken" and has not bought the wings, this is
@@ -291,18 +291,22 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack — **but only at the very end of Nightmare**. Dead weight everywhere else, the whole walk there included |
+| 🪽 **Aura Wings** | 500 | A jetpack — **but only inside Nightmare**. Dead weight in every other level |
 
-**The wings only work on the last deck of the Nightmare Level.** `canFly` in
-`stepPlayer` requires `atEnd`; anywhere else — including every one of its 27 chunks —
-holding jump in mid-air does nothing at all.
+**The wings only work inside the Nightmare Level.** `canFly` in `stepPlayer` requires
+`W.troll`; in every other level holding jump in mid-air does nothing at all, and there
+is no glide there either. The fuel gauge is hidden outside that level too — a gauge
+sitting in a level where the wings are inert is a puzzle with no answer.
 
 That restriction is the design, not a limitation. Flight skips straight over any
 course, so letting it work everywhere would quietly delete every level in the game.
 Confined to one level it stops being a cheat and becomes a key.
 
-On that deck it is a real jetpack: **9 a second upward**, **1.5× running speed
-forward**, sharper air steering, and no limit. The wings flare white under thrust.
+Inside Nightmare it is a real jetpack: **9 a second upward**, **1.5× running speed
+forward** (measured: 10.8 against a 7.2 run), sharper air steering, on a **2.8 second
+tank** that refills when you land. Run the tank dry and holding jump becomes a
+**glide** — you sink at 2.6 a second instead of 34, so a 38-unit drop takes 12 seconds
+instead of under 2. The wings flare white under thrust.
 
 The shop description is deliberately vague — *"They only stir in one place, and it is
 not down here."* It explains why nothing happens in a normal level without giving
@@ -311,8 +315,8 @@ away where it does.
 | | Rise above the deck | Wins |
 |---|---|---|
 | Wings, on Nightmare's last deck | **64.8** | **yes** |
-| Wings, elsewhere in Nightmare | 26.9 | no |
-| Wings, in Angel / Devil / Space | **1.7** — just a jump | no |
+| Wings, elsewhere in Nightmare | 27.8 | no |
+| Wings, in Angel / Devil / Ice / Space | **1.8** — just a jump, no glide | no |
 | No wings, on the last deck | 1.7 | no |
 
 `runMax()` is the one place top speed is decided, so anything that has to stay ahead
