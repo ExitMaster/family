@@ -1,11 +1,23 @@
 import { DEFAULT_STATE, BROWSE_TREE } from './default-data-v2.js';
 import { renderDetailedConditions, importantConditions } from './benefit-ui-v2.js';
+import { CARD_IMAGES } from './card-images-v2.js';
 
 const app=document.querySelector('#app');
 const byName=new Map();
 for(const card of DEFAULT_STATE.cards)for(const benefit of card.benefits)byName.set(benefit.name,{card,benefit});
 let pathLabels=[];
 let homeSelections={channel:null,paymentMethod:null};
+
+function ensureImageStyles(){
+  if(document.querySelector('#card-result-image-style'))return;
+  const style=document.createElement('style');style.id='card-result-image-style';
+  style.textContent=`
+    .hero-result.with-card-image{position:relative;padding-right:124px;min-height:168px}
+    .card-result-image{position:absolute;top:18px;right:18px;width:94px;height:98px;object-fit:contain;border-radius:8px;background:#fff;box-shadow:0 2px 10px rgba(16,24,40,.12)}
+    @media(max-width:420px){.hero-result.with-card-image{padding-right:108px}.card-result-image{width:80px;height:88px;top:16px;right:14px}}
+  `;
+  document.head.appendChild(style);
+}
 
 function topLabels(){return new Set(BROWSE_TREE.map(x=>x.label))}
 function fixBenefitFinder(){
@@ -53,6 +65,18 @@ function enrichCardTab(){
   });
 }
 
+function enrichRecommendationImage(){
+  ensureImageStyles();
+  const result=app.querySelector('.hero-result');
+  if(!result||result.querySelector('.card-result-image'))return;
+  const cardName=result.querySelector('h2')?.textContent?.trim();
+  const src=CARD_IMAGES[cardName];
+  if(!src)return;
+  const img=document.createElement('img');
+  img.className='card-result-image';img.src=src;img.alt=`${cardName} 카드 이미지`;img.loading='eager';img.decoding='async';
+  result.classList.add('with-card-image');result.appendChild(img);
+}
+
 function rememberHomeSelections(form=document.querySelector('#recommendForm')){
   if(!form)return;
   const channel=form.querySelector('[name="channel"]');
@@ -72,7 +96,7 @@ function restoreHomeSelections(){
 }
 
 function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function enhance(){restoreHomeSelections();fixBenefitFinder();enrichBenefitFinder();enrichCardTab()}
+function enhance(){restoreHomeSelections();fixBenefitFinder();enrichBenefitFinder();enrichCardTab();enrichRecommendationImage()}
 
 // Preserve recommendation form choices before app-v2 synchronously re-renders the form.
 document.addEventListener('submit',e=>{
