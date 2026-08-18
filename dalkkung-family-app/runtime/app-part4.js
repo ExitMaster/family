@@ -1,12 +1,64 @@
- if(state.modal==='settle')return `<div class="modal-backdrop"><div class="modal"><div class="modal-head"><h2>정산 추가</h2>${close}</div><form id="settleForm" class="form"><div class="form-grid"><div class="field"><label>일자</label><input name="date" type="date" value="${new Date().toISOString().slice(0,10)}" required></div><div class="field"><label>대납 가정</label><select name="payer">${state.households.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('')}</select></div></div><div class="field"><label>내용</label><input name="description" required></div><div class="field"><label>총액</label><input id="settleTotal" name="total" type="number" min="0" required></div>${state.households.map(h=>`<div class="form-grid"><div class="field"><label>${esc(h.name)} 분담액</label><input name="share_${h.id}" type="number" min="0" value="0"></div><div class="field"><label>${esc(h.name)} 상태</label><select name="status_${h.id}"><option value="unpaid">미정산</option><option value="paid">완료</option><option value="self">본인</option><option value="excluded">-</option></select></div></div>`).join('')}<button class="btn">저장</button></form></div></div>`; return '';
+function bindLinkButtons(){document.querySelectorAll('.link-btn').forEach(b=>b.onclick=()=>{const a=state.attachments.find(x=>x.id===b.dataset.link);if(!a?.drive_url)return;window.open(a.drive_url,'_blank','noopener,noreferrer');});}
+
+function bindModal(){
+  $('#closeModal').onclick=()=>{state.modal=null;render();};
+  const tx=$('#txForm'),careForm=$('#careForm'),health=$('#healthForm'),settle=$('#settleForm'),imp=$('#importForm');
+  if(tx){const type=tx.elements.type,cat=tx.elements.category;const fill=()=>cat.innerHTML=state.categories.filter(c=>c.type===type.value).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');type.onchange=fill;fill();tx.onsubmit=saveTx;}
+  if(careForm)careForm.onsubmit=saveCare;
+  if(health)health.onsubmit=saveHealth;
+  if(settle){settle.onsubmit=saveSettlement;$('#settleTotal').onchange=()=>{const v=Math.round(Number($('#settleTotal').value||0)/3);state.households.forEach(h=>settle.elements[`share_${h.id}`].value=v);};}
+  if(imp)imp.onsubmit=importSeed;
 }
 
-function bindFileButtons(){document.querySelectorAll('.file-btn').forEach(b=>b.onclick=async()=>{const a=state.attachments.find(x=>x.id===b.dataset.file);if(!a)return;const {data,error}=await state.sb.storage.from('family-files').createSignedUrl(a.storage_path,60);if(error)return alert(error.message);window.open(data.signedUrl,'_blank','noopener');});}
+async function saveTx(e){e.preventDefault();const f=new FormData(e.target);try{await addDoc(subcol('transactions'),{txn_date:f.get('date'),type:f.get('type'),category_id:f.get('category')||null,description:f.get('description'),amount:Number(f.get('amount')),household_id:f.get('household')||null,payment_method:f.get('payment'),memo:f.get('memo')||null,created_by:state.user.uid,created_at:serverTimestamp()});await done();}catch(err){alert(err.message);}}
 
-function bindModal(){ $('#closeModal').onclick=()=>{state.modal=null;render();}; const tx=$('#txForm'),care=$('#careForm'),health=$('#healthForm'),settle=$('#settleForm'); if(tx){const type=tx.elements.type,cat=tx.elements.category;const fill=()=>cat.innerHTML=state.categories.filter(c=>c.type===type.value).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');type.onchange=fill;fill();tx.onsubmit=saveTx;} if(care)care.onsubmit=saveCare;if(health)health.onsubmit=saveHealth;if(settle){settle.onsubmit=saveSettlement;$('#settleTotal').onchange=()=>{const v=Math.round(Number($('#settleTotal').value||0)/3);state.households.forEach(h=>settle.elements[`share_${h.id}`].value=v);};}}
-async function saveTx(e){e.preventDefault();const f=new FormData(e.target);const {error}=await state.sb.from('transactions').insert({family_id:state.family.id,txn_date:f.get('date'),type:f.get('type'),category_id:f.get('category')||null,description:f.get('description'),amount:Number(f.get('amount')),household_id:f.get('household')||null,payment_method:f.get('payment'),memo:f.get('memo')||null,created_by:state.session.user.id});if(error)return alert(error.message);await done();}
-async function saveCare(e){e.preventDefault();const f=new FormData(e.target);const {data,error}=await state.sb.from('care_events').insert({family_id:state.family.id,event_date:f.get('date'),event_type:f.get('type'),place:f.get('place')||null,doctor:f.get('doctor')||null,companions:f.get('companions')||null,content:f.get('content')||null,memo:f.get('memo')||null,created_by:state.session.user.id}).select().single();if(error)return alert(error.message);const file=f.get('file');if(file&&file.size&&!f.get('protected')) return alert('의료 첨부파일은 파일 자체에 비밀번호를 설정한 뒤 체크해 주세요.');if(file&&file.size){const path=`${state.family.id}/${data.id}/${crypto.randomUUID()}-${file.name}`;const up=await state.sb.storage.from('family-files').upload(path,file,{upsert:false});if(up.error)return alert('기록은 저장됐지만 파일 업로드 실패: '+up.error.message);await state.sb.from('attachments').insert({family_id:state.family.id,care_event_id:data.id,storage_path:path,original_name:file.name,mime_type:file.type||null,password_protected:true,created_by:state.session.user.id});}await done();}
-async function saveHealth(e){e.preventDefault();const f=new FormData(e.target),num=n=>f.get(n)?Number(f.get(n)):null;const {error}=await state.sb.from('health_logs').insert({family_id:state.family.id,log_date:f.get('date'),weight_kg:num('weight'),wbc:num('wbc'),anc:num('anc'),neuropathy_score:num('neuropathy'),fatigue_score:num('fatigue'),meal_memo:f.get('memo')||null,created_by:state.session.user.id});if(error)return alert(error.message);await done();}
-async function saveSettlement(e){e.preventDefault();const f=new FormData(e.target);const {data,error}=await state.sb.from('settlements').insert({family_id:state.family.id,settlement_date:f.get('date'),description:f.get('description'),total_amount:Number(f.get('total')),payer_household_id:f.get('payer'),created_by:state.session.user.id}).select().single();if(error)return alert(error.message);const rows=state.households.map(h=>({family_id:state.family.id,settlement_id:data.id,household_id:h.id,amount:Number(f.get(`share_${h.id}`)||0),status:f.get(`status_${h.id}`),created_by:state.session.user.id}));const r=await state.sb.from('settlement_shares').insert(rows);if(r.error)return alert(r.error.message);await done();}
+async function saveCare(e){
+  e.preventDefault();const f=new FormData(e.target);const driveUrl=String(f.get('drive_url')||'').trim();
+  if(driveUrl && !/^https:\/\/(drive|docs)\.google\.com\//i.test(driveUrl)) return alert('Google Drive 또는 Google Docs 링크만 등록해 주세요.');
+  if(driveUrl && !f.get('protected')) return alert('의료자료 링크를 등록하려면 파일 자체 비밀번호 보호 완료를 확인해 주세요.');
+  try{
+    const ref=await addDoc(subcol('care_events'),{event_date:f.get('date'),event_type:f.get('type'),place:f.get('place')||null,doctor:f.get('doctor')||null,companions:f.get('companions')||null,content:f.get('content')||null,memo:f.get('memo')||null,created_by:state.user.uid,created_at:serverTimestamp()});
+    if(driveUrl) await addDoc(subcol('attachments'),{care_event_id:ref.id,drive_url:driveUrl,label:String(f.get('drive_label')||'Google Drive 자료').trim(),password_protected:true,created_by:state.user.uid,created_at:serverTimestamp()});
+    await done();
+  }catch(err){alert(err.message);}
+}
+
+async function saveHealth(e){e.preventDefault();const f=new FormData(e.target),num=n=>f.get(n)?Number(f.get(n)):null;try{await addDoc(subcol('health_logs'),{log_date:f.get('date'),weight_kg:num('weight'),wbc:num('wbc'),anc:num('anc'),neuropathy_score:num('neuropathy'),fatigue_score:num('fatigue'),meal_memo:f.get('memo')||null,created_by:state.user.uid,created_at:serverTimestamp()});await done();}catch(err){alert(err.message);}}
+
+async function saveSettlement(e){e.preventDefault();const f=new FormData(e.target);try{const ref=await addDoc(subcol('settlements'),{settlement_date:f.get('date'),description:f.get('description'),total_amount:Number(f.get('total')),payer_household_id:f.get('payer'),is_example:false,created_by:state.user.uid,created_at:serverTimestamp()});const batch=writeBatch(state.db);state.households.forEach(h=>{const sr=doc(subcol('settlement_shares'));batch.set(sr,{settlement_id:ref.id,household_id:h.id,amount:Number(f.get(`share_${h.id}`)||0),status:f.get(`status_${h.id}`),created_by:state.user.uid,created_at:serverTimestamp()});});await batch.commit();await done();}catch(err){alert(err.message);}}
+
+function containsSensitivePasswordKey(value,path='root'){
+  if(!value||typeof value!=='object')return null;
+  for(const [k,v] of Object.entries(value)){
+    const key=String(k).toLowerCase();
+    if(/password|passwd|passcode|\bpin\b|비번|비밀번호/.test(key)) return `${path}.${k}`;
+    const nested=containsSensitivePasswordKey(v,`${path}.${k}`); if(nested)return nested;
+  }
+  return null;
+}
+
+async function importSeed(e){
+  e.preventDefault();if(!state.isAdmin)return alert('관리자만 이관할 수 있습니다.');
+  const f=new FormData(e.target),file=f.get('seed');if(!file?.size)return;
+  try{
+    const seed=JSON.parse(await file.text());const bad=containsSensitivePasswordKey(seed);if(bad)return alert(`비밀번호 관련 필드가 발견되어 중단했습니다: ${bad}`);
+    if(state.transactions.length||state.settlements.length||state.careEvents.length){if(!confirm('이미 일부 데이터가 있습니다. 계속하면 중복 데이터가 생길 수 있습니다. 계속할까요?'))return;}
+    await importSeedData(seed);state.modal=null;await refreshData();render();alert(`이관 완료: 거래 ${(seed.transactions||[]).length}건, 정산 ${(seed.settlements||[]).length}건, 간병 ${(seed.care_events||[]).length}건`);
+  }catch(err){console.error(err);alert('이관 실패: '+(err.message||err));}
+}
+
+async function importSeedData(seed){
+  const householdByName=Object.fromEntries(state.households.map(h=>[h.name,h.id]));
+  const catByName=Object.fromEntries(state.categories.map(c=>[`${c.type}:${c.name}`,c.id]));
+  const batch=writeBatch(state.db);let writes=0;
+  for(const x of seed.transactions||[]){const r=doc(subcol('transactions'));batch.set(r,{txn_date:x.date,type:x.type,category_id:catByName[`${x.type}:${x.category}`]||null,description:x.description||'',amount:Number(x.amount||0),household_id:x.household?householdByName[x.household]||null:null,payment_method:x.payment_method||null,receipt_shared:x.receipt_shared||null,memo:x.memo||null,created_by:state.user.uid,created_at:serverTimestamp()});writes++;}
+  for(const s of seed.settlements||[]){const sr=doc(subcol('settlements'));batch.set(sr,{settlement_date:s.date,description:s.description||'',total_amount:Number(s.total_amount||0),payer_household_id:householdByName[s.payer]||null,memo:s.memo||null,is_example:!!s.is_example,created_by:state.user.uid,created_at:serverTimestamp()});writes++;for(const [name,v] of Object.entries(s.shares||{})){const sh=doc(subcol('settlement_shares'));batch.set(sh,{settlement_id:sr.id,household_id:householdByName[name]||null,amount:Number(v.amount||0),status:v.status||'unpaid',created_by:state.user.uid,created_at:serverTimestamp()});writes++;}}
+  for(const [i,x] of (seed.care_events||[]).entries()){const r=doc(subcol('care_events'));batch.set(r,{event_date:x.date,event_type:x.event_type||null,place:x.place||null,doctor:x.doctor||null,companions:x.companions||null,content:x.content||null,memo:x.memo||null,medication:x.medication||null,chemo_cycle:x.chemo_cycle||null,sort_order:i,created_by:state.user.uid,created_at:serverTimestamp()});writes++;}
+  for(const x of seed.chemo_cycles||[]){batch.set(subdoc('chemo_cycles',x.cycle_number),{cycle_number:Number(x.cycle_number),cycle_date:x.cycle_date||null,hospital:x.hospital||null,medication:x.medication||null,condition_summary:x.condition_summary||null,notes:x.notes||null,updated_by:state.user.uid,updated_at:serverTimestamp()},{merge:true});writes++;}
+  for(const x of seed.payout_accounts||[]){const hid=householdByName[x.household];if(!hid)continue;batch.set(subdoc('payout_accounts',hid),{household_id:hid,bank_name:x.bank_name||null,account_number:x.account_number||null,updated_at:serverTimestamp()},{merge:true});writes++;}
+  if(writes>450) throw new Error(`이관 데이터가 ${writes}개 write로 너무 큽니다. 현재 도구는 450개 이하 seed를 전제로 합니다.`);
+  if(writes) await batch.commit();
+}
+
 async function done(){state.modal=null;await refreshData();render();}
 boot();
