@@ -1,9 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" translate="no">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Aura Obby 3D — Killer Snail</title>
+<!-- The game stays in English even on a browser set to translate everything.
+     Auto-translate rewrites the text nodes under it, which turns the controls into
+     something nobody typed ("SPACE" becomes "우주") and can break a screen mid-play.
+     translate="no" plus the notranslate class is what Chrome, Edge and Safari all
+     read; the google meta stops the "translate this page?" bar being offered. -->
+<meta name="google" content="notranslate">
+<title translate="no">Aura Obby 3D — Killer Snail</title>
 <style>
   :root { --ink:#1E1B33; --aura:#A46BFF; --aura2:#5BE7FF; --gold:#FFC53D; --bg:#F0ECFF; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -144,7 +150,7 @@
   }
 </style>
 </head>
-<body>
+<body class="notranslate" translate="no">
 <h1>✨ AURA OBBY 3D ✨</h1>
 
 <div id="stage">
