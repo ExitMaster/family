@@ -116,14 +116,14 @@ function buildMission(key) {
 //  각 샷은 SVG 한 장 + 자막 한 줄. 타임라인이 자동으로 넘긴다 = 영상.
 function shots(m) {
   return [
-    {ms:2600, cap:'M.S.G. HQ — SUB-BASEMENT. 0451 HOURS.',            draw:sHQ},
-    {ms:3000, cap:m.alarm,                                                 draw:sAlarm},
-    {ms:3600, cap:m.order,                                                 draw:sOrder},
-    {ms:3000, cap:'SQUAD ' + m.squadA + ' AND SQUAD ' + m.squadB + ' DEPLOY. ' + m.soldiers + ' SOLDIER SQUIRRELS.', draw:sDeploy},
-    {ms:3000, cap:'CONTACT AT ' + m.sector + '. ' + m.threat.n + ' — ' + m.threat.d + '.', draw:sThreat},
-    {ms:3400, cap:m.weapon + ' FIRING. ' + m.rounds + ' ROUNDS AWAY.',      draw:sFire},
-    {ms:3000, cap:m.outcome.t + '. ' + m.outcome.s,                        draw:sVictory},
-    {ms:3600, cap:m.closer,                                                draw:sSeal}
+    {sfx:'hq',     ms:2600, cap:'M.S.G. HQ — SUB-BASEMENT. 0451 HOURS.',            draw:sHQ},
+    {sfx:'alarm',  ms:3000, cap:m.alarm,                                                 draw:sAlarm},
+    {sfx:'order',  ms:3600, cap:m.order,                                                 draw:sOrder},
+    {sfx:'deploy', ms:3000, cap:'SQUAD ' + m.squadA + ' AND SQUAD ' + m.squadB + ' DEPLOY. ' + m.soldiers + ' SOLDIER SQUIRRELS.', draw:sDeploy},
+    {sfx:'threat', ms:3000, cap:'CONTACT AT ' + m.sector + '. ' + m.threat.n + ' — ' + m.threat.d + '.', draw:sThreat},
+    {sfx:'fire',   ms:3400, cap:m.weapon + ' FIRING. ' + m.rounds + ' ROUNDS AWAY.',      draw:sFire},
+    {sfx:'win',    ms:3000, cap:m.outcome.t + '. ' + m.outcome.s,                        draw:sVictory},
+    {sfx:'stamp',  ms:3600, cap:m.closer,                                                draw:sSeal}
   ];
 }
 
@@ -246,9 +246,71 @@ function sSeal(m) {
       '<text x="0" y="10" text-anchor="middle" class="mono" font-size="24" fill="#b3271c">CLASSIFIED</text></g>');
 }
 
+
+// ── 효과음 (WebAudio 합성 — 음원 파일 없이, 오프라인에서도 난다) ─────────
+const K_MUTE = 'family-msg-mute';
+let AC = null;
+let muted = (() => { try { return localStorage.getItem(K_MUTE) === '1'; } catch (e) { return false; } })();
+function ac() {
+  if (!AC) { const C = window.AudioContext || window.webkitAudioContext; if (C) AC = new C(); }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+// 기본 음 하나. type=파형, f0→f1 로 미끄러지며 dur 초 동안 감쇠.
+function tone(f0, f1, dur, type, gain, delay) {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime + (delay || 0);
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(f0, t);
+  if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain || 0.16, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+// 노이즈 한 덩이. 폭발·발사음의 몸통.
+function noise(dur, cut0, cut1, gain, delay) {
+  const c = ac(); if (!c || muted) return;
+  const t = c.currentTime + (delay || 0);
+  const n = Math.floor(c.sampleRate * dur);
+  const buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = c.createBufferSource(); src.buffer = buf;
+  const f = c.createBiquadFilter(); f.type = 'lowpass';
+  f.frequency.setValueAtTime(cut0, t);
+  f.frequency.exponentialRampToValueAtTime(Math.max(60, cut1), t + dur);
+  const g = c.createGain(); g.gain.setValueAtTime(gain || 0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f); f.connect(g); g.connect(c.destination);
+  src.start(t); src.stop(t + dur);
+}
+const SFX = {
+  key:    () => tone(660, 660, 0.05, 'square', 0.07),
+  wrong:  () => { tone(200, 110, 0.28, 'sawtooth', 0.13); tone(150, 90, 0.3, 'square', 0.08, 0.04); },
+  unlock: () => { tone(523, 523, 0.1, 'triangle', 0.12); tone(784, 784, 0.1, 'triangle', 0.12, 0.1); tone(1046, 1046, 0.22, 'triangle', 0.13, 0.2); },
+  go:     () => { tone(392, 784, 0.35, 'square', 0.14); noise(0.5, 900, 200, 0.22, 0.1); },
+  hq:     () => { tone(880, 880, 0.06, 'sine', 0.07); tone(1174, 1174, 0.07, 'sine', 0.06, 0.22); },
+  alarm:  () => { for (let i = 0; i < 4; i++) { tone(440, 880, 0.3, 'sawtooth', 0.12, i * 0.62); tone(880, 440, 0.3, 'sawtooth', 0.12, i * 0.62 + 0.3); } },
+  order:  () => { tone(330, 330, 0.09, 'square', 0.1); tone(247, 247, 0.16, 'square', 0.1, 0.11); },
+  deploy: () => { for (let i = 0; i < 5; i++) noise(0.22, 1600, 300, 0.16, i * 0.34); },
+  threat: () => { tone(70, 42, 1.1, 'sawtooth', 0.2); noise(0.9, 320, 70, 0.24, 0.05); },
+  fire:   () => { for (let i = 0; i < 6; i++) { tone(500, 90, 0.16, 'sawtooth', 0.11, i * 0.42); noise(0.4, 1400, 120, 0.3, i * 0.42 + 0.16); } },
+  win:    () => { [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.26, 'triangle', 0.14, i * 0.13)); },
+  stamp:  () => { noise(0.22, 700, 90, 0.4); tone(140, 70, 0.24, 'square', 0.16); }
+};
+function muteLabel() { return muted ? '🔇 소리 켜기' : '🔊 소리 끄기'; }
+function sfx(n) { const f = SFX[n]; if (f) try { f(); } catch (e) {} }
+function toggleMute() {
+  muted = !muted;
+  try { localStorage.setItem(K_MUTE, muted ? '1' : '0'); } catch (e) {}
+  if (!muted) sfx('key');
+}
+
 // ── 재생기 ───────────────────────────────────────────────────
 const app = document.getElementById('app');
-let state = { mission:null, i:0, timer:null, playing:false, started:false, pin:'', pinErr:false };
+let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false };
 function unlocked() { try { return sessionStorage.getItem(K_UNLOCK) === '1'; } catch (e) { return false; } }
 
 function css(){ return `
@@ -320,6 +382,7 @@ function renderLock() {
   app.querySelectorAll('.pad button').forEach(b => b.onclick = () => key(b.dataset.k));
 }
 function key(k) {
+  sfx('key');
   state.pinErr = false;
   if (k === '←') state.pin = state.pin.slice(0, -1);
   else if (k === '✓') return submitPin();
@@ -330,9 +393,9 @@ function key(k) {
 function submitPin() {
   if (state.pin === PIN) {
     try { sessionStorage.setItem(K_UNLOCK, '1'); } catch (e) {}
-    state.pin = ''; render(); return;
+    state.pin = ''; sfx('unlock'); render(); return;
   }
-  state.pin = ''; state.pinErr = true; renderLock();
+  state.pin = ''; state.pinErr = true; sfx('wrong'); renderLock();
 }
 
 function renderBrief() {
@@ -350,11 +413,13 @@ function renderBrief() {
     '</div>' +
     '<div class="row">' +
       '<button class="tapbtn mono" id="full">' + fsLabel() + '</button>' +
+      '<button class="tapbtn mono" id="mute">' + muteLabel() + '</button>' +
       '<button class="tapbtn mono" id="arch">▤ ARCHIVE</button>' +
     '</div>' +
   '</div>';
-  document.getElementById('go').onclick = () => { state.started = true; state.i = 0; play(); };
+  document.getElementById('go').onclick = () => { sfx('go'); state.started = true; state.i = 0; state.cued = -1; play(); };
   document.getElementById('full').onclick = () => { toggleFull(); setTimeout(renderBrief, 120); };
+  document.getElementById('mute').onclick = () => { toggleMute(); renderBrief(); };
   document.getElementById('arch').onclick = archive;
 }
 
@@ -362,6 +427,7 @@ function render() {
   if (!unlocked()) return renderLock();
   if (!state.started) return renderBrief();
   const m = state.mission, sh = shots(m), s = sh[state.i];
+  if (state.cued !== state.i) { state.cued = state.i; sfx(s.sfx); }
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span>' +
     '<h1 class="mono">M.S.G. FILES</h1>' +
@@ -376,6 +442,7 @@ function render() {
       '<button class="tapbtn" id="next">NEXT ▶</button>' +
       '<button class="tapbtn" id="arch">▤ ARCHIVE</button>' +
       '<button class="tapbtn" id="brief">▣ 브리핑</button>' +
+      '<button class="tapbtn" id="mute">' + muteLabel() + '</button>' +
     '</div>' +
     '<div class="meta mono">SHOT <b>' + (state.i+1) + '/' + sh.length + '</b> · DATE <b>' + m.key + '</b><br>' +
       'FLOOR <b>' + m.floor + '</b> · SECTOR <b>' + m.sector + '</b> · THREAT <b>' + m.threat.n + '</b><br>' +
@@ -387,16 +454,18 @@ function render() {
   document.getElementById('arch').onclick = archive;
   document.getElementById('full').onclick = () => { toggleFull(); setTimeout(render, 120); };
   document.getElementById('brief').onclick = () => { pause(); state.started = false; render(); };
+  document.getElementById('mute').onclick = () => { toggleMute(); render(); };
 }
 function go(i) {
   const n = shots(state.mission).length;
   state.i = Math.max(0, Math.min(n - 1, i));
+  state.cued = -1;
   if (state.i === n - 1) remember();
   render();
 }
 function play() {
   const sh = shots(state.mission);
-  if (state.i >= sh.length - 1) state.i = 0;
+  if (state.i >= sh.length - 1) { state.i = 0; state.cued = -1; }
   state.playing = true; render(); tick();
 }
 function tick() {
