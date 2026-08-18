@@ -429,21 +429,28 @@ AIR_JUMPS 1   DBL_JUMP 0.85      ->  with the second jump, roughly 3.0 high and 
 ### SPEED_MUL — read this before touching it
 
 `SPEED_MUL` multiplies `RUN`, and `ACC` / `AIR_ACC` / `FRIC` with it so that getting
-going and stopping still *feel* the same. It is currently **4**, at the player's
-request, and that number is far outside what the courses were built for.
+going and stopping still *feel* the same. It is currently **18.9**, at the player's
+request — a top speed of **136 units a second** against courses built for 7.2. This is
+a joyride setting, not a difficulty setting, and it is meant to be.
 
 What it does, measured with the bot on the doubled-length courses:
 
-| SPEED_MUL | Angel | Normal | Devil | Nightmare |
-|---|---|---|---|---|
-| 1 | **won**, 102s | **won**, 129s | **won**, 169s | walked 100% |
-| 4 | 15% | 14% | 19% | 2% |
+| SPEED_MUL | Top speed | Angel | Normal | Devil | Nightmare |
+|---|---|---|---|---|---|
+| 1 | 7.2 | **won**, 102s | **won**, 129s | **won**, 169s | walked 100% |
+| 4 | 28.8 | 15% | 14% | 19% | 2% |
+| 18.9 | 136 | on the ground about a quarter of the time | | | |
 
 The reason is not the running, it is the jumping. A jump lasts 0.74s no matter how
 fast you are going, so at 4× it carries you about **21 units** instead of 5.3, while
 `MAXGAP` is 4.2 and platforms are 4 to 6 deep. You do not clear gaps — you sail past
-the platform on the other side of them. Ice is the exception (it stays winnable),
-because its courses are wide and forgiving by design.
+the platform on the other side of them. Ice is the exception at 4× (it stays
+winnable), because its courses are wide and forgiving by design.
+
+At 18.9 you cover **2.3 units per frame** at 60fps. Platforms are 4 to 6 deep, so the
+floor still catches you, but walls and other `THICK` (0.6) geometry are thinner than a
+single frame of travel and are not guaranteed to. If someone reports passing through
+something solid, this is the first thing to suspect.
 
 If the levels need to be playable again, `SPEED_MUL = 1` restores exactly the tuning
 every chunk was verified against. Anything above about 1.5 starts costing levels.
