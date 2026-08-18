@@ -152,7 +152,7 @@ const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
 // 제목용: 관사·전치사만 소문자로 남기는 통상적인 영문 제목 표기.
 const SMALL = new Set(['the','a','an','in','on','at','of','and','by','where']);
 const titleCase = t => t.split(' ')
-  .map((w, i) => (i > 0 && SMALL.has(w.toLowerCase())) ? w.toLowerCase() : cap(w))
+  .map((w, i) => SMALL.has(w.toLowerCase()) ? w.toLowerCase() : cap(w))   // 문장 중간에 끼워 넣으므로 첫 관사도 소문자
   .join(' ');
 
 // ── 이야기 생성 ──────────────────────────────────────────────
