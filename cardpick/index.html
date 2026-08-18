@@ -10,11 +10,14 @@
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="stylesheet" href="./styles.css" />
   <link rel="stylesheet" href="./v2.css" />
+  <script type="importmap">
+    {"imports":{"./engine-v2.js":"./engine-v12.js"}}
+  </script>
   <title>카드픽</title>
 </head>
 <body>
   <header class="app-header">
-    <div><p class="eyebrow">개인용 카드 할인 도우미</p><h1>카드픽</h1></div>
+    <div><p class="eyebrow">개인용 카드 할인 도우미 · v1.2</p><h1>카드픽</h1></div>
     <button id="installButton" class="icon-button hidden" type="button" aria-label="앱 설치">설치</button>
   </header>
   <main id="app" class="app-shell" aria-live="polite"></main>
@@ -27,7 +30,10 @@
   </nav>
   <dialog id="modal" class="modal"></dialog>
   <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="./v12-preload.js"></script>
+  <script type="module" src="./v12-preapp-extra.js"></script>
   <script type="module" src="./app-v2.js"></script>
   <script type="module" src="./ui-enhancer-v2.js"></script>
+  <script type="module" src="./v12-ui.js"></script>
 </body>
 </html>
