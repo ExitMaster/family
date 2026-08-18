@@ -7,7 +7,7 @@ const byName=new Map();
 for(const card of DEFAULT_STATE.cards)for(const benefit of card.benefits)byName.set(benefit.name,{card,benefit});
 let pathLabels=[];
 let homeSelections={channel:null,paymentMethod:null};
-let enhanceQueued=false;
+let enhanceTimer=null;
 
 function ensureImageStyles(){
   if(document.querySelector('#card-result-image-style'))return;
@@ -33,16 +33,8 @@ function fixBenefitFinder(){
   }
   if(pathLabels.length){
     let crumb=app.querySelector('.benefit-breadcrumb');
-    if(!crumb){
-      crumb=document.createElement('div');
-      crumb.className='benefit-breadcrumb';
-      title.closest('.section-title').before(crumb);
-    }
+    if(!crumb){crumb=document.createElement('div');crumb.className='benefit-breadcrumb';title.closest('.section-title').before(crumb)}
     const nextText=pathLabels.join(' › ');
-    // textContent replacement creates a childList mutation even when the text is
-    // unchanged. Since this module observes #app childList mutations, assigning
-    // it unconditionally caused an endless MutationObserver microtask loop in
-    // Benefit Finder and Chromium eventually reported RESULT_CODE_HUNG.
     if(crumb.textContent!==nextText)crumb.textContent=nextText;
   }
 }
@@ -107,26 +99,25 @@ function restoreHomeSelections(){
 
 function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function enhance(){restoreHomeSelections();fixBenefitFinder();enrichBenefitFinder();enrichCardTab();enrichRecommendationImage()}
-function scheduleEnhance(){
-  if(enhanceQueued)return;
-  enhanceQueued=true;
-  queueMicrotask(()=>{enhanceQueued=false;enhance()});
-}
+function scheduleEnhance(){clearTimeout(enhanceTimer);enhanceTimer=setTimeout(enhance,0)}
 
-// Preserve recommendation form choices before app-v2 synchronously re-renders the form.
+// The app re-renders synchronously on navigation/form actions. Run enhancement
+// once after the user action instead of observing every DOM mutation. This avoids
+// observer feedback loops that can hang Chromium in Benefit Finder.
 document.addEventListener('submit',e=>{
   if(e.target?.id==='recommendForm')rememberHomeSelections(e.target);
+  scheduleEnhance();
 },true);
 document.addEventListener('change',e=>{
   if(e.target?.closest?.('#recommendForm')&&(e.target.name==='channel'||e.target.name==='paymentMethod'))rememberHomeSelections(e.target.form);
+  scheduleEnhance();
 },true);
-
-// Track Benefit Finder navigation labels in capture phase, before app re-renders.
 document.addEventListener('click',e=>{
   const tile=e.target.closest?.('.browse-tile');
-  if(tile){const label=tile.querySelector('strong')?.textContent?.trim();if(label)pathLabels.push(label);setTimeout(scheduleEnhance,0);return}
-  if(e.target.closest?.('#browseBack')){pathLabels.pop();setTimeout(scheduleEnhance,0);return}
-  const nav=e.target.closest?.('.nav-item');if(nav&&nav.dataset.route!=='benefits')pathLabels=[];
+  if(tile){const label=tile.querySelector('strong')?.textContent?.trim();if(label)pathLabels.push(label)}
+  else if(e.target.closest?.('#browseBack'))pathLabels.pop();
+  else {const nav=e.target.closest?.('.nav-item');if(nav&&nav.dataset.route!=='benefits')pathLabels=[]}
+  scheduleEnhance();
 },true);
 
-const observer=new MutationObserver(scheduleEnhance);observer.observe(app,{childList:true,subtree:true});enhance();
+enhance();
