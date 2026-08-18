@@ -1,0 +1,7 @@
+{
+  "name":"dalkkung-family-app",
+  "private":true,
+  "version":"0.1.0",
+  "type":"module",
+  "scripts":{"serve":"python3 -m http.server 8080","seed":"node scripts/seed.mjs"}
+}
