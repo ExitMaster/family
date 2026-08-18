@@ -4,6 +4,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
+    "target": "kkoongs",
     "public": ".",
     "ignore": [
       "firebase.json",
