@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101828" />
-  <meta name="description" content="CardPick v1.3 preview" />
+  <meta name="description" content="CardPick v1.4 preview" />
   <link rel="icon" href="../cardpick/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="../cardpick/icons/icon-192.png" />
   <link rel="stylesheet" href="../cardpick/styles.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@b84edd960eaf9ce7549e4a6d5c5639d2fe3596a7/cardpick/v2.css" />
-  <title>카드픽 v1.3 Preview</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@e2e979030ba647ab6f2b3d3cfe387e105ca8d8a7/cardpick/v2.css" />
+  <title>카드픽 v1.4 Preview</title>
   <style>
     .preview-banner{position:sticky;top:0;z-index:1000;background:#fff3cd;color:#664d03;padding:8px 14px;text-align:center;font-size:12px;font-weight:700;border-bottom:1px solid #ffecb5}
     .benefit-breadcrumb{margin:0 0 12px;padding:9px 12px;border-radius:10px;background:#eef4ff;color:#344054;font-size:13px;font-weight:700}
@@ -18,9 +18,9 @@
   </style>
 </head>
 <body>
-  <div class="preview-banner">PREVIEW · CardPick v1.3 · 실사용 카드픽과 데이터가 분리되어 있습니다</div>
+  <div class="preview-banner">PREVIEW · CardPick v1.4 · 실사용 카드픽과 데이터가 분리되어 있습니다</div>
   <header class="app-header">
-    <div><p class="eyebrow">개인용 카드 할인 도우미 · v1.3 Preview</p><h1>카드픽</h1></div>
+    <div><p class="eyebrow">개인용 카드 할인 도우미 · v1.4 Preview</p><h1>카드픽</h1></div>
     <button id="installButton" class="icon-button hidden" type="button" aria-label="앱 설치">설치</button>
   </header>
   <main id="app" class="app-shell" aria-live="polite"></main>
@@ -34,7 +34,7 @@
   <dialog id="modal" class="modal"></dialog>
   <div id="toast" class="toast" role="status"></div>
   <script type="module">
-    const base='https://cdn.jsdelivr.net/gh/ExitMaster/family@b84edd960eaf9ce7549e4a6d5c5639d2fe3596a7/cardpick/';
+    const base='https://cdn.jsdelivr.net/gh/ExitMaster/family@e2e979030ba647ab6f2b3d3cfe387e105ca8d8a7/cardpick/';
     globalThis.CARDPICK_STORAGE_KEY='card-pick-v13-preview-state';
     globalThis.CARDPICK_LINK_STORAGE_KEY='card-pick-link-watch-v13-preview';
     await import(base+'v12-preload.js');
@@ -52,6 +52,7 @@
     await import(base+'ui-enhancer-v2.js');
     await import(base+'v12-ui.js');
     await import(base+'v13-links.js');
+    await import(base+'v14-recording.js');
   </script>
 </body>
 </html>
