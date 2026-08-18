@@ -7,6 +7,7 @@ const byName=new Map();
 for(const card of DEFAULT_STATE.cards)for(const benefit of card.benefits)byName.set(benefit.name,{card,benefit});
 let pathLabels=[];
 let homeSelections={channel:null,paymentMethod:null};
+let enhanceQueued=false;
 
 function ensureImageStyles(){
   if(document.querySelector('#card-result-image-style'))return;
@@ -32,8 +33,17 @@ function fixBenefitFinder(){
   }
   if(pathLabels.length){
     let crumb=app.querySelector('.benefit-breadcrumb');
-    if(!crumb){crumb=document.createElement('div');crumb.className='benefit-breadcrumb';title.closest('.section-title').before(crumb)}
-    crumb.textContent=pathLabels.join(' › ');
+    if(!crumb){
+      crumb=document.createElement('div');
+      crumb.className='benefit-breadcrumb';
+      title.closest('.section-title').before(crumb);
+    }
+    const nextText=pathLabels.join(' › ');
+    // textContent replacement creates a childList mutation even when the text is
+    // unchanged. Since this module observes #app childList mutations, assigning
+    // it unconditionally caused an endless MutationObserver microtask loop in
+    // Benefit Finder and Chromium eventually reported RESULT_CODE_HUNG.
+    if(crumb.textContent!==nextText)crumb.textContent=nextText;
   }
 }
 
@@ -97,6 +107,11 @@ function restoreHomeSelections(){
 
 function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function enhance(){restoreHomeSelections();fixBenefitFinder();enrichBenefitFinder();enrichCardTab();enrichRecommendationImage()}
+function scheduleEnhance(){
+  if(enhanceQueued)return;
+  enhanceQueued=true;
+  queueMicrotask(()=>{enhanceQueued=false;enhance()});
+}
 
 // Preserve recommendation form choices before app-v2 synchronously re-renders the form.
 document.addEventListener('submit',e=>{
@@ -109,9 +124,9 @@ document.addEventListener('change',e=>{
 // Track Benefit Finder navigation labels in capture phase, before app re-renders.
 document.addEventListener('click',e=>{
   const tile=e.target.closest?.('.browse-tile');
-  if(tile){const label=tile.querySelector('strong')?.textContent?.trim();if(label)pathLabels.push(label);setTimeout(enhance,0);return}
-  if(e.target.closest?.('#browseBack')){pathLabels.pop();setTimeout(enhance,0);return}
+  if(tile){const label=tile.querySelector('strong')?.textContent?.trim();if(label)pathLabels.push(label);setTimeout(scheduleEnhance,0);return}
+  if(e.target.closest?.('#browseBack')){pathLabels.pop();setTimeout(scheduleEnhance,0);return}
   const nav=e.target.closest?.('.nav-item');if(nav&&nav.dataset.route!=='benefits')pathLabels=[];
 },true);
 
-const observer=new MutationObserver(()=>queueMicrotask(enhance));observer.observe(app,{childList:true,subtree:true});enhance();
+const observer=new MutationObserver(scheduleEnhance);observer.observe(app,{childList:true,subtree:true});enhance();
