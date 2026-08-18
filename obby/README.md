@@ -31,9 +31,22 @@ never have to touch it.
 Six courses. Reach the glowing portal at the end. Checkpoints land every two
 sections, so dying sends you back a little, not to the start.
 
+Every level is **twice as long as it used to be** — the chunk counts were doubled, so
+Angel is 36 sections and Devil is 38. Saved best times from before that change are
+not comparable with times set now; they were set on courses half the size.
+
+| Level | Sections | Length | Orbs |
+|---|---|---|---|
+| Angel | 36 | 744 | 42 |
+| Normal | 30 | 775 | 42 |
+| Devil | 38 | 915 | 54 |
+| Ice | 26 | 473 | 29 |
+| Space | 28 | 680 | 37 |
+| Nightmare | 54 | 1771 | 67 |
+
 | Level | What is in it |
 |---|---|
-| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The longest gentle course — 18 sections, about 350 units |
+| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The gentle one — 36 sections, about 744 units |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches, fireball runs |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
@@ -49,10 +62,10 @@ a `chunks` count:
 shuffle: { from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' }
 ```
 
-`buildCourse` rolls **27 sections of one chunk each**, and every one of them picks a
+`buildCourse` rolls **54 sections of one chunk each**, and every one of them picks a
 course at random. Not six blocks in order — properly mixed, so a run of the 1313 seed
 goes ice, ice, devil, nightmare, space, nightmare, ice, devil, angel, devil… About
-800 units, more than twice any other level.
+**1771 units**, more than twice any other level, and around five minutes of running.
 
 A chunk brings **everything** from the course it came from: its obstacles, its
 difficulty, its colours (the builder reads `W.pal` as it goes, so each chunk bakes
@@ -89,33 +102,33 @@ is — visible, and apparently out of reach. `troll:true` puts the goal in the s
 
 #### The secret — do not sign-post this
 
-**The jetpack only works on the last deck, under the portal.** Nowhere else — not in
-any other level, and not on the way there either. All 27 chunks have to be run on
-foot. Reach the end, hold jump, and the wings finally start, with nothing to run out
-of. See `atEnd` in `stepPlayer`: `troll` is set and you are within 12 of the goal's z.
+**On the last deck, under the portal, the tank stops draining.** That is the only way
+anyone reaches the portal: buy the Aura Wings, walk all 54 chunks, and hold jump at
+the end. See `atEnd` in `stepPlayer` — it is on when `troll` is set and you are within
+12 of the goal's z.
 
-There is no fuel any more. Where the wings work they work forever, and where they do
-not they do nothing, so there is nothing left for a gauge to say — it is gone.
+Everywhere else in the level one tankful tops out at **27.8** against a portal at
+**70**, so that deck is the only place it can be done.
 
-Once you are climbing there, **steering is switched off** — you only go up. The climb
-also eases you onto the portal's x/z. That is not decoration: without it you could
-lift off from the back of the deck and rise straight past the portal forever with no
-way to correct. Verified from all four corners of the deck, and while actively
-holding a direction to fight it: every one of them reaches the portal.
+On that climb **you still fly it — you are not carried.** Your steering works the
+whole way up; the portal simply reels your x/z in harder than you can push away from
+it, so you always arrive. That pull is not decoration: without it you could lift off
+from the back of the deck and rise straight past the portal forever with no way to
+correct. Verified from five spots across the deck while actively holding a direction
+to fight it — all five reach the portal, all five win.
 
 Nothing in the game hints at it. The blurb still says nobody has finished it, the
 gatekeeper still says nobody gets past him, and there is no marker in the sky. Keep
 it that way.
 
-Everywhere else holding jump does nothing at all, so the level stays impossible for
-anyone who has not bought the wings, walked all 27 chunks, and thought to fly:
+Outside Nightmare holding jump does nothing at all, so the level stays impossible for
+anyone who has not bought the wings, walked all 54 chunks, and thought to fly:
 
 | | Rise above the deck | Wins |
 |---|---|---|
 | Wings, on the last deck | **64.8** | **yes** |
-| Wings, at the start of Nightmare | 1.7 — just a jump | no |
-| Wings, halfway through Nightmare | 1.7 | no |
-| Wings, in Angel or Devil | 1.7 | no |
+| Wings, anywhere else in Nightmare | 27.8 at most, swept across the whole course | no |
+| Wings, in Angel / Devil / Ice / Space | 1.8 — just a jump, and no glide either | no |
 | No wings, on the last deck | 1.7 | no |
 
 If someone reports "the last level is broken" and has not bought the wings, this is
@@ -131,6 +144,31 @@ time pays a **+25 aura bonus**.
 Ice and Space sit after Devil on purpose: they are the odd ones rather than the
 hardest, and Nightmare has to stay last because it can never be cleared — anything
 placed after it would be locked forever.
+
+### 🔀 Dying shuffles the course
+
+`shuffleObstacles`, called from `afterDeath`, re-rolls the moving parts every time you
+die, in every level. The run you just failed is not the run you are about to try.
+
+**The floor never changes.** Platforms, gaps, spikes and lava stay exactly where they
+were — your checkpoint has to keep meaning what it meant, and geometry that rearranged
+itself would be unlearnable rather than exciting. What changes is everything that
+moves: where each ferry sits on its path and which way it travels, which way the
+spinners turn, which way the fireballs fly, and the beat the blinkers are on.
+
+Only **ahead of your respawn** (changing what is behind you is work nobody sees) and
+only **some** of it — a 45% roll per obstacle, because a course where everything
+changed every time would be noise rather than a shuffle.
+
+**The one rule that must not be broken:** every blinking platform shifts by the *same*
+amount. Their phases relative to each other are the whole reason a `blinkRun` is
+crossable (see the timing table further down); re-rolling them one at a time would
+quietly rebuild the impossible version of that chunk. The test asserts this directly —
+`blinkRelativeSame` compares every consecutive phase gap before and after a shuffle.
+
+Verified: geometry and static hazards byte-identical after a shuffle, movers, blinkers,
+spinners and fireballs all moved, relative blink phases unchanged, and the bot still
+runs a course to 99% after eight shuffles in a row.
 
 ### x_x The wrong key kills you
 
@@ -291,18 +329,22 @@ shop counts aura.
 |---|---|---|
 | ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack — **but only at the very end of Nightmare**. Dead weight everywhere else, the whole walk there included |
+| 🪽 **Aura Wings** | 500 | A jetpack — **but only inside Nightmare**. Dead weight in every other level |
 
-**The wings only work on the last deck of the Nightmare Level.** `canFly` in
-`stepPlayer` requires `atEnd`; anywhere else — including every one of its 27 chunks —
-holding jump in mid-air does nothing at all.
+**The wings only work inside the Nightmare Level.** `canFly` in `stepPlayer` requires
+`W.troll`; in every other level holding jump in mid-air does nothing at all, and there
+is no glide there either. The fuel gauge is hidden outside that level too — a gauge
+sitting in a level where the wings are inert is a puzzle with no answer.
 
 That restriction is the design, not a limitation. Flight skips straight over any
 course, so letting it work everywhere would quietly delete every level in the game.
 Confined to one level it stops being a cheat and becomes a key.
 
-On that deck it is a real jetpack: **9 a second upward**, **1.5× running speed
-forward**, sharper air steering, and no limit. The wings flare white under thrust.
+Inside Nightmare it is a real jetpack: **9 a second upward**, **1.5× running speed
+forward** (measured: 10.8 against a 7.2 run), sharper air steering, on a **2.8 second
+tank** that refills when you land. Run the tank dry and holding jump becomes a
+**glide** — you sink at 2.6 a second instead of 34, so a 38-unit drop takes 12 seconds
+instead of under 2. The wings flare white under thrust.
 
 The shop description is deliberately vague — *"They only stir in one place, and it is
 not down here."* It explains why nothing happens in a normal level without giving
@@ -311,8 +353,8 @@ away where it does.
 | | Rise above the deck | Wins |
 |---|---|---|
 | Wings, on Nightmare's last deck | **64.8** | **yes** |
-| Wings, elsewhere in Nightmare | 26.9 | no |
-| Wings, in Angel / Devil / Space | **1.7** — just a jump | no |
+| Wings, elsewhere in Nightmare | 27.8 | no |
+| Wings, in Angel / Devil / Ice / Space | **1.8** — just a jump, no glide | no |
 | No wings, on the last deck | 1.7 | no |
 
 `runMax()` is the one place top speed is decided, so anything that has to stay ahead
@@ -499,16 +541,22 @@ mistiming the hop, not an unfair course.
 
 Full levels, played by the bot end to end:
 
-| Level | Time | Deaths |
-|---|---|---|
-| Angel | 50s | 0 |
-| Normal | 70s | 3 |
-| Devil | 80s | 2 |
-| Ice | 56s | 6 |
-| Nightmare, all 27 chunks, no powers | 151s | 4 |
+| Level | Time | Deaths | Finished |
+|---|---|---|---|
+| Angel | 102s | 0 | yes, 99% |
+| Normal | 129s | 3 | yes, 99% |
+| Devil | 169s | 7 | yes, 99% |
+| Ice | — | 7 | no — stalls around z 180 |
+| Space | — | 5 | no — stalls around z 170 |
+| Nightmare, all 54 chunks, no powers | 289s | 2 | walked 100% of 1771 |
+
+Ice and Space are the two the bot has never finished, and both stall at the same
+**absolute** distance they always did — doubling the length did not move the wall, it
+only made the percentage look worse. Both stalls are the bot mistiming a hop onto a
+moving platform.
 
 That last row is the one to re-run after touching the shuffle, the chunk pools or the
-physics. It walks the whole 800 units on foot — through every floor change — and
+physics. It walks the whole 1771 units on foot — through every floor change — and
 reaching 100% of `endZ` is the proof that the level can still be crossed at all. It
 does not *win*: the portal is 70 up, which is the point.
 
