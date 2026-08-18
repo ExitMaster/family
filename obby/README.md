@@ -425,6 +425,28 @@ fly over it and the bot was assumed to be at fault. Once the jetpack was locked 
 the very end of Nightmare, that chunk became something you had to actually cross, and
 it turned out not to be crossable. **A timing chunk needs its window measured, not eyeballed.**
 
+## The game stays in English
+
+A browser set to translate everything — which is the normal setting on a Korean
+phone — will happily rewrite the page. That is worse than it sounds: **SPACE** turns
+into **우주** (outer space), **Aura** into **아우라** or **기운** depending on the
+sentence, and the controls table stops matching the keyboard. The canvas HUD is
+drawn, not text, so half the game would translate and half would not.
+
+Four markers, and browsers want different ones:
+
+| | Where | Read by |
+|---|---|---|
+| `lang="en"` | `<html>` | everyone — says what language this actually is |
+| `translate="no"` | `<html>`, `<body>`, `<title>` | Chrome, Edge, Safari |
+| `class="notranslate"` | `<body>` | the older Google Translate widget |
+| `<meta name="google" content="notranslate">` | `<head>` | stops the "translate this page?" bar being offered |
+
+Verified in a `ko-KR` browser: `document.documentElement.translate` is `false` and the
+help table still reads **Move**. What that does *not* prove is Chrome's own translate
+button — that cannot be driven headlessly, so it is the markers that are checked here,
+not the outcome. If someone forces a translation by hand it may still go through.
+
 ## When something breaks
 
 Same idea as `jump/`: you cannot open a browser console on a tablet, so the game
