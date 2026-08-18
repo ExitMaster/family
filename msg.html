@@ -152,7 +152,7 @@ function jrShots(m) {
 // ── 그림 조각 ────────────────────────────────────────────────
 function squirrel(x, y, s, opts) {
   opts = opts || {};
-  const c = opts.helmet ? '#4a6b3f' : '#7a4a24';
+  const c = opts.body || (opts.helmet ? '#4a6b3f' : '#7a4a24');   // body 를 주면 헬멧과 무관하게 같은 털색
   const anim = opts.anim ? ' style="animation:' + opts.anim + '"' : '';
   return '<g transform="translate(' + x + ',' + y + ') scale(' + s + ')"' + anim + '>' +
     '<path d="M18 4 C34 6 40 26 26 34 C22 22 18 16 12 14 Z" fill="' + c + '" opacity=".85" style="transform-origin:14px 20px;animation:sway 1.6s ease-in-out infinite"/>' +
@@ -663,35 +663,113 @@ function choicesAround(r, ans, spread, min) {
   for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = out[i]; out[i] = out[j]; out[j] = t; }
   return out;
 }
+// 문제 종류. jr:true 인 것만 주니어 심사에 나온다.
 const QUIZ_KINDS = [
   // 도토리 세기
-  function (r, m, jr) {
-    const n = jr ? ri(r, 3, 8) : ri(r, 5, 14), seed = hashStr('acorn|' + n + '|' + Math.floor(r() * 1e9));
-    return { q: '도토리가 몇 개일까?', art: acornField(n, seed), opts: choicesAround(r, n, 3, 1), ans: n };
-  },
-  // 창고 계산
-  function (r, m, jr) {
+  { jr: true, make: function (r, m, jr) {
+    const n = jr ? ri(r, 3, 8) : ri(r, 5, 14);
+    return { q: '도토리가 몇 개일까?', art: acornField(n, hashStr('acorn|' + n + '|' + Math.floor(r() * 1e9))),
+             opts: choicesAround(r, n, 3, 1), ans: n };
+  }},
+  // 창고 더하기 · 빼기
+  { jr: true, make: function (r, m, jr) {
     const a = jr ? ri(r, 3, 9) : ri(r, 6, 20), b = jr ? ri(r, 1, 5) : ri(r, 3, 12), plus = jr ? true : r() < 0.55;
     const ans = plus ? a + b : Math.max(a, b) - Math.min(a, b);
-    const q = plus
-      ? '창고에 도토리가 ' + a + '개. ' + b + '개를 더 모았다. 모두 몇 개?'
-      : '창고에 도토리가 ' + Math.max(a,b) + '개. ' + Math.min(a,b) + '개를 먹었다. 몇 개 남았나?';
-    return { q: q, art: acornField(Math.min(plus ? a : Math.max(a,b), 12), hashStr('calc|' + a + b)), opts: choicesAround(r, ans, 4, 0), ans: ans };
-  },
-  // 부대 편성
-  function (r, m) {
+    return {
+      q: plus ? '창고에 도토리가 ' + a + '개. ' + b + '개를 더 모았다. 모두 몇 개?'
+              : '창고에 도토리가 ' + Math.max(a,b) + '개. ' + Math.min(a,b) + '개를 적이 가져갔다. 몇 개 남았나?',
+      art: acornField(Math.min(plus ? a : Math.max(a,b), 12), hashStr('calc|' + a + b)),
+      opts: choicesAround(r, ans, 4, 0), ans: ans };
+  }},
+  // 두 창고 비교 — 차이 구하기
+  { jr: true, make: function (r, m, jr) {
+    const a = jr ? ri(r, 2, 7) : ri(r, 4, 12), b = jr ? ri(r, 2, 7) : ri(r, 4, 12);
+    const hi = Math.max(a, b), lo = Math.min(a, b), ans = hi - lo;
+    const pile = (n, x, seed) => {
+      const rr = rng(seed); let g = '';
+      for (let i = 0; i < n; i++) g += '<g transform="translate(' + Math.round(x + rr() * 200) + ',' + Math.round(70 + rr() * 190) + ')">' +
+        '<ellipse cy="6" rx="15" ry="18" fill="#c08a44"/><path d="M-16 -5 A16 12 0 0 1 16 -5 Z" fill="#7a4a24"/></g>';
+      return g;
+    };
+    return {
+      q: 'A창고 ' + a + '개, B창고 ' + b + '개. 몇 개 차이가 날까?',
+      art: '<rect width="640" height="340" fill="#12161b"/><line x1="320" y1="20" x2="320" y2="320" stroke="#2c3b47" stroke-width="2"/>' +
+        '<text x="60" y="34" class="mono" font-size="14" fill="#5fd08a">A</text>' +
+        '<text x="360" y="34" class="mono" font-size="14" fill="#5fd08a">B</text>' +
+        pile(a, 40, hashStr('pa|' + a)) + pile(b, 340, hashStr('pb|' + b)),
+      opts: choicesAround(r, ans, 3, 0), ans: ans };
+  }},
+  // 헬멧 센 마리 — 관찰
+  { jr: true, make: function (r, m, jr) {
+    const tot = jr ? ri(r, 4, 7) : ri(r, 6, 10), hel = ri(r, 2, tot - 1);
+    let g = '', k = 0;
+    for (let row = 0; row < 2; row++) for (let col = 0; col < Math.ceil(tot / 2); col++) {
+      if (k >= tot) break;
+      g += squirrel(40 + col * 100, 60 + row * 130, 1.5, { helmet: k < hel, body: '#7a4a24' });
+      k++;
+    }
+    return { q: '헬멧을 쓴 다람쥐는 몇 마리?',
+             art: '<rect width="640" height="340" fill="#12161b"/>' + g,
+             opts: choicesAround(r, hel, 2, 1), ans: hel };
+  }},
+  // 부대 편성 — 곱하기
+  { jr: false, make: function (r, m) {
     const sq = ri(r, 2, 5), per = ri(r, 3, 8), ans = sq * per;
     return {
       q: '부대 ' + sq + '개, 한 부대에 다람쥐 ' + per + '마리. 모두 몇 마리?',
       art: '<rect width="640" height="340" fill="#12161b"/>' +
         Array.from({length: sq}, (_, i) =>
-          Array.from({length: per}, (_, j) =>
-            squirrel(50 + j * 70, 40 + i * 70, 1.2, {helmet:1})).join('')).join(''),
-      opts: choicesAround(r, ans, 5, 1), ans: ans
-    };
-  },
+          Array.from({length: per}, (_, j) => squirrel(50 + j * 70, 40 + i * 70, 1.2, {helmet:1})).join('')).join(''),
+      opts: choicesAround(r, ans, 5, 1), ans: ans };
+  }},
+  // 나누기 — 도토리 똑같이 나누기
+  { jr: false, make: function (r, m) {
+    const per = ri(r, 2, 9), sq = ri(r, 2, 5), tot = per * sq;
+    return {
+      q: '도토리 ' + tot + '개를 부대 ' + sq + '개에 똑같이 나누면, 한 부대에 몇 개?',
+      art: acornField(Math.min(tot, 14), hashStr('div|' + tot + sq)),
+      opts: choicesAround(r, per, 3, 1), ans: per };
+  }},
+  // 다음 순서 — 뛰어 세기
+  { jr: false, make: function (r, m) {
+    const step = pick(r, [2, 3, 5, 10]), from = step * ri(r, 1, 4);
+    const seq = [from, from + step, from + step * 2, from + step * 3], ans = from + step * 4;
+    return {
+      q: '다음에 올 숫자는? ' + seq.join(', ') + ', ?',
+      art: '<rect width="640" height="340" fill="#12161b"/>' +
+        seq.map((v, i) => '<g transform="translate(' + (60 + i * 120) + ',150)"><rect x="-42" y="-40" width="84" height="80" rx="10" fill="#0e1418" stroke="#2c3b47"/>' +
+          '<text y="12" text-anchor="middle" class="mono" font-size="30" fill="#5fd08a">' + v + '</text></g>').join('') +
+        '<g transform="translate(540,150)"><rect x="-42" y="-40" width="84" height="80" rx="10" fill="#0e1418" stroke="#ffdc4a"/>' +
+        '<text y="12" text-anchor="middle" class="mono" font-size="30" fill="#ffdc4a">?</text></g>',
+      opts: (() => { const o = [ans, ans + step, ans - step, ans + step * 2].map(v => Math.max(0, v));
+        for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = o[i]; o[i] = o[j]; o[j] = t; }
+        return o; })(), ans: ans };
+  }},
+  // 층 이동 계산
+  { jr: false, make: function (r, m) {
+    const from = Math.abs(m.floor), up = ri(r, 3, Math.max(4, from - 2)), ans = from - up;
+    return {
+      q: '지하 ' + from + '층에서 ' + up + '층 위로 올라가면 지하 몇 층?',
+      art: '<rect width="640" height="340" fill="#12161b"/>' +
+        Array.from({length: 6}, (_, i) => '<g><rect x="60" y="' + (30 + i * 50) + '" width="520" height="40" rx="6" fill="#1b2229" stroke="#2c3b47"/>' +
+          '<text x="80" y="' + (57 + i * 50) + '" class="mono" font-size="14" fill="#8aa0b4">FLOOR -' + (from - (5 - i)) + '</text></g>').join('') +
+        squirrel(470, 250, 1.6, {helmet:1}),
+      opts: choicesAround(r, ans, 3, 0), ans: ans, prefix: '-' };
+  }},
+  // 대장 명령 듣기 — 영국식 발음으로 읽어주는 숫자
+  { jr: false, voice: true, make: function (r, m) {
+    const ans = ri(r, 11, 39);
+    return {
+      q: '🎧 대장3의 무전을 듣고 숫자를 고르라. (소리를 켜야 한다 — 다시 들으려면 화면을 누른다)',
+      art: '<rect width="640" height="340" fill="#12161b"/>' +
+        '<text x="320" y="120" text-anchor="middle" class="mono" font-size="26" fill="#5fd08a">📻 INCOMING</text>' +
+        '<text x="320" y="164" text-anchor="middle" class="mono" font-size="13" fill="#8aa0b4">HEAD SQUIRREL — VOICE ONLY</text>' +
+        squirrel(280, 200, 1.9, {cap:1}),
+      opts: choicesAround(r, ans, 5, 1), ans: ans,
+      say: 'Listen carefully, trooper. Send ' + ans + ' squirrels to the front. I repeat: ' + ans + '.' };
+  }},
   // 브리핑 기억
-  function (r, m) {
+  { jr: false, make: function (r, m) {
     const ans = Math.abs(m.floor);
     return {
       q: '오늘 작전은 지하 몇 층인가? (브리핑을 떠올려라)',
@@ -699,24 +777,36 @@ const QUIZ_KINDS = [
         '<text x="320" y="150" text-anchor="middle" class="mono" font-size="34" fill="#5fd08a">FLOOR ?</text>' +
         '<text x="320" y="196" text-anchor="middle" class="mono" font-size="15" fill="#8aa0b4">SECTOR ' + m.sector + '</text>' +
         squirrel(280, 210, 1.8, {cap:1}),
-      opts: choicesAround(r, ans, 6, 1), ans: ans, prefix: '-'
-    };
-  }
+      opts: choicesAround(r, ans, 6, 1), ans: ans, prefix: '-' };
+  }},
+  // 적 이름 — 브리핑에서 본 오늘의 적 고르기
+  { jr: true, make: function (r, m) {
+    const others = THREATS.filter(t => t.n !== m.threat.n);
+    const opts = [m.threat.n];
+    while (opts.length < 4 && others.length) opts.push(others.splice(Math.floor(r() * others.length), 1)[0].n);
+    for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = opts[i]; opts[i] = opts[j]; opts[j] = t; }
+    return {
+      q: '오늘 우리가 맞서는 적은?',
+      art: '<rect width="640" height="340" fill="#12161b"/>' + stars() + monster(m.threat.kind) +
+        '<text x="40" y="60" class="mono" font-size="20" fill="#ff5a49">???</text>' +
+        squirrel(50, 230, 1.6, {helmet:1}),
+      opts: opts, ans: m.threat.n, text: true };
+  }}
 ];
 function buildQuiz(m) {
   const r = rng(hashStr('quiz|' + m.key + '|' + (state.attempt || 0) + '|' + Math.floor(Math.random() * 1e9)));
-  const kinds = QUIZ_KINDS.slice();
-  const out = [];
   const jr = state.mode === 'jr';
-  const pool = jr ? kinds.slice(0, 2) : kinds;   // 주니어는 세기 · 더하기 빼기만
-  while (out.length < quizN() && pool.length) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0](r, m, jr));
+  // 소리를 껐거나 음성이 없으면 듣기 문제는 뺀다.
+  const pool = QUIZ_KINDS.filter(k => (jr ? k.jr : true) && !(k.voice && (muted || !window.speechSynthesis)));
+  const out = [];
+  while (out.length < quizN() && pool.length) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0].make(r, m, jr));
   return out;
 }
 function startQuiz() {
   if (state.lastMode !== state.mode) { state.attempt = 0; state.lastMode = state.mode; }  // 심사 횟수는 작전별로 센다
   state.attempt = (state.attempt || 0) + 1;
   state.quiz = buildQuiz(state.mission);
-  state.qi = 0; state.qmsg = ''; state.qok = false;
+  state.qi = 0; state.qmsg = ''; state.qok = false; state.said = -1;
   renderQuiz();
 }
 function renderQuiz() {
@@ -739,7 +829,12 @@ function renderQuiz() {
       '<button class="tapbtn mono" id="mute">' + muteLabel() + '</button>' +
     '</div>' +
   '</div>';
-  app.querySelectorAll('.pad button').forEach(b => b.onclick = () => answer(Number(b.dataset.a)));
+  app.querySelectorAll('.pad button').forEach(b => b.onclick = () => answer(q.text ? b.dataset.a : Number(b.dataset.a)));
+  if (q.say) {
+    const scr = app.querySelector('.screen');
+    if (scr) scr.onclick = () => speak(q.say, false);
+    if (state.said !== state.qi) { state.said = state.qi; setTimeout(() => speak(q.say, false), 350); }
+  }
   document.getElementById('brief2').onclick = () => { state.quiz = null; renderBrief(); };
   document.getElementById('mute').onclick = () => { toggleMute(); renderQuiz(); };
 }
@@ -752,7 +847,7 @@ function answer(v) {
   }
   sfx('unlock');
   if (state.qi < state.quiz.length - 1) {
-    state.qi++; state.qok = true; state.qmsg = pick(r, PRAISE); speak(state.qmsg); renderQuiz(); return;
+    state.qi++; state.said = -1; state.qok = true; state.qmsg = pick(r, PRAISE); speak(state.qmsg); renderQuiz(); return;
   }
   state.quiz = null; sfx('go');
   speak(state.mode === 'jr'
