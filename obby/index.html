@@ -1,0 +1,3818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Aura Obby 3D — Killer Snail</title>
+<style>
+  :root { --ink:#1E1B33; --aura:#A46BFF; --aura2:#5BE7FF; --gold:#FFC53D; --bg:#F0ECFF; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    margin:0; padding:16px; background:var(--bg);
+    font-family:"Trebuchet MS", Verdana, sans-serif; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    overscroll-behavior:none;
+  }
+  h1 {
+    margin:0; font-size:26px; letter-spacing:1px;
+    background:linear-gradient(90deg,var(--aura),var(--aura2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  #stage {
+    position:relative; width:100%; max-width:960px; aspect-ratio:16/9;
+    border:6px solid var(--ink); border-radius:18px; overflow:hidden;
+    box-shadow:0 8px 0 rgba(30,27,51,.25); touch-action:none; user-select:none;
+    background:#12101F;
+  }
+  #gl, #hud { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #hud { pointer-events:none; }
+
+  /* .big is the fallback for browsers with no element fullscreen (iPhone Safari).
+     The :fullscreen rules are kept separate on purpose — one unsupported selector
+     in a comma list would throw the whole rule away. */
+  #stage.big { position:fixed; inset:0; z-index:100; max-width:none; aspect-ratio:auto;
+    border:0; border-radius:0; box-shadow:none; }
+  #stage.big #gl, #stage.big #hud { object-fit:contain; }
+  #stage:fullscreen { max-width:none; aspect-ratio:auto; border:0; border-radius:0;
+    box-shadow:none; background:#12101F; }
+  #stage:fullscreen #gl, #stage:fullscreen #hud { width:100%; height:100%; object-fit:contain; }
+  #stage:-webkit-full-screen { max-width:none; aspect-ratio:auto; border:0; border-radius:0;
+    box-shadow:none; background:#12101F; }
+  #stage:-webkit-full-screen #gl, #stage:-webkit-full-screen #hud { width:100%; height:100%; object-fit:contain; }
+
+  /* Errors have to be visible on a tablet, where you cannot open a console.
+     Same idea as the red bar in jump/. */
+  #oops {
+    position:fixed; top:0; left:0; right:0; z-index:9999; cursor:pointer; display:none;
+    background:#E2445C; color:#fff; font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px; padding:8px 12px; line-height:1.45; border-bottom:4px solid #9B1F33;
+    white-space:pre-wrap; word-break:break-word; max-height:40vh; overflow:auto;
+  }
+  #fsBtn, #soundBtn, #musicBtn {
+    position:absolute; top:9px; z-index:8; font-size:15px; padding:4px 10px;
+    border-width:3px; border-radius:10px; background:#fff; box-shadow:0 3px 0 var(--ink); min-width:0;
+  }
+  #fsBtn { right:9px; } #soundBtn { right:62px; } #musicBtn { right:115px; }
+
+  /* align-items:flex-start + margin:auto keeps tall screens scrollable instead
+     of clipping their top and bottom the way plain centering does */
+  #panel {
+    position:absolute; inset:0; z-index:5; display:flex; align-items:flex-start; justify-content:center;
+    padding:16px; background:rgba(18,16,31,.9); color:#fff; text-align:center; overflow:auto;
+  }
+  #panel.hidden { display:none; }
+  .screen { display:none; flex-direction:column; align-items:center; gap:11px; width:100%; max-width:660px; margin:auto; }
+  .screen.on { display:flex; }
+  .screen h2 { margin:0; font-size:clamp(19px,4.6vw,32px); }
+  .screen p { margin:0; font-size:clamp(12px,2.5vw,15px); line-height:1.55; opacity:.92; }
+  .big-title {
+    font-size:clamp(28px,7.5vw,56px); font-weight:bold; letter-spacing:2px; margin:0;
+    background:linear-gradient(90deg,#C9A0FF,#5BE7FF,#FFC53D);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 4px 0 rgba(0,0,0,.25);
+  }
+  button {
+    font-family:inherit; font-size:17px; font-weight:bold; color:var(--ink);
+    background:var(--gold); border:4px solid var(--ink); border-radius:14px;
+    padding:9px 20px; cursor:pointer; box-shadow:0 5px 0 var(--ink); min-width:150px;
+  }
+  button:active { transform:translateY(4px); box-shadow:0 1px 0 var(--ink); }
+  button.ghost { background:#fff; }
+  button.wide { width:100%; max-width:340px; }
+  .rowbtns { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+
+  .cards { display:flex; gap:11px; flex-wrap:wrap; justify-content:center; width:100%; }
+  .card {
+    background:rgba(255,255,255,.1); border:4px solid #fff; border-radius:16px;
+    padding:11px 9px; width:168px; cursor:pointer;
+  }
+  .card:active { transform:translateY(3px); }
+  .card.locked { opacity:.5; cursor:not-allowed; border-style:dashed; }
+  .card.equipped { border-color:var(--gold); background:rgba(255,197,61,.18); }
+  .card .em { font-size:32px; line-height:1.1; }
+  .card .nm { font-weight:bold; font-size:16px; margin-top:3px; }
+  .card .sub { font-size:12px; opacity:.85; margin-top:4px; line-height:1.4; }
+  .card canvas { width:54px; height:60px; display:block; margin:2px auto; }
+  .orbcount { font-size:19px; font-weight:bold; color:var(--gold); }
+  table.keys { font-size:13px; border-collapse:collapse; }
+  table.keys td { padding:3px 8px; border-bottom:1px solid rgba(255,255,255,.15); text-align:left; }
+
+  #touch { position:absolute; inset:0; z-index:4; display:none; }
+  #touch.on { display:block; }
+  #panel:not(.hidden) ~ #touch { display:none; }
+  #stick {
+    position:absolute; left:18px; bottom:18px; width:104px; height:104px; border-radius:50%;
+    background:rgba(255,255,255,.16); border:4px solid rgba(30,27,51,.4);
+  }
+  #knob {
+    position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px;
+    border-radius:50%; background:rgba(255,255,255,.55); border:3px solid rgba(30,27,51,.5);
+  }
+  #tJ {
+    position:absolute; right:18px; bottom:18px; width:88px; height:88px; border-radius:50%;
+    background:rgba(255,197,61,.5); border:4px solid rgba(30,27,51,.5);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:bold; font-size:19px; color:#1E1B33;
+  }
+  #tJ.press { background:rgba(255,197,61,.85); }
+  /* killer-snail action buttons — only shown in that mode */
+  .act {
+    position:absolute; width:62px; height:62px; border-radius:50%;
+    border:4px solid rgba(30,27,51,.5); display:none;
+    align-items:center; justify-content:center; font-weight:bold; font-size:22px; color:#1E1B33;
+  }
+  #touch.war .act { display:flex; }
+  #tG {
+    position:absolute; right:118px; bottom:34px; width:62px; height:62px; border-radius:50%;
+    border:4px solid rgba(30,27,51,.5); background:rgba(255,209,102,.55);
+    display:flex; align-items:center; justify-content:center; font-size:22px; pointer-events:auto;
+  }
+  #touch.war #tG { bottom:198px; }        /* keep clear of the snail buttons */
+  #tG.press { filter:brightness(1.35); }
+  #tZ { right:118px; bottom:34px; background:rgba(255,255,255,.55); }
+  #tK { right:22px;  bottom:116px; background:rgba(255,120,120,.6); }
+  #tT { right:118px; bottom:116px; background:rgba(91,231,255,.55); }
+  .act.press { filter:brightness(1.35); }
+  footer { font-size:12px; opacity:.6; text-align:center; max-width:960px; }
+
+  /* phone in landscape: give the whole screen to the game */
+  @media (max-height: 540px) {
+    body { padding:4px; gap:4px; }
+    h1, footer { display:none; }
+    /* cap the width so the 16:9 stage still fits the viewport height */
+    #stage { max-width: calc((100vh - 16px) * 1.7778); }
+  }
+</style>
+</head>
+<body>
+<h1>✨ AURA OBBY 3D ✨</h1>
+
+<div id="stage">
+  <canvas id="gl" width="1280" height="720"></canvas>
+  <canvas id="hud" width="1280" height="720"></canvas>
+  <button id="musicBtn" title="Music">🎵</button>
+  <button id="soundBtn" title="Sound">🔊</button>
+  <button id="fsBtn" title="Fullscreen (F)">⛶</button>
+
+  <div id="panel">
+    <div class="screen on" id="scrMenu">
+      <div class="big-title">AURA OBBY 3D</div>
+      <p>Run the obby in full 3D. Collect aura orbs. Do not let the snail touch you.</p>
+      <div class="orbcount">💠 <span id="menuOrbs">0</span> aura</div>
+      <div id="menuWho" style="font-size:13px;opacity:.75;margin-top:-4px">not saving yet</div>
+      <div class="rowbtns" style="flex-direction:column;align-items:center;">
+        <button class="wide" id="btnObby">🧗 OBBY MODE</button>
+        <button class="wide" id="btnSnail">🐌 KILLER SNAIL</button>
+        <button class="wide" id="btnInf">♾️ INFINITY CHALLENGE</button>
+        <button class="wide ghost" id="btnShop">🛍️ AURA SHOP</button>
+        <button class="wide ghost" id="btnBoard">🏆 LEADERBOARD</button>
+        <button class="wide ghost" id="btnProfile">👤 NICKNAME</button>
+        <button class="wide ghost" id="btnHelp">❓ HOW TO PLAY</button>
+      </div>
+    </div>
+
+    <div class="screen" id="scrLevels">
+      <h2>🧗 Obby Mode</h2>
+      <p>Reach the glowing portal. Every level is harder than the last.</p>
+      <div class="cards" id="levelCards"></div>
+      <button class="ghost" id="btnLvlBack">⬅ Back</button>
+    </div>
+
+    <div class="screen" id="scrShop">
+      <h2>🛍️ Aura Shop</h2>
+      <div class="orbcount">💠 <span id="shopOrbs">0</span> aura</div>
+      <p style="margin-top:2px"><b>⚡ Powers</b> — bought once, on forever</p>
+      <div class="cards" id="shopPowers"></div>
+      <p style="margin-top:6px"><b>👕 Skins</b></p>
+      <div class="cards" id="shopCards"></div>
+      <button class="ghost" id="btnShopBack">⬅ Back</button>
+    </div>
+
+    <div class="screen" id="scrBoard">
+      <h2>🏆 Leaderboard</h2>
+      <p>Top 5 on this device. Everyone who plays here can get on it — put your name
+         in before you play.</p>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <label for="nameIn" style="font-size:14px">Playing as</label>
+        <input id="nameIn" maxlength="10" placeholder="your name">
+      </div>
+      <div class="rowbtns" style="gap:6px">
+        <button class="ghost" id="btnBoardOnline" style="font-size:14px;min-width:0;padding:6px 14px">🌍 Online</button>
+        <button class="ghost" id="btnBoardLocal" style="font-size:14px;min-width:0;padding:6px 14px">📱 This device</button>
+      </div>
+      <div id="boardWhere" style="font-size:12px;opacity:.7">—</div>
+      <div id="boardList" style="width:100%"></div>
+      <div class="rowbtns">
+        <button class="ghost" id="btnBoardBack">⬅ Back</button>
+        <button class="ghost" id="btnBoardClear" style="font-size:14px">🗑️ Clear my device</button>
+      </div>
+    </div>
+
+    <div class="screen" id="scrProfile">
+      <h2>👤 Nickname</h2>
+      <p>Put in a nickname and your game saves under it — aura, levels, skins and
+         powers. Type the same nickname on a different computer to carry on there.</p>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap">
+        <input id="profIn" maxlength="10" placeholder="your nickname">
+        <button id="btnProfUse" style="font-size:14px;min-width:0;padding:8px 16px">💾 Play as this</button>
+      </div>
+      <div id="profWhere" style="font-size:13px;opacity:.8;margin-top:8px;min-height:18px">—</div>
+      <div id="profList" style="width:100%"></div>
+      <p style="font-size:12px;opacity:.6;margin-top:10px">Loading a nickname never
+         throws anything away — you keep the best of both. A nickname is a name,
+         not a password.</p>
+      <button class="ghost" id="btnProfBack">⬅ Back</button>
+    </div>
+
+    <div class="screen" id="scrHelp">
+      <h2>❓ How to play</h2>
+      <table class="keys">
+        <tr><td>Move</td><td><b>W A S D</b> or <b>arrow keys</b> (camera relative)</td></tr>
+        <tr><td>Jump</td><td><b>SPACE</b> — hold longer to jump higher</td></tr>
+        <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air — <b>buy it in the Aura Shop</b> first</td></tr>
+        <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
+        <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
+        <tr><td>Save yourself</td><td><b>G</b> while falling — <b>one per life</b>, and you must be quick</td></tr>
+        <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
+        <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
+        <tr><td style="color:#FF8A8A"><b>Any other key</b></td><td style="color:#FF8A8A"><b>x_x you die.</b> The keys above are the only ones the game will let you touch while you are playing</td></tr>
+        <tr><td>Phone / tablet</td><td>joystick + jump button, drag the right side to look</td></tr>
+        <tr><td colspan="2" style="padding-top:9px;color:#9BE58A"><b>🐌 In Killer Snail only</b></td></tr>
+        <tr><td>Throw salt</td><td><b>Z</b> — costs salt, aims itself at the snail</td></tr>
+        <tr><td>Swing</td><td><b>K</b> — big damage, but you must be right next to it</td></tr>
+        <tr><td>Teleport home</td><td><b>T</b> — jump straight to the safehouse (16s cooldown)</td></tr>
+      </table>
+      <p><b>👤 Nickname</b> — put one in from the menu and your aura, levels, skins and
+         powers save under it. Type the same nickname on another computer and your
+         game is waiting there.<br>
+         <b>💠 Aura orbs</b> are saved forever — spend them in the Aura Shop.<br>
+         <b>🐌 Killer Snail</b> flies through walls with a knife. You get <b>3 hearts</b> — fight back with
+         salt (<b>Z</b>) and swings (<b>K</b>), and let the <b>soldiers</b> shoot it. Hide in the
+         <b>🏠 safehouse</b> (<b>T</b>) — but the shield only lasts about 11 seconds, so you cannot camp.<br>
+         <b>♾️ Infinity</b> falls forever — find the hole in each floor before the spikes above catch you.</p>
+      <button class="ghost" id="btnHelpBack">⬅ Back</button>
+    </div>
+
+    <div class="screen" id="scrPause">
+      <h2>⏸ Paused</h2>
+      <div class="rowbtns" style="flex-direction:column;align-items:center;">
+        <button class="wide" id="btnResume">▶ Resume</button>
+        <button class="wide ghost" id="btnRetry">🔁 Restart</button>
+        <button class="wide ghost" id="btnQuit">🏠 Main menu</button>
+        <button class="wide ghost" id="btnDebug" style="font-size:14px">🐞 Debug info</button>
+      </div>
+    </div>
+
+    <div class="screen" id="scrResult">
+      <h2 id="resTitle">Level clear!</h2>
+      <p id="resBody"></p>
+      <div class="rowbtns">
+        <button id="btnResAgain">🔁 Again</button>
+        <button class="ghost" id="btnResNext">➡ Next</button>
+        <button class="ghost" id="btnResMenu">🏠 Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="touch">
+    <div id="stick"><div id="knob"></div></div>
+    <div id="tJ">JUMP</div>
+    <div class="act" id="tZ" title="Throw salt">🧂</div>
+    <div class="act" id="tK" title="Swing">👊</div>
+    <div class="act" id="tT" title="Teleport to safehouse">🏠</div>
+    <div id="tG" title="Emergency save">🆘</div>
+  </div>
+</div>
+
+<footer>Real-time 3D in one HTML file — no engine, no build, no server. Put in a nickname and your progress follows you.</footer>
+
+<script>
+/* =========================================================================
+   ONLINE LEADERBOARD (optional). Loads the Firebase SDK and signs in
+   anonymously. If any of that fails — no internet, blocked network, rules not
+   published yet — window.__cloud simply never appears and the game falls back
+   to the scores kept on this device. Nothing else waits on it.
+
+   For a grown-up: these values are an address label, not a password. They are
+   meant to ship inside a web page. The security is in the database rules, which
+   are in obby/README.md.
+   ========================================================================= */
+</script>
+<script type="module">
+const SDK = 'https://www.gstatic.com/firebasejs/10.12.5/';
+const firebaseConfig = {
+  apiKey:      "AIzaSyDNETb44pue8Kg9tYWqna7y6N7MlCoMpU0",
+  authDomain:  "unimai-game-hub.firebaseapp.com",
+  databaseURL: "https://unimai-game-hub-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:   "unimai-game-hub",
+  appId:       "1:527407328515:web:751f851d2a00e0a2980d36"
+};
+try {
+  const [appMod, authMod, dbMod] = await Promise.all([
+    import(SDK + 'firebase-app.js'),
+    import(SDK + 'firebase-auth.js'),
+    import(SDK + 'firebase-database.js')
+  ]);
+  const { ref, get, set, serverTimestamp } = dbMod;
+  const app = appMod.initializeApp(firebaseConfig);
+  const db = dbMod.getDatabase(app);
+  await authMod.signInAnonymously(authMod.getAuth(app));
+
+  window.__cloud = {
+    // one row per player per board, so the node stays small and each person
+    // is on the list once with their best
+    async top(board) {
+      const snap = await get(ref(db, 'obbyScores/' + board));
+      const raw = snap.val() || {};
+      return Object.keys(raw)
+        .filter(k => raw[k] && typeof raw[k].v === 'number')
+        .map(k => ({ n: String(raw[k].n || k), v: raw[k].v }));
+    },
+    async submit(board, key, name, value, lower) {
+      const node = ref(db, 'obbyScores/' + board + '/' + key);
+      const cur = (await get(node)).val();
+      if (cur && typeof cur.v === 'number' && (lower ? cur.v <= value : cur.v >= value)) return false;
+      await set(node, { n: name, v: value, at: serverTimestamp() });
+      return true;
+    },
+    // ---- progress saves: one node per nickname, so you can pick your game
+    // back up on a different computer ----
+    async getSave(key) {
+      const snap = await get(ref(db, 'obbySaves/' + key));
+      return snap.val() || null;
+    },
+    async putSave(key, data) {
+      await set(ref(db, 'obbySaves/' + key), Object.assign({}, data, { at: serverTimestamp() }));
+      return true;
+    }
+  };
+  window.dispatchEvent(new Event('cloud-ready'));
+} catch (e) {
+  window.__cloudError = (e && e.message) || String(e);
+  window.dispatchEvent(new Event('cloud-fail'));
+}
+</script>
+<script>
+(function () {
+'use strict';
+
+/* =========================================================================
+   0. OOPS BAR — you cannot open a console on a tablet, so anything that
+   breaks gets shown on the screen instead. Tap it to hide it.
+   ========================================================================= */
+const Oops = (function () {
+  let bar = null;
+  const seen = Object.create(null);
+  const log = [];
+  function el() {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'oops';
+      bar.addEventListener('click', () => { bar.style.display = 'none'; });
+      document.body.appendChild(bar);
+    }
+    return bar;
+  }
+  return {
+    report(text) {
+      text = String(text);
+      seen[text] = (seen[text] || 0) + 1;
+      if (seen[text] === 1) log.push(text);
+      if (seen[text] > 3) return;                       // the same fault every frame is not news
+      const b = el();
+      b.style.display = 'block';
+      b.textContent = '⚠️ ' + text + (seen[text] > 1 ? '  ×' + seen[text] : '') + '\n(tap to hide)';
+    },
+    total() { let n = 0; for (const k in seen) n += seen[k]; return n; },
+    last() { return log.length ? log[log.length-1] : null; },
+    log() { return log.slice(); }
+  };
+})();
+addEventListener('error', e =>
+  Oops.report((e.message || 'something broke') + '  — line ' + (e.lineno || '?')));
+addEventListener('unhandledrejection', e =>
+  Oops.report('promise failed: ' + ((e.reason && e.reason.message) || e.reason)));
+
+/* =========================================================================
+   1. MATH — just enough 4x4 matrix code to drive a camera
+   ========================================================================= */
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const lerp  = (a,b,t) => a+(b-a)*t;
+function angLerp(a, b, t) {           // shortest way round the circle
+  let d = ((b - a + Math.PI) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) - Math.PI;
+  return a + d * t;
+}
+
+function m4() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+function m4mul(o, a, b) {
+  for (let i=0;i<4;i++) for (let j=0;j<4;j++) {
+    o[i*4+j] = a[0*4+j]*b[i*4+0] + a[1*4+j]*b[i*4+1] + a[2*4+j]*b[i*4+2] + a[3*4+j]*b[i*4+3];
+  }
+  return o;
+}
+function m4translate(o,x,y,z){ o.set([1,0,0,0, 0,1,0,0, 0,0,1,0, x,y,z,1]); return o; }
+function m4scale(o,x,y,z){ o.set([x,0,0,0, 0,y,0,0, 0,0,z,0, 0,0,0,1]); return o; }
+function m4rotY(o,r){ const c=Math.cos(r),s=Math.sin(r); o.set([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]); return o; }
+function m4rotX(o,r){ const c=Math.cos(r),s=Math.sin(r); o.set([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); return o; }
+function m4rotZ(o,r){ const c=Math.cos(r),s=Math.sin(r); o.set([c,s,0,0, -s,c,0,0, 0,0,1,0, 0,0,0,1]); return o; }
+function m4persp(o, fovy, aspect, near, far) {
+  const f = 1/Math.tan(fovy/2), nf = 1/(near-far);
+  o.set([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+  return o;
+}
+function m4look(o, ex,ey,ez, cx,cy,cz) {
+  let zx=ex-cx, zy=ey-cy, zz=ez-cz;                // z = eye - target
+  let l = Math.hypot(zx,zy,zz)||1; zx/=l; zy/=l; zz/=l;
+  let xx = zz, xy = 0, xz = -zx;                   // x = cross(up, z), up = (0,1,0)
+  l = Math.hypot(xx,xy,xz);
+  if (l < 1e-6) { xx=1; xy=0; xz=0; } else { xx/=l; xy/=l; xz/=l; }
+  const yx = zy*xz - zz*xy, yy = zz*xx - zx*xz, yz = zx*xy - zy*xx;
+  o.set([xx,yx,zx,0, xy,yy,zy,0, xz,yz,zz,0,
+         -(xx*ex+xy*ey+xz*ez), -(yx*ex+yy*ey+yz*ez), -(zx*ex+zy*ey+zz*ez), 1]);
+  return o;
+}
+const TMP_A = m4(), TMP_B = m4(), TMP_C = m4(), TMP_D = m4();
+// model matrix: translate * rotY * rotX * scale
+function compose(out, tx,ty,tz, ry, rx, sx,sy,sz) {
+  m4translate(TMP_A, tx,ty,tz);
+  m4rotY(TMP_B, ry||0);
+  m4mul(TMP_C, TMP_A, TMP_B);
+  if (rx) { m4rotX(TMP_B, rx); m4mul(TMP_A, TMP_C, TMP_B); TMP_C.set(TMP_A); }
+  m4scale(TMP_B, sx,sy,sz);
+  return m4mul(out, TMP_C, TMP_B);
+}
+
+/* =========================================================================
+   2. MESHES — cube, pyramid, sphere. Everything is built from these.
+   ========================================================================= */
+function cubeMesh() {
+  // unit cube, -0.5..0.5
+  const f = [
+    [[-.5,-.5, .5],[ .5,-.5, .5],[ .5, .5, .5],[-.5, .5, .5],[0,0,1]],
+    [[ .5,-.5,-.5],[-.5,-.5,-.5],[-.5, .5,-.5],[ .5, .5,-.5],[0,0,-1]],
+    [[-.5, .5, .5],[ .5, .5, .5],[ .5, .5,-.5],[-.5, .5,-.5],[0,1,0]],
+    [[-.5,-.5,-.5],[ .5,-.5,-.5],[ .5,-.5, .5],[-.5,-.5, .5],[0,-1,0]],
+    [[ .5,-.5, .5],[ .5,-.5,-.5],[ .5, .5,-.5],[ .5, .5, .5],[1,0,0]],
+    [[-.5,-.5,-.5],[-.5,-.5, .5],[-.5, .5, .5],[-.5, .5,-.5],[-1,0,0]]
+  ];
+  const pos = [], nrm = [];
+  for (const q of f) {
+    const n = q[4];
+    for (const i of [0,1,2, 0,2,3]) { pos.push(q[i][0],q[i][1],q[i][2]); nrm.push(n[0],n[1],n[2]); }
+  }
+  return { pos: new Float32Array(pos), nrm: new Float32Array(nrm) };
+}
+function pyramidMesh() {
+  const a=[-.5,-.5,-.5], b=[.5,-.5,-.5], c=[.5,-.5,.5], d=[-.5,-.5,.5], t=[0,.5,0];
+  const pos=[], nrm=[];
+  const tri=(p,q,r)=>{
+    const ux=q[0]-p[0],uy=q[1]-p[1],uz=q[2]-p[2], vx=r[0]-p[0],vy=r[1]-p[1],vz=r[2]-p[2];
+    let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+    const l=Math.hypot(nx,ny,nz)||1; nx/=l;ny/=l;nz/=l;
+    for (const v of [p,q,r]) { pos.push(v[0],v[1],v[2]); nrm.push(nx,ny,nz); }
+  };
+  // wound counter-clockwise seen from outside, so face culling and lighting agree
+  tri(b,a,t); tri(c,b,t); tri(d,c,t); tri(a,d,t); tri(a,b,c); tri(a,c,d);
+  return { pos:new Float32Array(pos), nrm:new Float32Array(nrm) };
+}
+function sphereMesh(seg, ring) {
+  const pos=[], nrm=[];
+  const P=(i,j)=>{
+    const u=i/seg*Math.PI*2, v=j/ring*Math.PI;
+    return [Math.sin(v)*Math.cos(u)*.5, Math.cos(v)*.5, Math.sin(v)*Math.sin(u)*.5];
+  };
+  for (let j=0;j<ring;j++) for (let i=0;i<seg;i++) {
+    const a=P(i,j), b=P(i+1,j), c=P(i+1,j+1), d=P(i,j+1);
+    for (const v of [a,b,c, a,c,d]) {
+      pos.push(v[0],v[1],v[2]);
+      const l=Math.hypot(v[0],v[1],v[2])||1;
+      nrm.push(v[0]/l, v[1]/l, v[2]/l);
+    }
+  }
+  return { pos:new Float32Array(pos), nrm:new Float32Array(nrm) };
+}
+
+/* =========================================================================
+   3. WEBGL RENDERER
+   ========================================================================= */
+const glcv = document.getElementById('gl');
+const gl = glcv.getContext('webgl', { antialias:true, alpha:false }) ||
+           glcv.getContext('experimental-webgl', { antialias:true, alpha:false });
+if (!gl) { document.getElementById('panel').innerHTML = '<div class="screen on"><h2>This browser cannot do 3D (WebGL is off).</h2></div>'; }
+
+const VS = `
+attribute vec3 aPos; attribute vec3 aNrm; attribute vec3 aCol;
+uniform mat4 uVP, uModel;
+varying vec3 vNrm; varying vec3 vCol; varying float vFog; varying float vY;
+void main(){
+  vec4 wp = uModel * vec4(aPos, 1.0);
+  gl_Position = uVP * wp;
+  vNrm = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNrm);
+  vCol = aCol; vY = wp.y;
+  vFog = gl_Position.w;
+}`;
+const FS = `
+precision mediump float;
+varying vec3 vNrm; varying vec3 vCol; varying float vFog; varying float vY;
+uniform vec3 uTint, uFogCol, uLight;
+uniform float uFogNear, uFogFar, uGlow, uAlpha;
+void main(){
+  vec3 n = normalize(vNrm);
+  float d = max(dot(n, normalize(uLight)), 0.0);
+  float top = max(n.y, 0.0);
+  vec3 base = vCol * uTint;
+  vec3 col = base * (0.55 + 0.38*d + 0.12*top);
+  col = mix(col, base, uGlow);                       // glowing things ignore the light
+  float f = clamp((vFog - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+  gl_FragColor = vec4(mix(col, uFogCol, f), uAlpha);
+}`;
+
+function shader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+let prog, loc = {}, meshes = {}, staticBuf = null, staticCount = 0;
+if (gl) {
+  prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  loc = {
+    aPos: gl.getAttribLocation(prog,'aPos'), aNrm: gl.getAttribLocation(prog,'aNrm'), aCol: gl.getAttribLocation(prog,'aCol'),
+    uVP: gl.getUniformLocation(prog,'uVP'), uModel: gl.getUniformLocation(prog,'uModel'),
+    uTint: gl.getUniformLocation(prog,'uTint'), uFogCol: gl.getUniformLocation(prog,'uFogCol'),
+    uLight: gl.getUniformLocation(prog,'uLight'), uFogNear: gl.getUniformLocation(prog,'uFogNear'),
+    uFogFar: gl.getUniformLocation(prog,'uFogFar'), uGlow: gl.getUniformLocation(prog,'uGlow'),
+    uAlpha: gl.getUniformLocation(prog,'uAlpha')
+  };
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+
+  const mk = m => {
+    const buf = gl.createBuffer();
+    const data = new Float32Array(m.pos.length * 3);
+    for (let i=0, v=0; i<m.pos.length; i+=3, v++) {
+      data[i*3+0]=m.pos[i]; data[i*3+1]=m.pos[i+1]; data[i*3+2]=m.pos[i+2];
+      data[i*3+3]=m.nrm[i]; data[i*3+4]=m.nrm[i+1]; data[i*3+5]=m.nrm[i+2];
+      data[i*3+6]=1; data[i*3+7]=1; data[i*3+8]=1;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    return { buf, count: m.pos.length/3, src: m };
+  };
+  meshes.cube = mk(cubeMesh());
+  meshes.pyr  = mk(pyramidMesh());
+  meshes.ball = mk(sphereMesh(12, 8));
+}
+const STRIDE = 9 * 4;
+function bindMesh(m) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
+  gl.enableVertexAttribArray(loc.aPos); gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, STRIDE, 0);
+  gl.enableVertexAttribArray(loc.aNrm); gl.vertexAttribPointer(loc.aNrm, 3, gl.FLOAT, false, STRIDE, 12);
+  gl.enableVertexAttribArray(loc.aCol); gl.vertexAttribPointer(loc.aCol, 3, gl.FLOAT, false, STRIDE, 24);
+}
+const MODEL = m4();
+function drawMesh(m, model, col, glow) {
+  gl.uniformMatrix4fv(loc.uModel, false, model);
+  gl.uniform3f(loc.uTint, col[0], col[1], col[2]);
+  gl.uniform1f(loc.uGlow, glow || 0);
+  gl.uniform1f(loc.uAlpha, 1);
+  bindMesh(m);
+  gl.drawArrays(gl.TRIANGLES, 0, m.count);
+}
+// additive pass — for see-through glowing things like the safehouse shield
+function drawGhost(m, model, col, alpha) {
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  gl.depthMask(false);
+  gl.disable(gl.CULL_FACE);
+  gl.uniformMatrix4fv(loc.uModel, false, model);
+  gl.uniform3f(loc.uTint, col[0], col[1], col[2]);
+  gl.uniform1f(loc.uGlow, 1);
+  gl.uniform1f(loc.uAlpha, alpha);
+  bindMesh(m);
+  gl.drawArrays(gl.TRIANGLES, 0, m.count);
+  gl.enable(gl.CULL_FACE);
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+  gl.uniform1f(loc.uAlpha, 1);
+}
+function drawBox(cx,cy,cz, sx,sy,sz, col, ry, glow) {
+  compose(MODEL, cx,cy,cz, ry||0, 0, sx,sy,sz);
+  drawMesh(meshes.cube, MODEL, col, glow);
+}
+
+/* ---- static geometry gets baked into one buffer, drawn in one call ---- */
+function StaticBatch() {
+  return { data: [], add(mesh, mdl, col) {
+    const src = mesh.src;
+    for (let i=0;i<src.pos.length;i+=3) {
+      const x=src.pos[i], y=src.pos[i+1], z=src.pos[i+2];
+      this.data.push(
+        mdl[0]*x + mdl[4]*y + mdl[8]*z + mdl[12],
+        mdl[1]*x + mdl[5]*y + mdl[9]*z + mdl[13],
+        mdl[2]*x + mdl[6]*y + mdl[10]*z + mdl[14],
+        mdl[0]*src.nrm[i] + mdl[4]*src.nrm[i+1] + mdl[8]*src.nrm[i+2],
+        mdl[1]*src.nrm[i] + mdl[5]*src.nrm[i+1] + mdl[9]*src.nrm[i+2],
+        mdl[2]*src.nrm[i] + mdl[6]*src.nrm[i+1] + mdl[10]*src.nrm[i+2],
+        col[0], col[1], col[2]);
+    }
+  }};
+}
+function uploadStatic(batch) {
+  if (!staticBuf) staticBuf = gl.createBuffer();
+  const arr = new Float32Array(batch.data);
+  gl.bindBuffer(gl.ARRAY_BUFFER, staticBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+  staticCount = arr.length / 9;
+}
+function drawStatic() {
+  if (!staticCount) return;
+  gl.uniformMatrix4fv(loc.uModel, false, m4());
+  gl.uniform3f(loc.uTint, 1,1,1);
+  gl.uniform1f(loc.uGlow, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, staticBuf);
+  gl.enableVertexAttribArray(loc.aPos); gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, STRIDE, 0);
+  gl.enableVertexAttribArray(loc.aNrm); gl.vertexAttribPointer(loc.aNrm, 3, gl.FLOAT, false, STRIDE, 12);
+  gl.enableVertexAttribArray(loc.aCol); gl.vertexAttribPointer(loc.aCol, 3, gl.FLOAT, false, STRIDE, 24);
+  gl.drawArrays(gl.TRIANGLES, 0, staticCount);
+}
+const hex = h => [parseInt(h.slice(1,3),16)/255, parseInt(h.slice(3,5),16)/255, parseInt(h.slice(5,7),16)/255];
+
+/* =========================================================================
+   4. CONSTANTS — the whole game is tuned around these
+   ========================================================================= */
+// AIR_ACC is generous on purpose: you can steer a lot mid-jump, which is what
+// makes diagonal hops between staggered platforms fair.
+const GRAV = 26, RUN = 7.2, ACC = 46, AIR_ACC = 36, FRIC = 62;   // FRIC high so stopping is crisp
+const JUMP_V = 9.6;              // -> 1.77 units high, 0.74s airborne, ~5.3 units far
+const AIR_JUMPS = 1, DBL_JUMP = 0.85;   // one mid-air jump, a little weaker than the first
+// Ice level. ICE_FRIC is 79% below the first pass at ice (0.18), so from a full run
+// you now coast about 11 units before stopping — roughly two platforms. Steering
+// still works, because ICE_ACC is left alone; you just cannot brake.
+const ICE_FRIC = 0.038, ICE_ACC = 0.55;
+const PAD_V = 16;                // bounce pad -> 4.9 units high
+const MAX_FALL = 34;
+const COYOTE = 0.11, BUFFER = 0.13, CUT_JUMP = 0.42;
+const PHX = 0.4, PHY = 0.8, PHZ = 0.4;   // player half-extents
+const THICK = 0.6;               // standard platform thickness
+const MAXGAP = 4.2;              // never exceed this: max jump is ~5.3
+
+/* =========================================================================
+   5. SAVE
+   ========================================================================= */
+const SAVE_KEY = 'obby3d-save-v1';
+function loadSave() {
+  try {
+    const r = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (r && typeof r === 'object') return {
+      orbs: r.orbs|0, lifetimeOrbs: r.lifetimeOrbs|0, skin: r.skin || 'kid',
+      owned: Array.isArray(r.owned) && r.owned.length ? r.owned.slice() : ['kid'],
+      cleared: Object.assign({}, r.cleared), best: Object.assign({}, r.best),
+      sound: r.sound !== false, music: r.music !== false,
+      powers: Array.isArray(r.powers) ? r.powers.slice() : [],
+      name: typeof r.name === 'string' ? r.name : ''
+    };
+  } catch (e) {}
+  return { orbs:0, lifetimeOrbs:0, skin:'kid', owned:['kid'], cleared:{}, best:{},
+           sound:true, music:true, powers:[], name:'' };
+}
+const save = loadSave();
+function persistLocal() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch(e){} }
+function persist() {
+  persistLocal();
+  scheduleSync();                     // and under your nickname, if you set one
+}
+
+/* =========================================================================
+   5b. NICKNAME PROFILES — your progress lives under a nickname, so more than
+   one person can play on the same tablet and so you can pick your game back up
+   on a different computer. Two rules keep it safe:
+
+     * merging never takes anything away. If the copy on the internet has more
+       aura and this computer has more levels cleared, you end up with both.
+     * a nickname is a name, not a password. Anyone who types yours gets that
+       progress. Fine for a family; it is not a bank.
+
+   With no nickname set, none of this runs and the game behaves exactly as it
+   did before: progress in this browser only.
+   ========================================================================= */
+const PROFILE_KEY = 'obby3d-profiles-v1';
+
+// what travels between computers. sound and music stay put — they are settings
+// for the machine you are sitting at, not things you earned.
+function snapshot() {
+  return {
+    orbs: save.orbs|0, lifetimeOrbs: save.lifetimeOrbs|0, skin: save.skin,
+    owned: save.owned.slice(), powers: save.powers.slice(),
+    cleared: Object.assign({}, save.cleared), best: Object.assign({}, save.best),
+    name: save.name || ''
+  };
+}
+// in save.best, level ids hold times (faster wins) and these three hold scores
+const bestIsTime = k => k !== 'snail' && k !== 'kills' && k !== 'depth';
+
+// the whole safety of this feature is in here: every field takes the better of
+// the two, so a merge can only ever hand you more than you walked in with.
+function mergeSave(a, b) {
+  if (!a) return b ? Object.assign({}, b) : null;
+  if (!b) return Object.assign({}, a);
+  const union = (x, y) => {
+    const out = [];
+    (x || []).concat(y || []).forEach(v => { if (out.indexOf(v) < 0) out.push(v); });
+    return out;
+  };
+  const out = {
+    orbs:         Math.max(a.orbs|0, b.orbs|0),
+    lifetimeOrbs: Math.max(a.lifetimeOrbs|0, b.lifetimeOrbs|0),
+    owned:        union(a.owned, b.owned),
+    powers:       union(a.powers, b.powers),
+    cleared:      {}, best: {},
+    name:         b.name || a.name || ''
+  };
+  for (const k in (a.cleared || {})) if (a.cleared[k]) out.cleared[k] = true;
+  for (const k in (b.cleared || {})) if (b.cleared[k]) out.cleared[k] = true;
+  const keys = Object.assign({}, a.best || {}, b.best || {});
+  for (const k in keys) {
+    const x = a.best && a.best[k], y = b.best && b.best[k];
+    out.best[k] = (typeof x === 'number' && typeof y === 'number')
+      ? (bestIsTime(k) ? Math.min(x, y) : Math.max(x, y))
+      : (typeof x === 'number' ? x : y);
+  }
+  // never leave you wearing a skin the merged list says you do not own
+  out.skin = out.owned.indexOf(a.skin) >= 0 ? a.skin
+           : out.owned.indexOf(b.skin) >= 0 ? b.skin : 'kid';
+  return out;
+}
+function applySave(o) {
+  if (!o) return;
+  save.orbs = o.orbs|0;
+  save.lifetimeOrbs = o.lifetimeOrbs|0;
+  save.owned   = (o.owned && o.owned.length) ? o.owned.slice() : ['kid'];
+  save.powers  = (o.powers || []).slice();
+  save.cleared = Object.assign({}, o.cleared);
+  save.best    = Object.assign({}, o.best);
+  save.skin    = o.skin || 'kid';
+  if (o.name) save.name = o.name;
+  persist();
+}
+
+// every nickname ever used on this computer, newest first
+const Profiles = (function () {
+  let data = null;
+  function all() {
+    if (data) return data;
+    try {
+      const r = JSON.parse(localStorage.getItem(PROFILE_KEY));
+      if (r && r.slots) { data = r; return data; }
+    } catch (e) {}
+    data = { v:1, slots:{} };
+    return data;
+  }
+  function write() { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(all())); } catch (e) {} }
+  return {
+    list() {
+      const s = all().slots;
+      return Object.keys(s).map(k => ({ key:k, name:s[k].name || k, at:s[k].at || 0 }))
+                           .sort((x, y) => y.at - x.at);
+    },
+    read(k) { const s = all().slots[k]; return s ? s.data : null; },
+    put(k, name, d) { all().slots[k] = { name, data:d, at: Date.now() }; write(); },
+    remove(k) { delete all().slots[k]; write(); }
+  };
+})();
+
+/* Saving happens on its own. Every persist() writes the nickname's copy on this
+   computer straight away; the copy on the internet follows a moment later, so a
+   run that collects thirty orbs sends one update instead of thirty. */
+let syncTimer = 0, syncState = 'none';   // none | local | saving | saved | offline
+
+/* Which nickname we are writing to. Deliberately NOT whatever is in the name
+   box this instant: typing "inu" letter by letter would otherwise leave saves
+   called i, in and inu behind. A nickname is only taken up when you commit it,
+   by pressing the button or leaving the box. */
+let profileKey = save.name ? nameKey() : '';
+
+function localSync() {
+  if (!profileKey) { syncState = 'none'; return false; }
+  Profiles.put(profileKey, (save.name || '').trim() || profileKey, snapshot());
+  return true;
+}
+function cloudSync() {
+  if (!localSync()) return;
+  const c = cloud();
+  if (!c) { syncState = 'offline'; paintProfile(); return; }
+  syncState = 'saving'; paintProfile();
+  c.putSave(profileKey, snapshot())
+   .then(() => { syncState = 'saved'; }, () => { syncState = 'offline'; })
+   .then(() => paintProfile());
+}
+function scheduleSync() {
+  if (!localSync()) return;
+  if (syncState !== 'saving') { syncState = 'local'; paintProfile(); }
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(cloudSync, 1500);
+}
+
+/* Switching to a nickname:
+     it already has progress  -> load it (this computer's copy merged with the
+                                 internet's), replacing what is on screen
+     it is brand new          -> it claims what you are playing right now, which
+                                 is what you want the first time you type a name
+   Only reachable from the menu, so nothing lands in the middle of a run. */
+function useProfile(name, done) {
+  const n = String(name || '').trim().slice(0, 10);
+  if (!n) return;
+  const carried = snapshot();
+  save.name = n;
+  profileKey = nameKey();
+  const mine = Profiles.read(profileKey);
+  const finish = (remote) => {
+    const stored = mergeSave(mine, remote);
+    applySave(Object.assign(stored || carried, { name: n }));
+    cloudSync();
+    if (done) done(!!stored);
+  };
+  const c = cloud();
+  if (!c) { finish(null); return; }
+  syncState = 'saving'; paintProfile();
+  c.getSave(profileKey).then(finish, () => finish(null));
+}
+
+/* =========================================================================
+   6. SOUND
+   ========================================================================= */
+const Sound = (function(){
+  let ac = null;
+  function ctx(){ if(!ac){ try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+    if (ac.state === 'suspended') ac.resume(); return ac; }
+  function tone(f, dur, type, vol, to) {
+    if (!save.sound) return;
+    const c = ctx(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(f, c.currentTime);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, c.currentTime + dur);
+    g.gain.setValueAtTime(vol || .05, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, c.currentTime + dur);
+    o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime + dur + .02);
+  }
+  return {
+    ctx,
+    jump: ()=>tone(360,.12,'square',.04,620),
+    dbl:  ()=>tone(700,.14,'triangle',.045,1250),
+    orb:  ()=>tone(880,.10,'triangle',.055,1400),
+    pad:  ()=>tone(240,.20,'sawtooth',.05,900),
+    die:  ()=>tone(300,.35,'sawtooth',.055,70),
+    check:()=>tone(700,.14,'triangle',.05,1050),
+    salt: ()=>tone(1200,.16,'square',.05,500),
+    swing:()=>tone(520,.12,'sawtooth',.05,180),
+    pop:  ()=>tone(900,.07,'square',.035,1500),
+    raise:()=>tone(180,.28,'sawtooth',.045,420),
+    stab: ()=>tone(1500,.09,'square',.055,240),
+    hurt: ()=>{ tone(320,.22,'sawtooth',.07,90); },
+    hit:  ()=>tone(180,.18,'square',.05,90),
+    devil:()=>{ tone(150,.5,'sawtooth',.05,70); setTimeout(()=>tone(120,.6,'sawtooth',.045,60),160); },
+    win:  ()=>{ tone(660,.12,'triangle',.06); setTimeout(()=>tone(880,.12,'triangle',.06),110); setTimeout(()=>tone(1180,.22,'triangle',.06),230); },
+    unlock:()=>{ tone(520,.1,'square',.05); setTimeout(()=>tone(780,.18,'square',.05),100); }
+  };
+})();
+
+/* =========================================================================
+   6b. MUSIC — one song per level, played by a little step sequencer.
+   No audio files: every note is an oscillator, so it stays a single HTML file.
+   Notes are MIDI numbers, 0 means rest, 16 steps to the bar.
+   ========================================================================= */
+const SONGS = {
+  // dreamy and slow — a warm-up level
+  angel: { bpm:92, vol:.055, lead:'triangle', bassW:'sine',
+    lead1:[76,0,79,0, 81,0,79,0, 76,0,72,0, 74,0,0,0,  77,0,81,0, 84,0,81,0, 79,0,76,0, 72,0,0,0],
+    bass: [48,0,0,0, 0,0,55,0, 45,0,0,0, 0,0,52,0,     53,0,0,0, 0,0,60,0, 48,0,0,0, 0,0,55,0] },
+  // Inu's own level: bouncy hero music
+  inu:   { bpm:126, vol:.05, lead:'square', bassW:'square',
+    lead1:[72,74,76,77, 79,0,77,79, 81,0,79,77, 76,0,74,0,  72,74,76,79, 81,0,84,0, 83,81,79,77, 76,0,0,0],
+    bass: [48,0,48,0, 55,0,55,0, 53,0,53,0, 50,0,50,0,      48,0,48,0, 57,0,57,0, 53,0,53,0, 55,0,55,0] },
+  // dark, fast, minor — hell
+  devil: { bpm:148, vol:.045, lead:'sawtooth', bassW:'sawtooth',
+    lead1:[74,0,74,77, 74,0,80,0, 79,0,77,0, 74,0,0,0,      74,0,74,77, 79,0,80,0, 82,0,80,79, 77,0,0,0],
+    bass: [38,38,38,38, 38,38,38,38, 36,36,36,36, 36,36,36,36, 41,41,41,41, 41,41,41,41, 38,38,38,38, 37,37,37,37] },
+  // the chase: tense and stabby
+  garden:{ bpm:116, vol:.045, lead:'square', bassW:'triangle',
+    lead1:[69,0,0,69, 0,72,0,0, 71,0,0,71, 0,74,0,0,        69,0,0,69, 0,72,0,0, 76,0,74,0, 72,0,71,0],
+    bass: [45,0,45,0, 45,0,45,0, 43,0,43,0, 43,0,43,0,      41,0,41,0, 41,0,41,0, 45,0,45,0, 44,0,44,0] },
+  // falling forever: everything walks downwards
+  void:  { bpm:88, vol:.05, lead:'sine', bassW:'sine',
+    lead1:[84,0,82,0, 80,0,78,0, 76,0,74,0, 72,0,0,0,       82,0,80,0, 78,0,76,0, 74,0,72,0, 70,0,0,0],
+    bass: [36,0,0,0, 0,0,0,0, 34,0,0,0, 0,0,0,0,            32,0,0,0, 0,0,0,0, 30,0,0,0, 0,0,0,0] },
+  // glassy and bright
+  ice:   { bpm:104, vol:.05, lead:'sine', bassW:'triangle',
+    lead1:[88,0,86,0, 84,0,86,0, 88,0,91,0, 88,0,0,0,        86,0,84,0, 83,0,84,0, 86,0,88,0, 84,0,0,0],
+    bass: [52,0,0,0, 59,0,0,0, 48,0,0,0, 55,0,0,0,           53,0,0,0, 60,0,0,0, 52,0,0,0, 59,0,0,0] },
+  // slow, wide and weightless
+  space: { bpm:78, vol:.05, lead:'triangle', bassW:'sine',
+    lead1:[69,0,0,0, 76,0,0,0, 81,0,0,76, 0,0,74,0,          71,0,0,0, 78,0,0,0, 83,0,0,78, 0,0,76,0],
+    bass: [33,0,0,0, 0,0,45,0, 0,0,0,0, 40,0,0,0,            35,0,0,0, 0,0,47,0, 0,0,0,0, 42,0,0,0] },
+  // after the devil: fast, cold and mechanical
+  nightmare:{ bpm:160, vol:.042, lead:'sawtooth', bassW:'square',
+    lead1:[73,0,73,76, 80,0,76,0, 73,0,71,0, 68,0,0,0,        73,0,73,76, 80,0,83,0, 81,0,80,76, 73,0,0,0],
+    bass: [37,37,0,37, 37,0,37,0, 35,35,0,35, 35,0,35,0,      33,33,0,33, 33,0,33,0, 37,37,0,37, 36,0,36,0] },
+  // the menu hums quietly to itself
+  menu:  { bpm:84, vol:.035, lead:'triangle', bassW:'sine',
+    lead1:[72,0,0,76, 0,0,79,0, 0,76,0,0, 74,0,0,0,         71,0,0,74, 0,0,79,0, 0,77,0,0, 76,0,0,0],
+    bass: [48,0,0,0, 0,0,0,0, 43,0,0,0, 0,0,0,0,            45,0,0,0, 0,0,0,0, 47,0,0,0, 0,0,0,0] }
+};
+
+const Music = (function(){
+  let timer = null, song = null, name = null, step = 0, nextAt = 0;
+  const hz = n => 440 * Math.pow(2, (n - 69) / 12);
+
+  function note(c, midi, at, len, wave, vol) {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = wave;
+    o.frequency.setValueAtTime(hz(midi), at);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + 0.015);      // soft attack, no clicks
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    o.connect(g); g.connect(c.destination);
+    o.start(at); o.stop(at + len + 0.03);
+  }
+
+  function tick() {
+    const c = Sound.ctx();
+    if (!c || !song) return;
+    const beat = 60 / song.bpm / 4;                        // one 16th note
+    while (nextAt < c.currentTime + 0.2) {                 // schedule a little ahead
+      if (nextAt > c.currentTime - 0.05) {
+        const i = step % song.lead1.length;
+        const m = song.lead1[i], b = song.bass[i % song.bass.length];
+        if (m) note(c, m, nextAt, beat * 1.7, song.lead, song.vol);
+        if (b) note(c, b, nextAt, beat * 2.6, song.bassW, song.vol * 1.15);
+      }
+      nextAt += beat;
+      step++;
+    }
+  }
+
+  return {
+    play(which) {
+      if (!save.music || !SONGS[which]) { this.stop(); return; }
+      if (name === which && timer) return;                 // already playing this one
+      this.stop();
+      const c = Sound.ctx();
+      if (!c) return;
+      song = SONGS[which]; name = which; step = 0;
+      nextAt = c.currentTime + 0.08;
+      timer = setInterval(tick, 45);
+      tick();
+    },
+    stop() {
+      if (timer) clearInterval(timer);
+      timer = null; song = null; name = null;
+    },
+    current() { return name; },
+    // called when the music toggle flips
+    refresh(which) { save.music ? this.play(which) : this.stop(); }
+  };
+})();
+// which song belongs to the thing you are playing right now
+function songFor() {
+  if (game.screen !== 'play' && game.screen !== 'pause') return 'menu';
+  if (game.mode === 'snail') return 'garden';
+  if (game.mode === 'infinity') return 'void';
+  // each zone names its own song — a shuffled level keeps one song throughout,
+  // because a new one every three seconds is not music
+  if (game.world && game.world.zone) return game.world.zone.song || game.world.zone.theme;
+  const L = LEVELS.find(l => l.id === game.levelId);
+  return L ? L.theme : 'menu';
+}
+
+/* =========================================================================
+   6c. LEADERBOARD — top 5 per board, kept on this device. Each entry carries a
+   name, so everyone playing on the same tablet competes on the same list.
+   ========================================================================= */
+const SCORE_KEY = 'obby3d-scores-v1';
+const Scores = (function () {
+  let data = null;
+  function all() {
+    if (data) return data;
+    try {
+      const r = JSON.parse(localStorage.getItem(SCORE_KEY));
+      if (r && r.boards) { data = r; return data; }
+    } catch (e) {}
+    data = { v:1, boards:{} };
+    return data;
+  }
+  function write() { try { localStorage.setItem(SCORE_KEY, JSON.stringify(all())); } catch (e) {} }
+  return {
+    top(id) { return (all().boards[id] || []).slice(); },
+    // returns the placing (1..5) if it made the board, otherwise 0
+    add(id, name, value, lower) {
+      const b = all().boards;
+      const row = b[id] || (b[id] = []);
+      const entry = { n: name, v: value };
+      row.push(entry);
+      row.sort((a, c) => lower ? a.v - c.v : c.v - a.v);
+      if (row.length > 5) row.length = 5;
+      write();
+      const i = row.indexOf(entry);
+      return i < 0 ? 0 : i + 1;
+    },
+    clear() { data = { v:1, boards:{} }; write(); }
+  };
+})();
+function playerName() {
+  const n = (save.name || '').trim();
+  return n || 'Player';
+}
+// Realtime Database keys cannot contain . $ # [ ] / — and one row per person per
+// board keeps the node small, so the player's name is the key.
+function nameKey() {
+  const k = playerName().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 12);
+  return k || 'player';
+}
+const cloudId = id => id.replace(/:/g, '-');
+const cloud = () => window.__cloud || null;
+
+// local always, online too when it is there
+function postScore(id, value, lower) {
+  const rank = Scores.add(id, playerName(), value, lower);
+  const c = cloud();
+  if (c) c.submit(cloudId(id), nameKey(), playerName(), value, lower).catch(() => {});
+  return rank;
+}
+// every board: what it is called, how to print it, and which way is better
+function boardList() {
+  const rows = LEVELS.filter(L => !L.troll).map(L =>
+    ({ id:'lvl:'+L.id, name:L.emoji + ' ' + L.name, sub:'fastest clear', lower:true, fmt:fmtTime }));
+  rows.push({ id:'snail:time', name:'🐌 Killer Snail', sub:'longest survival', lower:false, fmt:fmtTime });
+  rows.push({ id:'snail:kills', name:'🔪 Killer Snail', sub:'most snails beaten', lower:false, fmt:v => v + '' });
+  rows.push({ id:'inf:depth', name:'♾️ Infinity', sub:'deepest', lower:false, fmt:v => v + ' m' });
+  return rows;
+}
+
+/* =========================================================================
+   7. SKINS
+   ========================================================================= */
+const SKINS = [
+  { id:'kid',     name:'Aura Kid',   price:0,   em:'🧒', body:'#5B8DEF', head:'#F7C59F', desc:'The classic.' },
+  { id:'angel',   name:'Angel',      price:40,  em:'😇', body:'#FFFFFF', head:'#FFE9C9', desc:'Halo and wings.' },
+  { id:'inu',     name:'Inu',        price:90,  em:'👦', body:'#3FBF7F', head:'#F7C59F', desc:'The hero of the story.' },
+  { id:'devil',   name:'Devil',      price:160, em:'😈', body:'#E23B3B', head:'#FF7A6B', desc:'Horns and a tail.' },
+  { id:'ghost',   name:'Ghost',      price:120, em:'👻', body:'#D6E2FF', head:'#EEF4FF', desc:'Pale and floaty.' },
+  { id:'rainbow', name:'Rainbow',    price:320, em:'🌈', body:'#FF00FF', head:'#FFFFFF', desc:'Colour-shifting aura.' },
+  { id:'snail',   name:'Snail King', price:-1,  em:'🐌', body:'#7BD86B', head:'#B6F0A8', desc:'Survive 60s in Killer Snail.' }
+];
+const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
+const ownsSkin = id => save.owned.indexOf(id) >= 0;
+
+/* Powers are bought once and stay on for good — no equipping, no slots. */
+const POWERS = [
+  { id:'doublejump', name:'Double Jump', price:150, em:'⏫',
+    desc:'Press jump again in mid-air. Comes back when you land.' },
+  { id:'speed', name:'Speed Boots', price:200, em:'👟',
+    desc:'Run 35% faster in every mode. Jumps carry further too.' },
+  { id:'wings', name:'Aura Wings', price:500, em:'🪽',
+    desc:'They only stir in one place, and it is not down here.' }
+];
+// Jetpack. What keeps this from being free flight is not fuel any more but WHERE
+// it works: only on the last deck of Nightmare, under the portal. See stepPlayer.
+const WING_LIFT = 55, WING_MAX_UP = 9.0;
+const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
+// One emergency recovery per life. Slip off an edge and you have about half a second
+// to hit G before you are too far down for the boost to bring you back — miss the
+// window and it is spent for nothing, which is what keeps it from being a free net.
+const SAVE_BOOST = 18;
+const SPEED_BOOST = 1.35;
+// top speed, boots included — used for the run cap AND by anything that has to
+// stay ahead of you, like the Nightmare portal
+function runMax() { return RUN * (hasPower('speed') ? SPEED_BOOST : 1); }
+const hasPower = id => save.powers.indexOf(id) >= 0;
+
+/* =========================================================================
+   8. INPUT — keyboard, drag-to-look, touch stick
+   ========================================================================= */
+const input = { fwd:0, side:0, jump:false, jumpPressed:false, look:0, lookPitch:0, manualLook:0 };
+const keys = {};
+const stage = document.getElementById('stage');
+
+/* Every key the game actually uses. Anything else, while you are playing, kills
+   you — see wrongKey below. Add a new control here the moment you bind it, or it
+   will kill the player who presses it. */
+const GAME_KEYS = new Set([
+  'KeyW','KeyA','KeyS','KeyD',
+  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight',
+  'Space',                       // jump
+  'KeyQ','KeyE',                 // turn the camera
+  'KeyR',                        // back to the checkpoint
+  'KeyG',                        // the one save
+  'KeyZ','KeyK','KeyT',          // salt, swing, teleport — Killer Snail
+  'Escape','KeyP',               // pause
+  'KeyF',                        // fullscreen
+  'F3','Backquote'               // debug overlay
+]);
+// KeyJ -> J, Digit5 -> 5, ShiftLeft -> SHIFT, everything else as it comes
+function keyLabel(code) {
+  return code.replace(/^Key|^Digit|^Numpad/, '').replace(/(Left|Right)$/, '').toUpperCase();
+}
+/* Touch one key that is not in the game and you are dead. No warning shot, no
+   grace period — that is the whole joke. Held Ctrl/Cmd/Alt is let through so the
+   browser's own shortcuts still work: refreshing the page should refresh the page,
+   not kill you halfway through the combination. */
+function wrongKey(code) {
+  if (game.dead > 0 || game.won) return;
+  game.banner = { text:'x_x  WRONG KEY — ' + keyLabel(code), t:2.2 };
+  killPlayer();
+}
+
+addEventListener('keydown', e => {
+  if (e.repeat) { if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault(); return; }
+  if (game.screen === 'play' && !GAME_KEYS.has(e.code) &&
+      !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.code === 'Tab') e.preventDefault();      // do not let focus escape the game
+    wrongKey(e.code);
+    return;
+  }
+  keys[e.code] = true;
+  if (e.code === 'Space') { input.jumpPressed = true; e.preventDefault(); }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  if (game.screen === 'play' && game.mode === 'snail') {
+    if (e.code === 'KeyZ') shootSalt();
+    else if (e.code === 'KeyK') meleeSwing();
+    else if (e.code === 'KeyT') teleportHome();
+  }
+  if (e.code === 'KeyG' && game.screen === 'play') emergencySave();
+  else if (e.code === 'KeyR' && game.screen === 'play') respawnOrRestart();
+  else if (e.code === 'Escape' || e.code === 'KeyP') {
+    if (game.screen === 'play') showScreen('pause'); else if (game.screen === 'pause') resume();
+  } else if (e.code === 'KeyF') toggleFull();
+  else if (e.code === 'F3' || e.code === 'Backquote') { e.preventDefault(); toggleDebug(); }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+// the stick and the keyboard both feed the same intent; whichever is active wins
+let stickFwd = 0, stickSide = 0, touchJump = false;
+function readKeys() {
+  const up = keys.KeyW || keys.ArrowUp, dn = keys.KeyS || keys.ArrowDown;
+  const lf = keys.KeyA || keys.ArrowLeft, rt = keys.KeyD || keys.ArrowRight;
+  const kf = (up?1:0) - (dn?1:0), ks = (rt?1:0) - (lf?1:0);
+  input.fwd = kf || stickFwd;
+  input.side = ks || stickSide;
+  input.jump = !!keys.Space || touchJump;
+  const turn = (keys.KeyE?1:0) - (keys.KeyQ?1:0);
+  if (turn) { cam.yaw += turn * 2.2 * (1/60); input.manualLook = 1.4; }
+}
+
+// drag to look (mouse + touch), joystick on the left for touch
+let dragId = null, dragX = 0, dragY = 0;
+stage.addEventListener('pointerdown', e => {
+  if (game.screen !== 'play') return;
+  // Anything you can press is not a place to start a camera drag. Without this the
+  // stage captures the pointer and the ⛶ / 🔊 / 🎵 buttons never get their click,
+  // so they are unpressable the whole time you are playing.
+  if (e.target.closest && e.target.closest('button')) return;
+  if (['knob','stick','tJ','tZ','tK','tT','tG'].includes(e.target.id)) return;
+  dragId = e.pointerId; dragX = e.clientX; dragY = e.clientY;
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (e.pointerId !== dragId) return;
+  const dx = e.clientX - dragX, dy = e.clientY - dragY;
+  dragX = e.clientX; dragY = e.clientY;
+  cam.yaw -= dx * 0.006;
+  cam.pitch = clamp(cam.pitch + dy * 0.004, -0.25, 1.0);
+  input.manualLook = 1.6;
+});
+const endDrag = e => { if (e.pointerId === dragId) dragId = null; };
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+
+const touchWrap = document.getElementById('touch');
+const stickEl = document.getElementById('stick'), knobEl = document.getElementById('knob');
+let stickId = null;
+function stickMove(e) {
+  const r = stickEl.getBoundingClientRect();
+  let dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+  const len = Math.hypot(dx,dy), max = r.width/2;
+  if (len > max) { dx = dx/len*max; dy = dy/len*max; }
+  knobEl.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  stickSide = clamp(dx/max*1.4, -1, 1);
+  stickFwd  = clamp(-dy/max*1.4, -1, 1);
+}
+stickEl.addEventListener('pointerdown', e => { stickId = e.pointerId; stickEl.setPointerCapture(e.pointerId); stickMove(e); e.preventDefault(); });
+stickEl.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+const stickEnd = e => {
+  if (e.pointerId !== stickId) return;
+  stickId = null; knobEl.style.transform = ''; stickSide = 0; stickFwd = 0;
+};
+stickEl.addEventListener('pointerup', stickEnd);
+stickEl.addEventListener('pointercancel', stickEnd);
+
+const jbtn = document.getElementById('tJ');
+jbtn.addEventListener('pointerdown', e => { e.preventDefault(); jbtn.classList.add('press'); touchJump = true; input.jumpPressed = true; });
+const jUp = e => { e.preventDefault(); jbtn.classList.remove('press'); touchJump = false; };
+jbtn.addEventListener('pointerup', jUp);
+jbtn.addEventListener('pointercancel', jUp);
+// the three war buttons: salt, swing, teleport
+for (const [id, fn] of [['tZ', () => shootSalt()], ['tK', () => meleeSwing()], ['tT', () => teleportHome()],
+                        ['tG', () => emergencySave()]]) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.classList.add('press'); fn(); });
+  const up = e => { e.preventDefault(); el.classList.remove('press'); };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+}
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+if (TOUCH) touchWrap.classList.add('on');
+
+/* =========================================================================
+   9. WORLD PIECES
+   ========================================================================= */
+function box(cx,cy,cz, hx,hy,hz, color, kind) {
+  return { cx,cy,cz, hx,hy,hz, color: color || '#8FA3C8', kind: kind || 'plat' };
+}
+// Spikes are drawn as a grid of pyramids that taper to a point, so a box the size
+// of the whole patch kills you while you are still visibly clear of the points.
+// The box below keeps the drawn size, but carries a smaller c* box for collision:
+// inset at the sides, and only as tall as the fat lower half of each spike.
+function spikeBox(x, y, z, w, dep) {
+  const b = box(x, y + 0.3, z, w/2, 0.3, dep/2, '#C7D0E8', 'spike');
+  b.ccy = y + 0.16;
+  b.chx = Math.max(0.12, w/2 - 0.42);
+  b.chy = 0.16;
+  b.chz = Math.max(0.12, dep/2 - 0.42);
+  return b;
+}
+const aabb = (a,b) =>
+  Math.abs(a.cx-b.cx) < a.hx+b.hx && Math.abs(a.cy-b.cy) < a.hy+b.hy && Math.abs(a.cz-b.cz) < a.hz+b.hz;
+
+function newWorld(theme, name, kind) {
+  return {
+    theme, name, kind: kind || 'course',
+    solids: [], hazards: [], orbs: [], pads: [], checks: [], spinners: [], decos: [],
+    goal: null, npc: null, spawn: { x:0, y:2, z:0 },
+    endZ: 0, deathY: -16, totalOrbs: 0
+  };
+}
+
+const THEMES = {
+  angel: { sky:'#BFE9FF', fog:'#DCF2FF', top:'#FFFFFF', side:'#CFE0FF', accent:'#FFD86B', light:[.4,1,.35] },
+  inu:   { sky:'#FFD9A0', fog:'#FFE7C4', top:'#C98A4F', side:'#9C6537', accent:'#F2A65A', light:[.5,1,.3] },
+  devil: { sky:'#2B0B18', fog:'#5A1220', top:'#5A3A4A', side:'#33202C', accent:'#FF6B3D', light:[.3,1,.4] },
+  garden:{ sky:'#9BE07A', fog:'#CDF0B8', top:'#7BC96F', side:'#4E8B49', accent:'#FFD166', light:[.4,1,.4] },
+  void:  { sky:'#150E2E', fog:'#241645', top:'#6B57A8', side:'#3A2A66', accent:'#A46BFF', light:[.3,1,.35] },
+  nightmare:{ sky:'#05040D', fog:'#120A22', top:'#2A2140', side:'#171029', accent:'#00E5FF', light:[.3,1,.35] },
+  ice:   { sky:'#BFE6F2', fog:'#DFF3FA', top:'#DCF3FF', side:'#8FC4DC', accent:'#5BE7FF', light:[.4,1,.35] },
+  space: { sky:'#07061A', fog:'#0E0B2E', top:'#4A6BC8', side:'#2A3A78', accent:'#FFD166', light:[.35,1,.4] }
+};
+
+/* ---- level builder: chunks are strung along +Z and always line up ---- */
+function builder(W, rng, d) {
+  const rr = (a,b) => a + (b-a)*rng();
+  return {
+    z: 0, W, d, rr,
+    plat(w, dep, opts) {
+      const o = opts || {};
+      const y = o.y || 0;
+      W.solids.push(box(o.x || 0, y - THICK/2, this.z + dep/2, w/2, THICK/2, dep/2, o.color || W.pal.top, o.kind || 'plat'));
+      this.z += dep;
+      return this;
+    },
+    // free-floating platform, does not move the cursor
+    slab(x, y, z, w, dep, opts) {
+      const o = opts || {};
+      W.solids.push(box(x, y - (o.t || THICK)/2, z, w/2, (o.t||THICK)/2, dep/2, o.color || W.pal.top, o.kind || 'plat'));
+      return this;
+    },
+    wall(x,y,z, w,h,dep, color) { W.solids.push(box(x, y, z, w/2, h/2, dep/2, color || W.pal.side, 'plat')); return this; },
+    gap(dep) { this.z += dep; return this; },
+    mover(x,y,z, w,dep, bx,by,bz, spd) {
+      W.solids.push(Object.assign(box(x, y-THICK/2, z, w/2, THICK/2, dep/2, W.pal.accent, 'move'),
+        { ax:x, ay:y-THICK/2, az:z, bx, by:by-THICK/2, bz, spd, t:rng(), dx:0, dy:0, dz:0 }));
+      return this;
+    },
+    // blinks out and back on its own clock; phase spreads them so a path always opens
+    blink(x,y,z, w,dep, cycle, onFor, phase) {
+      W.solids.push(Object.assign(box(x, y-THICK/2, z, w/2, THICK/2, dep/2, '#8C6BFF', 'blink'),
+        { cycle, onFor, bt: phase % cycle, warn:false, gone:0 }));
+      return this;
+    },
+    crumble(x,y,z, w,dep) {
+      W.solids.push(Object.assign(box(x, y-THICK/2, z, w/2, THICK/2, dep/2, '#C08552', 'crumble'), { timer:0, gone:0 }));
+      return this;
+    },
+    lava(x,y,z, w,dep,h) { W.hazards.push(Object.assign(box(x, y-(h||2)/2, z, w/2, (h||2)/2, dep/2, '#FF4A10', 'lava'))); return this; },
+    spikes(x,y,z, w,dep) { W.hazards.push(spikeBox(x, y, z, w, dep)); return this; },
+    fire(x,y,z, bx,by,bz, spd) {
+      // hitbox is smaller than the fireball looks, so near misses feel fair
+      W.hazards.push(Object.assign(box(x,y,z, .45,.45,.45, '#FF9A2E', 'fire'), { ax:x, ay:y, az:z, bx, by, bz, spd, t:rng() }));
+      return this;
+    },
+    spinner(x,y,z, len, spd) { W.spinners.push({ x,y,z, len, spd, ang: rng()*6.28 }); return this; },
+    orb(x,y,z) { W.orbs.push({ x,y,z, got:false }); return this; },
+    pad(x,y,z) { W.pads.push({ x, y, z, hx:1.1, hy:0.35, hz:1.1, t:0 }); return this; },
+    check() {
+      this.plat(7, 4);
+      W.checks.push({ x:0, y:0, z:this.z - 2, hit:false });
+      return this;
+    }
+  };
+}
+
+/* ---- CHUNKS: each starts and ends with a walkable platform at y = 0 ---- */
+function ch_straight(b) {
+  const L = 9 + b.rr(0,5);
+  b.orb(0, 1.4, b.z + L/2);
+  b.plat(7, L);
+}
+function ch_gap(b) {
+  b.plat(6, 5);
+  const g = 2.6 + b.d * 1.6;
+  b.orb(0, 1.7, b.z + g/2);
+  b.gap(g);
+  b.plat(6.5, 6);
+}
+function ch_doubleGap(b) {
+  const g = 2.5 + b.d * 1.5;
+  b.plat(6, 4);
+  b.orb(0, 1.7, b.z + g/2); b.gap(g);
+  b.plat(4.5, 4);
+  b.orb(0, 1.7, b.z + g/2); b.gap(g);
+  b.plat(6, 5);
+}
+function ch_steps(b) {
+  b.plat(6, 4);
+  const rise = 1.1 + b.d*0.25, g = 2.2 + b.d*0.8;
+  for (let i=1;i<=3;i++) { b.gap(g); b.plat(5, 3.4, { y: rise*i }); }
+  b.orb(0, rise*3 + 1.5, b.z - 1.5);
+  for (let i=2;i>=0;i--) { b.gap(g); b.plat(5, 3.4, { y: rise*i }); }
+  b.plat(6, 4);
+}
+function ch_zigzag(b) {
+  b.plat(6, 4);
+  // The hop is diagonal, so what matters is sqrt(gap^2 + (2*offset)^2) against the
+  // ~5.3 unit jump arc. At the old 2.1 offset the sideways move alone ate 4.2 of it
+  // and the hardest zigzag was not actually jumpable.
+  const g = 1.8 + b.d*0.9, s = 1.6;      // worst case: sqrt(2.7^2 + 3.2^2) = 4.2
+  for (let i=0;i<4;i++) {
+    b.gap(g);
+    const x = (i%2 ? s : -s);
+    b.slab(x, 0, b.z + 1.8, 3.6 - b.d*0.5, 3.6);
+    if (i===1) b.orb(x, 1.5, b.z + 1.8);
+    b.z += 3.6;
+  }
+  b.gap(g);
+  b.plat(6, 5);
+}
+function ch_beam(b) {
+  b.plat(6, 4);
+  const L = 12 + b.d*4;
+  b.slab(0, 0, b.z + L/2, 1.9 - b.d*0.5, L);
+  b.orb(0, 1.5, b.z + L/2);
+  b.z += L;
+  b.plat(6, 5);
+}
+function ch_moverSide(b) {
+  b.plat(7, 5);
+  const gapLen = 8;                     // too wide to jump: you must ride
+  const z = b.z + gapLen/2;
+  b.mover(-2.6, 0, z, 4.5, 4.5, 2.6, 0, z, 2.0 + b.d*0.9);
+  b.orb(0, 2.2, z);
+  b.gap(gapLen);
+  b.plat(6, 5);
+}
+function ch_moverLong(b) {
+  // A ferry that docks at both ends: you walk on, ride, walk off. Its round
+  // trip is ~3s, so you are never left standing around.
+  b.plat(6, 5);
+  const gapLen = 10;
+  // dock ends overlap the platforms by 1.0 so there is never a seam to fall into,
+  // and the ferry lingers long enough to step off
+  const z0 = b.z + 1.5, z1 = b.z + gapLen - 1.5;
+  b.mover(0, 0, z0, 4.5, 5, 0, 0, z1, 3.2 + b.d*0.8);
+  b.orb(0, 2.2, b.z + gapLen/2);
+  b.gap(gapLen);
+  b.plat(6, 5);
+}
+function ch_lift(b) {
+  // the 3-unit gap is jumpable; the lift is the optional route to the orbs above
+  b.plat(6, 5);
+  const g = 3.0, z = b.z + 1.5;
+  b.mover(0, 0, z, 4, 3.4, 0, 5.0, z, 1.9 + b.d*1.0);
+  b.slab(0, 5.0, b.z + 6.0, 5, 5);
+  b.orb(0, 6.5, b.z + 5.0); b.orb(0, 6.5, b.z + 7.0);
+  b.gap(g);
+  b.plat(6, 6);
+}
+function ch_crumble(b) {
+  b.plat(6, 4);
+  const g = 2.2 + b.d*0.9;
+  for (let i=0;i<4;i++) {
+    b.gap(g);
+    b.crumble(0, 0, b.z + 1.7, 3.6, 3.4);
+    if (i===1) b.orb(0, 1.5, b.z + 1.7);
+    b.z += 3.4;
+  }
+  b.gap(g);
+  b.plat(6, 5);
+}
+function ch_spinner(b) {
+  // wide deck: getting clipped should usually mean stumbling, not dying
+  const L = 13;
+  const z0 = b.z;
+  b.plat(10, L);
+  b.spinner(0, 0.85, z0 + L/2, 5.6 + b.d*1.2, (1.4 + b.d*1.5) * (b.rr(0,1) < .5 ? 1 : -1));
+  b.orb(0, 1.5, z0 + L/2 + 4.4);
+}
+function ch_spinnerPair(b) {
+  const L = 20;
+  const z0 = b.z;
+  b.plat(10, L);
+  b.spinner(0, 0.85, z0 + 6, 6.2, 2.2);
+  b.spinner(0, 0.85, z0 + 14, 6.2, -2.6);
+  b.orb(0, 1.5, z0 + 10);
+}
+function ch_lava(b) {
+  b.plat(6, 4);
+  const pit = 15;
+  b.lava(0, -0.8, b.z + pit/2, 14, pit, 2.4);
+  const g = (pit - 3*3.2) / 4;
+  for (let i=0;i<3;i++) {
+    b.gap(g);
+    b.slab((i%2? 1.6 : -1.6), 0.35, b.z + 1.6, 3.6, 3.2);
+    if (i===1) b.orb((i%2? 1.6 : -1.6), 1.8, b.z + 1.6);
+    b.z += 3.2;
+  }
+  b.gap(g);
+  b.plat(6, 5);
+}
+function ch_fireRun(b) {
+  // two fireballs sweeping across the deck: watch the pattern, then run through
+  const L = 14, z0 = b.z;
+  b.plat(8, L);
+  b.fire(-4, 1.1, z0 + 4.5, 4, 1.1, z0 + 4.5, 2.6 + b.d*0.9);
+  b.fire(4, 1.1, z0 + 9.5, -4, 1.1, z0 + 9.5, 2.9 + b.d*0.9);
+  b.orb(0, 1.5, z0 + 7);
+}
+function ch_spikes(b) {
+  // Patches alternate sides, so you weave. Spacing is set so the sideways shift
+  // between two patches is comfortably walkable at running speed.
+  const L = 18, z0 = b.z;
+  b.plat(7, L);
+  for (let i=0;i<3;i++) {
+    const z = z0 + 3.5 + i*5;
+    b.spikes((i%2? 1.4 : -1.4), 0, z, 3.2, 2.2);
+    b.orb((i%2? -2.2 : 2.2), 1.3, z);
+  }
+}
+function ch_bounce(b) {
+  b.plat(7, 6);
+  b.pad(0, 0, b.z - 3);
+  // the pad throws you 4.9 up; the ledge sits ahead of the arc, not on top of it
+  b.slab(0, 4.4, b.z + 4.0, 6, 6);
+  b.orb(0, 5.9, b.z + 2.8); b.orb(0, 5.9, b.z + 5.2);
+  b.gap(1.5);
+  b.plat(6.5, 7);
+}
+function ch_pillars(b) {
+  b.plat(6, 4);
+  // diagonal hops: keep sqrt(gap^2 + sideways^2) inside the jump arc
+  const g = 2.2 + b.d*0.7, w = 2.8 - b.d*0.5;
+  for (let i=0;i<4;i++) {
+    b.gap(g);
+    const x = [-1.6, 1.6, 0, 1.8][i] * (b.d > .6 ? 1 : .7);
+    b.slab(x, i%2 ? 0.9 : 0, b.z + w/2, w, w);
+    if (i===2) b.orb(x, 2.2, b.z + w/2);
+    b.z += w;
+  }
+  b.gap(g);
+  b.plat(6, 5);
+}
+
+/* ---- nightmare-tier chunks ---- */
+
+// Two lanes of blinking platforms, offset half a cycle: when the left lane is out
+// the right lane is in, so there is always somewhere to stand if you read the flash.
+function ch_blink(b) {
+  b.plat(6, 4);
+  const cycle = 3.2, onFor = 2.0, gapZ = 0.6;
+  for (let i=0;i<5;i++) {
+    b.gap(gapZ);
+    const z = b.z + 1.9;
+    b.blink(-1.7, 0, z, 3.0, 3.8, cycle, onFor, i*0.55);
+    b.blink( 1.7, 0, z, 3.0, 3.8, cycle, onFor, i*0.55 + cycle/2);
+    if (i===2) b.orb(0, 2.4, z);
+    b.z += 3.8;
+  }
+  b.gap(gapZ);
+  b.plat(6, 5);
+}
+
+// A long blinking causeway straight over lava. One lane, so you have to move.
+function ch_blinkRun(b) {
+  b.plat(6, 4);
+  const z0 = b.z;
+  // The phase step decides whether this is a timed run or a wall. Running flat out
+  // you cross a slab every 0.64s, so a step of +0.9 means the lit window travels
+  // BACKWARDS past you and no start time gets you across — measured, from every
+  // phase, walking and waiting. A small negative step sends the window with you
+  // instead, drifting 0.34s per slab: enter on the beat and you make it, dawdle
+  // and you do not. Do not put this back to +0.9.
+  for (let i=0;i<4;i++) {
+    b.gap(0.5);
+    b.blink(0, 0, b.z + 2.0, 4.2, 4.0, 3.6, 2.4, (3.6 - 0.3*i) % 3.6);
+    b.z += 4.0;
+  }
+  b.gap(0.5);
+  b.lava(0, -1.4, (z0 + b.z)/2, 9, b.z - z0, 2);
+  b.orb(0, 2.2, (z0 + b.z)/2);
+  b.plat(6, 5);
+}
+
+// Fire coming both ways over a thin walkway.
+function ch_crossfire(b) {
+  const L = 16;
+  b.plat(4.4, L, { color:'#4A3560' });
+  const z = b.z - L/2;
+  b.fire(-5, 1.2, z - 3.5,  5, 1.2, z - 3.5, 7.5);
+  b.fire( 5, 1.2, z + 3.5, -5, 1.2, z + 3.5, 7.5);
+  b.orb(0, 1.8, z);
+}
+
+const CHUNKS = {
+  straight: ch_straight, gap: ch_gap, doubleGap: ch_doubleGap, steps: ch_steps,
+  zigzag: ch_zigzag, beam: ch_beam, moverSide: ch_moverSide, moverLong: ch_moverLong,
+  lift: ch_lift, crumble: ch_crumble, spinner: ch_spinner, spinnerPair: ch_spinnerPair,
+  lava: ch_lava, fireRun: ch_fireRun, spikes: ch_spikes, bounce: ch_bounce, pillars: ch_pillars,
+  blink: ch_blink, blinkRun: ch_blinkRun, crossfire: ch_crossfire
+};
+const POOL = {
+  angel: [ch_straight, ch_gap, ch_steps, ch_zigzag, ch_bounce, ch_moverSide, ch_beam, ch_gap, ch_straight],
+  inu:   [ch_gap, ch_doubleGap, ch_zigzag, ch_moverSide, ch_moverLong, ch_lift, ch_crumble, ch_spikes,
+          ch_spinner, ch_beam, ch_bounce, ch_steps, ch_pillars, ch_fireRun, ch_spinnerPair],
+  devil: [ch_doubleGap, ch_crumble, ch_pillars, ch_fireRun, ch_lava, ch_spinner, ch_spinnerPair,
+          ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam, ch_blink, ch_crossfire, ch_blinkRun],
+  // slippery, so the courses are wide and the hazards are few — the floor is the enemy
+  // no beams or pillars here: sliding off a narrow ledge you cannot stop on is not fun
+  ice:   [ch_straight, ch_gap, ch_moverLong, ch_steps, ch_gap, ch_lift, ch_straight,
+          ch_moverSide, ch_doubleGap, ch_steps, ch_straight, ch_gap],
+  // low gravity, so long floaty hops and tall towers
+  space: [ch_doubleGap, ch_gap, ch_zigzag, ch_bounce, ch_lift, ch_straight,
+          ch_moverLong, ch_steps, ch_gap, ch_beam, ch_bounce, ch_straight],
+  // after the devil: everything at once, plus platforms that will not stay put
+  nightmare: [ch_blink, ch_blinkRun, ch_crossfire, ch_spinnerPair, ch_pillars, ch_lava,
+              ch_crumble, ch_blink, ch_fireRun, ch_moverLong, ch_zigzag, ch_spinner,
+              ch_blinkRun, ch_beam, ch_doubleGap]
+};
+
+const LEVELS = [
+  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:18,
+    blurb:'Soft clouds and easy jumps. Long, but gentle all the way.' },
+  // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
+  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.78, chunks:15,
+    blurb:'Movers, spinners, crumbling wood and fire.' },
+  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:19,
+    blurb:'Lava, fire, blinking platforms and a devil at the gate.' },
+  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.3, chunks:13,
+    slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
+  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:14,
+    gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
+  // Nightmare is not a course of its own — it is every obstacle in the game shuffled
+  // into one level. Each chunk is drawn from a different course at random and brings
+  // that course's floor with it: a hell lava run, then an ice slide, then a floaty
+  // low-gravity hop, in whatever order the seed says. See W.zones in buildCourse.
+  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true,
+    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' },
+    blurb:'Every obstacle in the game, shuffled, with the floor changing under you. Nobody has ever finished it. Try anyway.' }
+];
+const levelIndex = id => LEVELS.findIndex(l => l.id === id);
+const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id];
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t>>>15), t|1); t ^= t + Math.imul(t ^ (t>>>7), t|61);
+    return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildCourse(cfg) {
+  const W = newWorld(cfg.theme, cfg.name);
+  W.pal = THEMES[cfg.theme];
+  const rng = mulberry32(cfg.seed);
+  const b = builder(W, rng, cfg.d);
+
+  /* A section is a run of chunks that share a floor. An ordinary level is ONE
+     section, so everything below makes a single trip through the loop and behaves
+     exactly as it always did.
+
+     A shuffled level is 27 sections of one chunk each, and every one of them rolls
+     which course it comes from: its obstacles, its difficulty, its colours and its
+     physics all arrive together. Pairing a chunk with its OWN level's floor is what
+     keeps this fair — ice has no beams or spinners in its pool and space has no
+     blinkers, so those combinations never come up by accident.
+
+     Every chunk starts and ends on a platform at y = 0. That is the whole reason
+     pieces of six different courses can be bolted together in any order at all. */
+  const mix = cfg.shuffle;
+  const asSection = (id, n) => {
+    const L = LEVELS.find(l => l.id === id) || cfg;
+    return { n, name:L.name, emoji:L.emoji, theme:L.theme, d:L.d,
+             slip: L.slip || 0, gravity: L.gravity || 1, song: (mix && mix.song) || L.theme,
+             pool: cfg.pool || POOL[id] || POOL.angel };
+  };
+  const sections = mix
+    ? Array.from({ length: mix.n }, () => asSection(mix.from[Math.floor(rng()*mix.from.length)], 1))
+    : [asSection(cfg.id, cfg.chunks)];
+  const totalChunks = sections.reduce((n, s) => n + s.n, 0);
+
+  b.plat(9, 10);                                  // start pad
+  W.spawn = { x:0, y:1.2, z:3 };
+  if (cfg.id === 'devil')
+    W.npc = { x:2.9, y:0, z:6.5, yaw:-0.6, said:0, t:0, line:'WELCOME TO HELL' };
+  if (cfg.id === 'nightmare')
+    W.npc = { x:2.9, y:0, z:6.5, yaw:-0.6, said:0, t:0, line:'NOBODY GETS PAST ME', bone:1 };
+
+  W.zones = [];
+  let last = null, prev = null, made = 0;
+  for (const sec of sections) {
+    // the builder reads W.pal as it goes, so each chunk bakes its own colours
+    W.pal = THEMES[sec.theme];
+    b.d = sec.d;
+    // A wide flat deck with a checkpoint on it wherever the floor changes under
+    // you — ice to normal, normal to low gravity. Landing a jump into physics you
+    // could not have planned for is not a fair death. Where the floor is the same
+    // as the chunk before, no deck: only the colours change and you run straight on.
+    const shift = !!prev && (prev.slip !== sec.slip || prev.gravity !== sec.gravity);
+    if (shift) { b.plat(11, 8); b.check(); }
+    const z0 = b.z;
+    for (let i=0;i<sec.n;i++) {
+      let fn, guard = 0;
+      do { fn = sec.pool[Math.floor(rng()*sec.pool.length)]; guard++; } while (fn === last && guard < 8);
+      last = fn;
+      fn(b, sec.d);
+      made++;
+      if (made % (cfg.checkEvery || 2) === 0 && made < totalChunks) b.check();
+    }
+    W.zones.push({ z0, z1:b.z, slip:sec.slip, gravity:sec.gravity, theme:sec.theme,
+                   pal:THEMES[sec.theme], name:sec.name, emoji:sec.emoji, song:sec.song, shift });
+    prev = sec;
+  }
+  b.plat(9, 10);
+  // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
+  // a jump is 1.8, a double jump about 3.5, and the wings only ever slow a fall.
+  // So it just hangs there, in plain sight, forever out of reach.
+  W.goal = { x:0, y: cfg.troll ? 70 : 0, z: b.z - 5 };
+
+  W.endZ = b.z;
+  // The Nightmare portal hangs in the sky (see updateObby). Nobody finishes it.
+  W.troll = !!cfg.troll;
+  // start in the first section — updateZone hands over the rest as you cross
+  W.zone = W.zones[0];
+  W.pal = W.zone.pal;
+  W.slip = W.zone.slip;                           // 1 = ice: barely any grip
+  W.gravity = W.zone.gravity;                     // < 1 = space: floaty jumps
+  W.totalOrbs = W.orbs.length;
+  return W;
+}
+
+/* ---- KILLER SNAIL ARENA ---- */
+const ARENA = 62;
+function buildArena() {
+  const W = newWorld('garden', 'Killer Snail', 'arena');
+  W.pal = THEMES.garden;
+  const H = ARENA/2;
+  W.solids.push(box(0, -1, 0, H, 1, H, W.pal.top, 'plat'));                    // ground
+  for (const s of [[-1,0],[1,0],[0,-1],[0,1]]) {                               // fences
+    W.solids.push(box(s[0]*H, 1.5, s[1]*H, s[0] ? 1 : H, 2.5, s[1] ? 1 : H, W.pal.side, 'plat'));
+  }
+  // ---- the safehouse: walls the snail cannot pass while the shield holds ----
+  const SH = { x:0, y:0, z:0, hx:6, hz:6, wallH:4.4 };
+  const wall = '#EDE3CF', trim = '#8C7A5B';
+  const wy = SH.wallH/2, T = 0.6;
+  W.solids.push(box(SH.x, 0.2, SH.z, SH.hx, 0.4, SH.hz, '#C7B899', 'plat'));            // floor slab
+  W.solids.push(box(SH.x, wy, SH.z - SH.hx, SH.hx, wy, T, wall, 'plat'));               // back wall
+  W.solids.push(box(SH.x - SH.hx, wy, SH.z, T, wy, SH.hz, wall, 'plat'));               // left wall
+  W.solids.push(box(SH.x + SH.hx, wy, SH.z, T, wy, SH.hz, wall, 'plat'));               // right wall
+  for (const s of [-1, 1]) {                                                            // front wall + doorway
+    W.solids.push(box(SH.x + s*4.05, wy, SH.z + SH.hz, 1.95, wy, T, wall, 'plat'));
+  }
+  W.solids.push(box(SH.x, SH.wallH + 0.3, SH.z + SH.hz, 2.1, 0.3, T, trim, 'plat'));    // door lintel
+  W.solids.push(box(SH.x, SH.wallH + 0.4, SH.z, SH.hx + 0.5, 0.4, SH.hz + 0.5, trim, 'plat')); // roof
+  W.safe = { x:SH.x, y:2.4, z:SH.z, hx:SH.hx - 0.9, hy:3.2, hz:SH.hz - 0.9, wallH:SH.wallH, roofY:SH.wallH + 0.8 };
+
+  // ---- soldiers: two on the roof, two guarding the door ----
+  const roofY = SH.wallH + 0.8;
+  W.soldierPosts = [
+    { x:-4.2, y:roofY, z:-4.2 }, { x:4.2, y:roofY, z:-4.2 },
+    { x:-8.2, y:0,     z:8.2  }, { x:8.2,  y:0,    z:8.2  }
+  ];
+
+  const rng = mulberry32(777);
+  const spots = [];
+  for (let i=0;i<26;i++) {
+    const x = (rng()-0.5)*(ARENA-14), z = (rng()-0.5)*(ARENA-14);
+    const h = 1.6 + rng()*5.5, w = 3.5 + rng()*4;
+    if (Math.abs(x) < SH.hx + w/2 + 3 && Math.abs(z) < SH.hz + w/2 + 3) continue;  // keep the safehouse clear
+    W.solids.push(box(x, h/2, z, w/2, h/2, w/2, rng()<.5 ? W.pal.top : W.pal.side, 'plat'));
+    spots.push({ x, y: h + 1.1, z });
+  }
+  W.orbSpots = spots;
+  W.saltSpots = [ {x:-22,y:1.2,z:-22}, {x:22,y:1.2,z:-22}, {x:-22,y:1.2,z:22}, {x:22,y:1.2,z:22}, {x:-15,y:1.2,z:0} ];
+  W.spawn = { x:0, y:1.2, z:15 };      // just outside the door, house in view
+  W.deathY = -30;
+  return W;
+}
+
+/* ---- INFINITY TOWER (descending) ---- */
+const SHAFT = 26, LAYER = 8;
+function buildShaft() {
+  const W = newWorld('void', 'Infinity Challenge', 'shaft');
+  W.pal = THEMES.void;
+  W.rng = mulberry32(90210);
+  W.nextLayer = 0;
+  W.startY = 0;
+  W.spawn = { x:0, y:1.2, z:0 };
+  W.solids.push(box(0, -THICK/2, 0, 5, THICK/2, 5, W.pal.top, 'plat'));
+  W.crusherY = 26;
+  W.lastHole = null;
+  for (let i=0;i<7;i++) addShaftLayer(W);
+  return W;
+}
+function addShaftLayer(W) {
+  const i = W.nextLayer++;
+  const rng = W.rng, y = -6 - i*LAYER;
+  const diff = clamp(i/40, 0, 1);
+  const hs = 3.4 - diff*1.2;                       // hole half-size
+  const H = SHAFT/2;
+  const hx = (rng()-0.5) * (SHAFT - hs*2 - 6);
+  const hz = (rng()-0.5) * (SHAFT - hs*2 - 6);
+  const C = W.pal.top, S = W.pal.side;
+
+  // shaft walls for this layer's slice, so you can never leave the tower
+  const wy = y + LAYER/2;
+  W.solids.push(box(-(H+0.8), wy, 0, 0.8, LAYER/2, H+1.6, S, 'plat'));
+  W.solids.push(box( (H+0.8), wy, 0, 0.8, LAYER/2, H+1.6, S, 'plat'));
+  W.solids.push(box(0, wy, -(H+0.8), H+1.6, LAYER/2, 0.8, S, 'plat'));
+  W.solids.push(box(0, wy,  (H+0.8), H+1.6, LAYER/2, 0.8, S, 'plat'));
+
+  // floor = 4 slabs around the hole
+  const seg = (x0,x1,z0,z1) => {
+    if (x1-x0 < 0.2 || z1-z0 < 0.2) return;
+    W.solids.push(box((x0+x1)/2, y-THICK/2, (z0+z1)/2, (x1-x0)/2, THICK/2, (z1-z0)/2, (i%2?C:S), 'floor'));
+  };
+  seg(-H, H, -H, hz-hs);
+  seg(-H, H, hz+hs, H);
+  seg(-H, hx-hs, hz-hs, hz+hs);
+  seg(hx+hs, H, hz-hs, hz+hs);
+
+  // spikes — never right under the hole above, that would be undodgeable
+  const drop = W.lastHole;
+  if (i > 1 && rng() < 0.3 + diff*0.45) {
+    for (let tries=0; tries<6; tries++) {
+      const sx = (rng()-0.5)*(SHAFT-8), sz = (rng()-0.5)*(SHAFT-8);
+      const near = Math.abs(sx-hx) < hs+2.4 && Math.abs(sz-hz) < hs+2.4;
+      const underDrop = drop && Math.abs(sx-drop.x) < drop.s+3.5 && Math.abs(sz-drop.z) < drop.s+3.5;
+      if (near || underDrop) continue;
+      W.hazards.push(spikeBox(sx, y, sz, 3.8, 3.8));
+      break;
+    }
+  }
+  // a mid-air ledge so the drop is not a free ride
+  if (rng() < 0.5) {
+    W.solids.push(Object.assign(
+      box(hx + (rng()-0.5)*5, y + LAYER/2 - THICK/2, hz + (rng()-0.5)*5, 1.9, THICK/2, 1.9,
+          rng() < 0.35 + diff*0.3 ? '#C08552' : W.pal.accent,
+          rng() < 0.35 + diff*0.3 ? 'crumble' : 'plat'), { timer:0, gone:0 }));
+  }
+  // a slider that covers the hole on and off
+  if (i > 4 && rng() < 0.2 + diff*0.35) {
+    const w = hs*2 + 1.6;
+    W.solids.push(Object.assign(
+      box(hx, y + 1.6, hz, w/2, THICK/2, w/2, W.pal.accent, 'move'),
+      { ax: hx-6, ay: y+1.6, az: hz, bx: hx+6, by: y+1.6, bz: hz, spd: 2.2 + diff*2.4, t: rng(), dx:0, dy:0, dz:0 }));
+  }
+  W.orbs.push({ x:hx, y:y+2.2, z:hz, got:false });
+  if (rng() < 0.55) W.orbs.push({ x:(rng()-0.5)*(SHAFT-8), y:y+LAYER-2.5, z:(rng()-0.5)*(SHAFT-8), got:false });
+  W.lastHole = { x:hx, z:hz, s:hs };
+}
+
+/* =========================================================================
+   10. GAME STATE
+   ========================================================================= */
+const cam = { yaw: 0, pitch: 0.38, dist: 9.5, x:0, y:0, z:0, tx:0, ty:0, tz:0 };
+const game = {
+  screen:'menu', mode:null, levelId:null, world:null, player:null,
+  time:0, runOrbs:0, deaths:0, dead:0, won:false, depth:0,
+  banner:null, flash:0, shake:0, particles:[], snail:null, salts:[], orbTimer:0, speech:null,
+  // killer-snail war: hearts, salt ammo, soldiers, safehouse shield
+  debug:false,
+  hp:3, maxHp:3, iframe:0, ammo:0, bullets:[], soldiers:[], wave:1, kills:0,
+  shield:1, inSafe:false, tpCd:0, shootCd:0, meleeCd:0, swing:0, snailRespawn:0
+};
+const MAX_AMMO = 30;
+const ORB_VALUE = 30;    // what one 💠 orb is worth in aura
+const SNAIL_SPEED = 4.2;      // constant, every wave — you can always outrun it
+
+function makePlayer(sp) {
+  return {
+    x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
+    vx:0, vy:0, vz:0, onGround:false, standing:null,
+    coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false, saves:1,
+    ascending:false,
+    yaw:0, walk:0, squash:0,
+    respawn:{ x:sp.x, y:sp.y, z:sp.z }
+  };
+}
+
+/* =========================================================================
+   11. PHYSICS
+   ========================================================================= */
+function moveAxis(p, axis, d, solids) {      // horizontal only; y is handled by moveY
+  if (!d) return;
+  const c = 'c' + axis, h = 'h' + axis;
+  p[axis] += d;
+  for (const s of solids) {
+    if (s.gone) continue;
+    const t = { cx:p.x, cy:p.y, cz:p.z, hx:p.hx, hy:p.hy, hz:p.hz };
+    if (!aabb(t, s)) continue;
+    if (d > 0) p[axis] = s[c] - s[h] - p[h] - 0.0001;
+    else p[axis] = s[c] + s[h] + p[h] + 0.0001;
+    p['v' + axis] = 0;
+  }
+}
+// y grows upward, so "landing" is d < 0
+function moveY(p, d, solids) {
+  if (!d) return;
+  p.y += d;
+  for (const s of solids) {
+    if (s.gone) continue;
+    const t = { cx:p.x, cy:p.y, cz:p.z, hx:p.hx, hy:p.hy, hz:p.hz };
+    if (!aabb(t, s)) continue;
+    if (d < 0) { p.y = s.cy + s.hy + p.hy + 0.0001; p.vy = 0; p.onGround = true; p.standing = s; }
+    else { p.y = s.cy - s.hy - p.hy - 0.0001; p.vy = 0; }
+  }
+}
+
+function stepPlayer(dt) {
+  const p = game.player, W = game.world;
+
+  // moving platforms
+  for (const s of W.solids) {
+    if (s.kind !== 'move') continue;
+    const px=s.cx, py=s.cy, pz=s.cz;
+    const len = Math.hypot(s.bx-s.ax, s.by-s.ay, s.bz-s.az) || 1;
+    s.t += dt * s.spd / (2*len);
+    const k = 0.5 - 0.5*Math.cos(s.t * Math.PI * 2);
+    s.cx = lerp(s.ax, s.bx, k); s.cy = lerp(s.ay, s.by, k); s.cz = lerp(s.az, s.bz, k);
+    s.dx = s.cx-px; s.dy = s.cy-py; s.dz = s.cz-pz;
+  }
+  if (p.standing && p.standing.kind === 'move') {
+    p.x += p.standing.dx; p.y += p.standing.dy; p.z += p.standing.dz;
+  }
+
+  // camera-relative movement
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const fx = -sy, fz = -cy;                      // forward on the ground plane
+  const rx = cy,  rz = -sy;                      // right
+  let wx = fx*input.fwd + rx*input.side;
+  let wz = fz*input.fwd + rz*input.side;
+  const wl = Math.hypot(wx, wz);
+  if (wl > 1) { wx /= wl; wz /= wl; }
+  const moving = wl > 0.05;
+
+  // ice cuts your grip: you get up to speed slowly and you do not stop when you stop steering
+  const slip = W.slip || 0;
+  // The jetpack is decided here rather than after gravity, because the speed cap and
+  // the air acceleration below both need to know about it — that is what turns
+  // "hover upward" into "fly forward".
+  // The wings do nothing at all until the very end of Nightmare. Not in any other
+  // level, and not during the gauntlet either — every step of all six courses has
+  // to be run on foot. Flight would skip straight over a course, so this is what
+  // protects them; the wings are a key to one place, not a way around the game.
+  //
+  // THE NIGHTMARE SECRET: on the last deck, under the portal, they finally start,
+  // and there they never run out. That is the only way anything reaches 70.
+  // Nothing in the game says any of this. Do not sign-post it.
+  const atEnd = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
+  const canFly = hasPower('wings') && atEnd;
+  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0;
+  const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
+  if (moving) {
+    p.vx += wx*acc; p.vz += wz*acc;
+    const sp = Math.hypot(p.vx, p.vz);
+    const top = runMax() * (jetting ? JET_SPEED : 1);
+    if (sp > top) { p.vx = p.vx/sp*top; p.vz = p.vz/sp*top; }
+    p.yaw = angLerp(p.yaw, Math.atan2(wx, wz), 1 - Math.pow(0.0001, dt));
+  } else if (p.onGround) {
+    const f = FRIC*(slip ? ICE_FRIC : 1)*dt, sp = Math.hypot(p.vx, p.vz);
+    if (sp <= f) { p.vx = 0; p.vz = 0; }
+    else { p.vx -= p.vx/sp*f; p.vz -= p.vz/sp*f; }
+  }
+
+  // In low gravity a normal kick would fly 8.6 units and sail clean over anything
+  // small. Scaling by sqrt(gravity) keeps the jump the same HEIGHT everywhere and
+  // only stretches the hang time, which is the floaty part worth keeping.
+  const gScale = Math.sqrt(W.gravity || 1);
+
+  // jump, then one more in mid-air
+  if (input.jumpPressed) { p.buffer = BUFFER; input.jumpPressed = false; }
+  p.buffer -= dt;
+  p.coyote = p.onGround ? COYOTE : p.coyote - dt;
+  if (p.onGround) p.airJumps = 0;
+  if (p.buffer > 0) {
+    if (p.coyote > 0) {
+      p.vy = JUMP_V * gScale; p.buffer = 0; p.coyote = 0; p.airJumps = 0;
+      p.onGround = false; p.standing = null; p.jumpHeld = true; p.squash = -0.3;
+      Sound.jump(); puff(p.x, p.y - PHY, p.z, 5);
+    } else if (p.airJumps < (hasPower('doublejump') ? AIR_JUMPS : 0)) {
+      // set vy rather than add it, so it saves you even in a long fall
+      p.airJumps++;
+      p.vy = JUMP_V * DBL_JUMP * gScale; p.buffer = 0; p.jumpHeld = true; p.squash = -0.3;
+      Sound.dbl();
+      for (let i=0;i<10;i++) {                       // a little ring of dust
+        const a = i/10 * 6.283;
+        game.particles.push({ x:p.x + Math.cos(a)*0.5, y:p.y - PHY*0.7, z:p.z + Math.sin(a)*0.5,
+          vx:Math.cos(a)*2.6, vy:-0.4, vz:Math.sin(a)*2.6,
+          life:0.34, max:0.34, size:0.16, g:2, c:'#C9A0FF' });
+      }
+    }
+  }
+  if (p.jumpHeld && !input.jump) { if (p.vy > 0) p.vy *= CUT_JUMP; p.jumpHeld = false; }
+  if (p.vy <= 0) p.jumpHeld = false;
+
+  p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
+  // Aura Wings, as a jetpack: hold jump in the air on the last deck and you climb.
+  // There is no fuel any more — where they work at all, they work forever.
+  p.gliding = false; p.thrusting = false;
+  if (jetting) {
+    p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
+    p.thrusting = true; p.gliding = true;
+    if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
+  }
+  // The final Nightmare ascent is on rails: once you are climbing you cannot steer,
+  // you only go up. It also eases you onto the portal's x/z — without that you could
+  // lift off from the back of the deck and rise past it forever, unable to correct.
+  if (atEnd && !p.onGround && p.y > 3) {
+    const k = 1 - Math.pow(0.06, dt);
+    p.x = lerp(p.x, W.goal.x, k);
+    p.z = lerp(p.z, W.goal.z, k);
+    p.vx = 0; p.vz = 0;
+    p.ascending = true;
+  } else p.ascending = false;
+
+  const wasGround = p.onGround;
+  p.onGround = false; p.standing = null;
+  moveAxis(p, 'x', p.vx*dt, W.solids);
+  moveAxis(p, 'z', p.vz*dt, W.solids);
+  moveY(p, p.vy*dt, W.solids);
+  if (!wasGround && p.onGround) {
+    p.squash = 0.3; puff(p.x, p.y-PHY, p.z, 3);
+    // Land and stop. Friction alone takes ~0.15s to kill your speed, which slides
+    // you a whole platform-width after a jump and walks you off narrow ledges.
+    // If you are not actually steering when you touch down, you stop dead —
+    // except on ice, where sliding is the whole point of the level.
+    if (!moving && !slip) { p.vx = 0; p.vz = 0; }
+  }
+
+  // blinking platforms — solid, warning, gone, back again, forever on their own clock
+  for (const s of W.solids) {
+    if (s.kind !== 'blink') continue;
+    s.bt = (s.bt + dt) % s.cycle;
+    const on = s.bt < s.onFor;
+    s.warn = on && s.bt > s.onFor - 0.6;
+    s.gone = on ? 0 : 1;
+  }
+
+  // crumbling platforms
+  for (const s of W.solids) {
+    if (s.kind !== 'crumble') continue;
+    if (s.gone > 0) { s.gone -= dt; if (s.gone <= 0) { s.gone = 0; s.timer = 0; } }
+    else if (p.standing === s) {
+      s.timer += dt;
+      if (s.timer > 0.6) { s.gone = 2.8; s.timer = 0; puff(s.cx, s.cy, s.cz, 10, '#C08552'); }
+    } else if (s.timer > 0) s.timer = Math.max(0, s.timer - dt*0.5);
+  }
+
+  // bounce pads
+  for (const pad of W.pads) {
+    pad.t = Math.max(0, pad.t - dt*3);
+    if (p.vy <= 0 &&
+        Math.abs(p.x-pad.x) < pad.hx+p.hx && Math.abs(p.z-pad.z) < pad.hz+p.hz &&
+        Math.abs((p.y-p.hy) - pad.y) < 0.6) {
+      // height is v²/2g, so scale the kick by sqrt(gravity) and a pad throws you the
+      // same distance up in every level. Without this the Space pad overshoots its
+      // own ledge by miles and drops you in the gap past it.
+      p.y = pad.y + p.hy + 0.1; p.vy = PAD_V * Math.sqrt(W.gravity || 1);
+      p.jumpHeld = false; p.onGround = false; p.standing = null; p.airJumps = 0;
+      pad.t = 1; p.squash = -0.45; Sound.pad(); puff(pad.x, pad.y, pad.z, 10, '#FFC53D');
+    }
+  }
+
+  // spinning bars knock you off instead of killing you
+  for (const sp of W.spinners) {
+    sp.ang += sp.spd * dt;
+    if (Math.abs(p.y - sp.y) > 1.3) continue;
+    // world -> bar-local: the bar's long axis is local X, rotated by ang about Y
+    const dx = p.x - sp.x, dz = p.z - sp.z;
+    const ca = Math.cos(sp.ang), sa = Math.sin(sp.ang);
+    const lx = dx*ca - dz*sa, lz = dx*sa + dz*ca;
+    if (Math.abs(lx) < sp.len/2 + p.hx && Math.abs(lz) < 0.45 + p.hz) {
+      const push = lz >= 0 ? 1 : -1;            // shove out along local Z = (sin, cos)
+      const px = sa*push, pz = ca*push;
+      p.vx = px * 8.5; p.vz = pz * 8.5; p.vy = Math.max(p.vy, 5.2);
+      p.z += pz*0.25; p.x += px*0.25;
+      p.onGround = false; p.standing = null; p.airJumps = 0;
+      game.shake = 9; Sound.hit();
+      puff(p.x, p.y, p.z, 8, '#FF6B3D');
+    }
+  }
+
+  p.walk += dt * Math.hypot(p.vx, p.vz) * 1.5;
+  p.squash *= Math.pow(0.0009, dt);
+}
+
+function collectOrbs() {
+  const p = game.player;
+  for (const o of game.world.orbs) {
+    if (o.got) continue;
+    if (Math.abs(p.x-o.x) < 1.5 && Math.abs(p.y-o.y) < 1.9 && Math.abs(p.z-o.z) < 1.5) {
+      o.got = true; game.runOrbs++;
+      save.orbs += ORB_VALUE; save.lifetimeOrbs += ORB_VALUE;
+      persist(); Sound.orb(); burst(o.x, o.y, o.z, 14);
+    }
+  }
+}
+
+function hitHazards() {
+  const p = game.player, W = game.world;
+  const t = { cx:p.x, cy:p.y, cz:p.z, hx:p.hx*0.8, hy:p.hy*0.9, hz:p.hz*0.8 };
+  for (const h of W.hazards) {
+    if (h.kind === 'fire') {
+      const k = 0.5 - 0.5*Math.cos(h.t * Math.PI * 2);
+      const c = { cx: lerp(h.ax,h.bx,k), cy: lerp(h.ay,h.by,k), cz: lerp(h.az,h.bz,k), hx:h.hx, hy:h.hy, hz:h.hz };
+      if (aabb(t, c)) return true;
+    } else if (h.kind === 'spike') {
+      // use the forgiving inner box, not the drawn one
+      const c = { cx:h.cx, cy:h.ccy, cz:h.cz, hx:h.chx, hy:h.chy, hz:h.chz };
+      if (aabb(t, c)) return true;
+    } else if (aabb(t, h)) return true;
+  }
+  return false;
+}
+
+function killPlayer() {
+  if (game.dead > 0) return;
+  const p = game.player;
+  game.dead = 0.6; game.deaths++; game.shake = 14; game.flash = 0.5;
+  Sound.die(); burst(p.x, p.y, p.z, 24, '#FF5B5B');
+  if (game.mode !== 'obby') endRun();
+}
+function afterDeath() {
+  const p = game.player;
+  if (game.mode !== 'obby') return;
+  p.x = p.respawn.x; p.y = p.respawn.y; p.z = p.respawn.z;
+  p.vx = p.vy = p.vz = 0; p.onGround = false; p.standing = null;
+  p.saves = 1;                       // a fresh life gets a fresh recovery
+  for (const s of game.world.solids) if (s.kind === 'crumble') { s.gone = 0; s.timer = 0; }
+  snapCamera();
+}
+function respawnOrRestart() { if (game.mode === 'obby') killPlayer(); else restartCurrent(); }
+
+/* =========================================================================
+   12. MODES
+   ========================================================================= */
+/* The physics travel with you. Step onto an ice chunk and the floor really does
+   go slippery; step onto a space chunk and the gravity really does drop. The sky
+   and the colours come with it. An ordinary level has one zone, so this does
+   nothing there.
+
+   The banner only fires when the FLOOR changes, not on every chunk. Colours
+   change constantly in a shuffled level and a sign popping up every three seconds
+   would be noise — but walking onto ice without being told is a cheap death. */
+const floorName = z => z.slip ? '🧊 SLIPPERY!' : z.gravity < 1 ? '🚀 LOW GRAVITY!' : '🟢 NORMAL FLOOR';
+
+function updateZone() {
+  const W = game.world, p = game.player;
+  if (!W || !W.zones || !p) return;
+  let z = W.zones[0];
+  for (const s of W.zones) if (p.z >= s.z0) z = s;
+  if (z === W.zone) return;
+  const before = W.zone;
+  W.zone = z;
+  W.slip = z.slip; W.gravity = z.gravity; W.pal = z.pal;
+  Music.play(songFor());
+  if (!before || before.slip !== z.slip || before.gravity !== z.gravity) {
+    game.banner = { text: floorName(z), t: 1.8 };
+    Sound.check();
+  }
+}
+
+function updateObby(dt) {
+  const p = game.player, W = game.world;
+  updateZone();                       // which level am I standing in right now
+  stepPlayer(dt);
+  collectOrbs();
+
+  for (const c of W.checks) {
+    if (c.hit) continue;
+    if (Math.abs(p.x-c.x) < 3 && Math.abs(p.z-c.z) < 2.6 && Math.abs(p.y-c.y) < 3) {
+      c.hit = true;
+      p.respawn = { x:c.x, y:c.y + 1.2, z:c.z };
+      p.saves = 1;                     // reaching a checkpoint hands it back
+      Sound.check(); burst(c.x, c.y+1.5, c.z, 12, '#5BE7FF');
+      game.banner = { text:'🚩 Checkpoint!', t:1.3 };
+    }
+  }
+
+  // the devil at the gate of the Devil level
+  if (W.npc) {
+    const n = W.npc;
+    n.t += dt;
+    const d = Math.hypot(p.x-n.x, p.z-n.z);
+    n.yaw = angLerp(n.yaw, Math.atan2(p.x-n.x, p.z-n.z), 1 - Math.pow(0.02, dt));
+    if (!n.said && d < 13) {
+      n.said = 1;
+      game.speech = { text: n.line, t: 4.2, x:n.x, y:n.y+3.6, z:n.z };
+      Sound.devil();
+    }
+  }
+
+  // Nightmare taunts you when you get to the end and find the portal in the sky.
+  // It does not move — you simply cannot get up there. That is the joke.
+  if (W.troll && !game.won) {
+    const d = Math.abs(W.goal.z - p.z);
+    if (!W.taunt1 && d < 12) {
+      W.taunt1 = 1;
+      game.banner = { text:'💀 IT IS UP THERE. IT WAS ALWAYS UP THERE', t:3.4 };
+      Sound.devil();
+    }
+    if (!W.taunt2 && d < 12 && game.time > 3 && p.onGround) {
+      W.taunt2 = 1;
+      game.speech = { text:'TOLD YOU. NOBODY GETS PAST ME', t:5,
+                      x:W.goal.x, y:W.goal.y - 8, z:W.goal.z };
+    }
+  }
+
+  if (hitHazards() || p.y < W.deathY) killPlayer();
+
+  // forgiving: crossing the portal's line anywhere on the end platform counts
+  if (!game.won && p.z > W.goal.z - 1.4 && Math.abs(p.x-W.goal.x) < 4.6 && Math.abs(p.y-W.goal.y) < 4) {
+    game.won = true; Sound.win();
+    for (let i=0;i<3;i++) burst(W.goal.x, W.goal.y+2, W.goal.z, 24);
+    endRun();
+  }
+}
+
+/* ---- KILLER SNAIL: the war ------------------------------------------------
+   You are not defenceless any more. Z throws salt, K swings, T teleports home,
+   and four soldiers patrol the yard shooting at the snail. The snail carries a
+   knife: it winds up, then stabs, and you have three hearts.            */
+
+function camForward() {
+  const cp = Math.cos(cam.pitch);
+  return { x: -Math.sin(cam.yaw)*cp, y: -Math.sin(cam.pitch), z: -Math.cos(cam.yaw)*cp };
+}
+function playerInSafe() {
+  const s = game.world && game.world.safe, p = game.player;
+  if (!s || !p) return false;
+  return Math.abs(p.x-s.x) < s.hx && Math.abs(p.z-s.z) < s.hz && Math.abs(p.y-s.y) < s.hy;
+}
+function spawnSnail(wave) {
+  const a = Math.random()*Math.PI*2, hp = 120 + (wave-1)*115;
+  return {
+    x: Math.sin(a)*27, y: 2.2, z: Math.cos(a)*27,
+    spd:1.2, stun:0, wob:0, yaw:0, hp, maxHp:hp,
+    atk:0, atkCd:0, stagger:0, hurt:0, dead:0, sayCd:2
+  };
+}
+function makeSoldiers() {
+  const posts = (game.world.soldierPosts || []);
+  // Soldiers cannot be killed. The snail has not worked this out yet.
+  return posts.map((s, i) => ({
+    x:s.x, y:0.95, z:s.z, hx:0.42, hy:0.95, hz:0.42, vx:0, vz:0,
+    yaw:0, cd: 0.6 + i*0.3, hit:0, walk:0, circle: i%2 ? 1 : -1, unstick:0, home:{x:s.x, z:s.z}
+  }));
+}
+
+function shootSalt() {
+  if (game.dead > 0 || game.shootCd > 0) return;
+  if (game.ammo <= 0) {
+    game.shootCd = 0.4;
+    game.banner = { text:'🧂 Out of salt! Grab a shaker', t:1.2 };
+    return;
+  }
+  const p = game.player, sn = game.snail;
+  game.ammo--; game.shootCd = 0.22;
+  const f = camForward();
+  let dx = f.x, dy = f.y, dz = f.z;
+  // forgiving aim: if the snail is roughly in front, the throw curves onto it
+  if (sn && sn.dead <= 0) {
+    const ax = sn.x-p.x, ay = (sn.y+0.3)-(p.y+0.4), az = sn.z-p.z;
+    const l = Math.hypot(ax,ay,az) || 1;
+    if (l < 46 && (ax/l*f.x + ay/l*f.y + az/l*f.z) > 0.45) { dx = ax/l; dy = ay/l; dz = az/l; }
+  }
+  game.bullets.push({ x:p.x, y:p.y+0.4, z:p.z, vx:dx*38, vy:dy*38, vz:dz*38, life:1.4, dmg:11, mine:1 });
+  Sound.salt();
+}
+
+function meleeSwing() {
+  if (game.dead > 0 || game.meleeCd > 0) return;
+  game.meleeCd = 0.7; game.swing = 0.32;
+  Sound.swing();
+  const p = game.player, sn = game.snail;
+  if (!sn || sn.dead > 0) return;
+  const dx = sn.x-p.x, dy = sn.y-p.y, dz = sn.z-p.z;
+  const l = Math.hypot(dx,dy,dz) || 1;
+  if (l > 4.2) return;
+  hurtSnail(24);
+  sn.stagger = Math.max(sn.stagger, 0.55);
+  sn.atk = 0;                                   // a solid hit interrupts the stab
+  sn.x += dx/l*7; sn.z += dz/l*7;
+  game.shake = 9;
+  burst(sn.x, sn.y, sn.z, 16, '#FFE08A');
+}
+
+// G: one save per life. Only while you are falling, and only if you have not used it.
+function emergencySave() {
+  const p = game.player;
+  if (!p || game.dead > 0 || game.won) return;
+  if (p.onGround || p.vy > 0 || p.saves <= 0) return;
+  p.saves = 0;
+  p.vy = SAVE_BOOST;
+  p.airJumps = 0;                      // and your double jump comes back with it
+  p.jumpHeld = false;
+  Sound.pad();
+  game.banner = { text:'🆘 SAVED! (that was your one)', t:1.6 };
+  for (let i=0;i<14;i++) {
+    const a = i/14 * 6.283;
+    game.particles.push({ x:p.x + Math.cos(a)*0.6, y:p.y - PHY, z:p.z + Math.sin(a)*0.6,
+      vx:Math.cos(a)*3, vy:-0.5, vz:Math.sin(a)*3, life:0.4, max:0.4, size:0.18, g:2, c:'#FFD166' });
+  }
+}
+
+function teleportHome() {
+  if (game.dead > 0 || game.tpCd > 0) {
+    if (game.tpCd > 0) game.banner = { text:'🏠 Teleport recharging — ' + Math.ceil(game.tpCd) + 's', t:1.1 };
+    return;
+  }
+  const s = game.world.safe, p = game.player;
+  game.tpCd = 16;
+  burst(p.x, p.y, p.z, 18, '#5BE7FF');
+  p.x = s.x; p.y = s.y - s.hy + PHY + 0.5; p.z = s.z;
+  p.vx = p.vy = p.vz = 0;
+  burst(p.x, p.y, p.z, 18, '#5BE7FF');
+  snapCamera();
+  Sound.check();
+  game.banner = { text:'🏠 Teleported to the safehouse', t:1.3 };
+}
+
+// speech bubble that rides along above the snail's shell
+function snailSay(text, hold) {
+  const sn = game.snail;
+  if (!sn || sn.dead > 0) return;
+  game.speech = { text, t: hold || 2, snail: true };
+  sn.sayCd = 5 + Math.random()*4;
+}
+
+function hurtSnail(dmg) {
+  const sn = game.snail;
+  if (!sn || sn.dead > 0) return;
+  sn.hp -= dmg; sn.hurt = 0.18;
+  if (sn.hp <= 0) {
+    sn.hp = 0; sn.dead = 1;
+    // last words, left hanging in the air where it fell
+    game.speech = { text:'I NOT KILL YOU', t:3.4, x:sn.x, y:sn.y + 3.2, z:sn.z, green:true };
+    game.kills++;
+    game.snailRespawn = 3;
+    save.orbs += 12; save.lifetimeOrbs += 12; persist();
+    for (let i=0;i<4;i++) burst(sn.x, sn.y + i*0.4, sn.z, 20, i%2 ? '#FFE08A' : '#9BE58A');
+    Sound.win();
+    game.banner = { text:'🐌 SNAIL DOWN!  +12 aura  ·  wave ' + (game.wave+1) + ' incoming', t:2.6 };
+    game.shake = 16;
+  }
+}
+
+function hurtPlayer(fromX, fromZ) {
+  if (game.iframe > 0 || game.dead > 0) return;
+  game.hp--;
+  game.iframe = 1.5;
+  game.shake = 15; game.flash = 0.55;
+  const p = game.player;
+  const a = Math.atan2(p.x-fromX, p.z-fromZ);
+  p.vx = Math.sin(a)*11; p.vz = Math.cos(a)*11; p.vy = 6;
+  burst(p.x, p.y, p.z, 18, '#FF5B5B');
+  Sound.hurt();
+  if (game.hp <= 0) killPlayer();
+  else game.banner = { text:'🔪 STABBED!  ' + game.hp + ' ' + (game.hp === 1 ? 'heart' : 'hearts') + ' left', t:1.6 };
+}
+
+function updateSnail(dt) {
+  const p = game.player, W = game.world;
+  stepPlayer(dt);
+  collectOrbs();
+
+  game.iframe = Math.max(0, game.iframe - dt);
+  game.shootCd = Math.max(0, game.shootCd - dt);
+  game.meleeCd = Math.max(0, game.meleeCd - dt);
+  game.swing = Math.max(0, game.swing - dt);
+  game.tpCd = Math.max(0, game.tpCd - dt);
+
+  // ---- safehouse shield: safe while it holds, and it only holds for a while
+  game.inSafe = playerInSafe();
+  if (game.inSafe) game.shield = Math.max(0, game.shield - dt/11);
+  else game.shield = Math.min(1, game.shield + dt/15);
+  const shieldOn = game.shield > 0.02;
+
+  // ---- orbs keep coming back so there is always a reason to leave cover
+  game.orbTimer -= dt;
+  if (game.orbTimer <= 0) {
+    game.orbTimer = 4;
+    const gone = W.orbs.filter(o => o.got);
+    if (gone.length) {
+      const o = gone[Math.floor(Math.random()*gone.length)];
+      const s = W.orbSpots[Math.floor(Math.random()*W.orbSpots.length)];
+      o.x = s.x; o.y = s.y; o.z = s.z; o.got = false;
+    }
+  }
+
+  // ---- salt shakers reload you
+  for (const s of game.salts) {
+    if (s.got > 0) { s.got -= dt; continue; }
+    if (Math.hypot(p.x-s.x, p.y-s.y, p.z-s.z) < 2.3) {
+      s.got = 10;
+      game.ammo = Math.min(MAX_AMMO, game.ammo + 10);
+      Sound.salt(); burst(s.x, s.y, s.z, 16, '#FFFFFF');
+      game.banner = { text:'🧂 +10 salt', t:1.1 };
+    }
+  }
+
+  // ---- the snail
+  let sn = game.snail;
+  if (sn && sn.dead > 0) {
+    sn.dead += dt;
+    game.snailRespawn -= dt;
+    if (game.snailRespawn <= 0) {
+      game.wave++;
+      game.snail = sn = spawnSnail(game.wave);
+      game.banner = { text:'🐌 WAVE ' + game.wave + '!', t:2 };
+    }
+  } else if (sn) {
+    sn.wob += dt*3;
+    sn.hurt = Math.max(0, sn.hurt - dt);
+    sn.stagger = Math.max(0, sn.stagger - dt);
+    sn.atkCd = Math.max(0, sn.atkCd - dt);
+    if (sn.stun > 0) sn.stun -= dt;
+
+    // always the same speed — slower than you, but it never stops coming
+    sn.spd = SNAIL_SPEED;
+
+    // pick a target: the player, unless a soldier is much closer.
+    // it keeps going for the soldiers even though it can never win that fight.
+    let tx = p.x, ty = p.y - 0.2, tz = p.z, tgt = null;
+    let best = Math.hypot(p.x-sn.x, p.z-sn.z) * (game.inSafe && shieldOn ? 4 : 1);
+    for (const s of game.soldiers) {
+      const d = Math.hypot(s.x-sn.x, s.z-sn.z) * 1.6;
+      if (d < best) { best = d; tgt = s; tx = s.x; ty = s.y; tz = s.z; }
+    }
+
+    const frozen = sn.stun > 0 || sn.stagger > 0;
+    if (sn.atk > 0) {
+      sn.atk -= dt;                                     // winding up: it holds still
+      if (sn.atk <= 0) {
+        sn.atkCd = 1.3;
+        const d = Math.hypot(tx-sn.x, tz-sn.z);
+        if (d < 4) {
+          if (tgt) {
+            // it stabs a soldier with everything it has. Nothing happens.
+            tgt.hit = 0.35;
+            const a = Math.atan2(tgt.x-sn.x, tgt.z-sn.z);
+            tgt.x += Math.sin(a)*1.2; tgt.z += Math.cos(a)*1.2;
+            burst(tgt.x, tgt.y+0.6, tgt.z, 10, '#FFE08A');
+            snailSay(Math.random() < 0.5 ? 'WHY YOU NOT DIE' : 'STAY DOWN SOLDIER', 2);
+          } else if (!(game.inSafe && shieldOn)) {
+            hurtPlayer(sn.x, sn.z);
+          }
+        }
+        Sound.stab();
+      }
+    } else if (!frozen) {
+      const dx = tx-sn.x, dy = ty-sn.y, dz = tz-sn.z;
+      const l = Math.hypot(dx,dy,dz) || 1;
+      sn.x += dx/l*sn.spd*dt; sn.y += dy/l*sn.spd*dt; sn.z += dz/l*sn.spd*dt;
+      sn.yaw = angLerp(sn.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.02, dt));
+      if (l < 3.1 && sn.atkCd <= 0) {                     // telegraphed stab
+        sn.atk = 0.5; Sound.raise();
+        snailSay(tgt ? 'I KILL YOU SOLDIER' : 'I KILL YOU', 2.2);
+      }
+    }
+    sn.sayCd = Math.max(0, sn.sayCd - dt);
+    if (sn.sayCd <= 0 && !game.speech) snailSay('I KILL YOU', 2);   // it keeps announcing it
+
+    // the shield physically keeps it out of the safehouse
+    if (shieldOn) {
+      const s = W.safe, pad = 1.6;
+      const ix = s.hx + pad - Math.abs(sn.x - s.x);
+      const iz = s.hz + pad - Math.abs(sn.z - s.z);
+      const iy = s.hy + pad - Math.abs(sn.y - s.y);
+      if (ix > 0 && iz > 0 && iy > 0) {
+        if (ix < iz) sn.x = s.x + Math.sign(sn.x - s.x || 1) * (s.hx + pad);
+        else sn.z = s.z + Math.sign(sn.z - s.z || 1) * (s.hz + pad);
+        if (Math.random() < 0.25) burst(sn.x, sn.y, sn.z, 2, '#5BE7FF');
+      }
+    }
+
+    if (!(game.inSafe && shieldOn) &&
+        Math.hypot(p.x-sn.x, (p.y-sn.y)*0.8, p.z-sn.z) < 1.7) hurtPlayer(sn.x, sn.z);
+  }
+
+  updateSoldiers(dt);
+  updateBullets(dt);
+
+  if (p.y < W.deathY) killPlayer();
+}
+
+/* ---- soldiers: patrol the yard, keep their distance, shoot the snail ---- */
+function updateSoldiers(dt) {
+  const sn = game.snail, W = game.world, alive = sn && sn.dead <= 0;
+  for (const s of game.soldiers) {
+    s.walk += dt;
+    s.hit = Math.max(0, s.hit - dt);
+
+    let mx = 0, mz = 0;
+    if (alive) {
+      const dx = sn.x - s.x, dz = sn.z - s.z;
+      const d = Math.hypot(dx, dz) || 1;
+      // hold a firing line ~13 away: close in when far, back off when too near
+      const push = d > 15 ? 1 : d < 11 ? -1.15 : 0;
+      mx = dx/d*push + (-dz/d)*s.circle*0.55;
+      mz = dz/d*push + ( dx/d)*s.circle*0.55;
+      s.yaw = angLerp(s.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.02, dt));
+    } else {
+      const dx = s.home.x - s.x, dz = s.home.z - s.z;   // no snail: walk home
+      const d = Math.hypot(dx, dz);
+      if (d > 1.2) { mx = dx/d; mz = dz/d; s.yaw = angLerp(s.yaw, Math.atan2(dx, dz), 1 - Math.pow(0.05, dt)); }
+    }
+    // stay in the yard, never wander to the fence
+    const hd = Math.hypot(s.x, s.z);
+    if (hd > 26) { mx -= s.x/hd*1.4; mz -= s.z/hd*1.4; }
+
+    if (s.unstick > 0) { s.unstick -= dt; const t = mx; mx = -mz; mz = t; }
+    const ml = Math.hypot(mx, mz);
+    if (ml > 0.01) {
+      const spd = 5.2;
+      const px = s.x, pz = s.z;
+      moveAxis(s, 'x', mx/ml*spd*dt, W.solids);
+      moveAxis(s, 'z', mz/ml*spd*dt, W.solids);
+      if (Math.hypot(s.x-px, s.z-pz) < spd*dt*0.35 && s.unstick <= 0) s.unstick = 0.6;
+    }
+
+    // fire
+    s.cd -= dt;
+    if (alive && s.cd <= 0) {
+      const dx = sn.x - s.x, dy = (sn.y+0.2) - (s.y+0.7), dz = sn.z - s.z;
+      const d = Math.hypot(dx,dy,dz);
+      if (d < 24) {
+        s.cd = 1.6;
+        game.bullets.push({
+          x:s.x, y:s.y+0.7, z:s.z,
+          vx:dx/d*30, vy:dy/d*30, vz:dz/d*30, life:1.4, dmg:4, mine:0
+        });
+        Sound.pop();
+      }
+    }
+  }
+}
+
+function updateBullets(dt) {
+  const sn = game.snail;
+  for (let i = game.bullets.length - 1; i >= 0; i--) {
+    const b = game.bullets[i];
+    b.x += b.vx*dt; b.y += b.vy*dt; b.z += b.vz*dt;
+    b.vy -= 5*dt;                                    // a little arc
+    b.life -= dt;
+    let hit = false;
+    if (sn && sn.dead <= 0 && Math.hypot(b.x-sn.x, b.y-sn.y, b.z-sn.z) < 2) {
+      hurtSnail(b.dmg);
+      sn.stun = Math.max(sn.stun, b.mine ? 0.22 : 0.12);   // salt makes it flinch
+      burst(b.x, b.y, b.z, 6, '#FFFFFF');
+      hit = true;
+    }
+    if (hit || b.life <= 0 || b.y < -2) game.bullets.splice(i, 1);
+  }
+}
+
+function updateInfinity(dt) {
+  const p = game.player, W = game.world;
+  stepPlayer(dt);
+  collectOrbs();
+
+  game.depth = Math.max(game.depth, Math.round(W.startY - p.y));
+  while (-6 - (W.nextLayer-1)*LAYER > p.y - 90) addShaftLayer(W);
+
+  const spd = clamp(1.85 + game.depth*0.0045, 1.85, 8.5);
+  W.crusherY -= spd*dt;
+  if (W.crusherY > p.y + 30) W.crusherY = p.y + 30;      // never lag too far behind
+
+  const cut = W.crusherY + 2;
+  W.solids = W.solids.filter(s => s.cy - s.hy < cut);
+  W.hazards = W.hazards.filter(h => h.cy - h.hy < cut);
+  W.orbs = W.orbs.filter(o => o.y < cut + 2);
+
+  if (p.y + PHY > W.crusherY - 0.2) killPlayer();
+  if (hitHazards()) killPlayer();
+}
+
+function endRun() {
+  if (game.mode === 'obby') {
+    const cfg = LEVELS[levelIndex(game.levelId)];
+    const first = !save.cleared[game.levelId];
+    save.cleared[game.levelId] = true;
+    const prev = save.best[game.levelId], isBest = !prev || game.time < prev;
+    if (isBest) save.best[game.levelId] = game.time;
+    if (first) { save.orbs += 25; save.lifetimeOrbs += 25; }
+    persist();
+    const rank = cfg.troll ? 0 : postScore('lvl:'+game.levelId, game.time, true);
+    const next = LEVELS[levelIndex(game.levelId)+1];
+    showResult('🎉 ' + cfg.name + ' clear!',
+      '⏱ ' + fmtTime(game.time) + (isBest ? '  <b>NEW BEST!</b>' : '') +
+      rankLine(rank) +
+      '<br>💠 ' + game.runOrbs + ' / ' + game.world.totalOrbs + ' aura orbs  (+' +
+        (game.runOrbs * ORB_VALUE) + ' aura)' +
+      '<br>💀 ' + game.deaths + ' deaths' +
+      (first ? '<br><b>+25 bonus aura for the first clear!</b>' : '') +
+      (first && next ? '<br>🔓 <b>' + next.name + ' unlocked!</b>' : ''),
+      next ? 'Next level' : null);
+  } else if (game.mode === 'snail') {
+    const t = game.time, isBest = t > (save.best.snail || 0);
+    if (isBest) save.best.snail = t;
+    let unlocked = false;
+    if (t >= 60 && !ownsSkin('snail')) { save.owned.push('snail'); unlocked = true; Sound.unlock(); }
+    persist();
+    if (game.kills > (save.best.kills || 0)) save.best.kills = game.kills;
+    const rank = postScore('snail:time', t, false);
+    const kRank = game.kills > 0 ? postScore('snail:kills', game.kills, false) : 0;
+    showResult('🔪 The snail got you!',
+      '⏱ Survived <b>' + fmtTime(t) + '</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
+      rankLine(rank) + rankLine(kRank, 'for snails beaten') +
+      '<br>🐌 Snails defeated: <b>' + game.kills + '</b>  (reached wave ' + game.wave + ')' +
+      '<br>🏆 Best time: ' + fmtTime(save.best.snail || 0) + ' · most snails: ' + (save.best.kills || 0) +
+      '<br>💠 ' + (game.runOrbs * ORB_VALUE) + ' aura collected (' + game.runOrbs + ' orbs)' +
+      (unlocked ? '<br>🎁 <b>Snail King skin unlocked!</b>'
+                : (t < 60 ? '<br><span style="opacity:.7">Survive 60s to unlock the Snail King skin.</span>' : '')),
+      null);
+  } else {
+    const d = game.depth, isBest = d > (save.best.depth || 0);
+    if (isBest) save.best.depth = d;
+    persist();
+    const rank = postScore('inf:depth', d, false);
+    showResult('♾️ Squashed!',
+      '📉 Depth reached: <b>' + d + ' m</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
+      rankLine(rank) +
+      '<br>🏆 Best depth: ' + (save.best.depth || 0) + ' m' +
+      '<br>💠 ' + (game.runOrbs * ORB_VALUE) + ' aura collected (' + game.runOrbs + ' orbs)', null);
+  }
+}
+
+/* =========================================================================
+   13. PARTICLES
+   ========================================================================= */
+function burst(x,y,z,n,color) {
+  for (let i=0;i<n;i++) {
+    const a = Math.random()*Math.PI*2, e = Math.random()*Math.PI - Math.PI/2, s = 2+Math.random()*7;
+    game.particles.push({ x,y,z,
+      vx:Math.cos(a)*Math.cos(e)*s, vy:Math.abs(Math.sin(e))*s+2, vz:Math.sin(a)*Math.cos(e)*s,
+      life:.5+Math.random()*.5, max:1, size:.15+Math.random()*.2,
+      c: color || (Math.random()<.5 ? '#A46BFF' : '#5BE7FF') });
+  }
+}
+function puff(x,y,z,n,color) {
+  for (let i=0;i<n;i++) {
+    const a = Math.random()*Math.PI*2;
+    game.particles.push({ x,y,z, vx:Math.cos(a)*2, vy:Math.random()*1.5, vz:Math.sin(a)*2,
+      life:.3, max:.3, size:.13, c: color || '#FFFFFF' });
+  }
+}
+function stepParticles(dt) {
+  const P = game.particles;
+  for (let i=P.length-1;i>=0;i--) {
+    const q = P[i];
+    q.life -= dt;
+    if (q.life <= 0) { P.splice(i,1); continue; }
+    q.vy -= 16*dt;
+    q.x += q.vx*dt; q.y += q.vy*dt; q.z += q.vz*dt;
+  }
+}
+
+/* =========================================================================
+   14. CAMERA
+   ========================================================================= */
+function updateCamera(dt, snap) {
+  const p = game.player;
+  input.manualLook = Math.max(0, input.manualLook - dt);
+  // ease the camera behind you when you are running and not steering it.
+  // the camera sits at target + (sin yaw, _, cos yaw)*dist, so "behind" is the
+  // direction opposite your velocity.
+  if (!input.manualLook && Math.hypot(p.vx,p.vz) > 2.5) {
+    cam.yaw = angLerp(cam.yaw, Math.atan2(-p.vx, -p.vz), 1 - Math.pow(0.35, dt));
+  }
+  const tx = p.x, ty = p.y + 1.1, tz = p.z;
+  const k = snap ? 1 : 1 - Math.pow(0.0006, dt);
+  cam.tx = snap ? tx : lerp(cam.tx, tx, k);
+  cam.ty = snap ? ty : lerp(cam.ty, ty, k);
+  cam.tz = snap ? tz : lerp(cam.tz, tz, k);
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const dx = Math.sin(cam.yaw)*cp, dy = sp, dz = Math.cos(cam.yaw)*cp;
+  const d = cameraReach(cam.tx, cam.ty, cam.tz, dx, dy, dz, cam.dist);
+  cam.x = cam.tx + dx*d;
+  cam.y = cam.ty + dy*d;
+  cam.z = cam.tz + dz*d;
+}
+// don't let the camera sink into a wall — pull it in to the last clear spot
+function cameraReach(tx, ty, tz, dx, dy, dz, want) {
+  const W = game.world;
+  if (!W) return want;
+  const r = 0.5, steps = 12;
+  const pt = { cx:0, cy:0, cz:0, hx:r, hy:r, hz:r };
+  for (let i = 1; i <= steps; i++) {
+    const t = want * i/steps;
+    pt.cx = tx + dx*t; pt.cy = ty + dy*t; pt.cz = tz + dz*t;
+    for (const s of W.solids) {
+      if (s.gone || s.kind === 'crumble') continue;
+      if (aabb(pt, s)) return Math.max(2.2, want * (i-1)/steps);
+    }
+  }
+  return want;
+}
+function snapCamera() { updateCamera(0, true); }
+
+/* =========================================================================
+   15. DRAWING THE 3D WORLD
+   ========================================================================= */
+const VP = m4(), PROJ = m4(), VIEW = m4();
+
+function charColor(skinId, part) {
+  const sk = skinById(skinId);
+  if (skinId === 'rainbow') {
+    const h = (performance.now()/1000*80) % 360;
+    return hslArr(h + (part === 'head' ? 40 : 0), 0.85, 0.62);
+  }
+  return hex(part === 'head' ? sk.head : sk.body);
+}
+function hslArr(h,s,l) {
+  h = ((h%360)+360)%360 / 360;
+  const q = l < .5 ? l*(1+s) : l+s-l*s, p = 2*l - q;
+  const f = t => { t=(t+1)%1; return t<1/6 ? p+(q-p)*6*t : t<1/2 ? q : t<2/3 ? p+(q-p)*(2/3-t)*6 : p; };
+  return [f(h+1/3), f(h), f(h-1/3)];
+}
+
+function drawCharacter(x, y, z, yaw, skinId, walk, squash, airborne) {
+  const body = charColor(skinId, 'body'), head = charColor(skinId, 'head');
+  const sq = squash || 0;
+  const sw = Math.sin(walk)*0.55, sw2 = Math.sin(walk + Math.PI)*0.55;
+  const legSwing = airborne ? 0.4 : sw, armSwing = airborne ? -1.5 : sw2;
+  const base = y - PHY;                       // feet
+  const ry = yaw;
+
+  // legs
+  const leg = (side, swing) => {
+    m4translate(TMP_D, x, base + 0.28, z);
+    m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, side*0.19, 0, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4rotX(TMP_B, swing*0.5); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, 0, -0.02, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.3, 0.62, 0.32); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, body);
+  };
+  leg(-1, legSwing); leg(1, -legSwing);
+
+  // torso
+  compose(MODEL, x, base + 0.92, z, ry, 0, 0.78*(1-sq*.2), 0.62*(1+sq*.3), 0.46);
+  drawMesh(meshes.cube, MODEL, body);
+
+  // arms
+  const arm = (side, swing) => {
+    m4translate(TMP_D, x, base + 1.12, z);
+    m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, side*0.52, 0, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4rotX(TMP_B, swing*0.55); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, 0, -0.22, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.24, 0.58, 0.28); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, body);
+  };
+  arm(-1, armSwing); arm(1, -armSwing);
+
+  // head
+  compose(MODEL, x, base + 1.52, z, ry, 0, 0.56, 0.5, 0.5);
+  drawMesh(meshes.cube, MODEL, head);
+  // eyes
+  const eo = 0.16, ez = 0.26;
+  for (const s of [-1,1]) {
+    m4translate(TMP_D, x, base + 1.56, z);
+    m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, s*eo, 0, ez); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.1, 0.13, 0.06); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, [0.1,0.09,0.15]);
+  }
+
+  // skin extras
+  // Aura Wings, if you have bought them. They spread wide while you glide and fold
+  // back in when you do not, so you can see the power working.
+  if (hasPower('wings')) {
+    const p = game.player;
+    const glide = p && p.gliding;
+    const jet = p && p.thrusting;
+    const flap = Math.sin(performance.now()/(glide ? 260 : 150));
+    for (const side of [-1,1]) {
+      m4translate(TMP_D, x, base + 1.15, z);
+      m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+      m4translate(TMP_B, side*(glide ? 0.72 : 0.46), 0, -0.34); m4mul(TMP_D, MODEL, TMP_B);
+      m4rotY(TMP_B, side*(glide ? 1.15 : 0.55) + flap*0.22*side); m4mul(MODEL, TMP_D, TMP_B);
+      m4rotZ(TMP_B, side*(glide ? -0.15 : 0.25)); m4mul(TMP_D, MODEL, TMP_B);
+      m4scale(TMP_B, glide ? 1.35 : 0.8, 0.82, 0.09); m4mul(MODEL, TMP_D, TMP_B);
+      drawMesh(meshes.cube, MODEL, hex(jet ? '#FFFFFF' : glide ? '#C9A0FF' : '#8C6BFF'), jet ? 1 : glide ? 0.85 : 0.5);
+    }
+  }
+
+  if (skinId === 'angel') {
+    compose(MODEL, x, base + 2.02, z, ry, 0, 0.62, 0.09, 0.62);
+    drawMesh(meshes.cube, MODEL, hex('#FFD86B'), 0.7);
+    for (const s of [-1,1]) {
+      m4translate(TMP_D, x, base + 1.05, z);
+      m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+      m4translate(TMP_B, s*0.5, 0, -0.32); m4mul(TMP_D, MODEL, TMP_B);
+      m4rotY(TMP_B, s*0.7 + Math.sin(performance.now()/160)*0.25*s); m4mul(MODEL, TMP_D, TMP_B);
+      m4scale(TMP_B, 0.62, 0.72, 0.1); m4mul(TMP_D, MODEL, TMP_B);
+      drawMesh(meshes.cube, TMP_D, [1,1,1], 0.55);
+    }
+  }
+  if (skinId === 'devil') {
+    for (const s of [-1,1]) {
+      m4translate(TMP_D, x, base + 1.78, z);
+      m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+      m4translate(TMP_B, s*0.19, 0, 0); m4mul(TMP_D, MODEL, TMP_B);
+      m4scale(TMP_B, 0.14, 0.3, 0.14); m4mul(MODEL, TMP_D, TMP_B);
+      drawMesh(meshes.pyr, MODEL, hex('#FFE08A'));
+    }
+    m4translate(TMP_D, x, base + 0.8, z);
+    m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, 0, 0, -0.42); m4mul(TMP_D, MODEL, TMP_B);
+    m4rotX(TMP_B, 0.6 + Math.sin(performance.now()/300)*0.2); m4mul(MODEL, TMP_D, TMP_B);
+    m4scale(TMP_B, 0.1, 0.1, 0.8); m4mul(TMP_D, MODEL, TMP_B);
+    drawMesh(meshes.cube, TMP_D, hex('#C22B2B'));
+  }
+  if (skinId === 'inu') {
+    // Inu is a person, not a dog — short hair and a cap brim.
+    compose(MODEL, x, base + 1.78, z, ry, 0, 0.66, 0.2, 0.66);
+    drawMesh(meshes.cube, MODEL, hex('#2E2A26'));
+    m4translate(TMP_D, x, base + 1.72, z);
+    m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, 0, 0, 0.42); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.62, 0.09, 0.36); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, hex('#2FA96C'));
+  }
+  if (skinId === 'snail') {
+    compose(MODEL, x, base + 1.0, z, ry, 0, 1.1, 1.1, 1.1);
+    drawMesh(meshes.ball, MODEL, hex('#C97B3C'));
+  }
+}
+
+/* ---- safehouse shield: a glowing dome you can see through ---- */
+function drawShield(t) {
+  const s = game.world.safe;
+  if (!s || game.shield <= 0.02) return;
+  const flick = game.shield < 0.25 ? (0.4 + 0.6*Math.abs(Math.sin(t*14))) : 1;
+  const a = (0.20 + 0.10*Math.sin(t*2)) * flick * clamp(game.shield*1.4, 0, 1);
+  const r = s.hx + 2.6;
+  compose(MODEL, s.x, s.y - s.hy, s.z, 0, 0, r*2, (s.hy+3.4)*2, r*2);
+  drawGhost(meshes.ball, MODEL, hex(game.shield < 0.25 ? '#FF7A7A' : '#5BE7FF'), a);
+}
+
+/* ---- soldiers: blocky guards that walk, aim and fire ---- */
+function drawSoldier(s, t) {
+  const flash = s.hit > 0;                                  // stabbed, and completely fine
+  const uni = flash ? [1,1,1] : hex('#3E6B4F');
+  const skin = flash ? [1,1,1] : hex('#E8B98A');
+  const hat  = flash ? [1,1,1] : hex('#2C4C39');
+  const glow = flash ? 0.8 : 0;
+  const y = s.y + Math.sin(s.walk*9)*0.06;
+  for (const k of [-1,1]) {
+    const sw = Math.sin(s.walk*9 + (k>0?0:Math.PI))*0.28;
+    compose(MODEL, s.x + Math.cos(s.yaw)*k*0.22 + Math.sin(s.yaw)*sw*0.6, y - 0.62,
+                   s.z - Math.sin(s.yaw)*k*0.22 + Math.cos(s.yaw)*sw*0.6, s.yaw, 0, 0.26, 0.68, 0.26);
+    drawMesh(meshes.cube, MODEL, hat, glow);
+  }
+  compose(MODEL, s.x, y, s.z, s.yaw, 0, 0.72, 0.86, 0.48);
+  drawMesh(meshes.cube, MODEL, uni, glow);
+  compose(MODEL, s.x, y + 0.78, s.z, s.yaw, 0, 0.46, 0.46, 0.46);
+  drawMesh(meshes.cube, MODEL, skin, glow);
+  compose(MODEL, s.x, y + 1.04, s.z, s.yaw, 0, 0.56, 0.18, 0.56);
+  drawMesh(meshes.cube, MODEL, hat, glow);
+  // salt gun, held out toward whatever it is aiming at
+  const gx = s.x + Math.sin(s.yaw)*0.75, gz = s.z + Math.cos(s.yaw)*0.75;
+  compose(MODEL, gx, y + 0.44, gz, s.yaw, 0, 0.2, 0.2, 0.9);
+  drawMesh(meshes.cube, MODEL, hex('#4A4A55'));
+  if (s.cd > 1.4) {                          // muzzle flash right after firing
+    compose(MODEL, gx + Math.sin(s.yaw)*0.6, y + 0.44, gz + Math.cos(s.yaw)*0.6, 0, 0, 0.5, 0.5, 0.5);
+    drawMesh(meshes.ball, MODEL, [1,1,1], 1);
+  }
+}
+
+function drawSnail(sn) {
+  const bob = Math.sin(sn.wob)*0.12;
+  const y = sn.y + bob;
+  const glow = sn.hurt > 0 ? 0.9 : sn.atk > 0 ? 0.55 : sn.stun > 0 ? 0.6 : 0.15;
+  const skin = sn.hurt > 0 ? [1,1,1] : hex('#9BE58A');
+  compose(MODEL, sn.x, y - 0.35, sn.z, sn.yaw, 0, 1.5, 0.8, 2.6);
+  drawMesh(meshes.cube, MODEL, skin, glow);
+  compose(MODEL, sn.x, y + 0.35, sn.z, sn.yaw, 0, 2.3, 2.3, 2.3);
+  drawMesh(meshes.ball, MODEL, sn.hurt > 0 ? [1,1,1] : hex(sn.stun > 0 ? '#8FB6FF' : '#C97B3C'), glow);
+  // head + eye stalks
+  const hx = sn.x + Math.sin(sn.yaw)*1.25, hz = sn.z + Math.cos(sn.yaw)*1.25;
+  compose(MODEL, hx, y - 0.15, hz, sn.yaw, 0, 0.85, 0.85, 0.85);
+  drawMesh(meshes.ball, MODEL, skin, glow);
+  for (const s of [-1,1]) {
+    const ex = hx + Math.cos(sn.yaw)*s*0.3, ez = hz - Math.sin(sn.yaw)*s*0.3;
+    compose(MODEL, ex, y + 0.55, ez, 0, 0, 0.11, 0.9, 0.11);
+    drawMesh(meshes.cube, MODEL, skin, glow);
+    compose(MODEL, ex, y + 1.05, ez, 0, 0, 0.3, 0.3, 0.3);
+    drawMesh(meshes.ball, MODEL, hex('#FF3B3B'), 0.75);
+  }
+
+  // ---- the knife. raised while it winds up, thrust forward on the stab ----
+  const wind = sn.atk > 0 ? 1 - sn.atk/0.5 : 0;          // 0 -> 1 through the windup
+  const reach = sn.atk > 0 ? 0.5 + wind*0.9 : 0.75;
+  const lift  = sn.atk > 0 ? 1.5 - wind*0.5 : 0.35;
+  const tilt  = sn.atk > 0 ? -0.9 + wind*1.5 : -0.35;
+  const kx = hx + Math.sin(sn.yaw)*reach + Math.cos(sn.yaw)*0.75;
+  const kz = hz + Math.cos(sn.yaw)*reach - Math.sin(sn.yaw)*0.75;
+  compose(MODEL, kx, y + lift - 0.28, kz, sn.yaw, tilt, 0.16, 0.36, 0.16);   // handle
+  drawMesh(meshes.cube, MODEL, hex('#3A2B22'));
+  compose(MODEL, kx, y + lift + 0.34, kz, sn.yaw, tilt, 0.1, 1.05, 0.3);     // blade
+  drawMesh(meshes.cube, MODEL, hex('#E6ECF5'), sn.atk > 0 ? 0.7 : 0.35);
+}
+
+// The devil at the Devil gate, and his bone-white cousin at the Nightmare gate.
+function drawDevilNpc(n, t) {
+  const skin = hex(n.bone ? '#D9DEE8' : '#B31E2B');
+  const head = hex(n.bone ? '#EDF1F7' : '#E23B3B');
+  const horn = hex(n.bone ? '#8FA2B8' : '#FFD65A');
+  const eye  = hex(n.bone ? '#00E5FF' : '#FFF07A');
+  const leg  = hex(n.bone ? '#9AA6B8' : '#7C1420');
+  const y = n.y + Math.sin(t*1.6)*0.12;
+  compose(MODEL, n.x, y + 1.1, n.z, n.yaw, 0, 1.5, 1.5, 1.0);
+  drawMesh(meshes.cube, MODEL, skin);
+  compose(MODEL, n.x, y + 2.35, n.z, n.yaw, 0, 1.05, 0.95, 0.95);
+  drawMesh(meshes.cube, MODEL, head);
+  for (const s of [-1,1]) {
+    m4translate(TMP_D, n.x, y + 3.0, n.z);
+    m4rotY(TMP_B, n.yaw); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, s*0.34, 0, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.26, 0.62, 0.26); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.pyr, MODEL, horn);
+    // eyes
+    m4translate(TMP_D, n.x, y + 2.42, n.z);
+    m4rotY(TMP_B, n.yaw); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, s*0.26, 0, 0.5); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.19, 0.19, 0.08); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, eye, 0.85);
+  }
+  // arms
+  for (const s of [-1,1]) {
+    m4translate(TMP_D, n.x, y + 1.25, n.z);
+    m4rotY(TMP_B, n.yaw); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, s*0.95, 0, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4rotX(TMP_B, -0.5 + Math.sin(t*2 + s)*0.25); m4mul(MODEL, TMP_D, TMP_B);
+    m4translate(TMP_B, 0, -0.35, 0); m4mul(TMP_D, MODEL, TMP_B);
+    m4scale(TMP_B, 0.34, 0.9, 0.34); m4mul(MODEL, TMP_D, TMP_B);
+    drawMesh(meshes.cube, MODEL, skin);
+  }
+  // tail
+  m4translate(TMP_D, n.x, y + 0.9, n.z);
+  m4rotY(TMP_B, n.yaw); m4mul(MODEL, TMP_D, TMP_B);
+  m4translate(TMP_B, 0, 0, -0.7); m4mul(TMP_D, MODEL, TMP_B);
+  m4rotX(TMP_B, 0.75 + Math.sin(t*2.4)*0.28); m4mul(MODEL, TMP_D, TMP_B);
+  m4scale(TMP_B, 0.16, 0.16, 1.5); m4mul(TMP_D, MODEL, TMP_B);
+  drawMesh(meshes.cube, TMP_D, skin);
+  // legs
+  for (const s of [-1,1]) {
+    compose(MODEL, n.x + Math.cos(n.yaw)*s*0.36, y + 0.35, n.z - Math.sin(n.yaw)*s*0.36, n.yaw, 0, 0.4, 0.75, 0.4);
+    drawMesh(meshes.cube, MODEL, leg);
+  }
+}
+
+function drawWorld(t) {
+  const W = game.world, pal = W.pal;
+  const sky = hex(pal.sky), fog = hex(pal.fog);
+  gl.clearColor(sky[0], sky[1], sky[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  const shakeX = game.shake > 0 ? (Math.random()-0.5)*game.shake*0.02 : 0;
+  const shakeY = game.shake > 0 ? (Math.random()-0.5)*game.shake*0.02 : 0;
+
+  m4persp(PROJ, 1.05, glcv.width/glcv.height, 0.1, 400);
+  m4look(VIEW, cam.x+shakeX, cam.y+shakeY, cam.z, cam.tx, cam.ty, cam.tz);
+  m4mul(VP, PROJ, VIEW);
+  gl.uniformMatrix4fv(loc.uVP, false, VP);
+  gl.uniform3f(loc.uFogCol, fog[0], fog[1], fog[2]);
+  gl.uniform3f(loc.uLight, pal.light[0], pal.light[1], pal.light[2]);
+  gl.uniform1f(loc.uFogNear, W.kind === 'shaft' ? 22 : 55);
+  gl.uniform1f(loc.uFogFar, W.kind === 'shaft' ? 70 : 165);
+
+  drawStatic();
+
+  // dynamic solids
+  for (const s of W.solids) {
+    if (s.kind !== 'move' && s.kind !== 'crumble' && s.kind !== 'blink') continue;
+    if (s.gone) continue;
+    const shake = s.kind === 'crumble' && s.timer > 0 ? Math.sin(t*50)*0.09*(s.timer/0.6) : 0;
+    // a blink platform flashes just before it drops out from under you
+    const warn = s.kind === 'blink' && s.warn;
+    drawBox(s.cx+shake, s.cy, s.cz, s.hx*2, s.hy*2, s.hz*2,
+      hex(warn ? '#FFFFFF' : s.color), 0, warn ? 0.9 : 0.25);
+  }
+  // spinners
+  for (const sp of W.spinners) {
+    compose(MODEL, sp.x, sp.y, sp.z, sp.ang, 0, sp.len, 0.5, 0.75);
+    drawMesh(meshes.cube, MODEL, hex('#FF6B3D'));
+    compose(MODEL, sp.x, sp.y - 0.45, sp.z, 0, 0, 0.55, 1.2, 0.55);
+    drawMesh(meshes.cube, MODEL, hex('#4A3040'));
+  }
+  // hazards
+  for (const h of W.hazards) {
+    if (h.kind === 'fire') {
+      const k = 0.5 - 0.5*Math.cos(h.t*Math.PI*2);
+      compose(MODEL, lerp(h.ax,h.bx,k), lerp(h.ay,h.by,k) + Math.sin(t*6)*0.1, lerp(h.az,h.bz,k), 0, 0, 1.3,1.3,1.3);
+      drawMesh(meshes.ball, MODEL, hex('#FF9A2E'), 0.8);
+    }
+  }
+  // bounce pads
+  for (const p of W.pads) {
+    drawBox(p.x, p.y + 0.18 - p.t*0.13, p.z, p.hx*2, 0.36, p.hz*2, hex('#7A4BD8'));
+    drawBox(p.x, p.y + 0.38 - p.t*0.13, p.z, p.hx*1.4, 0.12, p.hz*1.4, hex('#C9A0FF'), 0, 0.5);
+  }
+  // checkpoints
+  for (const c of W.checks) {
+    drawBox(c.x + 1.7, c.y + 1.4, c.z, 0.16, 2.8, 0.16, hex('#6B5B95'));
+    drawBox(c.x + 0.95, c.y + 2.3, c.z, 1.5, 0.9, 0.1, hex(c.hit ? '#5BE7FF' : '#B7B2C7'), 0, c.hit ? 0.5 : 0);
+  }
+  // goal portal
+  if (W.goal) {
+    const g = W.goal;
+    for (let i=0;i<3;i++) {
+      const s = 3.2 + i*0.7 + Math.sin(t*2 + i)*0.16;
+      compose(MODEL, g.x, g.y + 2.1, g.z, t*0.6 + i, 0, s, s, 0.25);
+      drawMesh(meshes.cube, MODEL, i%2 ? hex('#A46BFF') : hex('#5BE7FF'), 0.85);
+    }
+    compose(MODEL, g.x, g.y + 2.1, g.z, 0, 0, 2.2, 2.2, 2.2);
+    drawMesh(meshes.ball, MODEL, hex('#FFFFFF'), 0.9);
+  }
+  // orbs
+  for (const o of W.orbs) {
+    if (o.got) continue;
+    const s = 0.85 + Math.sin(t*3 + o.x)*0.07;
+    compose(MODEL, o.x, o.y + Math.sin(t*2 + o.z)*0.18, o.z, t*1.5, 0, s,s,s);
+    drawMesh(meshes.ball, MODEL, hex('#C9A0FF'), 0.85);
+    compose(MODEL, o.x, o.y + Math.sin(t*2 + o.z)*0.18, o.z, t*1.5, 0, s*0.45, s*0.45, s*0.45);
+    drawMesh(meshes.ball, MODEL, [1,1,1], 1);
+  }
+  // salt
+  for (const s of game.salts) {
+    if (s.got > 0) continue;
+    drawBox(s.x, s.y + Math.sin(t*2)*0.12, s.z, 0.75, 1.1, 0.75, hex('#FFFFFF'), t*0.8, 0.35);
+    drawBox(s.x, s.y + 0.62 + Math.sin(t*2)*0.12, s.z, 0.55, 0.2, 0.55, hex('#C7CBD8'), t*0.8);
+  }
+  if (game.mode === 'snail') {
+    for (const s of game.soldiers) drawSoldier(s, t);
+    for (const b of game.bullets) {
+      compose(MODEL, b.x, b.y, b.z, 0, 0, 0.34, 0.34, 0.34);
+      drawMesh(meshes.ball, MODEL, b.mine ? [1,1,1] : hex('#BFE8FF'), 1);
+    }
+    if (game.snail && game.snail.dead <= 0) drawSnail(game.snail);
+    drawShield(t);
+  }
+  if (W.npc) drawDevilNpc(W.npc, t);
+
+  // infinity crusher
+  if (W.kind === 'shaft') {
+    const y = W.crusherY;
+    drawBox(0, y + 3.2, 0, SHAFT+4, 6, SHAFT+4, hex('#2A1140'));
+    for (let ix=-3; ix<=3; ix++) for (let iz=-3; iz<=3; iz++) {
+      compose(MODEL, ix*4, y - 0.7, iz*4, 0, Math.PI, 3.4, 1.6, 3.4);
+      drawMesh(meshes.pyr, MODEL, hex('#C9A0FF'), 0.25);
+    }
+  }
+
+  // player
+  const p = game.player;
+  if (p && game.dead <= 0) {
+    drawCharacter(p.x, p.y, p.z, p.yaw, save.skin, p.walk, p.squash, !p.onGround);
+  }
+
+  // particles
+  for (const q of game.particles) {
+    const a = clamp(q.life/q.max, 0, 1);
+    compose(MODEL, q.x, q.y, q.z, 0, 0, q.size*a*2, q.size*a*2, q.size*a*2);
+    drawMesh(meshes.cube, MODEL, hex(q.c), 0.8);
+  }
+}
+
+/* =========================================================================
+   16. HUD (2D canvas on top)
+   ========================================================================= */
+const hudcv = document.getElementById('hud');
+const H = hudcv.getContext('2d');
+const HW = 960, HH = 540, HSCALE = 1280/960;
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), r = s - m*60;
+  return m > 0 ? m + ':' + (r<10?'0':'') + r.toFixed(1) : r.toFixed(1) + 's';
+}
+function rr2(x,y,w,h,r) {
+  H.beginPath();
+  H.moveTo(x+r,y); H.arcTo(x+w,y,x+w,y+h,r); H.arcTo(x+w,y+h,x,y+h,r);
+  H.arcTo(x,y+h,x,y,r); H.arcTo(x,y,x+w,y,r); H.closePath();
+}
+function project(x,y,z) {
+  const w = VP[3]*x + VP[7]*y + VP[11]*z + VP[15];
+  if (w <= 0.01) return null;
+  const cx = (VP[0]*x + VP[4]*y + VP[8]*z + VP[12]) / w;
+  const cy = (VP[1]*x + VP[5]*y + VP[9]*z + VP[13]) / w;
+  return { x: (cx*0.5+0.5)*HW, y: (1 - (cy*0.5+0.5))*HH };
+}
+
+function drawHUD(t) {
+  H.setTransform(HSCALE,0,0,HSCALE,0,0);
+  H.clearRect(0,0,HW,HH);
+  if (game.screen !== 'play' && game.screen !== 'pause') return;
+
+  H.textAlign = 'left';
+  H.font = 'bold 21px "Trebuchet MS", sans-serif';
+  H.fillStyle = 'rgba(18,16,31,.6)';
+  rr2(14,12,150,38,12); H.fill();
+  H.fillStyle = '#C9A0FF';
+  H.beginPath(); H.arc(38,31,9,0,6.284); H.fill();
+  H.fillStyle = '#fff';
+  H.beginPath(); H.arc(38,31,3.5,0,6.284); H.fill();
+  H.fillStyle = '#fff';
+  H.fillText(game.mode === 'obby' ? game.runOrbs + ' / ' + game.world.totalOrbs : String(game.runOrbs), 58, 39);
+
+  // No fuel gauge any more: the wings are either dead or endless, and a bar that
+  // only ever reads full or empty tells you nothing. The white flare is the tell.
+
+  // the one emergency recovery, lit while you still have it
+  if (game.player) {
+    H.textAlign = 'left';
+    H.font = 'bold 15px "Trebuchet MS", sans-serif';
+    H.globalAlpha = game.player.saves > 0 ? 1 : 0.28;
+    H.fillStyle = 'rgba(18,16,31,.55)';
+    rr2(14, 54, 62, 26, 9); H.fill();
+    H.fillStyle = game.player.saves > 0 ? '#FFD166' : '#8A8AA0';
+    H.fillText('🆘 G', 24, 72);
+    H.globalAlpha = 1;
+  }
+
+  let label = 'TIME', big = fmtTime(game.time);
+  if (game.mode === 'snail') label = 'SURVIVED';
+  if (game.mode === 'infinity') { label = 'DEPTH'; big = game.depth + ' m'; }
+  H.textAlign = 'right';
+  H.fillStyle = 'rgba(18,16,31,.6)';
+  rr2(HW-250,12,150,38,12); H.fill();
+  H.font = 'bold 11px "Trebuchet MS", sans-serif';
+  H.fillStyle = 'rgba(255,255,255,.62)';
+  H.fillText(label, HW-114, 26);
+  H.font = 'bold 20px "Trebuchet MS", sans-serif';
+  H.fillStyle = '#fff';
+  H.fillText(big, HW-114, 44);
+  H.font = 'bold 12px "Trebuchet MS", sans-serif';
+  H.fillStyle = 'rgba(255,255,255,.78)';
+  H.fillText(game.mode === 'obby' ? '💀 ' + game.deaths
+    : game.mode === 'snail' ? '🏆 ' + fmtTime(save.best.snail||0)
+    : '🏆 ' + (save.best.depth||0) + ' m', HW-114, 62);
+
+  // progress bar for obby
+  if (game.mode === 'obby' && game.world.endZ) {
+    const pr = clamp(game.player.z / game.world.endZ, 0, 1);
+    H.fillStyle = 'rgba(18,16,31,.5)';
+    rr2(HW/2-140, 16, 280, 14, 7); H.fill();
+    H.fillStyle = '#5BE7FF';
+    rr2(HW/2-138, 18, 276*pr, 10, 5); H.fill();
+    H.textAlign = 'center';
+    H.font = 'bold 11px "Trebuchet MS", sans-serif';
+    H.fillStyle = '#fff';
+    H.fillText(Math.round(pr*100) + '%', HW/2, 44);
+  }
+
+  // ---- killer snail: hearts, ammo, shield, wave, boss bar ----
+  if (game.mode === 'snail') {
+    const p = game.player, sn = game.snail, alive = sn && sn.dead <= 0;
+
+    // hearts
+    H.textAlign = 'left';
+    H.font = 'bold 24px "Trebuchet MS", sans-serif';
+    for (let i = 0; i < game.maxHp; i++) {
+      H.globalAlpha = i < game.hp ? (game.iframe > 0 && i === game.hp ? 0.5 : 1) : 0.25;
+      H.fillText('❤️', 18 + i*30, 84);
+    }
+    H.globalAlpha = 1;
+
+    // salt ammo
+    H.fillStyle = 'rgba(18,16,31,.6)';
+    rr2(14, 96, 132, 32, 10); H.fill();
+    H.font = 'bold 18px "Trebuchet MS", sans-serif';
+    H.fillStyle = game.ammo > 0 ? '#fff' : '#FF8A8A';
+    H.fillText('🧂 ' + game.ammo, 26, 118);
+    H.font = 'bold 11px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.55)';
+    H.fillText('Z', 122, 118);
+
+    // shield battery
+    H.fillStyle = 'rgba(18,16,31,.6)';
+    rr2(14, 134, 132, 30, 10); H.fill();
+    H.fillStyle = 'rgba(255,255,255,.18)';
+    rr2(24, 146, 82, 8, 4); H.fill();
+    H.fillStyle = game.shield < 0.25 ? '#FF7A7A' : '#5BE7FF';
+    rr2(24, 146, 82*game.shield, 8, 4); H.fill();
+    H.font = 'bold 11px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.75)';
+    H.fillText('🛡', 24, 144);
+    H.fillStyle = game.tpCd > 0 ? 'rgba(255,255,255,.4)' : '#FFD166';
+    H.fillText(game.tpCd > 0 ? 'T ' + Math.ceil(game.tpCd) + 's' : 'T ready', 112, 154);
+
+    // wave + boss bar live along the bottom, clear of the banner and the sticks
+    H.textAlign = 'center';
+    H.font = 'bold 13px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.8)';
+    H.fillText('WAVE ' + game.wave + '   ·   🐌 ' + game.kills + ' down', HW/2, HH-66);
+
+    if (alive) {
+      const w = 300, x = HW/2 - w/2, y = HH-56;
+      H.fillStyle = 'rgba(18,16,31,.6)';
+      rr2(x-6, y, w+12, 22, 8); H.fill();
+      H.fillStyle = 'rgba(255,255,255,.16)';
+      rr2(x, y+5, w, 12, 6); H.fill();
+      H.fillStyle = sn.hp/sn.maxHp < 0.3 ? '#FF6B6B' : '#9BE58A';
+      rr2(x, y+5, w*clamp(sn.hp/sn.maxHp,0,1), 12, 6); H.fill();
+      H.font = 'bold 10px "Trebuchet MS", sans-serif';
+      H.fillStyle = '#fff';
+      H.fillText('KILLER SNAIL  ' + Math.ceil(sn.hp), HW/2, y+15);
+    }
+
+    if (game.inSafe && game.shield > 0.02) {
+      H.font = 'bold 15px "Trebuchet MS", sans-serif';
+      H.fillStyle = 'rgba(91,231,255,.95)';
+      H.fillText('🏠 SAFEHOUSE — shield holding', HW/2, HH-92);
+    } else if (game.inSafe) {
+      H.font = 'bold 15px "Trebuchet MS", sans-serif';
+      H.fillStyle = 'rgba(255,122,122,.95)';
+      H.fillText('⚠ SHIELD DOWN — it can get in!', HW/2, HH-92);
+    }
+
+    if (alive) {
+      const d = Math.hypot(p.x-sn.x, p.y-sn.y, p.z-sn.z);
+      const safe = game.inSafe && game.shield > 0.02;
+      if (d < 16 && !safe) {
+        const a = clamp((16-d)/16, 0, 1);
+        H.fillStyle = 'rgba(255,60,60,' + (a*0.30) + ')';
+        H.fillRect(0,0,HW,HH);
+        if (sn.atk > 0) {
+          H.textAlign = 'center';
+          H.font = 'bold 27px "Trebuchet MS", sans-serif';
+          H.fillStyle = 'rgba(255,255,255,' + a + ')';
+          H.fillText('🔪 IT IS SWINGING — MOVE!', HW/2, 152);
+        }
+      }
+      const sp = project(sn.x, sn.y+1.5, sn.z);
+      if (!sp || sp.x < 0 || sp.x > HW || sp.y < 0 || sp.y > HH) {
+        H.textAlign = 'center';
+        H.font = 'bold 15px "Trebuchet MS", sans-serif';
+        H.fillStyle = 'rgba(155,229,138,.95)';
+        const ax = sp ? clamp(sp.x, 40, HW-40) : HW/2, ay = sp ? clamp(sp.y, 40, HH-40) : 60;
+        H.beginPath(); H.arc(ax, ay, 19, 0, 6.284); H.fill();
+        H.fillStyle = '#1E1B33';
+        H.fillText('🐌', ax, ay+6);
+      }
+    }
+  }
+
+  // infinity danger tint
+  if (game.mode === 'infinity') {
+    const gap = game.world.crusherY - game.player.y;
+    const danger = clamp(1 - gap/18, 0, 1);
+    if (danger > 0.25) {
+      H.fillStyle = 'rgba(164,107,255,' + ((danger-0.25)*0.5) + ')';
+      H.fillRect(0,0,HW,HH);
+    }
+  }
+
+  // the devil's line, drawn as a speech bubble over his head
+  if (game.speech && game.speech.t > 0) {
+    const s = game.speech;
+    const sn = game.snail;
+    // the snail's lines follow it around; the devil's stay put
+    const wx = s.snail && sn ? sn.x : s.x;
+    const wy = s.snail && sn ? sn.y + 3.2 : s.y;
+    const wz = s.snail && sn ? sn.z : s.z;
+    const pt = (s.snail && (!sn || sn.dead > 0)) ? null : project(wx, wy, wz);
+    if (pt) {
+      const a = clamp(s.t, 0, 1);
+      const green = s.snail || s.green;
+      const bg = green ? 'rgba(6,26,10,.88)' : 'rgba(20,4,10,.88)';
+      const edge = green ? '#9BE58A' : '#FF6B3D';
+      const ink = green ? '#DDFFCF' : '#FF9A5A';
+      H.textAlign = 'center';
+      H.font = 'bold 26px "Trebuchet MS", sans-serif';
+      const w = H.measureText(s.text).width + 40;
+      H.globalAlpha = a;
+      H.fillStyle = bg;
+      rr2(pt.x - w/2, pt.y - 46, w, 50, 14); H.fill();
+      H.strokeStyle = edge; H.lineWidth = 3;
+      rr2(pt.x - w/2, pt.y - 46, w, 50, 14); H.stroke();
+      H.beginPath();
+      H.moveTo(pt.x-10, pt.y+3); H.lineTo(pt.x+10, pt.y+3); H.lineTo(pt.x, pt.y+18);
+      H.closePath(); H.fillStyle = bg; H.fill();
+      H.fillStyle = ink;
+      H.fillText(s.text, pt.x, pt.y - 12);
+      H.globalAlpha = 1;
+    }
+  }
+
+  if (game.banner && game.banner.t > 0) {
+    const a = clamp(game.banner.t, 0, 1);
+    H.globalAlpha = a;
+    H.textAlign = 'center';
+    H.fillStyle = 'rgba(18,16,31,.62)';
+    rr2(HW/2-215, 74, 430, 54, 16); H.fill();
+    H.font = 'bold 32px "Trebuchet MS", sans-serif';
+    H.fillStyle = '#fff';
+    H.fillText(game.banner.text, HW/2, 112);
+    H.globalAlpha = 1;
+  }
+
+  if (game.flash > 0) {
+    H.fillStyle = 'rgba(255,80,80,' + (game.flash*0.55) + ')';
+    H.fillRect(0,0,HW,HH);
+  }
+
+  if (game.time < 6 && game.mode === 'obby') {
+    H.textAlign = 'center';
+    H.font = 'bold 15px "Trebuchet MS", sans-serif';
+    H.fillStyle = 'rgba(255,255,255,.85)';
+    H.fillText(TOUCH ? 'joystick to move · JUMP to jump · drag the screen to look around'
+                     : 'W A S D to move · SPACE to jump · drag or Q/E to turn the camera', HW/2, HH-24);
+  }
+
+  if (game.debug) drawDebug();
+}
+
+/* ---- debug overlay: F3, or the 🐞 button on the pause screen ---- */
+function drawDebug() {
+  const p = game.player, W = game.world;
+  const n = v => (v >= 0 ? ' ' : '') + v.toFixed(2);
+  const lines = [
+    'fps ' + fps + '   step ' + (STEP*1000).toFixed(1) + 'ms',
+    'mode ' + game.mode + (game.levelId ? ' / ' + game.levelId : '') + '   screen ' + game.screen
+  ];
+  if (W) lines.push('world ' + W.kind + '  solids ' + W.solids.length +
+      '  hazards ' + W.hazards.length + '  parts ' + game.particles.length,
+    'slip ' + (W.slip||0) + '   gravity ' + (W.gravity||1) +
+      (W.zone ? '   zone ' + W.zone.theme : '') + (W.troll ? '   TROLL' : ''));
+  if (p) lines.push(
+    'pos ' + n(p.x) + n(p.y) + n(p.z),
+    'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
+    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.ascending ? '  ASCENT' : p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
+      '  airJumps ' + p.airJumps +
+      '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
+    'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
+  lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));
+  if (game.mode === 'obby') lines.push('z ' + (p ? p.z.toFixed(1) : '-') + ' / ' + (W && W.endZ || 0) +
+    '   orbs ' + game.runOrbs + '/' + (W && W.totalOrbs) + '   deaths ' + game.deaths);
+  if (game.mode === 'snail' && game.snail) lines.push(
+    'snail hp ' + Math.ceil(game.snail.hp) + '/' + game.snail.maxHp +
+    '  dist ' + Math.hypot(p.x-game.snail.x, p.z-game.snail.z).toFixed(1) +
+    '  wave ' + game.wave, 'hp ' + game.hp + '  ammo ' + game.ammo +
+    '  shield ' + game.shield.toFixed(2) + '  safe ' + (game.inSafe ? 'yes' : 'no'));
+  if (game.mode === 'infinity' && W) lines.push('depth ' + game.depth +
+    '   crusher gap ' + (W.crusherY - p.y).toFixed(1) + '   layers ' + W.nextLayer);
+  lines.push('aura ' + save.orbs + '   skin ' + save.skin + '   powers ' + (save.powers.join(',') || '-'));
+  const errs = Oops.total();
+  if (errs) lines.push('ERRORS ' + errs + ': ' + Oops.last());
+
+  H.textAlign = 'left';
+  H.font = '12px ui-monospace, Menlo, Consolas, monospace';
+  const w = 300, h = lines.length*15 + 12;
+  H.fillStyle = 'rgba(0,0,0,.62)';
+  rr2(8, HH - h - 8, w, h, 8); H.fill();
+  lines.forEach((s, i) => {
+    H.fillStyle = s.indexOf('ERRORS') === 0 ? '#FF9A9A' : '#9BE58A';
+    H.fillText(s, 16, HH - h + 8 + i*15);
+  });
+}
+
+/* =========================================================================
+   17. LEVEL START / MAIN LOOP
+   ========================================================================= */
+function bakeStatic(W) {
+  const batch = StaticBatch();
+  const M = m4();
+  for (const s of W.solids) {
+    if (s.kind === 'move' || s.kind === 'crumble' || s.kind === 'blink') continue;
+    compose(M, s.cx, s.cy, s.cz, 0, 0, s.hx*2, s.hy*2, s.hz*2);
+    batch.add(meshes.cube, M, hex(s.color));
+  }
+  for (const h of W.hazards) {
+    if (h.kind === 'lava') {
+      compose(M, h.cx, h.cy, h.cz, 0, 0, h.hx*2, h.hy*2, h.hz*2);
+      batch.add(meshes.cube, M, hex('#FF4A10'));
+    } else if (h.kind === 'spike') {
+      const n = Math.max(1, Math.round(h.hx));
+      for (let i=0;i<n;i++) for (let j=0;j<n;j++) {
+        const sx = h.cx - h.hx + (i+0.5)*(h.hx*2/n);
+        const sz = h.cz - h.hz + (j+0.5)*(h.hz*2/n);
+        compose(M, sx, h.cy, sz, 0, 0, h.hx*2/n*0.9, h.hy*2.4, h.hz*2/n*0.9);
+        batch.add(meshes.pyr, M, hex('#C7D0E8'));
+      }
+    }
+  }
+  uploadStatic(batch);
+}
+// the shaft grows as you fall, so its static mesh is rebuilt as needed
+function rebakeIfNeeded(W) {
+  if (W.kind !== 'shaft') return;
+  if (W.bakedLayer !== W.nextLayer || W.bakedCut !== W.solids.length) {
+    W.bakedLayer = W.nextLayer; W.bakedCut = W.solids.length;
+    bakeStatic(W);
+  }
+}
+
+function startLevel(id) {
+  const cfg = LEVELS[levelIndex(id)];
+  game.mode = 'obby'; game.levelId = id;
+  game.world = buildCourse(cfg);
+  resetRun();
+  bakeStatic(game.world);
+  game.banner = { text: cfg.emoji + '  ' + cfg.name, t: 2.2 };
+  showScreen('play');
+}
+function startSnail() {
+  game.mode = 'snail'; game.levelId = null;
+  game.world = buildArena();
+  resetRun();
+  game.world.orbs = game.world.orbSpots.map(s => ({ x:s.x, y:s.y, z:s.z, got:false }));
+  game.salts = game.world.saltSpots.map(s => ({ x:s.x, y:s.y, z:s.z, got:0 }));
+  game.wave = 1; game.kills = 0;
+  game.snail = spawnSnail(1);
+  game.soldiers = makeSoldiers();
+  game.hp = game.maxHp; game.iframe = 0; game.ammo = 14;
+  game.bullets = []; game.shield = 1; game.inSafe = false;
+  game.tpCd = 0; game.shootCd = 0; game.meleeCd = 0; game.swing = 0; game.snailRespawn = 0;
+  game.orbTimer = 0;
+  cam.yaw = 0;                     // start looking at the safehouse
+  snapCamera();
+  bakeStatic(game.world);
+  game.banner = { text:'🐌  FIGHT BACK!  Z = salt · K = swing · T = safehouse', t:3.4 };
+  showScreen('play');
+}
+function startInfinity() {
+  game.mode = 'infinity'; game.levelId = null;
+  game.world = buildShaft();
+  resetRun();
+  game.depth = 0;
+  bakeStatic(game.world);
+  game.banner = { text:'♾️  GO DOWN!', t:2.0 };
+  showScreen('play');
+}
+function resetRun() {
+  game.player = makePlayer(game.world.spawn);
+  game.time = 0; game.runOrbs = 0; game.deaths = 0;
+  game.dead = 0; game.won = false; game.flash = 0; game.shake = 0;
+  game.particles.length = 0; game.speech = null;
+  if (game.mode !== 'snail') {
+    game.snail = null; game.salts = []; game.soldiers = []; game.bullets = [];
+  }
+  cam.yaw = Math.PI;          // courses run toward +Z, so start looking that way
+  cam.pitch = 0.38;
+  snapCamera();
+}
+function restartCurrent() {
+  if (game.mode === 'obby') startLevel(game.levelId);
+  else if (game.mode === 'snail') startSnail();
+  else startInfinity();
+}
+
+function update(dt) {
+  game.shake = Math.max(0, game.shake - dt*40);
+  game.flash = Math.max(0, game.flash - dt*2);
+  if (game.banner) game.banner.t -= dt;
+  if (game.speech) game.speech.t -= dt;
+  stepParticles(dt);
+  for (const h of game.world.hazards) if (h.kind === 'fire') {
+    const len = Math.hypot(h.bx-h.ax, h.by-h.ay, h.bz-h.az) || 1;
+    h.t += dt * h.spd / (2*len);
+  }
+  if (game.dead > 0) { game.dead -= dt; if (game.dead <= 0) afterDeath(); return; }
+  if (game.won) return;
+
+  game.time += dt;
+  if (game.mode === 'obby') updateObby(dt);
+  else if (game.mode === 'snail') updateSnail(dt);
+  else updateInfinity(dt);
+  updateCamera(dt, false);
+}
+
+const STEP = 1/120;
+let acc = 0, last = 0, fps = 0, fpsT = 0, fpsN = 0;
+function frame(ts) {
+  requestAnimationFrame(frame);
+  // A throw in here would kill requestAnimationFrame and freeze the game with no
+  // clue why. Catch it, put it on the screen, and keep the loop alive.
+  try { step(ts); } catch (err) { Oops.report('loop: ' + (err && err.message || err)); }
+}
+function step(ts) {
+  if (!last) last = ts;
+  let dt = (ts - last)/1000; last = ts;
+  if (dt > 0.25) dt = 0.25;
+
+  fpsN++; fpsT += dt;
+  if (fpsT >= 0.5) { fps = Math.round(fpsN/fpsT); fpsN = 0; fpsT = 0; }
+
+  if (game.screen === 'play') {
+    readKeys();
+    acc += dt;
+    let guard = 0;
+    while (acc >= STEP && guard++ < 240) { update(STEP); acc -= STEP; }
+    rebakeIfNeeded(game.world);
+  } else { acc = 0; input.jumpPressed = false; }
+
+  if (gl) {
+    gl.viewport(0,0,glcv.width,glcv.height);
+    if (game.world && (game.screen === 'play' || game.screen === 'pause' || game.screen === 'result')) {
+      drawWorld(performance.now()/1000);
+    } else {
+      gl.clearColor(0.07,0.06,0.12,1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    }
+  }
+  drawHUD(performance.now()/1000);
+}
+
+/* =========================================================================
+   18. UI
+   ========================================================================= */
+const panel = document.getElementById('panel');
+const screens = {
+  menu: document.getElementById('scrMenu'), levels: document.getElementById('scrLevels'),
+  shop: document.getElementById('scrShop'), help: document.getElementById('scrHelp'),
+  board: document.getElementById('scrBoard'), profile: document.getElementById('scrProfile'),
+  pause: document.getElementById('scrPause'), result: document.getElementById('scrResult')
+};
+function showScreen(name) {
+  game.screen = name;
+  touchWrap.classList.toggle('war', game.mode === 'snail');   // salt/swing/teleport buttons
+  Music.play(songFor());                                      // each level has its own song
+  if (name === 'play') { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  for (const k in screens) screens[k].classList.toggle('on', k === name);
+  if (name === 'menu') {
+    document.getElementById('menuOrbs').textContent = save.orbs;
+    document.getElementById('menuWho').textContent = (save.name || '').trim()
+      ? '👤 saving as ' + save.name.trim()
+      : 'not saving under a nickname yet';
+  }
+  if (name === 'levels') renderLevels();
+  if (name === 'shop') renderShop();
+  if (name === 'board') renderBoard();
+  if (name === 'profile') renderProfile();
+}
+function resume() { showScreen('play'); }
+
+function renderLevels() {
+  const boxEl = document.getElementById('levelCards');
+  boxEl.innerHTML = '';
+  LEVELS.forEach((L,i) => {
+    const un = levelUnlocked(i), best = save.best[L.id];
+    const d = document.createElement('div');
+    d.className = 'card' + (un ? '' : ' locked');
+    d.innerHTML = '<div class="em">' + (un ? L.emoji : '🔒') + '</div>' +
+      '<div class="nm">' + L.name + '</div>' +
+      '<div class="sub">' + (un ? L.blurb : 'Clear ' + LEVELS[i-1].name + ' first') + '</div>' +
+      '<div class="sub">' + (save.cleared[L.id] ? '✅ cleared' : '—') + (best ? ' · ⏱ ' + fmtTime(best) : '') + '</div>';
+    if (un) d.onclick = () => startLevel(L.id);
+    boxEl.appendChild(d);
+  });
+}
+
+// "🏆 2nd on this device" under a result, or nothing if it missed the top 5
+function rankLine(rank, what) {
+  if (!rank) return '';
+  const medal = ['🥇','🥈','🥉','4️⃣','5️⃣'][rank-1] || '';
+  const ord = ['1st','2nd','3rd','4th','5th'][rank-1];
+  return '<br>' + medal + ' <b>' + ord + ' on this device</b>' + (what ? ' ' + what : '');
+}
+
+/* ---- nickname screen ------------------------------------------------- */
+// names are typed by people and can come back from the internet, so they never
+// go into innerHTML as-is
+const safeName = n => String(n).replace(/[<>&]/g, '');
+
+function profileStatus() {
+  const n = (save.name || '').trim();
+  if (!n || !profileKey) return 'No nickname yet. Put one in and this game becomes yours.';
+  if (syncState === 'saving')  return '⏳ saving ' + n + '…';
+  if (syncState === 'saved')   return '🌍 saved as ' + n + ' — type that on any computer to carry on';
+  if (syncState === 'offline') return '📱 saved as ' + n + ' on this computer (the internet copy is not reachable)';
+  return '📱 saved as ' + n + ' on this computer';
+}
+// safe to call at any time — the sync code calls it whether or not you are looking
+function paintProfile() {
+  const el = document.getElementById('profWhere');
+  if (el) el.textContent = profileStatus();
+  const who = document.getElementById('menuWho');
+  if (who) who.textContent = (save.name || '').trim()
+    ? '👤 saving as ' + save.name.trim() : 'not saving under a nickname yet';
+}
+function renderProfile() {
+  document.getElementById('profIn').value = save.name || '';
+  paintProfile();
+  const box = document.getElementById('profList');
+  box.innerHTML = '';
+  const rows = Profiles.list();
+  if (!rows.length) return;
+  const head = document.createElement('div');
+  head.style.cssText = 'font-size:12px;opacity:.6;margin:12px 0 4px';
+  head.textContent = 'nicknames used on this computer';
+  box.appendChild(head);
+  rows.forEach(r => {
+    const d = Profiles.read(r.key) || {};
+    const levels = Object.keys(d.cleared || {}).filter(k => d.cleared[k]).length;
+    const here = r.key === profileKey;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(255,255,255,' +
+      (here ? '.16' : '.08') + ');border-radius:12px;padding:8px 12px;margin:6px 0;text-align:left';
+    row.innerHTML = '<div style="flex:1"><b>' + (here ? '👤 ' : '') + safeName(r.name) + '</b>' +
+      '<div style="font-size:12px;opacity:.7">💠 ' + (d.orbs|0) + ' aura · ' +
+      levels + ' level' + (levels === 1 ? '' : 's') + ' cleared</div></div>';
+    const use = document.createElement('button');
+    use.textContent = here ? 'playing' : 'play as';
+    use.style.cssText = 'font-size:13px;min-width:0;padding:6px 12px';
+    use.disabled = here;
+    if (here) use.style.opacity = '.5';
+    use.onclick = () => useProfile(r.name, () => renderProfile());
+    const del = document.createElement('button');
+    del.className = 'ghost';
+    del.textContent = '🗑️';
+    del.style.cssText = 'font-size:13px;min-width:0;padding:6px 10px';
+    del.onclick = () => {
+      if (!confirm('Forget "' + r.name + '" on this computer? If it was saved on the internet you can get it back by typing the nickname again.')) return;
+      Profiles.remove(r.key);
+      renderProfile();
+    };
+    row.appendChild(use); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+let boardMode = 'online';          // flips to 'local' on its own if the cloud is not there
+let boardCache = null;             // last online fetch, so switching back is instant
+
+function renderBoard() {
+  const nameIn = document.getElementById('nameIn');
+  nameIn.value = save.name || '';
+  const where = document.getElementById('boardWhere');
+  const online = boardMode === 'online';
+  document.getElementById('btnBoardOnline').style.opacity = online ? '1' : '.5';
+  document.getElementById('btnBoardLocal').style.opacity = online ? '.5' : '1';
+
+  if (online) {
+    if (!cloud()) {
+      where.textContent = window.__cloudError
+        ? '🌍 offline — showing this device instead'
+        : '🌍 connecting…';
+      paintBoard(null);
+      return;
+    }
+    where.textContent = '🌍 everyone, from every device';
+    paintBoard(boardCache);
+    Promise.all(boardList().map(b => cloud().top(cloudId(b.id)).catch(() => null)))
+      .then(res => {
+        boardCache = {};
+        boardList().forEach((b, i) => { boardCache[b.id] = res[i]; });
+        if (game.screen === 'board' && boardMode === 'online') paintBoard(boardCache);
+      });
+  } else {
+    where.textContent = '📱 only the scores set on this device';
+    paintBoard(null);
+  }
+}
+
+// rows = null means read from the local store
+function paintBoard(rows) {
+  const box = document.getElementById('boardList');
+  box.innerHTML = '';
+  boardList().forEach(b => {
+    const src = rows ? rows[b.id] : Scores.top(b.id);
+    const list = (src || []).slice().sort((a, c) => b.lower ? a.v - c.v : c.v - a.v).slice(0, 5);
+    renderOneBoard(box, b, list, rows && !src);
+  });
+}
+
+function renderOneBoard(box, b, rows, loading) {
+  {
+    const d = document.createElement('div');
+    d.style.cssText = 'background:rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;margin:8px 0;text-align:left';
+    let html = '<div style="font-weight:bold;font-size:15px">' + b.name +
+      ' <span style="opacity:.65;font-weight:normal;font-size:12px">' + b.sub + '</span></div>';
+    if (loading) {
+      html += '<div style="opacity:.5;font-size:13px;padding:4px 0">loading…</div>';
+    } else if (!rows.length) {
+      html += '<div style="opacity:.5;font-size:13px;padding:4px 0">nobody yet — go and set one</div>';
+    } else {
+      html += '<table style="width:100%;font-size:13px;border-collapse:collapse">';
+      rows.forEach((r, i) => {
+        const me = r.n === playerName();
+        html += '<tr style="' + (me ? 'color:#FFD166;font-weight:bold' : '') + '">' +
+          '<td style="padding:2px 0;width:26px">' + (['🥇','🥈','🥉','4','5'][i] || '') + '</td>' +
+          '<td>' + safeName(r.n) + '</td>' +
+          '<td style="text-align:right">' + b.fmt(r.v) + '</td></tr>';
+      });
+      html += '</table>';
+    }
+    d.innerHTML = html;
+    box.appendChild(d);
+  }
+}
+
+function renderShop() {
+  document.getElementById('shopOrbs').textContent = save.orbs;
+
+  const powEl = document.getElementById('shopPowers');
+  powEl.innerHTML = '';
+  POWERS.forEach(pw => {
+    const owned = hasPower(pw.id);
+    const d = document.createElement('div');
+    d.className = 'card' + (owned ? ' equipped' : '');
+    d.innerHTML = '<div class="em">' + pw.em + '</div>' +
+      '<div class="nm">' + pw.name + '</div>' +
+      '<div class="sub">' + pw.desc + '</div>' +
+      '<div class="sub">' + (owned ? '✅ unlocked' : '💠 ' + pw.price) + '</div>';
+    if (!owned) d.onclick = () => {
+      if (save.orbs >= pw.price) {
+        save.orbs -= pw.price; save.powers.push(pw.id);
+        persist(); Sound.unlock(); renderShop();
+      } else d.animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], 220);
+    };
+    powEl.appendChild(d);
+  });
+
+  const boxEl = document.getElementById('shopCards');
+  boxEl.innerHTML = '';
+  SKINS.forEach(sk => {
+    const owned = ownsSkin(sk.id), equipped = save.skin === sk.id;
+    const locked = !owned && sk.price < 0;
+    const d = document.createElement('div');
+    d.className = 'card' + (equipped ? ' equipped' : '') + (locked ? ' locked' : '');
+    d.innerHTML = '<div class="em">' + (locked ? '🔒' : sk.em) + '</div>' +
+      '<div class="nm">' + sk.name + '</div>' +
+      '<div class="sub">' + sk.desc + '</div>' +
+      '<div class="sub">' + (equipped ? '⭐ equipped' : owned ? 'tap to wear'
+        : sk.price < 0 ? '🔒 locked' : '💠 ' + sk.price) + '</div>';
+    if (!locked) d.onclick = () => {
+      if (owned) { save.skin = sk.id; persist(); Sound.check(); renderShop(); }
+      else if (save.orbs >= sk.price) {
+        save.orbs -= sk.price; save.owned.push(sk.id); save.skin = sk.id;
+        persist(); Sound.unlock(); renderShop();
+      } else d.animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], 220);
+    };
+    boxEl.appendChild(d);
+  });
+}
+
+function showResult(title, body, nextLabel) {
+  document.getElementById('resTitle').innerHTML = title;
+  document.getElementById('resBody').innerHTML = body;
+  const nb = document.getElementById('btnResNext');
+  if (nextLabel) { nb.style.display = ''; nb.textContent = '➡ ' + nextLabel; } else nb.style.display = 'none';
+  showScreen('result');
+}
+
+document.getElementById('btnObby').onclick = () => showScreen('levels');
+document.getElementById('btnSnail').onclick = startSnail;
+document.getElementById('btnInf').onclick = startInfinity;
+document.getElementById('btnShop').onclick = () => showScreen('shop');
+document.getElementById('btnHelp').onclick = () => showScreen('help');
+document.getElementById('btnBoard').onclick = () => showScreen('board');
+document.getElementById('btnBoardBack').onclick = () => showScreen('menu');
+document.getElementById('btnBoardClear').onclick = () => {
+  if (confirm('Clear the scores kept on this device? The online board is not touched.')) {
+    Scores.clear(); renderBoard();
+  }
+};
+document.getElementById('btnBoardOnline').onclick = () => { boardMode = 'online'; renderBoard(); };
+document.getElementById('btnBoardLocal').onclick  = () => { boardMode = 'local';  renderBoard(); };
+// the SDK finishes loading after the menu is already up
+for (const ev of ['cloud-ready','cloud-fail']) {
+  addEventListener(ev, () => {
+    if (game.screen === 'board') renderBoard();
+    // a returning player: now that the internet is there, go and get their save
+    if (profileKey && game.screen !== 'play') useProfile(save.name, () => {
+      if (game.screen === 'profile') renderProfile();
+    });
+    else paintProfile();
+  });
+}
+// typing is not committing — the name only becomes the save slot when you leave
+// the box or press enter, so half-typed names never claim one
+document.getElementById('nameIn').oninput = e => {
+  save.name = e.target.value.slice(0, 10); persistLocal();
+};
+document.getElementById('nameIn').onchange = e => useProfile(e.target.value, () => renderBoard());
+
+document.getElementById('btnProfile').onclick  = () => showScreen('profile');
+document.getElementById('btnProfBack').onclick = () => showScreen('menu');
+document.getElementById('btnProfUse').onclick  = () => {
+  useProfile(document.getElementById('profIn').value, () => renderProfile());
+};
+document.getElementById('profIn').onkeydown = e => {
+  if (e.key === 'Enter') document.getElementById('btnProfUse').click();
+};
+document.getElementById('btnLvlBack').onclick = () => showScreen('menu');
+document.getElementById('btnShopBack').onclick = () => showScreen('menu');
+document.getElementById('btnHelpBack').onclick = () => showScreen('menu');
+document.getElementById('btnResume').onclick = resume;
+document.getElementById('btnRetry').onclick = restartCurrent;
+document.getElementById('btnQuit').onclick = () => { game.world = null; showScreen('menu'); };
+document.getElementById('btnResAgain').onclick = restartCurrent;
+document.getElementById('btnResMenu').onclick = () => { game.world = null; showScreen('menu'); };
+document.getElementById('btnResNext').onclick = () => {
+  const i = levelIndex(game.levelId);
+  if (game.mode === 'obby' && LEVELS[i+1]) startLevel(LEVELS[i+1].id); else showScreen('menu');
+};
+
+// Real fullscreen where the browser has it, so the address bar and system chrome go
+// away too. iPhone Safari has no element fullscreen, so it falls back to .big, which
+// only fills the browser window.
+function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+function lockLandscape() {
+  if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{});
+}
+function toggleFull() {
+  if (fsElement()) {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) exit.call(document);
+    stage.classList.remove('big');
+    return;
+  }
+  if (stage.classList.contains('big')) { stage.classList.remove('big'); return; }
+  const req = stage.requestFullscreen || stage.webkitRequestFullscreen;
+  if (req) {
+    const r = req.call(stage);
+    if (r && r.then) r.then(lockLandscape).catch(() => { stage.classList.add('big'); });
+    else lockLandscape();
+  } else {
+    stage.classList.add('big');                 // no element fullscreen here
+  }
+}
+// Esc or the system gesture can leave fullscreen without going through the button
+for (const ev of ['fullscreenchange','webkitfullscreenchange']) {
+  document.addEventListener(ev, () => { if (!fsElement()) stage.classList.remove('big'); });
+}
+function toggleDebug() {
+  game.debug = !game.debug;
+  const b = document.getElementById('btnDebug');
+  if (b) b.textContent = game.debug ? '🐞 Debug info: ON' : '🐞 Debug info';
+}
+document.getElementById('btnDebug').onclick = toggleDebug;
+document.getElementById('fsBtn').onclick = toggleFull;
+const soundBtn = document.getElementById('soundBtn');
+const paintSound = () => soundBtn.textContent = save.sound ? '🔊' : '🔇';
+soundBtn.onclick = () => { save.sound = !save.sound; persist(); paintSound(); };
+
+const musicBtn = document.getElementById('musicBtn');
+const paintMusic = () => { musicBtn.style.opacity = save.music ? '1' : '.4'; };
+musicBtn.onclick = () => { save.music = !save.music; persist(); paintMusic(); Music.refresh(songFor()); };
+paintMusic();
+paintSound();
+
+showScreen('menu');
+requestAnimationFrame(frame);
+
+window.OBBY = {
+  game, save, cam, input, LEVELS, SKINS, CHUNKS, POOL, update, readKeys, bakeStatic, resetRun,
+  buildCourse, buildArena, buildShaft, addShaftLayer,
+  startLevel, startSnail, startInfinity, showScreen, persist,
+  shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, emergencySave, project, cam, endRun, Scores,
+  Profiles, useProfile, mergeSave, snapshot, get profileKey() { return profileKey; },
+  GAME_KEYS, wrongKey,
+  consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
+};
+
+})();
+</script>
+</body>
+</html>

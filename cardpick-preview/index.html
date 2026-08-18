@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101828" />
+  <meta name="description" content="CardPick v2 preview" />
+  <link rel="icon" href="../cardpick/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="../cardpick/icons/icon-192.png" />
+  <link rel="stylesheet" href="../cardpick/styles.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@766de08c50c886d473b97a0d2b4f5b171f3b98bc/cardpick/v2.css" />
+  <title>카드픽 v2 Preview</title>
+  <style>
+    .preview-banner{position:sticky;top:0;z-index:1000;background:#fff3cd;color:#664d03;padding:8px 14px;text-align:center;font-size:12px;font-weight:700;border-bottom:1px solid #ffecb5}
+    .benefit-breadcrumb{margin:0 0 12px;padding:9px 12px;border-radius:10px;background:#eef4ff;color:#344054;font-size:13px;font-weight:700}
+    .finder-detail{margin-top:12px;border-top:1px solid #e4e7ec;padding-top:8px}.finder-detail summary{display:flex;justify-content:space-between;cursor:pointer;padding:6px 0;font-weight:700}
+    .condition-section{margin-top:12px}.condition-section h5{margin:0 0 5px;font-size:13px}.condition-section ul{margin:0;padding-left:19px}.condition-section li{margin:4px 0;line-height:1.45}.condition-section.key{padding:10px 12px;border-radius:10px;background:#f8fafc}.condition-section.common{padding-top:10px;border-top:1px solid #e4e7ec}
+  </style>
+</head>
+<body>
+  <div class="preview-banner">PREVIEW · cardpick-merchant-first · 실사용 카드픽과 데이터가 분리되어 있습니다</div>
+  <header class="app-header">
+    <div><p class="eyebrow">개인용 카드 할인 도우미 · v2 Preview</p><h1>카드픽</h1></div>
+    <button id="installButton" class="icon-button hidden" type="button" aria-label="앱 설치">설치</button>
+  </header>
+  <main id="app" class="app-shell" aria-live="polite"></main>
+  <nav class="bottom-nav" aria-label="주요 메뉴">
+    <button type="button" data-route="home" class="nav-item active"><span>⌕</span><small>추천</small></button>
+    <button type="button" data-route="benefits" class="nav-item"><span>◎</span><small>혜택찾기</small></button>
+    <button type="button" data-route="cards" class="nav-item"><span>▣</span><small>카드</small></button>
+    <button type="button" data-route="links" class="nav-item"><span>✦</span><small>Link</small></button>
+    <button type="button" data-route="more" class="nav-item"><span>☰</span><small>기록</small></button>
+  </nav>
+  <dialog id="modal" class="modal"></dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module">
+    const base = 'https://cdn.jsdelivr.net/gh/ExitMaster/family@766de08c50c886d473b97a0d2b4f5b171f3b98bc/cardpick/';
+    const response = await fetch(base + 'app-v2.js', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Preview app source load failed: ' + response.status);
+    let source = await response.text();
+    source = source
+      .replaceAll("'./default-data-v2.js'", `'${base}default-data-v2.js'`)
+      .replaceAll("'./engine-v2.js'", `'${base}engine-v2.js'`)
+      .replaceAll("'card-pick-state-v1'", "'card-pick-preview-state-v2'")
+      .replace(/if\s*\(\s*['\"]serviceWorker['\"]\s+in\s+navigator\s*\)[^;]*;/g, '');
+    const blob = new Blob([source], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    try { await import(url); } finally { URL.revokeObjectURL(url); }
+    await import(base + 'ui-enhancer-v2.js');
+  </script>
+</body>
+</html>

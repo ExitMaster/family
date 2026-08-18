@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Haramji &amp; Haramji Jr. — A New Story Every Day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; min-height:100%; }
+body { font-family:'Inter',system-ui,sans-serif; background:#efeae1; color:#2f2a24; }
+@keyframes tailSway { 0%,100%{transform:rotate(-5deg)} 50%{transform:rotate(5deg)} }
+@keyframes bob      { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes tapPop   { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
+@keyframes fadeUp   { 0%{opacity:0; transform:translateY(10px)} 100%{opacity:1; transform:translateY(0)} }
+.tapbtn:active { animation:tapPop 0.22s ease; }
+::-webkit-scrollbar { width:0; height:0; }
+</style>
+</head>
+<body class="notranslate">
+<div id="app"></div>
+<script>
+// ── 하람쥐와 주니어: 매일 다람쥐 이야기 ────────────────────────────────────────
+//  날짜를 씨앗으로 삼는 결정론적 생성기.
+//  같은 날짜 = 언제 열어도, 누가 열어도 똑같은 이야기.
+const K_STORE = 'family-squirrel-v1';
+
+// ── 씨앗 난수 (mulberry32) ───────────────────────────────────
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i=0; i<s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function rng(seed) {
+  let a = seed >>> 0;
+  return function() {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const pick  = (r, arr) => arr[Math.floor(r() * arr.length)];
+const pickN = (r, arr, n) => {
+  const pool = arr.slice(), out = [];
+  while (out.length < n && pool.length) out.push(pool.splice(Math.floor(r()*pool.length), 1)[0]);
+  return out;
+};
+
+// ── 재료 ─────────────────────────────────────────────────────
+const ELDER = 'Haramji';
+const YOUNGER = 'Haramji Jr.';   // 문장 끝에 그대로 놓이므로 마침표를 이름이 갖고 있다
+const PLACES = [
+  {n:'Oakridge Hill',        d:'the first slope the sun touches'},
+  {n:'the birch stand',      d:'where a white fog lies down every morning'},
+  {n:'the stepping stones',  d:'where the creek talks all day long'},
+  {n:'the abandoned mailbox',d:'that nobody has opened in years'},
+  {n:'the bench in the city park', d:'where footsteps come and go like surf'},
+  {n:'the pinecone slope',   d:'that turns entirely brown in autumn'},
+  {n:'the old lighthouse yard', d:'where a light swings around once a minute at night'},
+  {n:'the fir hollow',       d:'where footprints last a long time under snow'},
+  {n:'the attic windowsill', d:'where the smell of dust is somehow comforting'},
+  {n:'the fallen stone wall',d:'laid over with moss like a green blanket'}
+];
+const SEASONS = [
+  'Early spring, before the dew had burned off',
+  'Midsummer, with the cicadas at full volume',
+  'Autumn, with the wind knocking acorns loose',
+  'Winter, after the first snow had settled',
+  'The third straight day of rain',
+  'An early summer night with far too many stars'
+];
+// 그날 형(하람쥐)의 상태 / 동생(주니어)의 그날 엉뚱함
+const ELDER_MOODS = [
+  'had already recounted yesterday\u2019s acorns three times and gotten a different number each time',
+  'had a stiff back and was not about to mention it',
+  'was in a genuinely good mood, on account of the light',
+  'had sighed once in advance, on the assumption that Jr. would start something',
+  'had promised himself a nap and meant it',
+  'was busy checking whether the winter store still closed properly'
+];
+const YOUNGER_QUIRKS = [
+  'liked shiny pebbles considerably more than acorns',
+  'asked "why" exactly three times about everything',
+  'liked wearing his brother\u2019s tail as a scarf best of all',
+  'was afraid of heights and kept looking up at the tallest branch anyway',
+  'did not himself know what was in his cheek pouches',
+  'kept forgetting how to stop once he started running',
+  'gave a name to every insect he had not met before'
+];
+const WANTS = [
+  'fill out a hundred acorns for the winter',
+  'teach Jr. how to cross the creek',
+  'get up to the highest branch in the woods together',
+  'dig a new store nobody would ever find',
+  'deliver a letter to the neighbours who had moved away',
+  'find out what was making that noise in the middle of the night',
+  'recover the shiny pebble Jr. had lost',
+  'patch the roof before the first frost'
+];
+const TROUBLES = [
+  'a magpie kept following a few lengths behind them',
+  'last night\u2019s rain had taken the whole path with it',
+  'half the stored acorns had gone missing overnight',
+  'the fog came in thick enough to hide their own front paws',
+  'a branch went over with a crack, straight down the middle',
+  'a strange set of tracks ran right up to the store',
+  'the sun was going down considerably faster than expected',
+  'Jr. got well out in front while nobody was watching'
+];
+const FRIENDS = [
+  {n:'an unhurried old mole',      s:'The mole',      h:'a shortcut underground'},
+  {n:'a fast-talking chickadee',   s:'The chickadee', h:'what the place looked like from above'},
+  {n:'a hedgehog who said nothing',s:'The hedgehog',  h:'about the berries kept in among his spines'},
+  {n:'a lost kitten',              s:'The kitten',    h:'how to keep smiling at a frightening thing'},
+  {n:'an owl who read',            s:'The owl',       h:'which stars to steer by after dark'},
+  {n:'a shy tree frog',            s:'The frog',      h:'how to smell rain before it arrives'}
+];
+const TWISTS = [
+  'the acorns had not been stolen at all \u2014 Jr. had hidden them separately, for later',
+  'the noise was the lid of the old mailbox knocking in the wind',
+  'under the washed-out path lay a set of old stone steps nobody had known about',
+  'the magpie had been trying to return the pebble Jr. had dropped',
+  'what you could see from the highest branch was not a view, but their own roof',
+  'Jr. had known the way the whole time, and pretended otherwise so his brother would not worry',
+  'the letter had arrived long ago. Only the reply never came'
+];
+const LESSONS = [
+  'stop because a thing is frightening and you never learn how small it was',
+  'fifty acorns each between two of you fills you up better than a hundred alone',
+  'getting lost is one of the ways of learning a place',
+  'a younger brother grows up faster than you expect',
+  'you have to go the whole distance out before home means anything',
+  'small feet still cover a fair amount of ground in one day',
+  'waiting is also a way of doing something'
+];
+const ENDINGS = [
+  'That night the two of them slept full, under Haramji\u2019s tail like a blanket.',
+  'They reached the door before the sun was all the way down. Late, but not too late.',
+  'Jr. left one acorn outside the door, for whoever came along next.',
+  'By morning there was one more small trail marker in the woods, built by the two of them.',
+  'Haramji never told anyone about it. He simply took that path every day afterwards.',
+  '"Are we going together tomorrow?" Jr. asked. Haramji answered by knocking his tail against his brother\u2019s back.'
+];
+const OPENERS = ['%S%, ','Before anything else was awake, ','On a day that smelled like rain, ','In the afternoon, with everyone else asleep, '];
+const HEADINGS = ['Haramji and Jr. at %P%','A Day in the Life of the Haramji Brothers','What Happened at %P%','The Day Jr. Went First','Haramji and %F%'];
+
+const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+// 제목용: 관사·전치사만 소문자로 남기는 통상적인 영문 제목 표기.
+const SMALL = new Set(['the','a','an','in','on','at','of','and','by','where']);
+const titleCase = t => t.split(' ')
+  .map((w, i) => SMALL.has(w.toLowerCase()) ? w.toLowerCase() : cap(w))   // 문장 중간에 끼워 넣으므로 첫 관사도 소문자
+  .join(' ');
+
+// ── 이야기 생성 ──────────────────────────────────────────────
+function dayKey(d) {
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function makeStory(key) {
+  const r = rng(hashStr('haramji|'+key));
+  const place  = pick(r, PLACES);
+  const season = pick(r, SEASONS);
+  const elderMood= pick(r, ELDER_MOODS);
+  const quirk  = pick(r, YOUNGER_QUIRKS);
+  const want   = pick(r, WANTS);
+  const [t1,t2]= pickN(r, TROUBLES, 2);
+  const friend = pick(r, FRIENDS);
+  const twist  = pick(r, TWISTS);
+  const lesson = pick(r, LESSONS);
+  const ending = pick(r, ENDINGS);
+  const opener = pick(r, OPENERS).replace('%S%', season);
+  const heading = pick(r, HEADINGS)
+    .replace('%P%', titleCase(place.n))
+    .replace('%F%', friend.n);
+
+  const paras = [
+    `At ${place.n}, ${place.d}, live two squirrel brothers, ${ELDER} and ${YOUNGER} The younger of the two ${quirk}.`,
+    `${opener}${ELDER} ${elderMood}. There was one thing to do that day: ${want}. Jr. was already at the door with his tail going.`,
+    `They did not get far before there was a problem. ${cap(t1)}. They stopped to get their breath back, and then ${t2}. ${ELDER} took hold of his brother\u2019s paw.`,
+    `That was when ${friend.n} turned up. "Come round this way." ${friend.s} knew ${friend.h}. The three of them walked on, and the way turned out shorter than it had looked.`,
+    `And so they found out: ${twist}. Jr. laughed. ${ELDER} pretended not to, and then did.`,
+    `What ${ELDER} told his brother that day was this: ${lesson}.`,
+    ending
+  ];
+  return { key, heading, paras, season };
+}
+
+// ── 색 보조 ──────────────────────────────────────────────────
+// 색을 흰색 쪽으로 섞어 주니어의 밝은 털색을 만든다.
+function lightenHex(hex, amt) {
+  const h = hex.replace('#','');
+  const f = i => {
+    const c = parseInt(h.slice(i, i+2), 16);
+    return Math.round(c + (255 - c) * amt).toString(16).padStart(2, '0');
+  };
+  return '#' + f(0) + f(2) + f(4);
+}
+
+
+// ── 슬라이드쇼 재생기 ────────────────────────────────────────
+//  그림은 assets/scenes/ 에 미리 구워 둔 이미지를 쓴다 (scripts/render-scenes.js).
+//  여기서는 그 이미지를 캔버스에 얹고 아주 느리게 밀거나 당기면서(켄 번스)
+//  컷 사이를 암전으로 넘기고, 자막을 얹는다.
+const SLIDE_MS = 6800;
+const DIP_MS = 620;
+const SEASON_SLUG = {
+  '봄':'spring', '여름':'summer', '가을':'autumn', '겨울':'winter', '장마':'rain', '밤':'night'
+};
+function seasonOf(seasonLine) {
+  if (/[Ww]inter|snow/.test(seasonLine)) return '겨울';
+  if (/rain/.test(seasonLine)) return '장마';
+  if (/night|stars/.test(seasonLine)) return '밤';
+  if (/[Mm]idsummer|cicada/.test(seasonLine)) return '여름';
+  if (/[Aa]utumn/.test(seasonLine)) return '가을';
+  return '봄';
+}
+// 컷마다 다른 방향으로 아주 천천히 움직인다. 정지 이미지에 숨을 넣는 정도.
+const MOVES = [
+  {z0:1.02, z1:1.12, x0:  0, x1:-14, y0: 0, y1:  4},
+  {z0:1.14, z1:1.04, x0:-12, x1:  6, y0: 3, y1: -2},
+  {z0:1.06, z1:1.18, x0:  8, x1: -8, y0:-2, y1:  5},
+  {z0:1.16, z1:1.06, x0: -6, x1: 10, y0: 4, y1: -3},
+  {z0:1.04, z1:1.14, x0: 10, x1: -6, y0:-3, y1:  3},
+  {z0:1.20, z1:1.08, x0: -8, x1:  8, y0: 2, y1: -4},
+  {z0:1.06, z1:1.16, x0:  6, x1:-10, y0:-2, y1:  4}
+];
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+function createPlayer(canvas, story, onEnd) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const slug = SEASON_SLUG[seasonOf(story.season || '')] || 'spring';
+  const total = story.paras.length * SLIDE_MS;
+
+  const slides = story.paras.map((_, i) => {
+    const img = new Image();
+    img.src = `assets/scenes/${slug}-${i % 7}.jpg`;
+    return img;
+  });
+
+  let t0 = null, raf = null, elapsed = 0, playing = false;
+
+  function wrap(text, maxW) {
+    const words = text.split(' '), lines = [];
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function frame(ms) {
+    const idx = Math.min(story.paras.length - 1, Math.floor(ms / SLIDE_MS));
+    const local = (ms % SLIDE_MS) / SLIDE_MS;
+    const mv = MOVES[idx % MOVES.length];
+    const e = easeInOut(local);
+    const zoom = mv.z0 + (mv.z1 - mv.z0) * e;
+    const dx = mv.x0 + (mv.x1 - mv.x0) * e;
+    const dy = mv.y0 + (mv.y1 - mv.y0) * e;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#0d0b09'; ctx.fillRect(0, 0, W, H);
+
+    const img = slides[idx];
+    if (img && img.complete && img.naturalWidth) {
+      ctx.save();
+      ctx.translate(W / 2 + dx, H / 2 + dy);
+      ctx.scale(zoom, zoom);
+      ctx.drawImage(img, -W / 2, -H / 2, W, H);
+      ctx.restore();
+    }
+
+    const inMs = ms % SLIDE_MS, outMs = SLIDE_MS - inMs;         // 컷 전환 암전
+    const dip = Math.max(
+      idx === 0 ? 0 : Math.max(0, 1 - inMs / DIP_MS),
+      idx === story.paras.length - 1 ? 0 : Math.max(0, 1 - outMs / DIP_MS)
+    );
+    if (dip > 0) { ctx.fillStyle = `rgba(0,0,0,${dip})`; ctx.fillRect(0, 0, W, H); }
+
+    const fade = Math.min(1, local * 6) * Math.min(1, (1 - local) * 8);
+    ctx.font = '500 17px "Inter", system-ui, sans-serif';
+    const lines = wrap(story.paras[idx], W - 80);
+    const boxH = lines.length * 26 + 26;
+    ctx.globalAlpha = fade * (1 - dip);
+    ctx.fillStyle = 'rgba(8,8,10,.55)';
+    const bx = 26, by = H - boxH - 26, bw = W - 52, rad = 10;
+    ctx.beginPath();
+    ctx.moveTo(bx + rad, by); ctx.arcTo(bx + bw, by, bx + bw, by + boxH, rad);
+    ctx.arcTo(bx + bw, by + boxH, bx, by + boxH, rad);
+    ctx.arcTo(bx, by + boxH, bx, by, rad); ctx.arcTo(bx, by, bx + bw, by, rad);
+    ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'top';
+    lines.forEach((ln, i) => ctx.fillText(ln, bx + 18, by + 14 + i * 26));
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, H - 4, W, 4);
+    ctx.fillStyle = '#c8a266'; ctx.fillRect(0, H - 4, W * (ms / total), 4);
+  }
+
+  function loop(now) {
+    if (!playing) return;
+    if (t0 === null) t0 = now - elapsed;
+    elapsed = now - t0;
+    if (elapsed >= total) { frame(total - 1); stop(); onEnd && onEnd(); return; }
+    frame(elapsed);
+    raf = requestAnimationFrame(loop);
+  }
+  function play()  { if (playing) return; playing = true; t0 = null; raf = requestAnimationFrame(loop); }
+  function stop()  { playing = false; if (raf) cancelAnimationFrame(raf); raf = null; }
+  function reset() { stop(); elapsed = 0; frame(0); }
+
+  // 첫 장이 도착하면 표지로 한 번 그려 준다.
+  slides[0].addEventListener('load', () => { if (!playing) frame(0); });
+  frame(0);
+
+  return { play, stop, reset, get playing() { return playing; }, totalMs: total,
+           toggle() { playing ? stop() : play(); } };
+}
+
+// ── 상태 ─────────────────────────────────────────────────────
+function loadRead() {
+  try { return JSON.parse(localStorage.getItem(K_STORE) || '[]'); } catch(e) { return []; }
+}
+function markRead(key) {
+  const s = loadRead();
+  if (!s.includes(key)) { s.push(key); try { localStorage.setItem(K_STORE, JSON.stringify(s.slice(-400))); } catch(e) {} }
+}
+let offset = 0;   // 0 = 오늘, 1 = 어제 …
+
+function currentKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - offset);
+  return dayKey(d);
+}
+function label(key) {
+  if (offset === 0) return 'today';
+  if (offset === 1) return 'yesterday';
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [, m, dd] = key.split('-');
+  return `${MON[Number(m) - 1]} ${Number(dd)}`;
+}
+
+// ── 렌더 ─────────────────────────────────────────────────────
+function render() {
+  const key = currentKey();
+  const s = makeStory(key);
+  markRead(key);
+  const readCount = loadRead().length;
+
+  document.getElementById('app').innerHTML = `
+  <div style="max-width:620px; margin:0 auto; padding:22px 18px 56px;">
+    <div style="text-align:center; margin-bottom:6px;">
+      <div style="font-family:'Noto Serif',Georgia,serif; font-size:26px; font-weight:700; letter-spacing:-.02em; color:#2f2a24;">Haramji &amp; Haramji Jr.</div>
+      <div style="font-size:12px; color:#8b8377; margin-top:4px; letter-spacing:.08em;">${key} · the story for ${label(key)}</div>
+    </div>
+
+    <div style="position:relative; margin:12px 0 4px; border-radius:18px; overflow:hidden;
+                border:1px solid #ded7cb; box-shadow:0 2px 10px rgba(60,50,35,.10); background:#000;">
+      <canvas id="vid" width="640" height="360" style="display:block; width:100%; height:auto;"></canvas>
+      <button id="playbig" class="tapbtn" aria-label="play"
+        style="position:absolute; inset:0; margin:auto; width:74px; height:74px; border:none; border-radius:50%;
+               background:rgba(250,248,244,.92); color:#3b352d; font-size:26px; cursor:pointer;">▶</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button id="play" class="tapbtn" style="flex:1; padding:11px; font-size:15px; font-weight:700; font-family:inherit;
+        border:none; border-radius:12px; background:#4a4238; color:#f4f1ea; cursor:pointer;">▶ Play</button>
+      <button id="replay" class="tapbtn" style="padding:11px 16px; font-size:15px; font-weight:700; font-family:inherit;
+        border:none; border-radius:12px; background:#e4ded3; color:#3b352d; cursor:pointer;">↺</button>
+      <button id="save" class="tapbtn" style="padding:11px 16px; font-size:15px; font-weight:700; font-family:inherit;
+        border:none; border-radius:12px; background:#e4ded3; color:#3b352d; cursor:pointer;">⬇ Save</button>
+    </div>
+
+    <div style="background:#faf8f4; border:1px solid #ded7cb; border-radius:6px; padding:26px 22px;
+                box-shadow:0 2px 10px rgba(60,50,35,.07); animation:fadeUp .35s ease both;">
+      <div style="font-family:'Noto Serif',Georgia,serif; font-size:22px; font-weight:700; color:#2f2a24; text-align:center; margin-bottom:18px; line-height:1.45;">
+        ${s.heading}
+      </div>
+      ${s.paras.map(p => `<p style="font-family:'Noto Serif',Georgia,serif; font-size:16px; line-height:2.0; margin:0 0 16px; color:#3b352d;">${p}</p>`).join('')}
+      <div style="text-align:center; font-size:12px; color:#a49b8d; margin-top:10px; letter-spacing:.3em;">END</div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button id="prev" class="tapbtn" style="flex:1; padding:14px; font-size:16px; font-weight:700; font-family:inherit;
+        border:none; border-radius:14px; background:#e4ded3; color:#3b352d; cursor:pointer;">← Earlier</button>
+      <button id="next" class="tapbtn" ${offset===0?'disabled':''} style="flex:1; padding:14px; font-size:16px; font-weight:700; font-family:inherit;
+        border:none; border-radius:14px; cursor:${offset===0?'default':'pointer'};
+        background:${offset===0?'#eae5dc':'#e4ded3'}; color:${offset===0?'#b6afa3':'#3b352d'};">Next →</button>
+    </div>
+    <button id="copy" class="tapbtn" style="width:100%; margin-top:10px; padding:14px; font-size:16px; font-weight:700; font-family:inherit;
+      border:none; border-radius:14px; background:#4a4238; color:#f4f1ea; cursor:pointer;">📋 Copy story</button>
+
+    <div style="text-align:center; font-size:13px; color:#a4907a; margin-top:18px;">
+      ${readCount} ${readCount === 1 ? 'story' : 'stories'} read · a new one arrives at midnight
+    </div>
+  </div>`;
+
+  // ── 영상 플레이어 ──
+  const canvas = document.getElementById('vid');
+  const playBig = document.getElementById('playbig');
+  const playBtn = document.getElementById('play');
+  const syncBtn = () => {
+    playBtn.textContent = player.playing ? '⏸ Pause' : '▶ Play';
+    playBig.style.display = player.playing ? 'none' : 'block';
+  };
+  const player = createPlayer(canvas, s, syncBtn);
+  const toggle = () => { player.toggle(); syncBtn(); };
+  playBig.onclick = toggle;
+  playBtn.onclick = toggle;
+  document.getElementById('replay').onclick = () => { player.reset(); player.play(); syncBtn(); };
+
+  // 저장: 캔버스를 실시간으로 녹화해 webm으로 내려받는다 (영상 길이만큼 걸림).
+  document.getElementById('save').onclick = (ev) => {
+    if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
+      ev.target.textContent = 'unsupported'; return;
+    }
+    // file:// 로 열면 이미지가 캔버스를 오염시켜 녹화가 막힌다 (서버로 열면 정상).
+    try { canvas.captureStream(1); } catch (err) {
+      ev.target.textContent = 'needs http';
+      setTimeout(() => { ev.target.textContent = '⬇ Save'; }, 2200);
+      return;
+    }
+    const btn = ev.target;
+    btn.disabled = true;
+    const chunks = [];
+    const rec = new MediaRecorder(canvas.captureStream(30), { mimeType: 'video/webm' });
+    rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `haramji-${key}.webm`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      btn.disabled = false; btn.textContent = '⬇ Save';
+    };
+    player.reset(); rec.start(); player.play(); syncBtn();
+    btn.textContent = 'recording…';
+    setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, player.totalMs + 400);
+  };
+
+  document.getElementById('prev').onclick = () => { offset++; render(); window.scrollTo(0,0); };
+  document.getElementById('next').onclick = () => { if (offset > 0) { offset--; render(); window.scrollTo(0,0); } };
+  document.getElementById('copy').onclick = (e) => {
+    const text = `${s.heading}\n(${key})\n\n` + s.paras.join('\n\n');
+    const done = () => { e.target.textContent = 'Copied ✅'; setTimeout(() => { e.target.textContent = '📋 Copy story'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+    else {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch(err) {}
+      document.body.removeChild(ta); done();
+    }
+  };
+}
+render();
+</script>
+</body>
+</html>
