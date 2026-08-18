@@ -30,10 +30,12 @@
   </nav>
   <dialog id="modal" class="modal"></dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script type="module" src="./v12-preload.js"></script>
-  <script type="module" src="./v12-preapp-extra.js"></script>
-  <script type="module" src="./app-v2.js"></script>
-  <script type="module" src="./ui-enhancer-v2.js"></script>
-  <script type="module" src="./v12-ui.js"></script>
+  <script type="module">
+    await import('./v12-preload.js');
+    await import('./v12-preapp-extra.js');
+    await import('./app-v2.js');
+    await import('./ui-enhancer-v2.js');
+    await import('./v12-ui.js');
+  </script>
 </body>
 </html>
