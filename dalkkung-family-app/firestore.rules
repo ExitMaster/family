@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true;
+    }
+
+    function allowlist() {
+      return get(/databases/$(database)/documents/access/allowlist).data;
+    }
+
+    function approved() {
+      return verified() && request.auth.token.email in allowlist().emails;
+    }
+
+    function admin() {
+      return approved() && request.auth.token.email in allowlist().admins;
+    }
+
+    match /access/allowlist {
+      allow get: if verified() && request.auth.token.email in resource.data.emails;
+      allow list: if false;
+      allow create, delete: if false;
+      allow update: if verified()
+        && request.auth.token.email in resource.data.admins
+        && request.resource.data.admins == resource.data.admins
+        && request.resource.data.emails.size() <= 8
+        && request.resource.data.emails.hasAll(resource.data.admins);
+    }
+
+    match /families/{familyId} {
+      allow read, write: if approved();
+
+      match /{document=**} {
+        allow read, write: if approved();
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
