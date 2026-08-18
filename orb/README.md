@@ -1,68 +1,71 @@
-# 🔮 소리 오브 (3D)
+# 🔮 Sound Orb (3D)
 
-소리를 내면 3D 오브가 부풀고, 출렁이고, 색이 바뀝니다. **HTML 파일 하나**로 끝 —
-엔진도, 빌드도, 서버도 없이 WebGL을 직접 써서 그립니다.
+Make a sound and the 3D orb swells, wobbles and shifts colour. It is **one HTML file** —
+no engine, no build step, no server; the rendering is raw WebGL.
 
 > <https://exitmaster.github.io/family/orb/>
 
-## 노는 법
+## How to play
 
-| 버튼 | 무엇 |
+| Control | What it does |
 |---|---|
-| 🎤 마이크 | 목소리·박수·악기 — 주변 소리에 반응 (기본) |
-| 🎵 음악 | 기기에 있는 음악 파일을 틀고 거기에 맞춰 움직이기 |
-| 🎹 데모 | 마이크가 없거나 조용한 곳에서, 앱이 직접 만든 소리로 구경하기 |
-| 슬라이더 | 민감도 — 작은 소리에도 크게 반응하게 하려면 오른쪽으로 |
-| 동그란 색 | 테마 5가지 (오로라·용암·솜사탕·심해·황금) |
-| 🕸️ | 오브를 감싼 빛 그물 켜기/끄기 |
-| ⛶ | 전체화면 |
+| 🎤 Mic | Reacts to whatever is around you — voice, clapping, instruments (default) |
+| 🎵 Music | Plays a music file from your device and moves with it |
+| 🎹 Demo | No mic, or a quiet room? The app makes its own sound to watch |
+| Slider | Sensitivity — drag right to make quiet sounds count for more |
+| Colour dots | Five themes (Aurora, Lava, Candy, Deep, Gold) |
+| 🕸️ | Toggle the glowing net around the orb |
+| ⛶ | Fullscreen |
+| ✅ Done! | Hides every control so only the orb is left. Tap ⚙️ at the top right to bring them back |
 
-조작줄은 몇 초 뒤 사라집니다. 화면을 건드리면 다시 나옵니다.
-테마·민감도·그물 설정은 브라우저에 저장돼서 다음에 열어도 그대로입니다.
+The toolbar fades out after a few seconds; touch the screen and it returns.
+Theme, sensitivity and net settings are saved in the browser, so they stick between visits.
 
-## 소리가 어떻게 모양이 되나
+## How sound becomes shape
 
-마이크 신호를 FFT로 쪼개 **저음 / 중음 / 고음** 세 덩어리의 세기를 구하고,
-그 값으로 구의 꼭짓점을 노이즈만큼 바깥으로 밀어냅니다.
+The signal is split with an FFT into **bass / mid / treble** energy, and those three
+numbers push the sphere's vertices outward through layers of simplex noise.
 
-| 소리 | 오브 |
+| Sound | Orb |
 |---|---|
-| 저음 (20~180Hz) — 북, 낮은 목소리 | 크고 느리게 출렁인다 |
-| 중음 (180~2000Hz) — 말소리, 멜로디 | 중간 크기의 결이 생긴다 |
-| 고음 (2000~9000Hz) — 치찰음, 심벌 | 잘고 빠르게 오돌토돌해진다 |
-| 전체 크기 | 부풀고, 테두리가 밝아지고, 회전이 빨라진다 |
-| 쿵! (저음이 평균보다 확 셀 때) | 한 번 튀고, 주위 빛알갱이가 바깥으로 밀려난다 |
+| Bass (20–180 Hz) — drums, low voices | Big, slow swells |
+| Mid (180–2000 Hz) — most voices, melody | Medium ridges over the surface |
+| Treble (2000–9000 Hz) — cymbals, "s" sounds | Fine, fast spikes |
+| Overall loudness | Inflates the orb, brightens the rim, speeds up the spin |
+| A beat (bass transient above its recent average) | The orb punches outward and the orbiting motes are shoved away |
 
-값은 **올라갈 때 빠르고 내려올 때 느리게** 따라가서, 튀는 맛은 살리고 깜빡임은 줄였습니다.
+## Under the hood
 
-## 만듦새
+- **Geometry** — an icosphere (subdivided icosahedron), so triangles stay evenly sized
+  instead of bunching at the poles like a UV sphere.
+- **Displacement** — done in the vertex shader with 3D simplex noise (Ashima Arts, MIT).
+  Normals are rebuilt per vertex from two real neighbour samples, so the lighting follows
+  the deformation instead of lagging behind it.
+- **Look** — Fresnel rim light, Lambert + specular body, an additive halo behind the orb,
+  a starfield background drawn on a fullscreen triangle, and 900 additive point sprites.
+- **Speed** — two bodies are built up front (20,480 and 5,120 triangles). If frames start
+  dropping the app switches to the coarse one automatically. The camera distance is fitted
+  to the viewport aspect, so the orb never clips on a portrait phone.
+- **Response** — short analyser smoothing plus asymmetric attack/release envelopes: values
+  rise fast and fall slower, which keeps the punch without the flicker.
 
-- 정이십면체를 5번 쪼갠 구(삼각형 20,480개)를 **버텍스 셰이더에서** 심플렉스 노이즈로 밀어냅니다.
-  법선은 이웃 두 점을 실제로 계산해 외적으로 구합니다(유한차분).
-- 프레임이 밀리는 기기에서는 삼각형 5,120개짜리 성긴 구로 **자동으로 낮춥니다.**
-- 배경 별, 빛무리, 900개의 빛알갱이는 각각 별도 셰이더 — 전부 더하기 합성.
-- 화면 비율에 따라 카메라 거리를 계산해서, 세로 폰에서도 오브가 잘리지 않습니다.
-- 화면 꺼짐 방지(Wake Lock)가 있어 태블릿·TV에 오래 틀어 둬도 됩니다.
+## Notes
 
-## 알아둘 것
+- **The mic needs an https origin.** Opening the file directly (`file://`) blocks
+  `getUserMedia`, so use the GitHub Pages link above. Music and demo modes work anywhere.
+- **Privacy** — audio never leaves the browser; nothing is recorded or uploaded. The mic is
+  connected only to the analyser, never to the speakers, so it cannot cause feedback.
+- Deployed by GitHub Pages from the repository root on `main`.
 
-- **마이크는 https 주소에서만 됩니다.** 파일을 더블클릭해서 여는 `file://` 방식은
-  브라우저가 마이크를 막습니다. 위 GitHub Pages 주소로 열거나, 그럴 땐 🎵 음악 / 🎹 데모를 쓰세요.
-- 마이크 소리는 **스피커로 내보내지 않습니다** (하울링 방지). 기기 밖으로 나가는 것도 없습니다 —
-  분석은 전부 브라우저 안에서 일어나고, 아무 데도 저장·전송하지 않습니다.
-- 처음 열면 브라우저가 마이크 허용을 묻습니다. 거절했다면 주소창 옆 자물쇠에서 다시 허용하면 됩니다.
+## Verifying it
 
-## 배포
+Serve the folder over http (not `file://`) and drive it headlessly with a software GL stack:
 
-이 저장소는 GitHub Pages(`main` 브랜치 / 루트)로 배포됩니다. 빌드가 없어서
-`main`에 머지되면 1~2분 뒤 자동 반영됩니다.
+```
+--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader
+--use-fake-device-for-media-stream          # lets the mic path be tested
+```
 
-## 검증
-
-`.claude/skills/verify`의 방법대로 헤드리스 Chromium으로 돌립니다. WebGL을 켜려면
-`--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`, 마이크는
-`--use-fake-device-for-media-stream`(삐 소리가 나는 가짜 장치)와 `permissions:['microphone']`이
-필요하고, 마이크 경로는 `file://`이 아니라 `http://localhost`로 열어야 확인됩니다.
-
-`window.ORB`에 현재 상태(모드·저음/중음/고음·박자·삼각형 수 등)가 노출돼 있어
-`page.evaluate(() => window.ORB)`로 값이 실제로 움직이는지 볼 수 있습니다.
+`window.ORB` exposes the live frame state (`mode`, `bass`, `mid`, `tre`, `level`, `beat`,
+`fps`, `tris`, `clean`, …) and `window.ORB_API` exposes the mode switches, so a test can
+assert the orb is really reacting rather than just that a canvas exists.
