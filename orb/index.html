@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<title>소리 오브 (3D)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#05060f; overscroll-behavior:none; }
+body { font-family:'Noto Sans KR',sans-serif; color:#eaf0ff; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+#gl { display:block; width:100%; height:100%; }
+
+/* ── 상단 조작줄 (몇 초 뒤 사라지고, 화면을 건드리면 다시 나온다) ── */
+#ui {
+  position:fixed; left:0; right:0; top:0; padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:center;
+  background:linear-gradient(180deg, rgba(5,6,15,.72), rgba(5,6,15,0));
+  transition:opacity .45s ease, transform .45s ease; z-index:5;
+}
+#ui.hide { opacity:0; transform:translateY(-14px); pointer-events:none; }
+.btn {
+  font-family:inherit; font-size:15px; font-weight:700; color:#eaf0ff;
+  background:rgba(255,255,255,.10); border:2px solid rgba(255,255,255,.22);
+  border-radius:999px; padding:8px 15px; cursor:pointer; backdrop-filter:blur(6px);
+  white-space:nowrap; line-height:1;
+}
+.btn:active { transform:translateY(2px); }
+.btn.on { background:rgba(255,255,255,.92); color:#101425; border-color:#fff; }
+.btn.sm { font-size:14px; padding:7px 12px; }
+#themes { display:flex; gap:6px; }
+.swatch {
+  width:30px; height:30px; border-radius:50%; border:2px solid rgba(255,255,255,.35);
+  cursor:pointer; padding:0; background-clip:padding-box;
+}
+.swatch.on { border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.28); }
+#sens { width:92px; accent-color:#8ad6ff; }
+.lbl { font-size:12.5px; opacity:.75; letter-spacing:.5px; }
+
+/* ── 시작 화면 ── */
+#start {
+  position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; text-align:center; padding:24px; z-index:10;
+  background:radial-gradient(circle at 50% 45%, rgba(60,90,200,.30), rgba(5,6,15,.92) 62%);
+}
+#start.hidden { display:none; }
+#start h1 { font-family:'Gaegu',cursive; font-size:clamp(38px,10vw,68px); margin:0; line-height:1;
+  text-shadow:0 0 26px rgba(120,170,255,.75); }
+#start p { margin:0; font-size:clamp(13px,3.2vw,16px); line-height:1.7; opacity:.85; max-width:440px; }
+.big {
+  font-family:'Gaegu',cursive; font-size:30px; font-weight:700; color:#101425;
+  background:linear-gradient(180deg,#fff,#cfe4ff); border:none; border-radius:999px;
+  padding:14px 40px; cursor:pointer; box-shadow:0 10px 34px rgba(120,170,255,.5);
+}
+.big:active { transform:translateY(3px); }
+.row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+#err {
+  max-width:460px; font-size:14px; line-height:1.65; background:rgba(255,90,110,.14);
+  border:2px solid rgba(255,90,110,.5); border-radius:14px; padding:12px 16px; display:none;
+}
+#err.show { display:block; }
+
+/* ── 아래쪽 소리 크기 막대 ── */
+#meter {
+  position:fixed; left:50%; transform:translateX(-50%); bottom:calc(14px + env(safe-area-inset-bottom,0px));
+  width:min(320px,70vw); height:8px; border-radius:999px; background:rgba(255,255,255,.13);
+  overflow:hidden; z-index:4; transition:opacity .45s ease;
+}
+#meter.hide { opacity:0; }
+#meterFill { height:100%; width:0%; border-radius:999px; background:linear-gradient(90deg,#5ce1c6,#8ad6ff,#c39bff,#ff8ab0); transition:width .06s linear; }
+#hint {
+  position:fixed; left:0; right:0; bottom:calc(42px + env(safe-area-inset-bottom,0px)); text-align:center;
+  font-family:'Gaegu',cursive; font-size:24px; opacity:.0; z-index:4; transition:opacity .6s ease; pointer-events:none;
+  text-shadow:0 0 18px rgba(0,0,0,.8);
+}
+#hint.show { opacity:.85; }
+audio { display:none; }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+
+<div id="ui" class="hide">
+  <button class="btn" id="mMic">🎤 마이크</button>
+  <button class="btn" id="mFile">🎵 음악</button>
+  <button class="btn" id="mDemo">🎹 데모</button>
+  <input id="sens" type="range" min="0.3" max="3" step="0.05" value="1" title="민감도">
+  <div id="themes"></div>
+  <button class="btn sm" id="bNet">🕸️</button>
+  <button class="btn sm" id="bFull">⛶</button>
+</div>
+
+<div id="meter" class="hide"><div id="meterFill"></div></div>
+<div id="hint"></div>
+
+<div id="start">
+  <h1>🔮 소리 오브</h1>
+  <p>소리를 내면 오브가 부풀고, 흔들리고, 색이 바뀝니다.<br>낮은 소리는 크게 출렁이고, 높은 소리는 뾰족하게 튑니다.</p>
+  <button class="big" id="goMic">🎤 마이크로 시작</button>
+  <div class="row">
+    <button class="btn" id="goFile">🎵 음악 파일 틀기</button>
+    <button class="btn" id="goDemo">🎹 데모 소리로 보기</button>
+  </div>
+  <div id="err"></div>
+</div>
+
+<input id="file" type="file" accept="audio/*" style="display:none">
+<audio id="player" crossorigin="anonymous" loop></audio>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════════════════════
+//  소리 오브 (3D) — 라이브러리 없이 WebGL로 직접 그린다.
+//    마이크(또는 음악)를 FFT로 분석 → 저음/중음/고음 세기를 구하고
+//    그 값으로 구(sphere)의 꼭짓점을 노이즈로 밀어내 실시간으로 일그러뜨린다.
+// ══════════════════════════════════════════════════════════════════════
+
+const K_STORE = 'orb-v1';
+
+// ── 테마 (오브 색 3종 + 배경색) ────────────────────────────────────────
+//  a: 안쪽 바탕색, b: 솟아오른 곳 색, c: 테두리(프레넬) 빛 색, bg: 배경 그라데이션
+const THEMES = [
+  { id:'aurora', name:'오로라', a:[0.09,0.35,0.55], b:[0.25,0.95,0.78], c:[0.55,0.80,1.00], bg:[0.02,0.05,0.11] },
+  { id:'lava',   name:'용암',   a:[0.35,0.05,0.05], b:[1.00,0.62,0.10], c:[1.00,0.35,0.20], bg:[0.09,0.02,0.02] },
+  { id:'candy',  name:'솜사탕', a:[0.45,0.20,0.55], b:[1.00,0.62,0.85], c:[0.70,0.90,1.00], bg:[0.07,0.03,0.10] },
+  { id:'deep',   name:'심해',   a:[0.03,0.12,0.30], b:[0.20,0.55,1.00], c:[0.35,1.00,0.95], bg:[0.01,0.03,0.09] },
+  { id:'gold',   name:'황금',   a:[0.30,0.20,0.02], b:[1.00,0.86,0.35], c:[1.00,0.95,0.65], bg:[0.06,0.05,0.02] }
+];
+
+// ── 설정 (localStorage) ───────────────────────────────────────────────
+const DEFAULTS = { theme:'aurora', sens:1, net:true };
+let CFG = (() => {
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(K_STORE) || '{}') }; }
+  catch (e) { return { ...DEFAULTS }; }
+})();
+const saveCfg = () => { try { localStorage.setItem(K_STORE, JSON.stringify(CFG)); } catch (e) {} };
+const theme = () => THEMES.find(t => t.id === CFG.theme) || THEMES[0];
+
+// ══════════════════════════════════════════════════════════════════════
+//  1. 작은 행렬 유틸 (열 우선 4x4 — WebGL 규약)
+// ══════════════════════════════════════════════════════════════════════
+function mIdent() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
+function mMul(a, b) {                       // a * b
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    o[c*4+r] = a[r]*b[c*4] + a[4+r]*b[c*4+1] + a[8+r]*b[c*4+2] + a[12+r]*b[c*4+3];
+  }
+  return o;
+}
+function mPerspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+}
+function mLookAt(eye, at, up) {
+  const z = vNorm([eye[0]-at[0], eye[1]-at[1], eye[2]-at[2]]);
+  const x = vNorm(vCross(up, z));
+  const y = vCross(z, x);
+  return new Float32Array([
+    x[0],y[0],z[0],0,
+    x[1],y[1],z[1],0,
+    x[2],y[2],z[2],0,
+    -(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),
+    -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),
+    -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]), 1
+  ]);
+}
+function mRotY(t) { const c=Math.cos(t), s=Math.sin(t);
+  return new Float32Array([c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1]); }
+function mRotX(t) { const c=Math.cos(t), s=Math.sin(t);
+  return new Float32Array([1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1]); }
+function vCross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function vNorm(a){ const l=Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l,a[1]/l,a[2]/l]; }
+
+// ══════════════════════════════════════════════════════════════════════
+//  2. 정이십면체를 잘게 쪼갠 구 (icosphere)
+//     삼각형이 고르게 퍼져 있어서 위/아래가 뭉치는 UV 구보다 덜 일그러진다.
+// ══════════════════════════════════════════════════════════════════════
+function icosphere(sub) {
+  const t = (1 + Math.sqrt(5)) / 2;
+  let verts = [
+    [-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],
+    [0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],
+    [t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]
+  ].map(vNorm);
+  let faces = [
+    [0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],
+    [1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],
+    [3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],
+    [4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]
+  ];
+  const cache = new Map();
+  const mid = (a, b) => {                          // 두 꼭짓점의 중점을 구 위로 올린다 (중복 제거)
+    const key = a < b ? a + ',' + b : b + ',' + a;
+    if (cache.has(key)) return cache.get(key);
+    const p = vNorm([(verts[a][0]+verts[b][0])/2, (verts[a][1]+verts[b][1])/2, (verts[a][2]+verts[b][2])/2]);
+    verts.push(p); cache.set(key, verts.length - 1); return verts.length - 1;
+  };
+  for (let i = 0; i < sub; i++) {
+    const next = [];
+    for (const [a,b,c] of faces) {
+      const ab = mid(a,b), bc = mid(b,c), ca = mid(c,a);
+      next.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]);
+    }
+    faces = next;
+  }
+  const pos = new Float32Array(verts.length * 3);
+  verts.forEach((v, i) => { pos[i*3]=v[0]; pos[i*3+1]=v[1]; pos[i*3+2]=v[2]; });
+  const idx = new Uint16Array(faces.length * 3);
+  faces.forEach((f, i) => { idx[i*3]=f[0]; idx[i*3+1]=f[1]; idx[i*3+2]=f[2]; });
+
+  // 선(그물) 그리기용 — 삼각형 모서리를 중복 없이 모은다
+  const seen = new Set(), edges = [];
+  for (const [a,b,c] of faces) for (const [p,q] of [[a,b],[b,c],[c,a]]) {
+    const k = p < q ? p+','+q : q+','+p;
+    if (!seen.has(k)) { seen.add(k); edges.push(p, q); }
+  }
+  return { pos, idx, edges:new Uint16Array(edges), count:idx.length, edgeCount:edges.length };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  3. 셰이더
+// ══════════════════════════════════════════════════════════════════════
+
+// 3D 심플렉스 노이즈 (Ashima Arts, MIT) — 오브를 울퉁불퉁하게 만드는 재료
+const SNOISE = `
+vec3 mod289(vec3 x){ return x - floor(x*(1.0/289.0))*289.0; }
+vec4 mod289(vec4 x){ return x - floor(x*(1.0/289.0))*289.0; }
+vec4 permute(vec4 x){ return mod289(((x*34.0)+1.0)*x); }
+vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314*r; }
+float snoise(vec3 v){
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+  vec3 i  = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy;
+  vec3 x3 = x0 - D.yyy;
+  i = mod289(i);
+  vec4 p = permute(permute(permute(
+             i.z + vec4(0.0, i1.z, i2.z, 1.0))
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+           + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  float n_ = 0.142857142857;
+  vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ *ns.x + ns.yyyy;
+  vec4 y = y_ *ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}`;
+
+// ── 오브 본체 ─────────────────────────────────────────────────────────
+//  disp(n): 방향 n에서 표면이 얼마나 튀어나올지.
+//    저음 → 크고 느린 출렁임 / 중음 → 중간 결 / 고음 → 잘고 빠른 가시
+//  법선은 미분 대신 이웃 두 점을 실제로 계산해서 외적으로 구한다(유한차분).
+const ORB_VS = SNOISE + `
+attribute vec3 aPos;
+uniform mat4 uProj, uView, uModel;
+uniform float uTime, uBass, uMid, uTre, uLevel, uBeat, uScale;
+varying vec3 vN, vW;
+varying float vD;
+
+float disp(vec3 n){
+  float t = uTime;
+  float d = 0.0;
+  d += snoise(n*1.5 + vec3(0.0, 0.0, t*0.46)) * (0.045 + uBass*0.30);
+  d += snoise(n*3.4 + vec3(t*0.72, 0.0, 0.0)) * (0.022 + uMid *0.15);
+  d += snoise(n*9.0 + vec3(0.0, t*2.00, 0.0)) * (0.008 + uTre *0.085);
+  return d;
+}
+float radiusAt(float d){ return (1.0 + d + uLevel*0.11 + uBeat*0.09) * uScale; }
+vec3 place(vec3 n){ return n * radiusAt(disp(n)); }
+
+void main(){
+  vec3 n = normalize(aPos);
+  vec3 up = abs(n.y) < 0.99 ? vec3(0.0,1.0,0.0) : vec3(1.0,0.0,0.0);
+  vec3 tx = normalize(cross(up, n));
+  vec3 ty = cross(n, tx);
+  float e = 0.03;
+  float d0 = disp(n);
+  vec3 p  = n * radiusAt(d0);
+  vec3 pa = place(normalize(n + tx*e));
+  vec3 pb = place(normalize(n + ty*e));
+  vec3 nrm = normalize(cross(pa - p, pb - p));
+  if (dot(nrm, n) < 0.0) nrm = -nrm;
+
+  vD = d0;
+  vec4 world = uModel * vec4(p, 1.0);
+  vW = world.xyz;
+  vN = normalize((uModel * vec4(nrm, 0.0)).xyz);
+  gl_Position = uProj * uView * world;
+}`;
+
+const ORB_FS = `
+precision highp float;
+uniform vec3 uColA, uColB, uColC, uCam;
+uniform float uLevel, uTre, uBeat, uAlpha;
+varying vec3 vN, vW;
+varying float vD;
+void main(){
+  vec3 V = normalize(uCam - vW);
+  float fres = pow(1.0 - clamp(dot(vN, V), 0.0, 1.0), 2.6);
+  vec3 L = normalize(vec3(0.45, 0.75, 0.55));
+  float lam = max(dot(vN, L), 0.0);
+  float spec = pow(max(dot(reflect(-L, vN), V), 0.0), 26.0);
+
+  vec3 base = mix(uColA, uColB, clamp(vD*2.6 + 0.45, 0.0, 1.0));
+  vec3 col  = base * (0.30 + 0.80*lam);
+  col += uColC * fres * (0.55 + uLevel*1.9 + uBeat*0.8);   // 테두리 빛 — 소리가 커지면 확 밝아진다
+  col += vec3(1.0) * spec * (0.35 + uTre*1.4);
+  col += vec3(1.0) * pow(fres, 7.0) * (uTre*1.1 + uBeat*0.5);
+  gl_FragColor = vec4(col, uAlpha);
+}`;
+
+// ── 오브를 감싼 그물(같은 변형식 위에 선으로만 그린다) ────────────────
+const NET_FS = `
+precision highp float;
+uniform vec3 uColC;
+uniform float uLevel, uBeat, uAlpha;
+varying vec3 vN, vW;
+varying float vD;
+void main(){
+  float g = 0.30 + uLevel*1.5 + uBeat*0.9 + max(vD,0.0)*1.2;
+  gl_FragColor = vec4(uColC * g, uAlpha);
+}`;
+
+// ── 배경 (별 + 은은한 그라데이션) ─────────────────────────────────────
+const QUAD_VS = `
+attribute vec2 aXY;
+varying vec2 vUV;
+void main(){ vUV = aXY; gl_Position = vec4(aXY, 0.0, 1.0); }`;
+
+const BG_FS = `
+precision highp float;
+uniform vec2 uRes;
+uniform vec3 uBg, uColC;
+uniform float uTime, uBass, uTre;
+varying vec2 vUV;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(41.7, 289.3))) * 43758.5453); }
+void main(){
+  vec2 q = vUV; q.x *= uRes.x / uRes.y;
+  float d = length(q);
+  vec3 col = uBg + uColC * (0.055 + uBass*0.16) * exp(-d*1.5);   // 저음에 배경이 은근히 부푼다
+  col *= 1.0 - 0.35*smoothstep(0.5, 1.5, d);                     // 가장자리 어둡게 (비네팅)
+  // 별: 화면을 격자로 나눠 칸마다 하나씩, 고음에 반짝인다
+  vec2 g = floor(vUV * uRes / 26.0);
+  float h = hash(g);
+  if (h > 0.972) {
+    vec2 c = (floor(vUV*uRes/26.0) + 0.5) * 26.0 / uRes;
+    float s = smoothstep(0.010, 0.0, length((vUV - c) * vec2(uRes.x/uRes.y, 1.0)));
+    col += vec3(0.75, 0.85, 1.0) * s * (0.35 + 0.65*abs(sin(uTime*1.7 + h*40.0))) * (0.6 + uTre*1.4);
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+// ── 오브 뒤편에 겹쳐 얹는 빛무리 ──────────────────────────────────────
+const GLOW_FS = `
+precision highp float;
+uniform vec2 uRes;
+uniform vec3 uColC;
+uniform float uLevel, uBeat;
+varying vec2 vUV;
+void main(){
+  vec2 q = vUV; q.x *= uRes.x / uRes.y;
+  float d = length(q);
+  float r = 0.62 + uLevel*0.45 + uBeat*0.30;
+  float g = pow(max(1.0 - d/r, 0.0), 3.0) * (0.30 + uLevel*0.95 + uBeat*0.7);
+  gl_FragColor = vec4(uColC * g, 1.0);
+}`;
+
+// ── 주변을 도는 빛알갱이 ──────────────────────────────────────────────
+const DOT_VS = `
+attribute vec3 aDir;
+attribute vec2 aSeed;                       // x: 반지름 여유, y: 흔들리는 속도
+uniform mat4 uProj, uView, uModel;
+uniform float uTime, uLevel, uShock, uRes;
+varying float vA;
+void main(){
+  float r = 1.45 + aSeed.x*1.15 + uLevel*0.55 + uShock*1.30
+          + sin(uTime*aSeed.y + aSeed.x*37.0) * 0.07;
+  vec4 world = uModel * vec4(aDir * r, 1.0);
+  vec4 eye = uView * world;
+  gl_Position = uProj * eye;
+  gl_PointSize = clamp(uRes * (0.9 + uShock*2.2) / max(-eye.z, 0.2), 1.0, 22.0);
+  vA = (0.30 + uLevel*0.8 + uShock*0.9) * (0.45 + 0.55*aSeed.x);
+}`;
+
+const DOT_FS = `
+precision highp float;
+uniform vec3 uColC;
+varying float vA;
+void main(){
+  float d = length(gl_PointCoord - 0.5);
+  if (d > 0.5) discard;
+  float f = pow(1.0 - d*2.0, 2.0);
+  gl_FragColor = vec4(uColC * f * vA, 1.0);
+}`;
+
+// ══════════════════════════════════════════════════════════════════════
+//  4. WebGL 준비
+// ══════════════════════════════════════════════════════════════════════
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { alpha:false, antialias:true, depth:true, powerPreference:'high-performance' })
+        || canvas.getContext('experimental-webgl');
+if (!gl) {
+  document.getElementById('err').className = 'show';
+  document.getElementById('err').textContent = '이 브라우저에서는 3D(WebGL)를 쓸 수 없어요. 다른 브라우저로 열어 주세요.';
+}
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) + '\n' + src);
+  return s;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  // 유니폼/어트리뷰트 위치를 미리 뽑아 둔다
+  p.u = {}; p.a = {};
+  const nu = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < nu; i++) { const n = gl.getActiveUniform(p, i).name; p.u[n] = gl.getUniformLocation(p, n); }
+  const na = gl.getProgramParameter(p, gl.ACTIVE_ATTRIBUTES);
+  for (let i = 0; i < na; i++) { const n = gl.getActiveAttrib(p, i).name; p.a[n] = gl.getAttribLocation(p, n); }
+  return p;
+}
+function buffer(target, data) {
+  const b = gl.createBuffer();
+  gl.bindBuffer(target, b); gl.bufferData(target, data, gl.STATIC_DRAW);
+  return b;
+}
+
+let PROG = {}, BUF = {}, MESH = {}, ready = false;
+try {
+  PROG.orb  = program(ORB_VS, ORB_FS);
+  PROG.net  = program(ORB_VS, NET_FS);
+  PROG.bg   = program(QUAD_VS, BG_FS);
+  PROG.glow = program(QUAD_VS, GLOW_FS);
+  PROG.dot  = program(DOT_VS, DOT_FS);
+
+  // 본체는 고운 것(삼각형 20480개)과 성긴 것(5120개) 두 벌을 만들어 두고,
+  // 프레임이 밀리면 성긴 쪽으로 자동으로 갈아탄다.
+  MESH.hi = icosphere(5);
+  MESH.lo = icosphere(4);
+  MESH.net = icosphere(3);                    // 그물: 선 1920개 — 표면에 딱 붙는다
+  BUF.hiPos = buffer(gl.ARRAY_BUFFER, MESH.hi.pos);
+  BUF.hiIdx = buffer(gl.ELEMENT_ARRAY_BUFFER, MESH.hi.idx);
+  BUF.loPos = buffer(gl.ARRAY_BUFFER, MESH.lo.pos);
+  BUF.loIdx = buffer(gl.ELEMENT_ARRAY_BUFFER, MESH.lo.idx);
+  BUF.netPos = buffer(gl.ARRAY_BUFFER, MESH.net.pos);
+  BUF.netIdx = buffer(gl.ELEMENT_ARRAY_BUFFER, MESH.net.edges);
+  BUF.quad    = buffer(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]));  // 화면 덮는 큰 삼각형
+
+  const N_DOT = 900;
+  const dir = new Float32Array(N_DOT*3), seed = new Float32Array(N_DOT*2);
+  for (let i = 0; i < N_DOT; i++) {
+    const u = Math.random()*2 - 1, a = Math.random()*Math.PI*2, s = Math.sqrt(1 - u*u);
+    dir[i*3] = s*Math.cos(a); dir[i*3+1] = u; dir[i*3+2] = s*Math.sin(a);
+    seed[i*2] = Math.random(); seed[i*2+1] = 0.6 + Math.random()*2.4;
+  }
+  BUF.dotDir = buffer(gl.ARRAY_BUFFER, dir);
+  BUF.dotSeed = buffer(gl.ARRAY_BUFFER, seed);
+  MESH.dots = N_DOT;
+  ready = true;
+} catch (e) {
+  console.error(e);
+  const el = document.getElementById('err');
+  el.className = 'show'; el.textContent = '3D를 켜지 못했어요: ' + e.message;
+}
+
+let W = 1, H = 1, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, Math.round(canvas.clientWidth  * DPR));
+  H = Math.max(1, Math.round(canvas.clientHeight * DPR));
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+  gl.viewport(0, 0, W, H);
+}
+window.addEventListener('resize', resize);
+
+// ══════════════════════════════════════════════════════════════════════
+//  5. 소리 분석 — FFT 막대를 저음/중음/고음 세 덩어리로 요약한다
+// ══════════════════════════════════════════════════════════════════════
+const AU = {
+  ctx:null, analyser:null, node:null, stream:null, mode:null,
+  freq:null, bass:0, mid:0, tre:0, level:0, beat:0, shock:0, peak:0
+};
+const BANDS = { bass:[20,180], mid:[180,2000], tre:[2000,9000] };
+let bassHist = [], lastBeat = 0;
+
+function ensureCtx() {
+  if (!AU.ctx) {
+    AU.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    AU.analyser = AU.ctx.createAnalyser();
+    AU.analyser.fftSize = 2048;
+    AU.analyser.smoothingTimeConstant = 0.55;   // 낮을수록 소리에 빨리 반응
+    AU.analyser.minDecibels = -95;
+    AU.analyser.maxDecibels = -12;
+    AU.freq = new Uint8Array(AU.analyser.frequencyBinCount);
+  }
+  if (AU.ctx.state === 'suspended') AU.ctx.resume();
+  return AU.ctx;
+}
+function disconnectSource() {
+  if (AU.node) { try { AU.node.disconnect(); } catch (e) {} AU.node = null; }
+  if (AU.stream) { AU.stream.getTracks().forEach(t => t.stop()); AU.stream = null; }
+  if (DEMO.timer) { clearInterval(DEMO.timer); DEMO.timer = null; }
+  player.pause();
+}
+
+// 주파수(Hz) → FFT 칸 번호
+const binOf = hz => Math.round(hz / (AU.ctx.sampleRate / 2) * AU.analyser.frequencyBinCount);
+function bandLevel(lo, hi) {
+  const a = Math.max(0, binOf(lo)), b = Math.min(AU.freq.length - 1, binOf(hi));
+  let sum = 0;
+  for (let i = a; i <= b; i++) sum += AU.freq[i];
+  return (sum / Math.max(1, b - a + 1)) / 255;
+}
+
+// 값이 커질 땐 빨리, 작아질 땐 천천히 (튀는 느낌은 살리고 깜빡임은 줄인다)
+const follow = (cur, target, up, down) => cur + (target - cur) * (target > cur ? up : down);
+
+function analyse(dt) {
+  if (!AU.analyser) return;
+  AU.analyser.getByteFrequencyData(AU.freq);
+  const s = CFG.sens;
+  const b = Math.min(1, bandLevel(...BANDS.bass) * 1.35 * s);
+  const m = Math.min(1, bandLevel(...BANDS.mid)  * 2.20 * s);
+  const t = Math.min(1, bandLevel(...BANDS.tre)  * 3.20 * s);
+
+  AU.bass  = follow(AU.bass,  b, 0.78, 0.17);
+  AU.mid   = follow(AU.mid,   m, 0.74, 0.16);
+  AU.tre   = follow(AU.tre,   t, 0.85, 0.22);
+  AU.level = follow(AU.level, Math.min(1, (b*0.55 + m*0.30 + t*0.15) * 1.25), 0.80, 0.14);
+  AU.peak  = Math.max(AU.peak * 0.985, AU.level);
+
+  // 박자: 지금 저음이 최근 평균보다 확 크면 한 방 터뜨린다
+  bassHist.push(b); if (bassHist.length > 43) bassHist.shift();
+  const avg = bassHist.reduce((x, y) => x + y, 0) / bassHist.length;
+  const now = performance.now();
+  if (b > 0.16 && b > avg * 1.38 && now - lastBeat > 150) { lastBeat = now; AU.beat = 1; AU.shock = 1; }
+  AU.beat  = Math.max(0, AU.beat  - dt * 4.6);
+  AU.shock = Math.max(0, AU.shock - dt * 2.1);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  6. 소리를 어디서 받을까 — 마이크 / 음악 파일 / 데모 합성음
+// ══════════════════════════════════════════════════════════════════════
+const player = document.getElementById('player');
+const fileInput = document.getElementById('file');
+const errBox = document.getElementById('err');
+const startScreen = document.getElementById('start');
+const hintEl = document.getElementById('hint');
+
+function showErr(msg) { errBox.textContent = msg; errBox.className = 'show'; }
+function clearErr() { errBox.className = ''; }
+function hint(msg, ms = 2600) {
+  hintEl.textContent = msg; hintEl.className = 'show';
+  clearTimeout(hint._t); hint._t = setTimeout(() => { hintEl.className = ''; }, ms);
+}
+function begin(mode) {
+  AU.mode = mode;
+  startScreen.className = 'hidden';
+  clearErr(); resize(); wakeLock();
+  document.querySelectorAll('#ui .btn').forEach(b => b.classList.remove('on'));
+  ({ mic:mMic, file:mFile, demo:mDemo })[mode].classList.add('on');
+  poke();
+}
+
+async function startMic() {
+  ensureCtx();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showErr(location.protocol === 'file:'
+      ? '파일을 직접 열면 마이크를 쓸 수 없어요. 인터넷 주소(https://exitmaster.github.io/family/orb/)로 열거나, 아래 “음악 파일”·“데모”를 눌러 보세요.'
+      : '이 브라우저에서는 마이크를 쓸 수 없어요. 음악 파일이나 데모로 즐겨 주세요.');
+    return;
+  }
+  try {
+    // 자동 음량 조절/잡음 제거를 끄면 소리 변화가 훨씬 크게 보인다
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+    });
+    disconnectSource();
+    AU.stream = stream;
+    AU.node = AU.ctx.createMediaStreamSource(stream);
+    AU.node.connect(AU.analyser);          // 스피커로는 보내지 않는다 (하울링 방지)
+    begin('mic');
+    hint('소리를 내 보세요! 🎤');
+  } catch (e) {
+    const m = e && e.name === 'NotAllowedError'
+      ? '마이크 사용이 거절됐어요. 주소창 옆 자물쇠에서 마이크를 허용한 뒤 다시 눌러 주세요.'
+      : e && e.name === 'NotFoundError'
+      ? '마이크를 찾지 못했어요. 음악 파일이나 데모로 즐겨 주세요.'
+      : '마이크를 켜지 못했어요 (' + (e && e.name || e) + ').';
+    showErr(m); startScreen.className = '';
+  }
+}
+
+function startFile() { ensureCtx(); fileInput.click(); }
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files && fileInput.files[0];
+  if (!f) return;
+  ensureCtx(); disconnectSource();
+  player.src = URL.createObjectURL(f);
+  if (!AU.fileNode) { AU.fileNode = AU.ctx.createMediaElementSource(player); }  // 한 요소당 한 번만 만들 수 있다
+  AU.fileNode.connect(AU.analyser);
+  AU.analyser.connect(AU.ctx.destination);
+  AU.node = AU.fileNode;
+  player.play().then(() => { begin('file'); hint('🎵 ' + f.name); })
+               .catch(() => showErr('그 파일은 재생하지 못했어요. 다른 파일로 해 볼까요?'));
+});
+
+// 데모: 마이크가 없어도 되게, 웹오디오로 직접 소리를 만든다 (킥 + 아르페지오)
+const DEMO = { timer:null, step:0, gain:null };
+const SCALE = [220, 277.18, 329.63, 440, 554.37, 659.25, 880];
+function startDemo() {
+  ensureCtx(); disconnectSource();
+  const g = AU.ctx.createGain(); g.gain.value = 0.5;
+  g.connect(AU.analyser); AU.analyser.connect(AU.ctx.destination);
+  DEMO.gain = g; AU.node = g;
+  DEMO.step = 0;
+  const tick = () => {
+    const t = AU.ctx.currentTime, s = DEMO.step++;
+    if (s % 4 === 0) {                                   // 쿵 (저음)
+      const o = AU.ctx.createOscillator(), e = AU.ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(42, t + 0.22);
+      e.gain.setValueAtTime(1.0, t); e.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      o.connect(e); e.connect(g); o.start(t); o.stop(t + 0.3);
+    }
+    if (s % 2 === 1) {                                   // 치 (고음)
+      const len = 2205, buf = AU.ctx.createBuffer(1, len, AU.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random()*2 - 1) * (1 - i/len);
+      const src = AU.ctx.createBufferSource(), e = AU.ctx.createGain();
+      src.buffer = buf; e.gain.value = 0.22;
+      src.connect(e); e.connect(g); src.start(t);
+    }
+    const o = AU.ctx.createOscillator(), e = AU.ctx.createGain();  // 멜로디
+    o.type = s % 8 < 4 ? 'triangle' : 'sawtooth';
+    o.frequency.value = SCALE[(s * 3) % SCALE.length] * (s % 16 < 8 ? 1 : 1.5);
+    e.gain.setValueAtTime(0.0001, t);
+    e.gain.linearRampToValueAtTime(0.30, t + 0.02);
+    e.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+    o.connect(e); e.connect(g); o.start(t); o.stop(t + 0.36);
+  };
+  tick();
+  DEMO.timer = setInterval(tick, 250);
+  begin('demo');
+  hint('🎹 데모 소리로 움직이는 중');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  7. 화면 조작
+// ══════════════════════════════════════════════════════════════════════
+const ui = document.getElementById('ui'), meter = document.getElementById('meter');
+const meterFill = document.getElementById('meterFill');
+const mMic = document.getElementById('mMic'), mFile = document.getElementById('mFile'), mDemo = document.getElementById('mDemo');
+const sens = document.getElementById('sens'), bNet = document.getElementById('bNet'), bFull = document.getElementById('bFull');
+
+let uiTimer = null;
+function poke() {                                   // 화면을 건드리면 조작줄을 잠깐 보여 준다
+  ui.classList.remove('hide'); meter.classList.remove('hide');
+  clearTimeout(uiTimer);
+  uiTimer = setTimeout(() => {
+    if (startScreen.className !== 'hidden') return;
+    ui.classList.add('hide'); meter.classList.add('hide');
+  }, 3800);
+}
+['pointerdown','pointermove','keydown','wheel'].forEach(ev => window.addEventListener(ev, poke, { passive:true }));
+
+const themeBox = document.getElementById('themes');
+THEMES.forEach(t => {
+  const b = document.createElement('button');
+  b.className = 'swatch' + (t.id === CFG.theme ? ' on' : '');
+  b.title = t.name;
+  const rgb = c => `rgb(${c.map(v => Math.round(v*255)).join(',')})`;
+  b.style.background = `linear-gradient(140deg, ${rgb(t.b)}, ${rgb(t.a)})`;
+  b.onclick = () => {
+    CFG.theme = t.id; saveCfg();
+    themeBox.querySelectorAll('.swatch').forEach(s => s.classList.remove('on'));
+    b.classList.add('on'); hint(t.name);
+  };
+  themeBox.appendChild(b);
+});
+
+sens.value = CFG.sens;
+sens.addEventListener('input', () => { CFG.sens = parseFloat(sens.value); saveCfg(); });
+
+function paintNetBtn() { bNet.classList.toggle('on', CFG.net); }
+paintNetBtn();
+bNet.onclick = () => { CFG.net = !CFG.net; saveCfg(); paintNetBtn(); hint(CFG.net ? '그물 켬 🕸️' : '그물 끔'); };
+
+bFull.onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || (() => {})).call(document.documentElement);
+};
+
+document.getElementById('goMic').onclick = startMic;
+document.getElementById('goFile').onclick = startFile;
+document.getElementById('goDemo').onclick = startDemo;
+mMic.onclick = startMic; mFile.onclick = startFile; mDemo.onclick = startDemo;
+
+// 화면 꺼짐 방지 (TV 미러링·태블릿에서 오래 틀어 둘 때)
+async function wakeLock() {
+  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wakeLock(); });
+
+// ══════════════════════════════════════════════════════════════════════
+//  8. 그리기
+// ══════════════════════════════════════════════════════════════════════
+const U = (p, n) => (p.u[n] !== undefined ? p.u[n] : null);
+
+function bindAttr(prog, name, buf, size) {
+  const loc = prog.a[name];
+  if (loc === undefined || loc < 0) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+}
+function drawFullQuad(prog, set) {
+  gl.useProgram(prog);
+  bindAttr(prog, 'aXY', BUF.quad, 2);
+  gl.uniform2f(U(prog,'uRes'), W, H);
+  set(prog);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function orbUniforms(prog, t, proj, view, model, eye, T) {
+  gl.uniformMatrix4fv(U(prog,'uProj'), false, proj);
+  gl.uniformMatrix4fv(U(prog,'uView'), false, view);
+  gl.uniformMatrix4fv(U(prog,'uModel'), false, model);
+  gl.uniform1f(U(prog,'uTime'), t);
+  gl.uniform1f(U(prog,'uBass'), AU.bass);
+  gl.uniform1f(U(prog,'uMid'),  AU.mid);
+  gl.uniform1f(U(prog,'uTre'),  AU.tre);
+  gl.uniform1f(U(prog,'uLevel'), AU.level);
+  gl.uniform1f(U(prog,'uBeat'), AU.beat);
+  gl.uniform3fv(U(prog,'uColA'), T.a);
+  gl.uniform3fv(U(prog,'uColB'), T.b);
+  gl.uniform3fv(U(prog,'uColC'), T.c);
+  gl.uniform3fv(U(prog,'uCam'), eye);
+}
+
+let spin = 0, tPrev = 0, ORB_STATE = null;
+
+// 프레임이 밀리는 기기는 알아서 성긴 구로 내린다 (한 번 내리면 되돌리지 않는다)
+let hi = !(navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+let slowFrames = 0, checked = 0;
+function watchSpeed(dt) {
+  if (!hi || checked > 240) return;
+  checked++;
+  if (checked < 40) return;                     // 처음 몇 프레임(셰이더 준비)은 빼고 센다
+  slowFrames += dt > 1/38 ? 1 : -0.5;
+  if (slowFrames > 30) { hi = false; }
+}
+function frame(nowMs) {
+  requestAnimationFrame(frame);
+  if (!ready) return;
+  const t = nowMs / 1000;
+  const dt = Math.min(0.05, tPrev ? t - tPrev : 0.016);
+  tPrev = t;
+
+  analyse(dt);
+  watchSpeed(dt);
+  if (!AU.mode) {                                  // 아직 소리를 안 켰을 때 — 잔잔한 숨쉬기
+    AU.level = 0.05 + 0.035 * Math.sin(t * 0.8);
+    AU.bass  = 0.05 + 0.04  * Math.sin(t * 0.55);
+    AU.mid   = 0.03; AU.tre = 0.02;
+  }
+
+  resize();
+  const T = theme();
+  spin += dt * (0.22 + AU.level * 1.7 + AU.beat * 0.9);   // 소리가 크면 확 빨라진다
+
+  // 오브가 아무리 커져도 화면 안에 들어오도록 거리 계산 (세로 화면이면 더 멀리)
+  const FOV = Math.PI / 4, aspect = W / H, MAX_R = 1.42;
+  const tanV = Math.tan(FOV / 2);
+  const dist = MAX_R / (tanV * Math.min(1, aspect)) * 1.03;
+  const eye = [Math.sin(t * 0.13) * dist * 0.12, (0.10 + Math.sin(t * 0.09) * 0.05) * dist, dist];
+  const proj = mPerspective(FOV, aspect, 0.1, 60);
+  const view = mLookAt(eye, [0, 0, 0], [0, 1, 0]);
+  const model = mMul(mRotY(spin), mRotX(Math.sin(t * 0.21) * 0.28));
+
+  gl.clearColor(T.bg[0], T.bg[1], T.bg[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  // (1) 배경
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+  drawFullQuad(PROG.bg, p => {
+    gl.uniform3fv(U(p,'uBg'), T.bg); gl.uniform3fv(U(p,'uColC'), T.c);
+    gl.uniform1f(U(p,'uTime'), t); gl.uniform1f(U(p,'uBass'), AU.bass); gl.uniform1f(U(p,'uTre'), AU.tre);
+  });
+
+  // (2) 오브 뒤 빛무리 (깊이 없이 더하기 합성)
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  drawFullQuad(PROG.glow, p => {
+    gl.uniform3fv(U(p,'uColC'), T.c);
+    gl.uniform1f(U(p,'uLevel'), AU.level); gl.uniform1f(U(p,'uBeat'), AU.beat);
+  });
+
+  // (3) 오브 본체
+  gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+  gl.useProgram(PROG.orb);
+  bindAttr(PROG.orb, 'aPos', hi ? BUF.hiPos : BUF.loPos, 3);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, hi ? BUF.hiIdx : BUF.loIdx);
+  orbUniforms(PROG.orb, t, proj, view, model, eye, T);
+  gl.uniform1f(U(PROG.orb,'uScale'), 1.0);
+  gl.uniform1f(U(PROG.orb,'uAlpha'), 1.0);
+  gl.drawElements(gl.TRIANGLES, (hi ? MESH.hi : MESH.lo).count, gl.UNSIGNED_SHORT, 0);
+
+  // (4) 표면을 감싼 빛 그물
+  if (CFG.net) {
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
+    gl.useProgram(PROG.net);
+    bindAttr(PROG.net, 'aPos', BUF.netPos, 3);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, BUF.netIdx);
+    orbUniforms(PROG.net, t, proj, view, model, eye, T);
+    gl.uniform1f(U(PROG.net,'uScale'), 1.012);
+    gl.uniform1f(U(PROG.net,'uAlpha'), 1.0);
+    gl.drawElements(gl.LINES, MESH.net.edgeCount, gl.UNSIGNED_SHORT, 0);
+  }
+
+  // (5) 주위를 도는 빛알갱이 — 박자마다 바깥으로 밀려 나간다
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
+  gl.useProgram(PROG.dot);
+  bindAttr(PROG.dot, 'aDir', BUF.dotDir, 3);
+  bindAttr(PROG.dot, 'aSeed', BUF.dotSeed, 2);
+  gl.uniformMatrix4fv(U(PROG.dot,'uProj'), false, proj);
+  gl.uniformMatrix4fv(U(PROG.dot,'uView'), false, view);
+  gl.uniformMatrix4fv(U(PROG.dot,'uModel'), false, mMul(mRotY(-spin * 0.55), mRotX(t * 0.07)));
+  gl.uniform1f(U(PROG.dot,'uTime'), t);
+  gl.uniform1f(U(PROG.dot,'uLevel'), AU.level);
+  gl.uniform1f(U(PROG.dot,'uShock'), AU.shock);
+  gl.uniform1f(U(PROG.dot,'uRes'), H * 0.012);
+  gl.uniform3fv(U(PROG.dot,'uColC'), T.c);
+  gl.drawArrays(gl.POINTS, 0, MESH.dots);
+  gl.depthMask(true);
+
+  meterFill.style.width = Math.round(Math.min(1, AU.level) * 100) + '%';
+
+  // 검증·디버깅용 — 콘솔이나 테스트에서 현재 상태를 들여다볼 수 있게
+  ORB_STATE = { t, mode:AU.mode, bass:AU.bass, mid:AU.mid, tre:AU.tre, level:AU.level,
+                beat:AU.beat, shock:AU.shock, peak:AU.peak, spin, theme:CFG.theme, net:CFG.net,
+                hi, fps: Math.round(1/Math.max(dt, 0.001)),
+                tris:(hi ? MESH.hi : MESH.lo).count/3, dots:MESH.dots, w:W, h:H };
+}
+Object.defineProperty(window, 'ORB', { get: () => ORB_STATE });
+window.ORB_API = { startDemo, startMic, startFile, CFG, THEMES, AU };
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
