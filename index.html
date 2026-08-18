@@ -1040,7 +1040,20 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
     </div>
     <div style="margin-top:8px;font-size:13px;color:${T.sub};font-weight:600;">${progLabel}</div>
   </div>
+  <div style="margin-top:12px;margin-bottom:26px;">${renderMsgLink(T, ST.timerRunning)}</div>
 </div>`;
+}
+// M.S.G. 파일 링크 — 하루 한 편, 다람쥐부 기밀 작전 영상. 집중 중엔 잠근다.
+function renderMsgLink(T, focus){
+  const lock=!!focus;
+  return `<div ${lock?'':'onclick="location.href=\'msg.html\'"'} class="tapbtn" style="${lock?'opacity:.45;filter:grayscale(.5);pointer-events:none;':'cursor:pointer;'}display:flex;align-items:center;gap:11px;background:#14161a;border:2px solid #35505f;border-radius:20px;padding:13px 16px;box-shadow:0 6px 16px rgba(0,0,0,0.08);">
+    <div style="font-size:24px;flex:none;">${lock?'🔒':'🐿️'}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:800;font-size:15.5px;color:#e8e4d8;">M.S.G. 파일 <span style="font-size:11px;font-weight:800;color:#ff6a5a;border:1.5px solid #b3271c;border-radius:4px;padding:1px 5px;margin-left:4px;">CLASSIFIED</span></div>
+      <div style="font-size:12.5px;color:#8aa0b4;font-weight:600;margin-top:2px;">다람쥐부 오늘의 작전 영상 ${lock?'· 집중 중엔 못 봐요':'· 하루 한 편'}</div>
+    </div>
+    <div style="flex:none;font-size:13px;font-weight:800;color:#5fd08a;">${lock?'':'열기 →'}</div>
+  </div>`;
 }
 // ── 가로 태블릿 대시보드 (한 화면에 연못+오늘숙제+도감) ──────────
 function isWide(){ return window.innerWidth>=820 && window.innerWidth>=window.innerHeight; }
@@ -1156,6 +1169,7 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
       <div style="flex:1;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
         ${dexPanel}
         ${renderHanwooriCard(T,focus)}
+        ${renderMsgLink(T,focus)}
         <div style="flex:1;min-height:8px;"></div>
         ${todayPanel}
       </div>
