@@ -14,6 +14,7 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 | Double jump | `SPACE` again in mid-air — **buy it in the Aura Shop first**, then one per jump, refilled on landing |
 | Turn the camera | drag the screen, or `Q` / `E` |
 | Back to checkpoint | `R` |
+| Save yourself | `G` while falling — **one per life**, and you have to be quick |
 | Pause | `ESC` or `P` |
 | Fullscreen | `F` or the ⛶ button — real fullscreen, so the address bar goes too |
 | Music / sound | 🎵 and 🔊 buttons, top right. They work **while you are playing** |
@@ -84,6 +85,25 @@ time pays a **+25 aura bonus**.
 Ice and Space sit after Devil on purpose: they are the odd ones rather than the
 hardest, and Nightmare has to stay last because it can never be cleared — anything
 placed after it would be locked forever.
+
+### 🆘 The one save
+
+Slip off an edge and you have **one** emergency recovery: press `G` while falling and
+you get a hard boost upward, plus your double jump back. It is spent until you die or
+touch a new checkpoint, and the 🆘 indicator under the orb counter dims once it is
+gone. There is a touch button for it too.
+
+The catch is the timing. The boost buys back a fixed amount of height, so it only
+rescues you if you hit it almost immediately:
+
+| Press `G` after | Fell from | Peaked at | Rescued |
+|---|---|---|---|
+| 0.05s | 8 | **14.1** | yes, back above the ledge |
+| 0.5s | 8 | **10.9** | yes |
+| 1.5s | 8 | 1.2 | no — spent for nothing |
+
+That window is the point. A save you can use at any moment is a safety net that makes
+falling meaningless; a save you have to react to is a skill.
 
 ### 🐌 Killer Snail (not an obby)
 

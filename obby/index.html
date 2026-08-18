@@ -122,6 +122,13 @@
     align-items:center; justify-content:center; font-weight:bold; font-size:22px; color:#1E1B33;
   }
   #touch.war .act { display:flex; }
+  #tG {
+    position:absolute; right:118px; bottom:34px; width:62px; height:62px; border-radius:50%;
+    border:4px solid rgba(30,27,51,.5); background:rgba(255,209,102,.55);
+    display:flex; align-items:center; justify-content:center; font-size:22px; pointer-events:auto;
+  }
+  #touch.war #tG { bottom:198px; }        /* keep clear of the snail buttons */
+  #tG.press { filter:brightness(1.35); }
   #tZ { right:118px; bottom:34px; background:rgba(255,255,255,.55); }
   #tK { right:22px;  bottom:116px; background:rgba(255,120,120,.6); }
   #tT { right:118px; bottom:116px; background:rgba(91,231,255,.55); }
@@ -207,6 +214,7 @@
         <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air — <b>buy it in the Aura Shop</b> first</td></tr>
         <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
+        <tr><td>Save yourself</td><td><b>G</b> while falling — <b>one per life</b>, and you must be quick</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
         <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
         <tr><td>Phone / tablet</td><td>joystick + jump button, drag the right side to look</td></tr>
@@ -250,6 +258,7 @@
     <div class="act" id="tZ" title="Throw salt">🧂</div>
     <div class="act" id="tK" title="Swing">👊</div>
     <div class="act" id="tT" title="Teleport to safehouse">🏠</div>
+    <div id="tG" title="Emergency save">🆘</div>
   </div>
 </div>
 
@@ -881,6 +890,10 @@ const GLIDE_FALL = 2.6;      // how slowly you sink while gliding, units/sec
 // so the most you can ever climb in one go is about WING_MAX_UP * WING_FUEL.
 const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
 const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
+// One emergency recovery per life. Slip off an edge and you have about half a second
+// to hit G before you are too far down for the boost to bring you back — miss the
+// window and it is spent for nothing, which is what keeps it from being a free net.
+const SAVE_BOOST = 18;
 const SPEED_BOOST = 1.35;
 // top speed, boots included — used for the run cap AND by anything that has to
 // stay ahead of you, like the Nightmare portal
@@ -904,7 +917,8 @@ addEventListener('keydown', e => {
     else if (e.code === 'KeyK') meleeSwing();
     else if (e.code === 'KeyT') teleportHome();
   }
-  if (e.code === 'KeyR' && game.screen === 'play') respawnOrRestart();
+  if (e.code === 'KeyG' && game.screen === 'play') emergencySave();
+  else if (e.code === 'KeyR' && game.screen === 'play') respawnOrRestart();
   else if (e.code === 'Escape' || e.code === 'KeyP') {
     if (game.screen === 'play') showScreen('pause'); else if (game.screen === 'pause') resume();
   } else if (e.code === 'KeyF') toggleFull();
@@ -934,7 +948,7 @@ stage.addEventListener('pointerdown', e => {
   // stage captures the pointer and the ⛶ / 🔊 / 🎵 buttons never get their click,
   // so they are unpressable the whole time you are playing.
   if (e.target.closest && e.target.closest('button')) return;
-  if (['knob','stick','tJ','tZ','tK','tT'].includes(e.target.id)) return;
+  if (['knob','stick','tJ','tZ','tK','tT','tG'].includes(e.target.id)) return;
   dragId = e.pointerId; dragX = e.clientX; dragY = e.clientY;
   stage.setPointerCapture(e.pointerId);
 });
@@ -977,7 +991,8 @@ const jUp = e => { e.preventDefault(); jbtn.classList.remove('press'); touchJump
 jbtn.addEventListener('pointerup', jUp);
 jbtn.addEventListener('pointercancel', jUp);
 // the three war buttons: salt, swing, teleport
-for (const [id, fn] of [['tZ', () => shootSalt()], ['tK', () => meleeSwing()], ['tT', () => teleportHome()]]) {
+for (const [id, fn] of [['tZ', () => shootSalt()], ['tK', () => meleeSwing()], ['tT', () => teleportHome()],
+                        ['tG', () => emergencySave()]]) {
   const el = document.getElementById(id);
   el.addEventListener('pointerdown', e => { e.preventDefault(); el.classList.add('press'); fn(); });
   const up = e => { e.preventDefault(); el.classList.remove('press'); };
@@ -1528,7 +1543,7 @@ function makePlayer(sp) {
   return {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
-    coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false,
+    coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false, saves:1,
     ascending:false,
     fuel:WING_FUEL, yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
@@ -1791,6 +1806,7 @@ function afterDeath() {
   if (game.mode !== 'obby') return;
   p.x = p.respawn.x; p.y = p.respawn.y; p.z = p.respawn.z;
   p.vx = p.vy = p.vz = 0; p.onGround = false; p.standing = null;
+  p.saves = 1;                       // a fresh life gets a fresh recovery
   for (const s of game.world.solids) if (s.kind === 'crumble') { s.gone = 0; s.timer = 0; }
   snapCamera();
 }
@@ -1809,6 +1825,7 @@ function updateObby(dt) {
     if (Math.abs(p.x-c.x) < 3 && Math.abs(p.z-c.z) < 2.6 && Math.abs(p.y-c.y) < 3) {
       c.hit = true;
       p.respawn = { x:c.x, y:c.y + 1.2, z:c.z };
+      p.saves = 1;                     // reaching a checkpoint hands it back
       Sound.check(); burst(c.x, c.y+1.5, c.z, 12, '#5BE7FF');
       game.banner = { text:'🚩 Checkpoint!', t:1.3 };
     }
@@ -1920,6 +1937,24 @@ function meleeSwing() {
   sn.x += dx/l*7; sn.z += dz/l*7;
   game.shake = 9;
   burst(sn.x, sn.y, sn.z, 16, '#FFE08A');
+}
+
+// G: one save per life. Only while you are falling, and only if you have not used it.
+function emergencySave() {
+  const p = game.player;
+  if (!p || game.dead > 0 || game.won) return;
+  if (p.onGround || p.vy > 0 || p.saves <= 0) return;
+  p.saves = 0;
+  p.vy = SAVE_BOOST;
+  p.airJumps = 0;                      // and your double jump comes back with it
+  p.jumpHeld = false;
+  Sound.pad();
+  game.banner = { text:'🆘 SAVED! (that was your one)', t:1.6 };
+  for (let i=0;i<14;i++) {
+    const a = i/14 * 6.283;
+    game.particles.push({ x:p.x + Math.cos(a)*0.6, y:p.y - PHY, z:p.z + Math.sin(a)*0.6,
+      vx:Math.cos(a)*3, vy:-0.5, vz:Math.sin(a)*3, life:0.4, max:0.4, size:0.18, g:2, c:'#FFD166' });
+  }
 }
 
 function teleportHome() {
@@ -2743,6 +2778,18 @@ function drawHUD(t) {
     H.fillText('🪽', 138, 67);
   }
 
+  // the one emergency recovery, lit while you still have it
+  if (game.player) {
+    H.textAlign = 'left';
+    H.font = 'bold 15px "Trebuchet MS", sans-serif';
+    H.globalAlpha = game.player.saves > 0 ? 1 : 0.28;
+    H.fillStyle = 'rgba(18,16,31,.55)';
+    rr2(14, 54, 62, 26, 9); H.fill();
+    H.fillStyle = game.player.saves > 0 ? '#FFD166' : '#8A8AA0';
+    H.fillText('🆘 G', 24, 72);
+    H.globalAlpha = 1;
+  }
+
   let label = 'TIME', big = fmtTime(game.time);
   if (game.mode === 'snail') label = 'SURVIVED';
   if (game.mode === 'infinity') { label = 'DEPTH'; big = game.depth + ' m'; }
@@ -3383,7 +3430,7 @@ window.OBBY = {
   game, save, cam, input, LEVELS, SKINS, CHUNKS, POOL, update, readKeys, bakeStatic, resetRun,
   buildCourse, buildArena, buildShaft, addShaftLayer,
   startLevel, startSnail, startInfinity, showScreen, persist,
-  shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, project, cam, endRun, Scores,
+  shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, emergencySave, project, cam, endRun, Scores,
   consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
 };
 
