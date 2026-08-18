@@ -1,0 +1,5 @@
+config.js
+.env
+.env.*
+private/seed-data.json
+.DS_Store
