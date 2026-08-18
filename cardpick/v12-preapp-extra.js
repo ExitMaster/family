@@ -12,3 +12,9 @@ if(base){
   const excludedTags=new Set(['overseas-root','overseas','government-voucher','transport-root','bus','subway','taxi','apartment','gas','electricity','social-insurance']);
   base.browseTags=[...new Set(collect(BROWSE_TREE,[]).filter(id=>!excludedTags.has(id)))];
 }
+if(lawyers&&!lawyers.benefits.some(b=>b.id==='lawyers-mastercard-premium'))lawyers.benefits.push({
+  id:'lawyers-mastercard-premium',name:'Mastercard Platinum 프리미엄 서비스',group:'Mastercard Platinum',sourceType:'network-common',benefitType:'informational',
+  categories:['hotel','airport-transfer','rental-car'],browseTags:['travel','airport','airport-transfer','hotel','rental-car'],
+  capByTier:{inactive:999999999,'40+':999999999},
+  notes:['상품설명서(2022.10)에 호텔·공항픽업/주차·렌터카·여행·골프·로밍·라이프스타일 제휴서비스가 안내됨','Mastercard 프리미엄 서비스는 1년 단위로 제공되고 변경될 수 있으므로 실제 이용 전 Mastercard의 현재 연도 조건 확인 필요','이 정보성 혜택은 추천 할인액 계산에는 포함하지 않음']
+});
