@@ -116,15 +116,36 @@ function buildMission(key) {
 // ── 장면(샷) 구성 ────────────────────────────────────────────
 //  각 샷은 SVG 한 장 + 자막 한 줄. 타임라인이 자동으로 넘긴다 = 영상.
 function shots(m) {
+  if (state.mode === 'jr') return jrShots(m);
   return [
-    {sfx:'hq',     ms:2600, cap:'M.S.G. HQ — SUB-BASEMENT. 0451 HOURS.',            draw:sHQ},
-    {sfx:'alarm',  ms:3000, cap:m.alarm,                                                 draw:sAlarm},
-    {sfx:'order',  ms:3600, cap:m.order,                                                 draw:sOrder},
-    {sfx:'deploy', ms:3000, cap:'SQUAD ' + m.squadA + ' AND SQUAD ' + m.squadB + ' DEPLOY. ' + m.soldiers + ' SOLDIER SQUIRRELS.', draw:sDeploy},
-    {sfx:'threat', ms:3000, cap:'CONTACT AT ' + m.sector + '. ' + m.threat.n + ' — ' + m.threat.d + '.', draw:sThreat},
-    {sfx:'fire',   ms:3400, cap:m.weapon + ' FIRING. ' + m.rounds + ' ROUNDS AWAY.',      draw:sFire},
-    {sfx:'win',    ms:3000, cap:m.outcome.t + '. ' + m.outcome.s,                        draw:sVictory},
-    {sfx:'stamp',  ms:3600, cap:m.closer,                                                draw:sSeal}
+    {sfx:'hq',     ms:3000, cap:'M.S.G. HQ — SUB-BASEMENT. 0451 HOURS.',            draw:sHQ},
+    {sfx:'alarm',  ms:3400, cap:m.alarm,                                            draw:sAlarm},
+    {sfx:'order',  ms:4200, cap:m.order,                                            draw:sOrder},
+    {sfx:'deploy', ms:3400, cap:'무장고 개방. ' + m.weapon + ' 지급.',              draw:sArmory},
+    {sfx:'deploy', ms:3400, cap:'SQUAD ' + m.squadA + ' AND SQUAD ' + m.squadB + ' DEPLOY. ' + m.soldiers + ' SOLDIER SQUIRRELS.', draw:sDeploy},
+    {sfx:'hq',     ms:3200, cap:'정찰대 보고 — ' + m.sector + ' 방향에서 접촉.',    draw:sRecon},
+    {sfx:'threat', ms:3400, cap:'CONTACT AT ' + m.sector + '. ' + m.threat.n + ' — ' + m.threat.d + '.', draw:sThreat},
+    {sfx:'fire',   ms:3600, cap:'1차 사격. ' + m.weapon + ' — ' + m.rounds + ' ROUNDS AWAY.', draw:sFire},
+    {sfx:'threat', ms:3400, cap:m.threat.n + ' 반격! 3층까지 무너졌다. 대피!',      draw:sCounter},
+    {sfx:'deploy', ms:3200, cap:'HEAD SQUIRREL: "Send in the second wave. Steady, chaps."', draw:sReinforce},
+    {sfx:'fire',   ms:3600, cap:'전 부대 일제 사격. 좌표 ' + Math.abs(m.floor) + '-' + m.rounds + '.', draw:sFire},
+    {sfx:'stamp',  ms:3400, cap:'최후의 일격 — 명중!',                              draw:sFinal},
+    {sfx:'win',    ms:3400, cap:m.outcome.t + '. ' + m.outcome.s,                    draw:sVictory},
+    {sfx:'win',    ms:3400, cap:'전원 귀환. 훈장 수여식.',                          draw:sMedal},
+    {sfx:'stamp',  ms:3800, cap:m.closer,                                            draw:sSeal}
+  ];
+}
+// 주니어 작전 — 형 몰래 나갔다가 사고 치고, 형아 부대가 구하러 온다.
+function jrShots(m) {
+  return [
+    {sfx:'hq',     ms:3000, cap:'하람쥐 주니어, 형 몰래 출동. 04시 51분.',           draw:jSneak},
+    {sfx:'deploy', ms:3200, cap:'도토리 흔적 발견! 여섯 개. 주니어는 다 셀 수 있다.', draw:jTrail},
+    {sfx:'threat', ms:3400, cap:'앗! ' + m.threat.n + ' 에게 들켰다!',               draw:jOops},
+    {sfx:'order',  ms:3800, cap:'주니어: "형아! 형아 나와! 여기 ' + m.sector + '!"', draw:jCall},
+    {sfx:'deploy', ms:3400, cap:'HEAD SQUIRREL: "Hold on, little one. We are coming."', draw:jRescue},
+    {sfx:'fire',   ms:3400, cap:m.squadA + ' 부대 엄호 사격! 주니어 탈출!',          draw:sFire},
+    {sfx:'win',    ms:3400, cap:'무사 귀환. 도토리도 하나 안 놓쳤다.',                draw:jHome},
+    {sfx:'stamp',  ms:3600, cap:'대장3: "Well done, little one. But ask me next time."', draw:sSeal}
   ];
 }
 
@@ -333,6 +354,13 @@ function swStop() { if (state.t0 && !state.tEnd) state.tEnd = Date.now(); clearI
 // ── 임무 체크리스트 ──────────────────────────────────────────
 //  작전을 보면서 하나씩 눌러 확인한다. 전부 확인 + 영상 끝 = 임무 완수.
 function buildTasks(m) {
+  if (state.mode === 'jr') return [
+    { t: '형 몰래 나가기 성공',            done: false },
+    { t: '도토리 흔적 세기',               done: false },
+    { t: '형아한테 무전 치기',             done: false },
+    { t: '형아 부대 도착 확인',            done: false },
+    { t: '도토리 들고 무사히 집으로',      done: false }
+  ];
   return [
     { t: '경보 확인 — 층 ' + m.floor,               done: false },
     { t: m.squadA + ' / ' + m.squadB + ' 출동 확인', done: false },
@@ -359,10 +387,102 @@ function finishIfDone() {
   return true;
 }
 
+
+function sArmory(m) {
+  let racks = '';
+  for (let i=0;i<6;i++) racks += '<g transform="translate(' + (70+i*90) + ',110)"><rect x="-8" y="0" width="60" height="9" rx="4" fill="#39424c"/>' +
+    '<rect x="46" y="-3" width="12" height="15" rx="3" fill="#2b333b"/><rect x="-14" y="-2" width="10" height="13" rx="2" fill="#4a5560"/></g>';
+  return room('<text x="40" y="56" class="mono" font-size="15" fill="#5fd08a">ARMOURY — ' + m.weapon + '</text>' + racks +
+    squirrel(90, 200, 1.9, {helmet:1, bazooka:1, anim:'bob .8s infinite'}) +
+    squirrel(300, 200, 1.9, {helmet:1, bazooka:1, anim:'bob .95s infinite'}) +
+    squirrel(500, 200, 1.9, {helmet:1, anim:'bob 1.1s infinite'}));
+}
+function sRecon(m) {
+  return room(stars() +
+    '<g transform="translate(300,120)" opacity=".5"><circle r="90" fill="none" stroke="#5fd08a" stroke-width="1"/>' +
+    '<circle r="58" fill="none" stroke="#5fd08a" stroke-width="1"/><circle r="26" fill="none" stroke="#5fd08a" stroke-width="1"/>' +
+    '<path d="M0 0 L74 -52" stroke="#5fd08a" stroke-width="2" style="transform-origin:0 0;animation:sway 2.4s linear infinite"/></g>' +
+    '<circle cx="356" cy="72" r="6" fill="#ff5a49" style="animation:blink .9s infinite"/>' +
+    '<text x="40" y="52" class="mono" font-size="14" fill="#5fd08a">RECON — CONTACT BEARING 0-4-5</text>' +
+    squirrel(60, 240, 1.7, {helmet:1}));
+}
+function sCounter(m) {
+  let debris = '';
+  for (let i=0;i<7;i++) debris += '<rect x="' + (60+i*80) + '" y="' + (250+(i%3)*22) + '" width="' + (16+i*3) + '" height="9" rx="3" fill="#4a5560" style="animation:bob ' + (0.5+i*0.1) + 's infinite"/>';
+  return '<g style="animation:shake .18s infinite">' + room(stars() + monster(m.threat.kind) + debris +
+    '<g style="animation:boom .7s infinite"><circle cx="150" cy="210" r="44" fill="#ff8a3c" opacity=".8"/><circle cx="150" cy="210" r="22" fill="#ffe27a"/></g>' +
+    squirrel(40, 250, 1.6, {helmet:1, anim:'bob .3s infinite'}) +
+    '<text x="40" y="52" class="mono" font-size="16" fill="#ff5a49">적 반격! 대피!</text>') + '</g>';
+}
+function sReinforce(m) {
+  let wave = '';
+  for (let i=0;i<8;i++) wave += '<g style="animation:flyR ' + (1.6+i*0.12) + 's linear infinite">' +
+    squirrel(-80 + i*30, 150 + (i%4)*48, 1.35, {helmet:1, bazooka:1}) + '</g>';
+  return room('<text x="320" y="56" text-anchor="middle" class="mono" font-size="16" fill="#5fd08a">증원 도착 — ' + m.squadB + ' 2진</text>' + wave);
+}
+function sFinal(m) {
+  return '<g style="animation:shake .22s infinite">' + room(stars() + monster(m.threat.kind) +
+    '<g style="animation:boom .5s infinite"><circle cx="430" cy="120" r="72" fill="#ffe27a" opacity=".95"/>' +
+    '<circle cx="430" cy="120" r="120" fill="#ff8a3c" opacity=".45"/></g>' +
+    squirrel(40, 230, 2, {helmet:1, bazooka:1, anim:'bob .28s infinite'}) +
+    '<text x="40" y="52" class="mono" font-size="18" fill="#ffdc4a">최후의 일격!</text>') + '</g>';
+}
+function sMedal(m) {
+  return room('<rect width="640" height="360" fill="#ffdc4a" opacity=".07"/>' +
+    squirrel(120, 190, 2.2, {cap:1}) + squirrel(330, 200, 2, {helmet:1, anim:'bob 1s infinite'}) +
+    '<g transform="translate(300,150)"><circle r="26" fill="#ffdc4a" stroke="#c79a1e" stroke-width="3"/>' +
+    '<path d="M-14 26 L-8 54 L0 44 L8 54 L14 26 Z" fill="#b3271c"/>' +
+    '<text y="7" text-anchor="middle" class="mono" font-size="20" fill="#7a5c07">M</text></g>' +
+    '<text x="320" y="60" text-anchor="middle" class="mono" font-size="18" fill="#ffdc4a">훈장 수여</text>');
+}
+// ── 주니어 작전 전용 장면 ────────────────────────────────────
+function jrSquirrel(x, y, sc, opts) { return squirrel(x, y, sc, Object.assign({}, opts)); }
+function jRoom(extra) {
+  return '<rect width="640" height="360" fill="#16202a"/><rect y="250" width="640" height="110" fill="#20303c"/>' +
+    '<g opacity=".2" stroke="#ffdc4a" stroke-width="1"><path d="M0 290H640M0 320H640"/></g>' + (extra || '');
+}
+function jSneak(m) {
+  return jRoom('<text x="40" y="54" class="mono" font-size="15" fill="#ffdc4a">주니어, 몰래 출동</text>' +
+    jrSquirrel(90, 200, 1.7, {}) +
+    '<g opacity=".45">' + jrSquirrel(430, 190, 2.1, {cap:1}) + '</g>');
+}
+function jTrail(m) {
+  let acorns = '';
+  for (let i=0;i<6;i++) acorns += '<g transform="translate(' + (90+i*88) + ',' + (200+(i%2)*46) + ')">' +
+    '<ellipse cy="6" rx="14" ry="17" fill="#c08a44"/><path d="M-15 -5 A15 11 0 0 1 15 -5 Z" fill="#7a4a24"/></g>';
+  return jRoom('<text x="40" y="54" class="mono" font-size="15" fill="#ffdc4a">도토리 흔적 발견</text>' + acorns +
+    jrSquirrel(40, 240, 1.5, {anim:'bob .6s infinite'}));
+}
+function jOops(m) {
+  return '<g style="animation:shake .25s infinite">' + jRoom(monster(m.threat.kind) +
+    '<text x="40" y="54" class="mono" font-size="17" fill="#ff5a49">앗! 들켰다!</text>' +
+    jrSquirrel(50, 240, 1.6, {anim:'bob .3s infinite'})) + '</g>';
+}
+function jCall(m) {
+  return jRoom('<rect x="60" y="70" width="330" height="110" rx="10" fill="#0e1418" stroke="#ffdc4a"/>' +
+    '<text x="80" y="106" class="mono" font-size="13" fill="#ffdc4a">📻 형아! 형아 나와!</text>' +
+    '<text x="80" y="134" class="mono" font-size="12" fill="#cfe6d9">HEAD SQUIRREL: "Hold on, little one."</text>' +
+    '<text x="80" y="160" class="mono" font-size="12" fill="#8aa0b4">지원 요청 — ' + m.sector + '</text>' +
+    jrSquirrel(430, 190, 1.9, {}) +
+    '<circle cx="368" cy="98" r="6" fill="#ff5a49" style="animation:blink .7s infinite"/>');
+}
+function jRescue(m) {
+  let wave = '';
+  for (let i=0;i<4;i++) wave += '<g style="animation:flyR ' + (1.5+i*0.16) + 's linear infinite">' +
+    squirrel(-60 + i*40, 160 + (i%3)*50, 1.5, {helmet:1, bazooka:1}) + '</g>';
+  return jRoom(monster(m.threat.kind) + wave +
+    '<text x="40" y="54" class="mono" font-size="16" fill="#5fd08a">형아 부대 도착!</text>');
+}
+function jHome(m) {
+  return jRoom('<rect width="640" height="360" fill="#ffdc4a" opacity=".08"/>' +
+    jrSquirrel(150, 200, 2, {anim:'bob .9s infinite'}) + squirrel(360, 190, 2.1, {cap:1}) +
+    '<text x="320" y="60" text-anchor="middle" class="mono" font-size="18" fill="#ffdc4a">무사 귀환 — 도토리도 챙겼다</text>');
+}
+
 // ── 재생기 ───────────────────────────────────────────────────
 const app = document.getElementById('app');
 let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false, quiz:null, qi:0, qmsg:'', qok:false, attempt:0,
-                t0:0, tEnd:0, swTimer:null, tasks:null, reelDone:false, doneAt:0 };
+                t0:0, tEnd:0, swTimer:null, tasks:null, reelDone:false, doneAt:0, mode:'main' };
 function unlocked() { try { return sessionStorage.getItem(K_UNLOCK) === '1'; } catch (e) { return false; } }
 
 function css(){ return `
@@ -388,6 +508,8 @@ function css(){ return `
       color:#0d1a12;background:linear-gradient(180deg,#7fe3a4,#4bbd78);border:none;border-radius:16px;
       box-shadow:0 6px 0 #2f8b54;cursor:pointer;letter-spacing:.04em}
   .go:active{transform:translateY(4px);box-shadow:0 2px 0 #2f8b54}
+  .go.jr{background:linear-gradient(180deg,#ffd479,#eba93c);box-shadow:0 6px 0 #a9741d;color:#2b1d05;margin-top:12px}
+  .go.jr:active{box-shadow:0 2px 0 #a9741d}
   .go small{display:block;font-size:12px;letter-spacing:.16em;opacity:.75;margin-bottom:6px}
   .swrow{display:flex;align-items:baseline;gap:10px;justify-content:center;margin:2px 0 10px}
   .swrow #sw{font-size:30px;color:#5fd08a;letter-spacing:.04em}
@@ -480,13 +602,16 @@ function ukVoice() {
       || null;
 }
 if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { VOICE = ukVoice(); };
-function speak(text) {
+function speak(text, jr) {
   if (muted || !window.speechSynthesis || !text) return;
   if (!voiceTried) { VOICE = ukVoice(); voiceTried = true; }
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.85;
+    u.lang = 'en-GB';
+    if (jr === undefined) jr = (state.mode === 'jr');
+    u.rate = jr ? 1.08 : 0.95;
+    u.pitch = jr ? 1.6 : 0.85;
     try { if (VOICE) u.voice = VOICE; } catch (e) {}
     speechSynthesis.speak(u);
   } catch (e) {}
@@ -496,7 +621,8 @@ function hush() { try { if (window.speechSynthesis) speechSynthesis.cancel(); } 
 // ── 임무 자격 심사 (퀴즈) ─────────────────────────────────────
 //  시작 버튼 → 문제 3개를 맞혀야 작전이 개시된다.
 //  틀려도 실패가 아니라 다시 풀면 된다 — 대장이 한 소리 할 뿐.
-const QUIZ_N = 3;
+const QUIZ_N = 3, QUIZ_N_JR = 2;
+function quizN() { return state.mode === 'jr' ? QUIZ_N_JR : QUIZ_N; }
 const SCOLD = [
   'Steady on, trooper. Count them again.',
   'Not quite, I\u2019m afraid. Have another go.',
@@ -539,13 +665,13 @@ function choicesAround(r, ans, spread, min) {
 }
 const QUIZ_KINDS = [
   // 도토리 세기
-  function (r, m) {
-    const n = ri(r, 5, 14), seed = hashStr('acorn|' + n + '|' + Math.floor(r() * 1e9));
+  function (r, m, jr) {
+    const n = jr ? ri(r, 3, 8) : ri(r, 5, 14), seed = hashStr('acorn|' + n + '|' + Math.floor(r() * 1e9));
     return { q: '도토리가 몇 개일까?', art: acornField(n, seed), opts: choicesAround(r, n, 3, 1), ans: n };
   },
   // 창고 계산
-  function (r, m) {
-    const a = ri(r, 6, 20), b = ri(r, 3, 12), plus = r() < 0.55;
+  function (r, m, jr) {
+    const a = jr ? ri(r, 3, 9) : ri(r, 6, 20), b = jr ? ri(r, 1, 5) : ri(r, 3, 12), plus = jr ? true : r() < 0.55;
     const ans = plus ? a + b : Math.max(a, b) - Math.min(a, b);
     const q = plus
       ? '창고에 도토리가 ' + a + '개. ' + b + '개를 더 모았다. 모두 몇 개?'
@@ -581,10 +707,13 @@ function buildQuiz(m) {
   const r = rng(hashStr('quiz|' + m.key + '|' + (state.attempt || 0) + '|' + Math.floor(Math.random() * 1e9)));
   const kinds = QUIZ_KINDS.slice();
   const out = [];
-  while (out.length < QUIZ_N && kinds.length) out.push(kinds.splice(Math.floor(r() * kinds.length), 1)[0](r, m));
+  const jr = state.mode === 'jr';
+  const pool = jr ? kinds.slice(0, 2) : kinds;   // 주니어는 세기 · 더하기 빼기만
+  while (out.length < quizN() && pool.length) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0](r, m, jr));
   return out;
 }
 function startQuiz() {
+  if (state.lastMode !== state.mode) { state.attempt = 0; state.lastMode = state.mode; }  // 심사 횟수는 작전별로 센다
   state.attempt = (state.attempt || 0) + 1;
   state.quiz = buildQuiz(state.mission);
   state.qi = 0; state.qmsg = ''; state.qok = false;
@@ -597,7 +726,7 @@ function renderQuiz() {
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span>' +
     '<h1 class="mono">임무 자격 심사</h1>' +
-    '<p class="sub mono">' + QUIZ_N + '문제를 맞혀야 작전이 개시된다 — ' + (state.qi + 1) + ' / ' + QUIZ_N + '</p>' +
+    '<p class="sub mono">' + quizN() + '문제를 맞혀야 작전이 개시된다 — ' + (state.qi + 1) + ' / ' + quizN() + '</p>' +
     '<div class="screen"><svg viewBox="0 0 640 340">' + q.art + '</svg><div class="scan"></div></div>' +
     '<div class="cap mono">' + q.q + '</div>' +
     '<div class="pin">' + dots + '</div>' +
@@ -626,7 +755,9 @@ function answer(v) {
     state.qi++; state.qok = true; state.qmsg = pick(r, PRAISE); speak(state.qmsg); renderQuiz(); return;
   }
   state.quiz = null; sfx('go');
-  speak('All three correct. Very good indeed. M.S.G., you are cleared for the mission.');
+  speak(state.mode === 'jr'
+    ? 'Yay! All correct! Come on, come on, let us go!'
+    : 'All correct. Very good indeed. M.S.G., you are cleared for the mission.');
   state.tasks = buildTasks(state.mission); state.reelDone = false;
   swStart();
   state.started = true; state.i = 0; state.cued = -1; play();
@@ -644,7 +775,9 @@ function renderBrief() {
       '<p>적 <b style="color:#ff6a5a">' + m.threat.n + '</b> — ' + m.threat.d + '</p>' +
       '<p>부대 <b style="color:#cfe6d9">' + m.squadA + ' / ' + m.squadB + '</b> · 무장 <b style="color:#cfe6d9">' + m.weapon + '</b></p>' +
       '<button class="go tapbtn mono" id="go"><small>공군 하람쥐 대장3</small>임무 시작! 🚀</button>' +
-      '<p style="margin-top:10px;text-align:center">먼저 자격 심사 ' + QUIZ_N + '문제를 통과해야 한다.</p>' +
+      '<p style="margin-top:10px;text-align:center">자격 심사 ' + QUIZ_N + '문제 · 작전 15장면</p>' +
+      '<button class="go jr tapbtn mono" id="gojr"><small>하람쥐 주니어</small>미션 시작! 🌰</button>' +
+      '<p style="margin-top:8px;text-align:center">짧고 쉬운 작전. 문제 ' + QUIZ_N_JR + '개, 형아가 구하러 온다.</p>' +
     '</div>' +
     '<div class="row">' +
       '<button class="tapbtn mono" id="full">' + fsLabel() + '</button>' +
@@ -652,7 +785,8 @@ function renderBrief() {
       '<button class="tapbtn mono" id="arch">▤ ARCHIVE</button>' +
     '</div>' +
   '</div>';
-  document.getElementById('go').onclick = () => { sfx('key'); startQuiz(); };
+  document.getElementById('go').onclick = () => { state.mode = 'main'; sfx('key'); startQuiz(); };
+  document.getElementById('gojr').onclick = () => { state.mode = 'jr'; sfx('key'); startQuiz(); };
   document.getElementById('full').onclick = () => { toggleFull(); setTimeout(renderBrief, 120); };
   document.getElementById('mute').onclick = () => { toggleMute(); renderBrief(); };
   document.getElementById('arch').onclick = archive;
@@ -671,7 +805,7 @@ function render() {
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span>' +
     '<h1 class="mono">M.S.G. FILES</h1>' +
-    '<p class="sub mono">MINISTRY OF SQUIRREL GROUP — DAILY OPERATION ' + m.fileNo + '</p>' +
+    '<p class="sub mono">' + (state.mode === 'jr' ? '주니어 작전' : 'MINISTRY OF SQUIRREL GROUP') + ' — ' + m.fileNo + '</p>' +
     '<div class="screen"><button class="fs tapbtn mono" id="full" title="전체화면">' + (fsOn() ? '⤡' : '⛶') + '</button>' +
       '<svg viewBox="0 0 640 360">' + s.draw(m) + '</svg><div class="scan"></div></div>' +
     '<div class="cap mono" id="cap">' + s.cap + '</div>' +
@@ -734,13 +868,13 @@ function loadLog() { try { return JSON.parse(localStorage.getItem(K_STORE)) || [
 function remember() {
   const m = state.mission, log = loadLog();
   const rec = {
-    key: m.key, fileNo: m.fileNo, threat: m.threat.n, floor: m.floor, result: m.outcome.t,
+    key: m.key + (state.mode === 'jr' ? '-JR' : ''), jr: state.mode === 'jr', fileNo: m.fileNo, threat: m.threat.n, floor: m.floor, result: m.outcome.t,
     ms: state.doneAt ? swMs() : 0,
     tasks: taskDone(), tasksAll: state.tasks ? state.tasks.length : 0,
     tries: state.attempt || 0,
     clear: !!state.doneAt
   };
-  const at = log.findIndex(x => x.key === m.key);
+  const at = log.findIndex(x => x.key === rec.key);
   // 같은 날은 한 줄만. 더 좋은 기록(완수 우선, 그 다음 빠른 시간)일 때만 덮어쓴다.
   if (at < 0) log.unshift(rec);
   else {
@@ -758,7 +892,8 @@ function archive() {
   const best = cleared.length ? cleared.reduce((a, b) => (a.ms && a.ms < b.ms ? a : b)) : null;
   const rows = log.length
     ? log.map(x => '<div style="padding:9px 0;border-bottom:1px solid #222c35">' +
-        (x.clear ? '<span style="color:#ffdc4a">✓ </span>' : '<span style="color:#6f8598">· </span>') + x.key + ' · ' + x.fileNo +
+        (x.clear ? '<span style="color:#ffdc4a">✓ </span>' : '<span style="color:#6f8598">· </span>') + x.key +
+        (x.jr ? ' <span style="color:#eba93c">🌰 주니어</span>' : '') + ' · ' + x.fileNo +
         '<br><span style="color:#8aa0b4">FLOOR ' + x.floor + ' · ' + x.threat + ' · ' + x.result + '</span>' +
         '<br><span style="color:#5fd08a">⏱ ' + (x.ms ? swText(x.ms) : '--:--.-') + '</span>' +
         '<span style="color:#8aa0b4"> · ☑ ' + (x.tasks || 0) + '/' + (x.tasksAll || 5) + ' · 심사 ' + (x.tries || 1) + '회</span>' +
