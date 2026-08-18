@@ -35,7 +35,13 @@ body { font-family:'Inter',system-ui,sans-serif; background:#14161a; color:#e8e4
 //  같은 날짜 = 누가 열어도 똑같은 파일.
 const K_STORE = 'family-msg-files-v1';
 const K_UNLOCK = 'family-msg-unlocked';
-const PIN = '1706';   // 기밀 접근 코드. 놀이용 잠금 — 진짜 보안이 아니다.
+// 기밀 접근 코드. 놀이용 잠금 — 진짜 보안이 아니다.
+// 코드마다 누구로 들어왔는지가 다르다.
+const PINS = {
+  '1706': { who: '대장3', label: '공군 하람쥐 대장3', mode: 'main' },
+  '6767': { who: '주니어', label: '하람쥐 주니어 대원', mode: 'jr' }
+};
+const K_WHO = 'family-msg-who';
 
 // ── 씨앗 난수 (mulberry32) ───────────────────────────────────
 function hashStr(s) {
@@ -649,6 +655,7 @@ const app = document.getElementById('app');
 let state = { mission:null, i:0, timer:null, playing:false, started:false, cued:-1, pin:'', pinErr:false, quiz:null, qi:0, qmsg:'', qok:false, attempt:0,
                 t0:0, tEnd:0, swTimer:null, tasks:null, reelDone:false, doneAt:0, mode:'main' };
 function unlocked() { try { return sessionStorage.getItem(K_UNLOCK) === '1'; } catch (e) { return false; } }
+function whoIs() { try { return PINS[sessionStorage.getItem(K_WHO)] || null; } catch (e) { return null; } }
 
 function css(){ return `
   .wrap{max-width:720px;margin:0 auto;padding:18px 16px 60px}
@@ -673,6 +680,7 @@ function css(){ return `
       color:#0d1a12;background:linear-gradient(180deg,#7fe3a4,#4bbd78);border:none;border-radius:16px;
       box-shadow:0 6px 0 #2f8b54;cursor:pointer;letter-spacing:.04em}
   .go:active{transform:translateY(4px);box-shadow:0 2px 0 #2f8b54}
+  .go.mine{outline:2px solid #ffdc4a;outline-offset:3px}
   .go.jr{background:linear-gradient(180deg,#ffd479,#eba93c);box-shadow:0 6px 0 #a9741d;color:#2b1d05;margin-top:12px}
   .go.jr:active{box-shadow:0 2px 0 #a9741d}
   .go small{display:block;font-size:12px;letter-spacing:.16em;opacity:.75;margin-bottom:6px}
@@ -727,7 +735,7 @@ function renderLock() {
     '<h1 class="mono">M.S.G. FILES</h1>' +
     '<p class="sub mono">ACCESS CODE REQUIRED — 접근 코드를 입력하세요</p>' +
     '<div class="brief mono"><h2>🔒 기밀 파일</h2>' +
-      '<p>M.S.G. 대원만 열 수 있습니다. 네 자리 코드를 입력하세요.</p>' +
+      '<p>M.S.G. 대원만 열 수 있습니다. 네 자리 코드를 입력하세요.<br>대장 코드와 주니어 코드가 따로 있다.</p>' +
       '<div class="pin">' + dots + '</div>' +
       '<div class="err mono">' + (state.pinErr ? '코드가 틀렸습니다. 다시.' : '') + '</div>' +
       '<div class="pad">' + keys.map(k => '<button class="tapbtn mono" data-k="' + k + '">' + k + '</button>').join('') + '</div>' +
@@ -744,9 +752,13 @@ function key(k) {
   renderLock();
 }
 function submitPin() {
-  if (state.pin === PIN) {
-    try { sessionStorage.setItem(K_UNLOCK, '1'); } catch (e) {}
-    state.pin = ''; sfx('unlock'); render(); return;
+  const who = PINS[state.pin];
+  if (who) {
+    try { sessionStorage.setItem(K_UNLOCK, '1'); sessionStorage.setItem(K_WHO, state.pin); } catch (e) {}
+    state.mode = who.mode;
+    state.pin = ''; sfx('unlock');
+    speak(who.mode === 'jr' ? 'Ah. It is you, little one. In you come.' : 'Access granted. Welcome back, commander.', who.mode === 'jr');
+    render(); return;
   }
   state.pin = ''; state.pinErr = true; sfx('wrong'); renderLock();
 }
@@ -1030,14 +1042,14 @@ function renderBrief() {
     '<h1 class="mono">M.S.G. FILES</h1>' +
     '<p class="sub mono">MINISTRY OF SQUIRREL GROUP — DAILY OPERATION ' + m.fileNo + '</p>' +
     '<div class="brief mono">' +
-      '<h2>오늘의 임무 브리핑</h2>' +
+      '<h2>오늘의 임무 브리핑' + (whoIs() ? ' — ' + whoIs().label : '') + '</h2>' +
       '<p>지점 <b style="color:#cfe6d9">' + m.sector + '</b> · 층 <b style="color:#cfe6d9">' + m.floor + '</b></p>' +
       '<p>적 <b style="color:#ff6a5a">' + m.threat.n + '</b> — ' + m.threat.d + '</p>' +
       '<p>부대 <b style="color:#cfe6d9">' + m.squadA + ' / ' + m.squadB + '</b> · 무장 <b style="color:#cfe6d9">' + m.weapon + '</b></p>' +
-      '<button class="go tapbtn mono" id="go"><small>공군 하람쥐 대장3</small>임무 시작! 🚀</button>' +
-      '<p style="margin-top:10px;text-align:center">자격 심사 ' + QUIZ_N + '문제 · 작전 15장면</p>' +
-      '<button class="go jr tapbtn mono" id="gojr"><small>하람쥐 주니어</small>미션 시작! 🌰</button>' +
-      '<p style="margin-top:8px;text-align:center">짧고 쉬운 작전. 문제 ' + QUIZ_N_JR + '개, 형아가 구하러 온다.</p>' +
+      '<button class="go tapbtn mono' + (whoIs() && whoIs().mode === 'main' ? ' mine' : '') + '" id="go"><small>공군 하람쥐 대장3</small>임무 시작! 🚀</button>' +
+      '<p style="margin-top:10px;text-align:center">자격 심사 ' + QUIZ_N + '문제 · 작전 29장면 (약 1분 40초)</p>' +
+      '<button class="go jr tapbtn mono' + (whoIs() && whoIs().mode === 'jr' ? ' mine' : '') + '" id="gojr"><small>하람쥐 주니어</small>미션 시작! 🌰</button>' +
+      '<p style="margin-top:8px;text-align:center">쉬운 작전. 문제 ' + QUIZ_N_JR + '개 · 14장면, 형아가 구하러 온다.</p>' +
     '</div>' +
     '<div class="row">' +
       '<button class="tapbtn mono" id="full">' + fsLabel() + '</button>' +
@@ -1162,6 +1174,7 @@ function archive() {
     : '<p style="color:#8aa0b4">NO FILES ON RECORD. 임무를 완수하면 여기에 기록이 남는다.</p>';
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span><h1 class="mono">ARCHIVE</h1>' +
+    (whoIs() ? '<p class="sub mono">열람자 — ' + whoIs().label + '</p>' : '') +
     '<p class="sub mono">OPERATIONS ON RECORD: ' + log.length + ' · 완수 ' + cleared.length +
       (best ? ' · 최고 기록 ' + swText(best.ms) : '') + '</p>' +
     '<div class="meta mono">' + rows + '</div>' +
