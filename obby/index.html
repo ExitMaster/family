@@ -982,8 +982,9 @@ function songFor() {
   if (game.screen !== 'play' && game.screen !== 'pause') return 'menu';
   if (game.mode === 'snail') return 'garden';
   if (game.mode === 'infinity') return 'void';
-  // in the gauntlet each section brings its own song along with its own floor
-  if (game.world && game.world.zone) return game.world.zone.theme;
+  // each zone names its own song — a shuffled level keeps one song throughout,
+  // because a new one every three seconds is not music
+  if (game.world && game.world.zone) return game.world.zone.song || game.world.zone.theme;
   const L = LEVELS.find(l => l.id === game.levelId);
   return L ? L.theme : 'menu';
 }
@@ -1544,13 +1545,13 @@ const LEVELS = [
     slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
   { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:14,
     gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
-  // Nightmare is not a course of its own — it is every level in the game pressed
-  // together, in order, then the nightmare itself. Each piece keeps its own
-  // platforms, colours, music and physics (see W.zones in buildCourse).
+  // Nightmare is not a course of its own — it is every obstacle in the game shuffled
+  // into one level. Each chunk is drawn from a different course at random and brings
+  // that course's floor with it: a hell lava run, then an ice slide, then a floaty
+  // low-gravity hop, in whatever order the seed says. See W.zones in buildCourse.
   { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true,
-    gauntlet:[ {id:'angel',n:4}, {id:'inu',n:4}, {id:'devil',n:5},
-               {id:'ice',n:4}, {id:'space',n:4}, {id:'nightmare',n:6} ],
-    blurb:'Every level at once, back to back, then the nightmare. Nobody has ever finished it. Try anyway.' }
+    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' },
+    blurb:'Every obstacle in the game, shuffled, with the floor changing under you. Nobody has ever finished it. Try anyway.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
 const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id];
@@ -1571,17 +1572,29 @@ function buildCourse(cfg) {
   const rng = mulberry32(cfg.seed);
   const b = builder(W, rng, cfg.d);
 
-  /* One section per level being run. An ordinary level is a single section, so
-     everything below has exactly one trip through the loop and behaves as it
-     always did; Nightmare has six. Chunks all start and end on a platform at
-     y = 0, which is what lets pieces of six different courses be bolted
-     together at all. */
-  const sections = (cfg.gauntlet || [{ id:cfg.id, n:cfg.chunks }]).map(sec => {
-    const L = LEVELS.find(l => l.id === sec.id) || cfg;
-    return { n:sec.n, name:L.name, emoji:L.emoji, theme:L.theme, d:L.d,
-             slip: L.slip || 0, gravity: L.gravity || 1,
-             pool: cfg.pool || POOL[sec.id] || POOL.angel };
-  });
+  /* A section is a run of chunks that share a floor. An ordinary level is ONE
+     section, so everything below makes a single trip through the loop and behaves
+     exactly as it always did.
+
+     A shuffled level is 27 sections of one chunk each, and every one of them rolls
+     which course it comes from: its obstacles, its difficulty, its colours and its
+     physics all arrive together. Pairing a chunk with its OWN level's floor is what
+     keeps this fair — ice has no beams or spinners in its pool and space has no
+     blinkers, so those combinations never come up by accident.
+
+     Every chunk starts and ends on a platform at y = 0. That is the whole reason
+     pieces of six different courses can be bolted together in any order at all. */
+  const mix = cfg.shuffle;
+  const asSection = (id, n) => {
+    const L = LEVELS.find(l => l.id === id) || cfg;
+    return { n, name:L.name, emoji:L.emoji, theme:L.theme, d:L.d,
+             slip: L.slip || 0, gravity: L.gravity || 1, song: (mix && mix.song) || L.theme,
+             pool: cfg.pool || POOL[id] || POOL.angel };
+  };
+  const sections = mix
+    ? Array.from({ length: mix.n }, () => asSection(mix.from[Math.floor(rng()*mix.from.length)], 1))
+    : [asSection(cfg.id, cfg.chunks)];
+  const totalChunks = sections.reduce((n, s) => n + s.n, 0);
 
   b.plat(9, 10);                                  // start pad
   W.spawn = { x:0, y:1.2, z:3 };
@@ -1591,25 +1604,29 @@ function buildCourse(cfg) {
     W.npc = { x:2.9, y:0, z:6.5, yaw:-0.6, said:0, t:0, line:'NOBODY GETS PAST ME', bone:1 };
 
   W.zones = [];
-  let last = null;
+  let last = null, prev = null, made = 0;
   for (const sec of sections) {
-    // the builder reads W.pal as it goes, so each section bakes its own colours
+    // the builder reads W.pal as it goes, so each chunk bakes its own colours
     W.pal = THEMES[sec.theme];
     b.d = sec.d;
-    // A wide flat deck at every seam, with a checkpoint on it. The floor changes
-    // under you here — ice to normal, normal to low gravity — and landing a jump
-    // into different physics you could not have planned for is not a fair death.
-    if (W.zones.length) { b.plat(11, 8); b.check(); }
+    // A wide flat deck with a checkpoint on it wherever the floor changes under
+    // you — ice to normal, normal to low gravity. Landing a jump into physics you
+    // could not have planned for is not a fair death. Where the floor is the same
+    // as the chunk before, no deck: only the colours change and you run straight on.
+    const shift = !!prev && (prev.slip !== sec.slip || prev.gravity !== sec.gravity);
+    if (shift) { b.plat(11, 8); b.check(); }
     const z0 = b.z;
     for (let i=0;i<sec.n;i++) {
       let fn, guard = 0;
       do { fn = sec.pool[Math.floor(rng()*sec.pool.length)]; guard++; } while (fn === last && guard < 8);
       last = fn;
       fn(b, sec.d);
-      if ((i+1) % (cfg.checkEvery || 2) === 0 && i < sec.n-1) b.check();
+      made++;
+      if (made % (cfg.checkEvery || 2) === 0 && made < totalChunks) b.check();
     }
     W.zones.push({ z0, z1:b.z, slip:sec.slip, gravity:sec.gravity, theme:sec.theme,
-                   pal:THEMES[sec.theme], name:sec.name, emoji:sec.emoji });
+                   pal:THEMES[sec.theme], name:sec.name, emoji:sec.emoji, song:sec.song, shift });
+    prev = sec;
   }
   b.plat(9, 10);
   // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
@@ -2035,21 +2052,30 @@ function respawnOrRestart() { if (game.mode === 'obby') killPlayer(); else resta
 /* =========================================================================
    12. MODES
    ========================================================================= */
-/* The physics travel with you. In the gauntlet, crossing into the ice section
-   really does make the floor slippery and crossing into space really does turn
-   the gravity down — the sky, the colours and the music change with it. An
-   ordinary level has one zone, so this does nothing there. */
+/* The physics travel with you. Step onto an ice chunk and the floor really does
+   go slippery; step onto a space chunk and the gravity really does drop. The sky
+   and the colours come with it. An ordinary level has one zone, so this does
+   nothing there.
+
+   The banner only fires when the FLOOR changes, not on every chunk. Colours
+   change constantly in a shuffled level and a sign popping up every three seconds
+   would be noise — but walking onto ice without being told is a cheap death. */
+const floorName = z => z.slip ? '🧊 SLIPPERY!' : z.gravity < 1 ? '🚀 LOW GRAVITY!' : '🟢 NORMAL FLOOR';
+
 function updateZone() {
   const W = game.world, p = game.player;
   if (!W || !W.zones || !p) return;
   let z = W.zones[0];
   for (const s of W.zones) if (p.z >= s.z0) z = s;
   if (z === W.zone) return;
+  const before = W.zone;
   W.zone = z;
   W.slip = z.slip; W.gravity = z.gravity; W.pal = z.pal;
   Music.play(songFor());
-  game.banner = { text: z.emoji + ' ' + z.name, t: 2 };
-  Sound.check();
+  if (!before || before.slip !== z.slip || before.gravity !== z.gravity) {
+    game.banner = { text: floorName(z), t: 1.8 };
+    Sound.check();
+  }
 }
 
 function updateObby(dt) {
