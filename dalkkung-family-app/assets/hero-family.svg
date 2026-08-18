@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" role="img" aria-label="가족이 함께 응원하는 일러스트">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff4df"/><stop offset="1" stop-color="#eef7e9"/></linearGradient></defs>
+  <rect width="480" height="270" fill="url(#g)"/>
+  <g opacity=".55" fill="none" stroke-linecap="round">
+    <path d="M28 232c30-34 29-69 22-101M49 176c-20-8-27-20-28-37M50 155c18-7 28-18 34-34" stroke="#94b978" stroke-width="5"/>
+    <path d="M435 239c-12-33-5-67 7-100M442 179c-19-6-27-17-31-31M442 159c20-6 31-16 38-30" stroke="#e09e77" stroke-width="5"/>
+  </g>
+  <g fill="#f3b59d" opacity=".85"><circle cx="74" cy="73" r="8"/><circle cx="400" cy="67" r="7"/><path d="M101 45c9-16 28-4 21 10-6 12-21 17-21 17S87 58 90 48c3-10 11-10 11-3z"/></g>
+  <g stroke="#fff" stroke-width="3">
+    <circle cx="205" cy="85" r="31" fill="#f5c6a7"/><path d="M174 79c4-29 55-40 65-5-20-13-37-16-65 5z" fill="#6f4b38" stroke="none"/><path d="M157 184c5-48 22-71 49-71s46 24 50 71z" fill="#91afa1"/>
+    <circle cx="322" cy="92" r="30" fill="#f3c2a3"/><path d="M293 86c7-32 51-35 60-2-21-10-39-13-60 2z" fill="#7d5238" stroke="none"/><path d="M278 188c4-49 20-72 45-72s44 25 49 72z" fill="#d88a57"/>
+  </g>
+  <g stroke="#fff" stroke-width="3">
+    <circle cx="260" cy="115" r="32" fill="#f0bea1"/><path d="M230 105c3-28 53-38 63-4-18-15-40-16-63 4z" fill="#b6b1aa" stroke="none"/><path d="M205 221c6-57 27-82 56-82s50 26 57 82z" fill="#c87945"/>
+    <circle cx="388" cy="123" r="29" fill="#efbea4"/><path d="M360 116c4-27 48-34 56-2-19-11-34-12-56 2z" fill="#b6b0a9" stroke="none"/><path d="M345 224c4-52 20-76 44-76 26 0 43 27 46 76z" fill="#ef9c84"/>
+    <g fill="none" stroke="#725f54" stroke-width="2"><circle cx="378" cy="124" r="7"/><circle cx="399" cy="124" r="7"/><path d="M385 124h7"/></g>
+  </g>
+  <g stroke="#fff" stroke-width="3">
+    <circle cx="140" cy="132" r="28" fill="#f3c0a1"/><path d="M113 126c4-25 48-32 56-2-18-9-34-11-56 2z" fill="#69483b" stroke="none"/><path d="M98 226c4-48 19-70 43-70s41 24 46 70z" fill="#edc980"/>
+    <circle cx="303" cy="164" r="25" fill="#f3c3a5"/><path d="M279 158c2-23 42-29 49-2-16-9-31-10-49 2z" fill="#6e4c39" stroke="none"/><path d="M268 229c4-38 15-57 35-57s32 19 36 57z" fill="#63a895"/>
+  </g>
+  <g fill="#593f32"><circle cx="195" cy="87" r="2.8"/><circle cx="215" cy="87" r="2.8"/><circle cx="313" cy="94" r="2.8"/><circle cx="333" cy="94" r="2.8"/><circle cx="250" cy="117" r="2.8"/><circle cx="271" cy="117" r="2.8"/><circle cx="130" cy="134" r="2.8"/><circle cx="150" cy="134" r="2.8"/><circle cx="295" cy="166" r="2.8"/><circle cx="312" cy="166" r="2.8"/></g>
+  <g fill="none" stroke="#b16d59" stroke-width="2.2" stroke-linecap="round"><path d="M198 98c5 4 10 4 15 0"/><path d="M316 105c5 4 10 4 15 0"/><path d="M253 130c5 4 10 4 15 0"/><path d="M133 145c4 3 9 3 13 0"/><path d="M297 176c4 3 8 3 12 0"/></g>
+  <g fill="#f17867" opacity=".78"><path d="M83 100c7-12 22-3 16 8-5 9-16 13-16 13s-12-11-9-18c2-7 8-7 9-3z"/><path d="M421 97c6-10 19-2 14 7-4 8-14 11-14 11s-10-9-8-15c2-6 7-6 8-3z"/></g>
+</svg>
