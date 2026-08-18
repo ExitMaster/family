@@ -201,17 +201,14 @@ function lightenHex(hex, amt) {
 }
 
 
-// ── 이야기 영상 (캔버스 애니메이션) ──────────────────────────
-//  문단 하나 = 장면 하나. 계절에 따라 하늘·날씨·바닥색이 바뀌고
-//  하람쥐 형제가 스크롤되는 숲을 걸어간다. 전부 캔버스 실시간 렌더.
-const SCENE_MS = 6200;
-const SEASON_ART = {
-  '봄':   {sky:['#8fb2cc','#d8e4d2'], haze:'#cdd9cf', hill:'#6d8560', ground:'#5f6b45', litter:'#7a8450', weather:'petal',   particle:'#e8dcc8'},
-  '여름': {sky:['#6f9dc4','#cfe0d4'], haze:'#c2d2c6', hill:'#4a6b45', ground:'#415433', litter:'#586b38', weather:'firefly', particle:'#f2e6a8'},
-  '가을': {sky:['#a9a08a','#e2d3b4'], haze:'#d8c8a8', hill:'#7d6438', ground:'#6b512f', litter:'#8a6431', weather:'leaf',    particle:'#a8652c'},
-  '겨울': {sky:['#8e9db0','#dfe6ec'], haze:'#dbe3ea', hill:'#7d8794', ground:'#c9d3dc', litter:'#aab6c2', weather:'snow',    particle:'#f4f8fb'},
-  '장마': {sky:['#6f7c85','#b8c3c4'], haze:'#b3bdbd', hill:'#4f5f4c', ground:'#47543a', litter:'#5b6742', weather:'rain',    particle:'#c6d6de'},
-  '밤':   {sky:['#141c30','#31405c'], haze:'#2b3852', hill:'#1d2537', ground:'#232b3a', litter:'#2c3547', weather:'star',    particle:'#e8e2c4'}
+// ── 슬라이드쇼 재생기 ────────────────────────────────────────
+//  그림은 assets/scenes/ 에 미리 구워 둔 이미지를 쓴다 (scripts/render-scenes.js).
+//  여기서는 그 이미지를 캔버스에 얹고 아주 느리게 밀거나 당기면서(켄 번스)
+//  컷 사이를 암전으로 넘기고, 자막을 얹는다.
+const SLIDE_MS = 6800;
+const DIP_MS = 620;
+const SEASON_SLUG = {
+  '봄':'spring', '여름':'summer', '가을':'autumn', '겨울':'winter', '장마':'rain', '밤':'night'
 };
 function seasonOf(seasonLine) {
   if (/[Ww]inter|snow/.test(seasonLine)) return '겨울';
@@ -221,171 +218,31 @@ function seasonOf(seasonLine) {
   if (/[Aa]utumn/.test(seasonLine)) return '가을';
   return '봄';
 }
+// 컷마다 다른 방향으로 아주 천천히 움직인다. 정지 이미지에 숨을 넣는 정도.
+const MOVES = [
+  {z0:1.02, z1:1.12, x0:  0, x1:-14, y0: 0, y1:  4},
+  {z0:1.14, z1:1.04, x0:-12, x1:  6, y0: 3, y1: -2},
+  {z0:1.06, z1:1.18, x0:  8, x1: -8, y0:-2, y1:  5},
+  {z0:1.16, z1:1.06, x0: -6, x1: 10, y0: 4, y1: -3},
+  {z0:1.04, z1:1.14, x0: 10, x1: -6, y0:-3, y1:  3},
+  {z0:1.20, z1:1.08, x0: -8, x1:  8, y0: 2, y1: -4},
+  {z0:1.06, z1:1.16, x0:  6, x1:-10, y0:-2, y1:  4}
+];
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
 function createPlayer(canvas, story, onEnd) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
-  const r = rng(hashStr('art|' + story.key));
-  const furs = ['#8a6a4d','#6f5a44','#9a7350','#7b6350','#a1794f','#5f5044'];  // 실제 청설모/다람쥐 털색
-  const fur = furs[Math.floor(r() * furs.length)];
-  const kidFur = lightenHex(fur, .16);
-  const season = seasonOf(story.season || '');
-  const A = SEASON_ART[season];
-  const total = story.paras.length * SCENE_MS;
+  const slug = SEASON_SLUG[seasonOf(story.season || '')] || 'spring';
+  const total = story.paras.length * SLIDE_MS;
 
-  // 배경 요소를 미리 뿌려 둔다 (매 프레임 난수 금지 — 깜빡임 방지)
-  const trees = Array.from({length: 26}, (_, i) => ({
-    x: i * 120 + (i % 3) * 37, h: 90 + (i % 5) * 26, layer: i % 2, w: 16 + (i % 3) * 5
-  }));
-  const bits = Array.from({length: 70}, (_, i) => ({
-    x: Math.random() * W, y: Math.random() * H,
-    sp: 0.4 + Math.random() * 1.6, sw: Math.random() * 6.28, sz: 1.5 + Math.random() * 3
-  }));
+  const slides = story.paras.map((_, i) => {
+    const img = new Image();
+    img.src = `assets/scenes/${slug}-${i % 7}.jpg`;
+    return img;
+  });
 
   let t0 = null, raf = null, elapsed = 0, playing = false;
-
-  // 사실적인 다람쥐 (옆모습, 오른쪽을 봄).
-  //  털 결은 짧은 선을 결 방향으로 얹어서 표현하고, 명암은 그라디언트로 준다.
-  // 털: 짧고 끝이 가늘어지는 선을 결 방향(dir)으로 촘촘히 얹는다.
-  //  한 겹으로는 그림처럼 보여서, 밝은 겉털 → 어두운 속털 순으로 두세 겹 쌓는다.
-  function furStrands(cx, cy, rx, ry, n, color, len, seedOff, dir) {
-    ctx.strokeStyle = color; ctx.lineCap = 'round';
-    for (let i = 0; i < n; i++) {
-      const a = (i * 2.399 + seedOff) % 6.283;
-      const rr = 0.35 + ((i * 0.37) % 0.62);
-      const px = cx + Math.cos(a) * rx * rr, py = cy + Math.sin(a) * ry * rr;
-      const wob = Math.sin(i * 1.7) * 0.35;
-      const ang = (dir === undefined ? a : dir + wob);
-      const l = len * (0.55 + ((i * 0.19) % 0.6));
-      ctx.lineWidth = 0.45 + (i % 3) * 0.22;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.quadraticCurveTo(px + Math.cos(ang) * l * 0.6, py + Math.sin(ang) * l * 0.6 - 0.6,
-                           px + Math.cos(ang) * l,       py + Math.sin(ang) * l);
-      ctx.stroke();
-    }
-  }
-
-  function drawSquirrel(x, y, k, f, phase) {
-    const dark  = shade(f, -0.34), mid = shade(f, -0.15);
-    const light = lightenHex(f, 0.30), belly = lightenHex(f, 0.62);
-    const bob = Math.sin(phase) * 2.2 * k;
-    ctx.save();
-    ctx.translate(x, y + bob);
-    ctx.scale(k, k);
-    ctx.lineJoin = 'round';
-
-    // 땅 그림자 (몸 아래로 눌린 타원)
-    ctx.fillStyle = 'rgba(30,22,12,.22)';
-    ctx.beginPath(); ctx.ellipse(4, 2 - bob / k, 34, 5.5, 0, 0, 6.29); ctx.fill();
-
-    // ── 꼬리: 뒤쪽에 크게. 겉털(밝음) 위에 속털(어두움)을 겹친다.
-    ctx.save();
-    ctx.translate(-24, -14);
-    ctx.rotate(Math.sin(phase * 0.7) * 0.10);
-    const tg = ctx.createLinearGradient(-30, -40, 10, 10);
-    tg.addColorStop(0, lightenHex(f, .18)); tg.addColorStop(0.5, f); tg.addColorStop(1, dark);
-    ctx.fillStyle = tg;
-    ctx.beginPath();
-    ctx.moveTo(6, 6);
-    ctx.bezierCurveTo(-34, 8, -46, -34, -22, -62);
-    ctx.bezierCurveTo(-6, -78, 16, -70, 20, -52);
-    ctx.bezierCurveTo(6, -62, -12, -54, -14, -34);
-    ctx.bezierCurveTo(-16, -16, -2, -6, 8, -2);
-    ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.clip();
-    furStrands(-12, -36, 24, 32, 110, 'rgba(255,242,222,.09)', 9, 0.6, -1.35);
-    furStrands(-10, -30, 22, 30, 120, 'rgba(30,20,10,.16)',   8, 2.1, -1.15);
-    furStrands(-14, -44, 20, 24,  70, 'rgba(255,244,226,.12)',11, 4.0, -1.55);
-    ctx.restore();
-    ctx.restore();
-
-    // ── 뒷다리(허벅지) → 몸통 → 앞다리 순으로 겹친다.
-    ctx.fillStyle = mid;
-    ctx.beginPath(); ctx.ellipse(-8, -16, 17, 15, -0.15, 0, 6.29); ctx.fill();   // 허벅지
-    ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(-4, -3, 11, 4.5, -0.12, 0, 6.29); ctx.fill();   // 뒷발
-
-    const bg2 = ctx.createLinearGradient(0, -40, 0, -2);
-    bg2.addColorStop(0, mid); bg2.addColorStop(0.62, f); bg2.addColorStop(1, belly);
-    ctx.fillStyle = bg2;
-    ctx.beginPath();
-    ctx.moveTo(-20, -12);
-    ctx.bezierCurveTo(-22, -34, -6, -44, 10, -40);   // 등
-    ctx.bezierCurveTo(22, -37, 26, -24, 24, -14);    // 가슴
-    ctx.bezierCurveTo(20, -4, -8, -2, -20, -12);     // 배
-    ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.clip();
-    furStrands(0, -26, 22, 17, 130, 'rgba(30,20,10,.14)',   6, 1.2, 0.45);
-    furStrands(6, -16, 18, 11,  90, 'rgba(255,255,255,.18)', 5, 3.4, 0.55);
-    furStrands(-6, -34, 18, 10,  70, 'rgba(255,255,255,.13)', 5, 5.1, 0.15);
-    ctx.restore();
-
-    ctx.fillStyle = mid;                                                          // 앞다리
-    ctx.beginPath();
-    ctx.moveTo(18, -22); ctx.bezierCurveTo(24, -16, 24, -8, 21, -3);
-    ctx.bezierCurveTo(17, -2, 15, -8, 14, -18); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = dark;
-    ctx.beginPath(); ctx.ellipse(21, -2.5, 5, 2.6, 0, 0, 6.29); ctx.fill();       // 앞발
-
-    // ── 머리: 주둥이가 앞으로 나온 쐐기 모양.
-    const hg = ctx.createLinearGradient(10, -58, 10, -30);
-    hg.addColorStop(0, mid); hg.addColorStop(1, f);
-    ctx.fillStyle = hg;
-    ctx.beginPath();
-    ctx.moveTo(8, -34);
-    ctx.bezierCurveTo(6, -50, 18, -58, 28, -55);     // 이마
-    ctx.bezierCurveTo(38, -52, 42, -45, 41, -41);    // 코끝
-    ctx.bezierCurveTo(38, -36, 30, -32, 20, -32);    // 턱
-    ctx.closePath(); ctx.fill();
-
-    ctx.fillStyle = belly;                                                        // 목·뺨 밝은 털
-    ctx.beginPath(); ctx.ellipse(24, -36, 9, 4.5, -0.15, 0, 6.29); ctx.fill();
-
-    ctx.fillStyle = f;                                                            // 귀 + 귀털
-    ctx.beginPath(); ctx.ellipse(16, -55, 4.5, 7, -0.25, 0, 6.29); ctx.fill();
-    ctx.fillStyle = shade(f, -0.45);
-    ctx.beginPath(); ctx.ellipse(16, -54, 2.2, 4.2, -0.25, 0, 6.29); ctx.fill();
-    ctx.strokeStyle = light; ctx.lineWidth = 0.9;
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath(); ctx.moveTo(15 + i * 2, -61); ctx.lineTo(14 + i * 2.6, -67); ctx.stroke();
-    }
-
-    ctx.save();                                                                   // 머리 털결
-    ctx.beginPath();
-    ctx.moveTo(8, -34); ctx.bezierCurveTo(6, -50, 18, -58, 28, -55);
-    ctx.bezierCurveTo(38, -52, 42, -45, 41, -41);
-    ctx.bezierCurveTo(38, -36, 30, -32, 20, -32); ctx.closePath(); ctx.clip();
-    furStrands(22, -45, 13, 10, 70, 'rgba(30,20,10,.13)',   4, 0.9, 0.30);
-    furStrands(20, -50, 11,  7, 45, 'rgba(255,255,255,.15)', 3.4, 2.6, -0.2);
-    ctx.restore();
-
-    ctx.fillStyle = 'rgba(255,255,255,.30)';                                      // 눈 둘레 밝은 털
-    ctx.beginPath(); ctx.ellipse(27, -48, 4.4, 3.9, 0, 0, 6.29); ctx.fill();
-    ctx.fillStyle = '#14100c';                                                    // 눈
-    ctx.beginPath(); ctx.ellipse(27, -48, 2.4, 2.3, 0, 0, 6.29); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.75)';
-    ctx.beginPath(); ctx.arc(27.8, -48.8, 0.7, 0, 6.29); ctx.fill();
-
-    ctx.fillStyle = '#2b1d14';                                                    // 코
-    ctx.beginPath(); ctx.ellipse(41, -42, 1.9, 1.5, 0.3, 0, 6.29); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 0.6;                // 수염
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath(); ctx.moveTo(39, -41 + i * 0.9);
-      ctx.quadraticCurveTo(50, -44 + i * 3.2, 58, -40 + i * 5.2); ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // 색을 검정 쪽으로 섞어 그늘색을 만든다 (amt<0 만 사용).
-  function shade(hex, amt) {
-    const h = hex.replace('#', ''), m = Math.abs(amt);
-    const f = i => {
-      const c = parseInt(h.slice(i, i + 2), 16);
-      return Math.round(c * (1 - m)).toString(16).padStart(2, '0');
-    };
-    return '#' + f(0) + f(2) + f(4);
-  }
 
   function wrap(text, maxW) {
     const words = text.split(' '), lines = [];
@@ -400,162 +257,41 @@ function createPlayer(canvas, story, onEnd) {
   }
 
   function frame(ms) {
-    const idx = Math.min(story.paras.length - 1, Math.floor(ms / SCENE_MS));
-    const local = (ms % SCENE_MS) / SCENE_MS;
-    const scroll = ms / 26;
+    const idx = Math.min(story.paras.length - 1, Math.floor(ms / SLIDE_MS));
+    const local = (ms % SLIDE_MS) / SLIDE_MS;
+    const mv = MOVES[idx % MOVES.length];
+    const e = easeInOut(local);
+    const zoom = mv.z0 + (mv.z1 - mv.z0) * e;
+    const dx = mv.x0 + (mv.x1 - mv.x0) * e;
+    const dy = mv.y0 + (mv.y1 - mv.y0) * e;
 
-    const g = ctx.createLinearGradient(0, 0, 0, H * 0.72);          // 하늘
-    g.addColorStop(0, A.sky[0]); g.addColorStop(1, A.sky[1]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#0d0b09'; ctx.fillRect(0, 0, W, H);
 
-    if (season === '밤') {
-      ctx.fillStyle = 'rgba(240,236,214,.85)';
-      ctx.beginPath(); ctx.arc(W - 78, 58, 21, 0, 6.29); ctx.fill();
-      ctx.fillStyle = 'rgba(240,236,214,.10)';
-      ctx.beginPath(); ctx.arc(W - 78, 58, 40, 0, 6.29); ctx.fill();
-    } else {
-      ctx.fillStyle = 'rgba(255,255,255,.28)';                      // 낮은 구름층
-      for (let i = 0; i < 4; i++) {
-        const cx = (((i * 260 - scroll * 0.12) % (W + 340)) + W + 340) % (W + 340) - 170;
-        ctx.beginPath(); ctx.ellipse(cx, 46 + i * 13, 100, 15, 0, 0, 6.29); ctx.fill();
-      }
+    const img = slides[idx];
+    if (img && img.complete && img.naturalWidth) {
+      ctx.save();
+      ctx.translate(W / 2 + dx, H / 2 + dy);
+      ctx.scale(zoom, zoom);
+      ctx.drawImage(img, -W / 2, -H / 2, W, H);
+      ctx.restore();
     }
 
-    // 원경: 안개에 잠긴 나무 실루엣 세 겹. 뒤로 갈수록 흐리게 (대기원근).
-    for (let d = 0; d < 3; d++) {
-      const depth = 1 - d * 0.3;
-      ctx.globalAlpha = 0.16 + d * 0.16;
-      ctx.filter = `blur(${(2 - d) * 1.8}px)`;
-      ctx.fillStyle = A.hill;
-      const baseY = H * (0.52 + d * 0.05);
-      const sp = 0.06 + d * 0.10;
-      ctx.beginPath(); ctx.moveTo(0, H);
-      for (let x = -40; x <= W + 40; x += 14) {
-        const n = Math.sin((x + scroll * sp) / 37) + Math.sin((x + scroll * sp) / 91) * 1.6;
-        ctx.lineTo(x, baseY - n * 11 * depth - (Math.abs(Math.sin((x + d * 50) / 23)) > 0.86 ? 26 * depth : 0));
-      }
-      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = 1; ctx.filter = 'none';
-    }
-    ctx.fillStyle = A.haze; ctx.globalAlpha = 0.14;                 // 안개 띠
-    ctx.fillRect(0, H * 0.50, W, H * 0.14); ctx.globalAlpha = 1;
+    const inMs = ms % SLIDE_MS, outMs = SLIDE_MS - inMs;         // 컷 전환 암전
+    const dip = Math.max(
+      idx === 0 ? 0 : Math.max(0, 1 - inMs / DIP_MS),
+      idx === story.paras.length - 1 ? 0 : Math.max(0, 1 - outMs / DIP_MS)
+    );
+    if (dip > 0) { ctx.fillStyle = `rgba(0,0,0,${dip})`; ctx.fillRect(0, 0, W, H); }
 
-    // 중경/근경 나무: 줄기 명암 + 불규칙한 잎 덩어리
-    for (const layer of [0, 1]) {
-      const sp = layer ? 1 : 0.42;
-      const span = 120 * 26;
-      const leafBase = season === '겨울' ? '#8d9aa6' : (season === '가을' ? '#8a6a34' : '#3f5e39');
-      for (const tr of trees) {
-        if (tr.layer !== layer) continue;
-        let x = ((tr.x - scroll * sp) % span + span) % span - 60;
-        if (x < -110 || x > W + 110) continue;
-        const base = H * (layer ? 0.74 : 0.64);
-        const hh = tr.h * (layer ? 1 : 0.72);
-        ctx.globalAlpha = layer ? 1 : 0.5;
-        ctx.filter = layer ? 'none' : 'blur(3px)';
-        const bark = ctx.createLinearGradient(x - tr.w / 2, 0, x + tr.w / 2, 0);
-        bark.addColorStop(0, '#3d2f22'); bark.addColorStop(0.45, '#5c4632'); bark.addColorStop(1, '#2f2417');
-        ctx.fillStyle = bark;
-        ctx.beginPath();
-        ctx.moveTo(x - tr.w / 2.4, base);
-        ctx.lineTo(x - tr.w / 4.5, base - hh * 0.62);
-        ctx.lineTo(x + tr.w / 4.5, base - hh * 0.62);
-        ctx.lineTo(x + tr.w / 2.4, base); ctx.closePath(); ctx.fill();
-        if (season !== '겨울' || layer === 0) {
-          for (let c = 0; c < 5; c++) {                              // 잎 덩어리
-            const a = c * 1.7 + tr.x;
-            ctx.fillStyle = c % 2 ? leafBase : shade(leafBase, -0.22);
-            ctx.beginPath();
-            ctx.ellipse(x + Math.cos(a) * tr.w * 1.5, base - hh * (0.66 + Math.abs(Math.sin(a)) * 0.28),
-                        tr.w * 1.5, tr.w * 1.15, a, 0, 6.29);
-            ctx.fill();
-          }
-        }
-        ctx.globalAlpha = 1; ctx.filter = 'none';
-      }
-    }
-
-    // 바닥: 흙 그라디언트 + 낙엽/풀 잔결
-    const gg = ctx.createLinearGradient(0, H * 0.70, 0, H);
-    gg.addColorStop(0, A.ground); gg.addColorStop(1, shade(A.ground, -0.30));
-    ctx.fillStyle = gg; ctx.fillRect(0, H * 0.70, W, H * 0.30);
-    ctx.strokeStyle = A.litter; ctx.lineWidth = 1.1; ctx.globalAlpha = 0.55;
-    for (let i = 0; i < 90; i++) {
-      const gx = ((i * 71 - scroll) % (W + 60) + W + 60) % (W + 60) - 30;
-      const gy = H * 0.71 + ((i * 37) % Math.round(H * 0.28));
-      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + ((i % 5) - 2) * 2, gy - 4 - (i % 4)); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    const walk = ms / 150;                                    // 형제 둘
-    ctx.save();
-    ctx.shadowColor = 'rgba(20,14,8,.45)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 3;
-    drawSquirrel(W * 0.28, H * 0.715, 1.30, fur, walk);
-    drawSquirrel(W * 0.55, H * 0.695, 0.82, kidFur, walk + 1.6);
-    ctx.restore();
-
-    for (const b of bits) {                                   // 날씨 입자
-      ctx.fillStyle = A.particle;
-      if (A.weather === 'rain') {
-        const y = (b.y + ms * b.sp * 0.55) % H;
-        ctx.globalAlpha = .55; ctx.fillRect(b.x, y, 1.6, 12); ctx.globalAlpha = 1;
-      } else if (A.weather === 'star' || A.weather === 'firefly') {
-        const tw = 0.4 + 0.6 * Math.abs(Math.sin(ms / 500 + b.sw));
-        ctx.globalAlpha = tw;
-        const y = A.weather === 'star' ? b.y * 0.6 : b.y * 0.9;
-        ctx.beginPath(); ctx.arc(b.x, y, b.sz * 0.7, 0, 6.29); ctx.fill();
-        ctx.globalAlpha = 1;
-      } else {
-        const y = (b.y + ms * b.sp * 0.06) % H;
-        const x = b.x + Math.sin(ms / 700 + b.sw) * 18;
-        ctx.globalAlpha = .85;
-        ctx.beginPath(); ctx.ellipse(x, y, b.sz, b.sz * (A.weather === 'snow' ? 1 : 0.6), b.sw, 0, 6.29); ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    // 렌즈 느낌: 앞쪽 흐린 잎 몇 장이 화면 가장자리를 스친다 (전경 아웃포커스)
-    ctx.save();
-    ctx.filter = 'blur(9px)';
-    ctx.globalAlpha = 0.30;
-    ctx.fillStyle = season === '겨울' ? '#8ea0b2' : (season === '가을' ? '#5f4420' : '#24391f');
-    for (let i = 0; i < 3; i++) {
-      const fx = ((i * 430 - scroll * 2.8) % (W + 760) + W + 760) % (W + 760) - 380;
-      const fy = i % 2 ? H * 0.03 : H * 0.94;          // 위아래 가장자리만 스치게
-      ctx.beginPath();
-      ctx.ellipse(fx, fy, 96, 40, i * 0.7, 0, 6.29);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // 필름 그레인 — 매끈한 벡터 느낌을 덜어 준다
-    ctx.globalAlpha = 0.045;
-    for (let i = 0; i < 900; i++) {
-      const gx = (i * 6997 + Math.floor(ms / 90) * 131) % W;
-      const gy = (i * 3571 + Math.floor(ms / 90) * 977) % H;
-      ctx.fillStyle = (i % 2) ? '#fff' : '#000';
-      ctx.fillRect(gx, gy, 1, 1);
-    }
-    ctx.globalAlpha = 1;
-
-    const grade = ctx.createLinearGradient(0, 0, W, H);        // 색 보정
-    grade.addColorStop(0, season === '밤' ? 'rgba(40,60,120,.14)' : 'rgba(255,186,112,.06)');
-    grade.addColorStop(1, 'rgba(18,26,34,.09)');
-    ctx.fillStyle = grade; ctx.fillRect(0, 0, W, H);
-
-    const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.32)');
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-
-    const fade = Math.min(1, local * 6) * Math.min(1, (1 - local) * 8);   // 자막
-    const text = story.paras[idx];
+    const fade = Math.min(1, local * 6) * Math.min(1, (1 - local) * 8);
     ctx.font = '500 17px "Inter", system-ui, sans-serif';
-    const lines = wrap(text, W - 80);
+    const lines = wrap(story.paras[idx], W - 80);
     const boxH = lines.length * 26 + 26;
-    ctx.globalAlpha = fade;
+    ctx.globalAlpha = fade * (1 - dip);
     ctx.fillStyle = 'rgba(8,8,10,.55)';
+    const bx = 26, by = H - boxH - 26, bw = W - 52, rad = 10;
     ctx.beginPath();
-    const bx = 26, by = H - boxH - 26, bw = W - 52, rad = 14;
     ctx.moveTo(bx + rad, by); ctx.arcTo(bx + bw, by, bx + bw, by + boxH, rad);
     ctx.arcTo(bx + bw, by + boxH, bx, by + boxH, rad);
     ctx.arcTo(bx, by + boxH, bx, by, rad); ctx.arcTo(bx, by, bx + bw, by, rad);
@@ -564,8 +300,8 @@ function createPlayer(canvas, story, onEnd) {
     lines.forEach((ln, i) => ctx.fillText(ln, bx + 18, by + 14 + i * 26));
     ctx.globalAlpha = 1;
 
-    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(0, H - 5, W, 5);   // 진행바
-    ctx.fillStyle = '#ffb454'; ctx.fillRect(0, H - 5, W * (ms / total), 5);
+    ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, H - 4, W, 4);
+    ctx.fillStyle = '#c8a266'; ctx.fillRect(0, H - 4, W * (ms / total), 4);
   }
 
   function loop(now) {
@@ -580,11 +316,12 @@ function createPlayer(canvas, story, onEnd) {
   function stop()  { playing = false; if (raf) cancelAnimationFrame(raf); raf = null; }
   function reset() { stop(); elapsed = 0; frame(0); }
 
+  // 첫 장이 도착하면 표지로 한 번 그려 준다.
+  slides[0].addEventListener('load', () => { if (!playing) frame(0); });
   frame(0);
-  return {
-    play, stop, reset, get playing() { return playing; }, totalMs: total,
-    toggle() { playing ? stop() : play(); }
-  };
+
+  return { play, stop, reset, get playing() { return playing; }, totalMs: total,
+           toggle() { playing ? stop() : play(); } };
 }
 
 // ── 상태 ─────────────────────────────────────────────────────
@@ -682,6 +419,12 @@ function render() {
   document.getElementById('save').onclick = (ev) => {
     if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
       ev.target.textContent = 'unsupported'; return;
+    }
+    // file:// 로 열면 이미지가 캔버스를 오염시켜 녹화가 막힌다 (서버로 열면 정상).
+    try { canvas.captureStream(1); } catch (err) {
+      ev.target.textContent = 'needs http';
+      setTimeout(() => { ev.target.textContent = '⬇ Save'; }, 2200);
+      return;
     }
     const btn = ev.target;
     btn.disabled = true;
