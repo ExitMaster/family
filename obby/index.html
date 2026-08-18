@@ -982,6 +982,8 @@ function songFor() {
   if (game.screen !== 'play' && game.screen !== 'pause') return 'menu';
   if (game.mode === 'snail') return 'garden';
   if (game.mode === 'infinity') return 'void';
+  // in the gauntlet each section brings its own song along with its own floor
+  if (game.world && game.world.zone) return game.world.zone.theme;
   const L = LEVELS.find(l => l.id === game.levelId);
   return L ? L.theme : 'menu';
 }
@@ -1074,11 +1076,9 @@ const POWERS = [
   { id:'wings', name:'Aura Wings', price:500, em:'🪽',
     desc:'They only stir in one place, and it is not down here.' }
 ];
-const GLIDE_FALL = 2.6;      // how slowly you sink while gliding, units/sec
-// Jetpack. Fuel is what keeps this from being free flight: you get WING_FUEL
-// seconds of thrust per trip into the air, refilled the moment you touch ground,
-// so the most you can ever climb in one go is about WING_MAX_UP * WING_FUEL.
-const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
+// Jetpack. What keeps this from being free flight is not fuel any more but WHERE
+// it works: only on the last deck of Nightmare, under the portal. See stepPlayer.
+const WING_LIFT = 55, WING_MAX_UP = 9.0;
 const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
 // One emergency recovery per life. Slip off an edge and you have about half a second
 // to hit G before you are too far down for the boost to bring you back — miss the
@@ -1479,9 +1479,15 @@ function ch_blink(b) {
 function ch_blinkRun(b) {
   b.plat(6, 4);
   const z0 = b.z;
+  // The phase step decides whether this is a timed run or a wall. Running flat out
+  // you cross a slab every 0.64s, so a step of +0.9 means the lit window travels
+  // BACKWARDS past you and no start time gets you across — measured, from every
+  // phase, walking and waiting. A small negative step sends the window with you
+  // instead, drifting 0.34s per slab: enter on the beat and you make it, dawdle
+  // and you do not. Do not put this back to +0.9.
   for (let i=0;i<4;i++) {
     b.gap(0.5);
-    b.blink(0, 0, b.z + 2.0, 4.2, 4.0, 3.6, 2.4, i*0.9);
+    b.blink(0, 0, b.z + 2.0, 4.2, 4.0, 3.6, 2.4, (3.6 - 0.3*i) % 3.6);
     b.z += 4.0;
   }
   b.gap(0.5);
@@ -1538,8 +1544,13 @@ const LEVELS = [
     slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
   { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:14,
     gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
-  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, chunks:21,
-    troll:true, blurb:'Blinking platforms. Nobody has ever finished it. Try anyway.' }
+  // Nightmare is not a course of its own — it is every level in the game pressed
+  // together, in order, then the nightmare itself. Each piece keeps its own
+  // platforms, colours, music and physics (see W.zones in buildCourse).
+  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true,
+    gauntlet:[ {id:'angel',n:4}, {id:'inu',n:4}, {id:'devil',n:5},
+               {id:'ice',n:4}, {id:'space',n:4}, {id:'nightmare',n:6} ],
+    blurb:'Every level at once, back to back, then the nightmare. Nobody has ever finished it. Try anyway.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
 const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id];
@@ -1559,7 +1570,18 @@ function buildCourse(cfg) {
   W.pal = THEMES[cfg.theme];
   const rng = mulberry32(cfg.seed);
   const b = builder(W, rng, cfg.d);
-  const pool = cfg.pool || POOL[cfg.id] || POOL.angel;
+
+  /* One section per level being run. An ordinary level is a single section, so
+     everything below has exactly one trip through the loop and behaves as it
+     always did; Nightmare has six. Chunks all start and end on a platform at
+     y = 0, which is what lets pieces of six different courses be bolted
+     together at all. */
+  const sections = (cfg.gauntlet || [{ id:cfg.id, n:cfg.chunks }]).map(sec => {
+    const L = LEVELS.find(l => l.id === sec.id) || cfg;
+    return { n:sec.n, name:L.name, emoji:L.emoji, theme:L.theme, d:L.d,
+             slip: L.slip || 0, gravity: L.gravity || 1,
+             pool: cfg.pool || POOL[sec.id] || POOL.angel };
+  });
 
   b.plat(9, 10);                                  // start pad
   W.spawn = { x:0, y:1.2, z:3 };
@@ -1568,13 +1590,26 @@ function buildCourse(cfg) {
   if (cfg.id === 'nightmare')
     W.npc = { x:2.9, y:0, z:6.5, yaw:-0.6, said:0, t:0, line:'NOBODY GETS PAST ME', bone:1 };
 
+  W.zones = [];
   let last = null;
-  for (let i=0;i<cfg.chunks;i++) {
-    let fn, guard = 0;
-    do { fn = pool[Math.floor(rng()*pool.length)]; guard++; } while (fn === last && guard < 8);
-    last = fn;
-    fn(b, cfg.d);
-    if ((i+1) % (cfg.checkEvery || 2) === 0 && i < cfg.chunks-1) b.check();
+  for (const sec of sections) {
+    // the builder reads W.pal as it goes, so each section bakes its own colours
+    W.pal = THEMES[sec.theme];
+    b.d = sec.d;
+    // A wide flat deck at every seam, with a checkpoint on it. The floor changes
+    // under you here — ice to normal, normal to low gravity — and landing a jump
+    // into different physics you could not have planned for is not a fair death.
+    if (W.zones.length) { b.plat(11, 8); b.check(); }
+    const z0 = b.z;
+    for (let i=0;i<sec.n;i++) {
+      let fn, guard = 0;
+      do { fn = sec.pool[Math.floor(rng()*sec.pool.length)]; guard++; } while (fn === last && guard < 8);
+      last = fn;
+      fn(b, sec.d);
+      if ((i+1) % (cfg.checkEvery || 2) === 0 && i < sec.n-1) b.check();
+    }
+    W.zones.push({ z0, z1:b.z, slip:sec.slip, gravity:sec.gravity, theme:sec.theme,
+                   pal:THEMES[sec.theme], name:sec.name, emoji:sec.emoji });
   }
   b.plat(9, 10);
   // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
@@ -1583,10 +1618,13 @@ function buildCourse(cfg) {
   W.goal = { x:0, y: cfg.troll ? 70 : 0, z: b.z - 5 };
 
   W.endZ = b.z;
-  // The Nightmare portal runs away from you (see updateObby). Nobody finishes it.
+  // The Nightmare portal hangs in the sky (see updateObby). Nobody finishes it.
   W.troll = !!cfg.troll;
-  W.slip = cfg.slip || 0;                         // 1 = ice: barely any grip
-  W.gravity = cfg.gravity || 1;                   // < 1 = space: floaty jumps
+  // start in the first section — updateZone hands over the rest as you cross
+  W.zone = W.zones[0];
+  W.pal = W.zone.pal;
+  W.slip = W.zone.slip;                           // 1 = ice: barely any grip
+  W.gravity = W.zone.gravity;                     // < 1 = space: floaty jumps
   W.totalOrbs = W.orbs.length;
   return W;
 }
@@ -1735,7 +1773,7 @@ function makePlayer(sp) {
     vx:0, vy:0, vz:0, onGround:false, standing:null,
     coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false, saves:1,
     ascending:false,
-    fuel:WING_FUEL, yaw:0, walk:0, squash:0,
+    yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
   };
 }
@@ -1801,17 +1839,17 @@ function stepPlayer(dt) {
   // The jetpack is decided here rather than after gravity, because the speed cap and
   // the air acceleration below both need to know about it — that is what turns
   // "hover upward" into "fly forward".
-  // The wings only work in Nightmare. Everywhere else they are dead weight, which is
-  // the point: flight would let you skip straight over any course, so the courses are
-  // protected and the wings become the key to one specific place.
+  // The wings do nothing at all until the very end of Nightmare. Not in any other
+  // level, and not during the gauntlet either — every step of all six courses has
+  // to be run on foot. Flight would skip straight over a course, so this is what
+  // protects them; the wings are a key to one place, not a way around the game.
   //
-  // THE NIGHTMARE SECRET: on the last deck of that level the jetpack also stops
-  // burning fuel, which is what makes the portal at 70 reachable at all.
+  // THE NIGHTMARE SECRET: on the last deck, under the portal, they finally start,
+  // and there they never run out. That is the only way anything reaches 70.
   // Nothing in the game says any of this. Do not sign-post it.
-  const canFly = hasPower('wings') && !!W.troll;
-  const endlessFuel = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
-  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0 &&
-                  (p.fuel > 0 || endlessFuel);
+  const atEnd = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < 12);
+  const canFly = hasPower('wings') && atEnd;
+  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0;
   const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
@@ -1857,32 +1895,24 @@ function stepPlayer(dt) {
   if (p.vy <= 0) p.jumpHeld = false;
 
   p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
-  // Aura Wings, as a jetpack: hold jump in the air and you climb while fuel lasts,
-  // then it turns into a slow glide. Fuel comes back when you land.
+  // Aura Wings, as a jetpack: hold jump in the air on the last deck and you climb.
+  // There is no fuel any more — where they work at all, they work forever.
   p.gliding = false; p.thrusting = false;
-  if (canFly && !p.onGround && input.jump && p.buffer <= 0) {
-    if (jetting) {
-      p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
-      if (!endlessFuel) p.fuel = Math.max(0, p.fuel - dt);
-      p.thrusting = true; p.gliding = true;
-      if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
-    } else if (p.vy < 0) {
-      p.vy = Math.max(p.vy, -GLIDE_FALL);            // out of fuel: glide down
-      p.gliding = true;
-    }
+  if (jetting) {
+    p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
+    p.thrusting = true; p.gliding = true;
+    if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
   }
   // The final Nightmare ascent is on rails: once you are climbing you cannot steer,
   // you only go up. It also eases you onto the portal's x/z — without that you could
   // lift off from the back of the deck and rise past it forever, unable to correct.
-  if (endlessFuel && !p.onGround && p.y > 3) {
+  if (atEnd && !p.onGround && p.y > 3) {
     const k = 1 - Math.pow(0.06, dt);
     p.x = lerp(p.x, W.goal.x, k);
     p.z = lerp(p.z, W.goal.z, k);
     p.vx = 0; p.vz = 0;
     p.ascending = true;
   } else p.ascending = false;
-
-  if (p.onGround) p.fuel = WING_FUEL;
 
   const wasGround = p.onGround;
   p.onGround = false; p.standing = null;
@@ -2005,8 +2035,26 @@ function respawnOrRestart() { if (game.mode === 'obby') killPlayer(); else resta
 /* =========================================================================
    12. MODES
    ========================================================================= */
+/* The physics travel with you. In the gauntlet, crossing into the ice section
+   really does make the floor slippery and crossing into space really does turn
+   the gravity down — the sky, the colours and the music change with it. An
+   ordinary level has one zone, so this does nothing there. */
+function updateZone() {
+  const W = game.world, p = game.player;
+  if (!W || !W.zones || !p) return;
+  let z = W.zones[0];
+  for (const s of W.zones) if (p.z >= s.z0) z = s;
+  if (z === W.zone) return;
+  W.zone = z;
+  W.slip = z.slip; W.gravity = z.gravity; W.pal = z.pal;
+  Music.play(songFor());
+  game.banner = { text: z.emoji + ' ' + z.name, t: 2 };
+  Sound.check();
+}
+
 function updateObby(dt) {
   const p = game.player, W = game.world;
+  updateZone();                       // which level am I standing in right now
   stepPlayer(dt);
   collectOrbs();
 
@@ -2953,20 +3001,8 @@ function drawHUD(t) {
   H.fillStyle = '#fff';
   H.fillText(game.mode === 'obby' ? game.runOrbs + ' / ' + game.world.totalOrbs : String(game.runOrbs), 58, 39);
 
-  // jetpack fuel, only shown once you own the wings
-  if (hasPower('wings') && game.player && game.world && game.world.troll) {
-    const f = clamp((game.player.fuel || 0) / WING_FUEL, 0, 1);
-    H.fillStyle = 'rgba(18,16,31,.55)';
-    rr2(14, 54, 150, 16, 8); H.fill();
-    H.fillStyle = 'rgba(255,255,255,.18)';
-    rr2(20, 59, 112, 6, 3); H.fill();
-    H.fillStyle = f > 0.25 ? '#C9A0FF' : '#FF8A8A';
-    rr2(20, 59, 112*f, 6, 3); H.fill();
-    H.font = 'bold 10px "Trebuchet MS", sans-serif';
-    H.fillStyle = 'rgba(255,255,255,.8)';
-    H.textAlign = 'left';
-    H.fillText('🪽', 138, 67);
-  }
+  // No fuel gauge any more: the wings are either dead or endless, and a bar that
+  // only ever reads full or empty tells you nothing. The white flare is the tell.
 
   // the one emergency recovery, lit while you still have it
   if (game.player) {
@@ -3183,12 +3219,13 @@ function drawDebug() {
   ];
   if (W) lines.push('world ' + W.kind + '  solids ' + W.solids.length +
       '  hazards ' + W.hazards.length + '  parts ' + game.particles.length,
-    'slip ' + (W.slip||0) + '   gravity ' + (W.gravity||1) + (W.troll ? '   TROLL' : ''));
+    'slip ' + (W.slip||0) + '   gravity ' + (W.gravity||1) +
+      (W.zone ? '   zone ' + W.zone.theme : '') + (W.troll ? '   TROLL' : ''));
   if (p) lines.push(
     'pos ' + n(p.x) + n(p.y) + n(p.z),
     'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
     'ground ' + (p.onGround ? 'yes' : 'no ') + (p.ascending ? '  ASCENT' : p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
-      '  fuel ' + (p.fuel||0).toFixed(2) + '   airJumps ' + p.airJumps +
+      '  airJumps ' + p.airJumps +
       '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
     'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
   lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));
