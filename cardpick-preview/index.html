@@ -8,7 +8,7 @@
   <link rel="icon" href="../cardpick/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="../cardpick/icons/icon-192.png" />
   <link rel="stylesheet" href="../cardpick/styles.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@41ceae35f49d915650cd9cff233471ac30a63e71/cardpick/v2.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@9cde90b83078fdef8f005da0ce62cce828b4862b/cardpick/v2.css" />
   <title>카드픽 v2 Preview</title>
   <style>
     .preview-banner{position:sticky;top:0;z-index:1000;background:#fff3cd;color:#664d03;padding:8px 14px;text-align:center;font-size:12px;font-weight:700;border-bottom:1px solid #ffecb5}
@@ -34,7 +34,7 @@
   <dialog id="modal" class="modal"></dialog>
   <div id="toast" class="toast" role="status"></div>
   <script type="module">
-    const base = 'https://cdn.jsdelivr.net/gh/ExitMaster/family@41ceae35f49d915650cd9cff233471ac30a63e71/cardpick/';
+    const base = 'https://cdn.jsdelivr.net/gh/ExitMaster/family@9cde90b83078fdef8f005da0ce62cce828b4862b/cardpick/';
     const response = await fetch(base + 'app-v2.js', { cache: 'no-store' });
     if (!response.ok) throw new Error('Preview app source load failed: ' + response.status);
     let source = await response.text();
