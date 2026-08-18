@@ -34,6 +34,8 @@ body { font-family:'Inter',system-ui,sans-serif; background:#14161a; color:#e8e4
 //  Ministry of Squirrel Group. 하루 한 편, 날짜를 씨앗으로 삼는 결정론적 작전 영상.
 //  같은 날짜 = 누가 열어도 똑같은 파일.
 const K_STORE = 'family-msg-files-v1';
+const K_UNLOCK = 'family-msg-unlocked';
+const PIN = '1706';   // 기밀 접근 코드. 놀이용 잠금 — 진짜 보안이 아니다.
 
 // ── 씨앗 난수 (mulberry32) ───────────────────────────────────
 function hashStr(s) {
@@ -246,7 +248,8 @@ function sSeal(m) {
 
 // ── 재생기 ───────────────────────────────────────────────────
 const app = document.getElementById('app');
-let state = { mission:null, i:0, timer:null, playing:false };
+let state = { mission:null, i:0, timer:null, playing:false, started:false, pin:'', pinErr:false };
+function unlocked() { try { return sessionStorage.getItem(K_UNLOCK) === '1'; } catch (e) { return false; } }
 
 function css(){ return `
   .wrap{max-width:720px;margin:0 auto;padding:18px 16px 60px}
@@ -264,15 +267,107 @@ function css(){ return `
   button.p{background:#5fd08a;color:#0d1a12;border-color:#5fd08a;font-weight:700}
   .meta{margin-top:18px;border:1px dashed #35505f;border-radius:8px;padding:12px 14px;font-size:12px;color:#8aa0b4;line-height:1.8}
   .meta b{color:#cfe6d9;font-weight:400}
+  .brief{border:1px solid #2c3b47;border-radius:12px;background:#0e1318;padding:18px 16px;margin-top:14px}
+  .brief h2{font-size:15px;letter-spacing:.1em;color:#5fd08a;margin:0 0 10px}
+  .brief p{margin:0 0 6px;font-size:13px;color:#8aa0b4;line-height:1.7}
+  .go{display:block;width:100%;margin-top:16px;padding:22px 16px;font-size:19px;font-weight:700;line-height:1.4;
+      color:#0d1a12;background:linear-gradient(180deg,#7fe3a4,#4bbd78);border:none;border-radius:16px;
+      box-shadow:0 6px 0 #2f8b54;cursor:pointer;letter-spacing:.04em}
+  .go:active{transform:translateY(4px);box-shadow:0 2px 0 #2f8b54}
+  .go small{display:block;font-size:12px;letter-spacing:.16em;opacity:.75;margin-bottom:6px}
+  .pin{display:flex;gap:10px;justify-content:center;margin:18px 0 6px}
+  .pin i{width:46px;height:56px;border:2px solid #35505f;border-radius:10px;background:#0e1318;display:flex;
+         align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:26px;color:#5fd08a;font-style:normal}
+  .pin i.on{border-color:#5fd08a}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;max-width:320px;margin:16px auto 0}
+  .pad button{padding:17px 0;font-size:20px}
+  .err{color:#ff6a5a;text-align:center;font-size:13px;min-height:18px;letter-spacing:.06em}
+  .fs{position:absolute;top:8px;right:8px;z-index:5;padding:6px 9px;font-size:15px;line-height:1;background:rgba(10,14,18,.7);border-color:#35505f}
+  :fullscreen .wrap{padding-top:4px}
+  body.fakefull{overflow:hidden}
+  body.fakefull .wrap{position:fixed;inset:0;z-index:99;overflow-y:auto;background:#14161a;max-width:none;padding:14px 16px 40px}
 `; }
 
+// 전체화면 — 컨트롤까지 같이 들어가도록 .wrap 을 통째로 올린다.
+// iPhone Safari는 요소 전체화면을 지원하지 않으므로 CSS 전체화면으로 대체한다.
+function fsOn() { return !!document.fullscreenElement || document.body.classList.contains('fakefull'); }
+function fsLabel() { return fsOn() ? '⤡ 전체화면 끄기' : '⛶ 전체화면'; }
+function toggleFull() {
+  if (document.fullscreenElement) { document.exitFullscreen(); return; }
+  if (document.body.classList.contains('fakefull')) { document.body.classList.remove('fakefull'); return; }
+  const el = document.querySelector('.wrap') || document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) { document.body.classList.add('fakefull'); return; }
+  try {
+    const r = req.call(el);
+    if (r && r.catch) r.catch(() => { document.body.classList.add('fakefull'); render(); });
+  } catch (e) { document.body.classList.add('fakefull'); }
+}
+
+function renderLock() {
+  const dots = [0,1,2,3].map(i => '<i class="' + (state.pin.length > i ? 'on' : '') + '">' + (state.pin.length > i ? '●' : '') + '</i>').join('');
+  const keys = ['1','2','3','4','5','6','7','8','9','←','0','✓'];
+  app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
+    '<span class="badge mono">CLASSIFIED</span>' +
+    '<h1 class="mono">M.S.G. FILES</h1>' +
+    '<p class="sub mono">ACCESS CODE REQUIRED — 접근 코드를 입력하세요</p>' +
+    '<div class="brief mono"><h2>🔒 기밀 파일</h2>' +
+      '<p>M.S.G. 대원만 열 수 있습니다. 네 자리 코드를 입력하세요.</p>' +
+      '<div class="pin">' + dots + '</div>' +
+      '<div class="err mono">' + (state.pinErr ? '코드가 틀렸습니다. 다시.' : '') + '</div>' +
+      '<div class="pad">' + keys.map(k => '<button class="tapbtn mono" data-k="' + k + '">' + k + '</button>').join('') + '</div>' +
+    '</div></div>';
+  app.querySelectorAll('.pad button').forEach(b => b.onclick = () => key(b.dataset.k));
+}
+function key(k) {
+  state.pinErr = false;
+  if (k === '←') state.pin = state.pin.slice(0, -1);
+  else if (k === '✓') return submitPin();
+  else if (state.pin.length < 4) state.pin += k;
+  if (state.pin.length === 4) return submitPin();
+  renderLock();
+}
+function submitPin() {
+  if (state.pin === PIN) {
+    try { sessionStorage.setItem(K_UNLOCK, '1'); } catch (e) {}
+    state.pin = ''; render(); return;
+  }
+  state.pin = ''; state.pinErr = true; renderLock();
+}
+
+function renderBrief() {
+  const m = state.mission;
+  app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
+    '<span class="badge mono">CLASSIFIED</span>' +
+    '<h1 class="mono">M.S.G. FILES</h1>' +
+    '<p class="sub mono">MINISTRY OF SQUIRREL GROUP — DAILY OPERATION ' + m.fileNo + '</p>' +
+    '<div class="brief mono">' +
+      '<h2>오늘의 임무 브리핑</h2>' +
+      '<p>지점 <b style="color:#cfe6d9">' + m.sector + '</b> · 층 <b style="color:#cfe6d9">' + m.floor + '</b></p>' +
+      '<p>적 <b style="color:#ff6a5a">' + m.threat.n + '</b> — ' + m.threat.d + '</p>' +
+      '<p>부대 <b style="color:#cfe6d9">' + m.squadA + ' / ' + m.squadB + '</b> · 무장 <b style="color:#cfe6d9">' + m.weapon + '</b></p>' +
+      '<button class="go tapbtn mono" id="go"><small>공군 하람쥐 대장3</small>임무 시작! 🚀</button>' +
+    '</div>' +
+    '<div class="row">' +
+      '<button class="tapbtn mono" id="full">' + fsLabel() + '</button>' +
+      '<button class="tapbtn mono" id="arch">▤ ARCHIVE</button>' +
+    '</div>' +
+  '</div>';
+  document.getElementById('go').onclick = () => { state.started = true; state.i = 0; play(); };
+  document.getElementById('full').onclick = () => { toggleFull(); setTimeout(renderBrief, 120); };
+  document.getElementById('arch').onclick = archive;
+}
+
 function render() {
+  if (!unlocked()) return renderLock();
+  if (!state.started) return renderBrief();
   const m = state.mission, sh = shots(m), s = sh[state.i];
   app.innerHTML = '<style>' + css() + '</style><div class="wrap">' +
     '<span class="badge mono">CLASSIFIED</span>' +
     '<h1 class="mono">M.S.G. FILES</h1>' +
     '<p class="sub mono">MINISTRY OF SQUIRREL GROUP — DAILY OPERATION ' + m.fileNo + '</p>' +
-    '<div class="screen"><svg viewBox="0 0 640 360">' + s.draw(m) + '</svg><div class="scan"></div></div>' +
+    '<div class="screen"><button class="fs tapbtn mono" id="full" title="전체화면">' + (fsOn() ? '⤡' : '⛶') + '</button>' +
+      '<svg viewBox="0 0 640 360">' + s.draw(m) + '</svg><div class="scan"></div></div>' +
     '<div class="cap mono" id="cap">' + s.cap + '</div>' +
     '<div class="bar"><i id="bar" style="width:' + Math.round((state.i+1)/sh.length*100) + '%"></i></div>' +
     '<div class="row">' +
@@ -280,6 +375,7 @@ function render() {
       '<button class="tapbtn" id="prev">◀ PREV</button>' +
       '<button class="tapbtn" id="next">NEXT ▶</button>' +
       '<button class="tapbtn" id="arch">▤ ARCHIVE</button>' +
+      '<button class="tapbtn" id="brief">▣ 브리핑</button>' +
     '</div>' +
     '<div class="meta mono">SHOT <b>' + (state.i+1) + '/' + sh.length + '</b> · DATE <b>' + m.key + '</b><br>' +
       'FLOOR <b>' + m.floor + '</b> · SECTOR <b>' + m.sector + '</b> · THREAT <b>' + m.threat.n + '</b><br>' +
@@ -289,6 +385,8 @@ function render() {
   document.getElementById('prev').onclick = () => { pause(); go(state.i - 1); };
   document.getElementById('next').onclick = () => { pause(); go(state.i + 1); };
   document.getElementById('arch').onclick = archive;
+  document.getElementById('full').onclick = () => { toggleFull(); setTimeout(render, 120); };
+  document.getElementById('brief').onclick = () => { pause(); state.started = false; render(); };
 }
 function go(i) {
   const n = shots(state.mission).length;
@@ -321,6 +419,7 @@ function remember() {
   }
 }
 function archive() {
+  if (!unlocked()) return renderLock();
   pause();
   const log = loadLog();
   const rows = log.length
@@ -336,6 +435,7 @@ function archive() {
 }
 
 state.mission = buildMission(dayKey(new Date()));
+document.addEventListener('fullscreenchange', () => render());
 render();
 </script>
 </body>
