@@ -15,6 +15,10 @@ service cloud.firestore {
       return verified() && request.auth.token.email in allowlist().emails;
     }
 
+    function admin() {
+      return approved() && request.auth.token.email in allowlist().admins;
+    }
+
     match /access/allowlist {
       allow get: if verified() && request.auth.token.email in resource.data.emails;
       allow list: if false;
@@ -30,8 +34,34 @@ service cloud.firestore {
       allow read, create, update: if approved() && familyId == 'dalkkung';
       allow delete: if false;
 
-      match /{document=**} {
-        allow read, create, update: if approved() && familyId == 'dalkkung';
+      match /care_events/{eventId} {
+        allow read, create: if approved() && familyId == 'dalkkung';
+        allow update: if approved()
+          && familyId == 'dalkkung'
+          && (admin() || resource.data.created_by == request.auth.uid)
+          && request.resource.data.created_by == resource.data.created_by;
+        allow delete: if approved()
+          && familyId == 'dalkkung'
+          && (admin() || resource.data.created_by == request.auth.uid);
+      }
+
+      match /attachments/{attachmentId} {
+        allow read, create: if approved() && familyId == 'dalkkung';
+        allow update: if approved()
+          && familyId == 'dalkkung'
+          && (admin() || resource.data.created_by == request.auth.uid)
+          && request.resource.data.created_by == resource.data.created_by;
+        allow delete: if approved()
+          && familyId == 'dalkkung'
+          && (admin() || resource.data.created_by == request.auth.uid);
+      }
+
+      match /{collectionName}/{documentId} {
+        allow read, create: if approved() && familyId == 'dalkkung';
+        allow update: if approved()
+          && familyId == 'dalkkung'
+          && collectionName != 'care_events'
+          && collectionName != 'attachments';
         allow delete: if false;
       }
     }
