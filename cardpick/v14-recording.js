@@ -7,6 +7,7 @@ let enhanceTimer=null;
 
 const esc=(v='')=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const won=v=>`${Math.round(Number(v)||0).toLocaleString('ko-KR')}원`;
+const normalizeMerchant=v=>String(v||'').toLowerCase().normalize('NFKC').replace(/[\s·ㆍ._\-–—/\\()[\]{}'"`:;,!?]/g,'');
 
 function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null')}catch{return null}}
 function saveState(state){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
@@ -15,6 +16,7 @@ function currentInput(){
   const f=new FormData(form);
   return {merchant:String(f.get('merchant')||'').trim(),category:String(f.get('category')||'other'),amount:Number(f.get('amount')||0),channel:String(f.get('channel')||'unknown'),paymentMethod:String(f.get('paymentMethod')||'lump-sum')};
 }
+function fixedExpenseIdFor(state,input){const key=normalizeMerchant(input?.merchant);if(!key)return null;return (state.fixedExpenses||[]).find(x=>x.category===input.category&&normalizeMerchant(x.merchant)===key)?.id||null}
 function bestForCard(state,card,input){
   const rows=(card.benefits||[]).map(b=>evaluateBenefit(state,card,b,input)).filter(r=>r.discount>0&&!r.blockers?.length);
   rows.sort((a,b)=>b.discount-a.discount||a.warnings.length-b.warnings.length);
@@ -53,12 +55,12 @@ function openOtherCardModal(){
 function recordActualCard(recommendedId,input){
   const cardId=modal.querySelector('input[name="actualCard"]:checked')?.value;if(!cardId)return;
   const state=loadState(),card=state?.cards?.find(c=>c.id===cardId);if(!state||!card)return;
-  const best=bestForCard(state,card,input);
+  const best=bestForCard(state,card,input),fixedExpenseId=fixedExpenseIdFor(state,input),extra={actualChoice:true,recommendedCardId:recommendedId||null,fixedExpenseId};
   if(best){
-    applyTransaction(state,best,input,{actualChoice:true,recommendedCardId:recommendedId||null});
+    applyTransaction(state,best,input,extra);
   }else{
     state.transactions=Array.isArray(state.transactions)?state.transactions:[];
-    state.transactions.unshift({id:crypto.randomUUID(),date:new Date().toISOString(),month:state.settings?.currentMonth||new Date().toISOString().slice(0,7),merchant:input.merchant,category:input.category,channel:input.channel,paymentMethod:input.paymentMethod,amount:Math.max(0,Math.round(input.amount||0)),cardId:card.id,benefitId:null,expectedDiscount:0,capDiscount:0,bonusDiscount:0,warnings:[],actualChoice:true,recommendedCardId:recommendedId||null});
+    state.transactions.unshift({id:crypto.randomUUID(),date:new Date().toISOString(),month:state.settings?.currentMonth||new Date().toISOString().slice(0,7),merchant:input.merchant,category:input.category,channel:input.channel,paymentMethod:input.paymentMethod,amount:Math.max(0,Math.round(input.amount||0)),cardId:card.id,benefitId:null,expectedDiscount:0,capDiscount:0,bonusDiscount:0,warnings:[],...extra});
   }
   saveState(state);closeModal();showToastAfterReload(`${card.name} 결제로 기록했습니다.`);
 }
