@@ -438,9 +438,9 @@ AIR_JUMPS 1   DBL_JUMP 0.85      ->  with the second jump, roughly 3.0 high and 
 ### SPEED_MUL — read this before touching it
 
 `SPEED_MUL` multiplies `RUN`, and `ACC` / `AIR_ACC` / `FRIC` with it so that getting
-going and stopping still *feel* the same. It is currently **4.4**, at the player's
-request — a top speed of **31.7** against courses built for 7.2. That is a joyride
-setting rather than a difficulty setting, and it is meant to be.
+going and stopping still *feel* the same. It is back to **1** — a top speed of 7.2,
+exactly the tuning every chunk in the game was built and verified against. Every level
+is beatable at this setting and none of them are at 4.
 
 What it does, measured with the bot on the doubled-length courses:
 
@@ -456,8 +456,10 @@ fast you are going, so at 4× it carries you about **21 units** instead of 5.3, 
 the platform on the other side of them. Ice is the exception at 4× (it stays
 winnable), because its courses are wide and forgiving by design.
 
-Frame travel is the thing to watch if it goes back up. At 4.4 you cover 0.53 units per
-frame at 60fps, still under the 0.6 thickness of a wall — but only just. At 18.9 it was **2.3**,
+Frame travel is the thing to watch if it goes back up. At 1 you cover 0.12 units per
+frame at 60fps against walls 0.6 thick — five times the margin. At 4.4 it was 0.53,
+almost exactly wall thickness, and at 18.9 it was 2.3, four times thicker than a wall,
+with nothing guaranteeing you would not pass straight through one. At 18.9 it was **2.3**,
 four times thicker than the walls, so nothing guaranteed you would not pass straight
 through one. If someone reports going through something solid, check this number first.
 
