@@ -23,7 +23,7 @@ if (!config?.FIREBASE_CONFIG) {
 }
 
 const Firebase = { ...FirebaseApp, ...FirebaseAuth, ...Firestore };
-const paths = ['./runtime/app-part1.js','./runtime/app-part2.js','./runtime/app-part3.js','./runtime/app-part4.js'];
+const paths = ['./runtime/app-part1.js','./runtime/app-part2.js','./runtime/app-part3.js','./runtime/app-part4.js','./runtime/app-part5.js'];
 const code = (await Promise.all(paths.map(async p => {
   const r = await fetch(p, { cache: 'no-store' });
   if (!r.ok) throw new Error(`Failed to load ${p}`);
