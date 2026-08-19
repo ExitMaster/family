@@ -86,14 +86,30 @@ function enrichCardTab(){
 function enrichRecommendationImage(){
   ensureImageStyles();
   const result=app.querySelector('.hero-result');
-  if(!result||result.querySelector('.card-result-image'))return;
+  if(!result)return;
   const cardName=result.querySelector('h2')?.textContent?.trim();
   const src=CARD_IMAGES[cardName];
-  if(!src)return;
-  const img=document.createElement('img');
-  img.className='card-result-image';img.src=imageSource(src);img.alt=`${cardName} 카드 이미지`;img.loading='eager';img.decoding='async';
-  result.classList.add('with-card-image');result.appendChild(img);
+  let img=result.querySelector('.card-result-image');
+  if(!src){
+    img?.remove();
+    result.classList.remove('with-card-image');
+    return;
+  }
+  if(!img){
+    img=document.createElement('img');
+    img.className='card-result-image';
+    img.loading='eager';img.decoding='async';
+    result.appendChild(img);
+  }
+  if(img.dataset.cardName!==cardName){
+    img.src=imageSource(src);
+    img.alt=`${cardName} 카드 이미지`;
+    img.dataset.cardName=cardName;
+  }
+  result.classList.add('with-card-image');
 }
+
+globalThis.CardPickSyncRecommendationImage=enrichRecommendationImage;
 
 function rememberHomeSelections(form=document.querySelector('#recommendForm')){
   if(!form)return;
