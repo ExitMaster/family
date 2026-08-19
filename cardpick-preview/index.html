@@ -8,7 +8,7 @@
   <link rel="icon" href="../cardpick/icons/icon-192.png" />
   <link rel="apple-touch-icon" href="../cardpick/icons/icon-192.png" />
   <link rel="stylesheet" href="../cardpick/styles.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@3c5e2c7fb87c458769560ca0ae038c203849fe30/cardpick/v2.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ExitMaster/family@edbae2c3cfaed149753d82115e3193e561bd51d4/cardpick/v2.css" />
   <title>카드픽 v1.5 Preview</title>
   <style>
     .preview-banner{position:sticky;top:0;z-index:1000;background:#fff3cd;color:#664d03;padding:8px 14px;text-align:center;font-size:12px;font-weight:700;border-bottom:1px solid #ffecb5}
@@ -34,7 +34,7 @@
   <dialog id="modal" class="modal"></dialog>
   <div id="toast" class="toast" role="status"></div>
   <script type="module">
-    const base='https://cdn.jsdelivr.net/gh/ExitMaster/family@3c5e2c7fb87c458769560ca0ae038c203849fe30/cardpick/';
+    const base='https://cdn.jsdelivr.net/gh/ExitMaster/family@edbae2c3cfaed149753d82115e3193e561bd51d4/cardpick/';
     globalThis.CARDPICK_STORAGE_KEY='card-pick-v13-preview-state';
     globalThis.CARDPICK_LINK_STORAGE_KEY='card-pick-link-watch-v13-preview';
     await import(base+'v12-preload.js');
@@ -54,6 +54,7 @@
     await import(base+'v13-links.js');
     await import(base+'v14-recording.js');
     await import(base+'v15-academy-optimizer.js');
+    await import(base+'v15-image-sync.js');
   </script>
 </body>
 </html>
