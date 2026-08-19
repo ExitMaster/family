@@ -1026,6 +1026,7 @@ function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
   const progLabel=planned===0?'푹 쉬는 날':(done+' / '+planned+'쪽 완료');
   const headline=planned===0?'오늘은 숙제가 없어요 🌿':(allDone?'오늘 숙제 끝! 잘했어 🎉':'오늘 '+planned+'쪽이 있어요');
   return `<div>
+  <div style="margin-bottom:12px;">${renderMsgLink(T, ST.timerRunning)}</div>
   ${pondScene(T,dexPct,'46dvh',true)}
   <div style="margin-top:16px;background:${T.card};border:2px solid ${T.line};border-radius:24px;padding:18px 20px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
@@ -1177,9 +1178,9 @@ function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCou
         </div>
       </div>`:pondScene(T,dexPct,'100%',false)}</div>
       <div style="flex:1;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
+        ${renderMsgLink(T,focus)}
         ${dexPanel}
         ${renderHanwooriCard(T,focus)}
-        ${renderMsgLink(T,focus)}
         <div style="flex:1;min-height:8px;"></div>
         ${todayPanel}
       </div>
