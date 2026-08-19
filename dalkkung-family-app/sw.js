@@ -1,5 +1,5 @@
-const CACHE = 'kkoongs-firebase-v5';
-const ASSETS = ['./','./index.html','./styles.css','./app.js','./event-tones.js','./manifest.webmanifest','./assets/icon.svg','./assets/hero-family.svg','./runtime/app-part1.js','./runtime/app-part2.js','./runtime/app-part3.js','./runtime/app-part4.js'];
+const CACHE = 'kkoongs-firebase-v6';
+const ASSETS = ['./','./index.html','./styles.css','./v1.1.css','./app.js','./manifest.webmanifest','./assets/icon.svg','./assets/hero-family.svg','./runtime/app-part1.js','./runtime/app-part2.js','./runtime/app-part3.js','./runtime/app-part4.js','./runtime/app-part5.js'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))));
 self.addEventListener('activate', e => e.waitUntil(Promise.all([
   self.clients.claim(),
