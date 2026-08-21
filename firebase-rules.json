@@ -1,0 +1,41 @@
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "$room.matches(/^[A-Z0-9]{3,6}$/)"
+      }
+    },
+    "banks": {
+      "$who": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "$who.matches(/^[a-z0-9_-]{1,14}$/)"
+      }
+    },
+    "obbyScores": {
+      "$board": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "$who": {
+          ".validate": "newData.hasChildren(['n','v']) && newData.child('v').isNumber() && newData.child('n').isString() && newData.child('n').val().length <= 12"
+        }
+      }
+    },
+    "obbySaves": {
+      "$who": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "$who.matches(/^[a-z0-9_-]{1,12}$/) && newData.hasChildren(['orbs'])"
+      }
+    },
+    "obbyLive": {
+      ".read": "auth != null",
+      "$who": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['x','y','z']) && newData.child('x').isNumber() && newData.child('y').isNumber() && newData.child('z').isNumber()"
+      }
+    }
+  }
+}

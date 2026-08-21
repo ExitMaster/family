@@ -41,7 +41,10 @@
 - **Realtime Database** — 싱가포르(`asia-southeast1`)
 - **Authentication** — 익명(Anonymous) 로그인
 - 승인된 도메인에 `exitmaster.github.io`가 이미 등록되어 있습니다
-- 규칙도 이미 `rooms/{방코드}` 전체에 걸려 있어 **그대로 두면 됩니다**:
+- 규칙도 이미 `rooms/{방코드}` 전체에 걸려 있어 **그대로 두면 됩니다** — 아래는
+  **이 게임 부분만** 적은 것이니, 다시 게시할 일이 생기면 저장소 루트의
+  [`firebase-rules.json`](../firebase-rules.json) **전체**를 붙여넣으세요. 이 조각만
+  게시하면 다른 게임 규칙이 지워집니다. → [게시하는 법](../FIREBASE.md)
 
 ```json
 {

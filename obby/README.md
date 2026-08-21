@@ -322,9 +322,14 @@ with their best, and it cannot grow without limit.
 
 #### Turning the online board on (a grown-up does this once)
 
-It uses the same **Unimai Game Hub** Firebase project as `jump/` and `bunny/`, and
-needs one rule added. Firebase console → Realtime Database → 규칙, keeping whatever
-is already there:
+It uses the same **Unimai Game Hub** Firebase project as `jump/` and `bunny/`.
+
+> **The paste-ready file is [`../firebase-rules.json`](../firebase-rules.json), and the
+> five steps are in [`../FIREBASE.md`](../FIREBASE.md).** Rules are published for the
+> whole database at once, so that file holds *every* game's rules — paste all of it.
+
+The same JSON is reproduced here so this page explains itself, but the file is the
+copy to hand a grown-up:
 
 ```json
 {
