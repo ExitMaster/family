@@ -106,14 +106,20 @@
   #touch { position:absolute; inset:0; z-index:4; display:none; }
   #touch.on { display:block; }
   #panel:not(.hidden) ~ #touch { display:none; }
-  #stick {
-    position:absolute; left:18px; bottom:18px; width:104px; height:104px; border-radius:50%;
-    background:rgba(255,255,255,.16); border:4px solid rgba(30,27,51,.4);
+  /* Four buttons, not a thumbstick. A stick under your thumb is guesswork — you
+     cannot see where it is or feel the edges. Buttons you can aim at. */
+  #dpad { position:absolute; left:14px; bottom:14px; width:150px; height:150px; }
+  #dpad div {
+    position:absolute; width:48px; height:48px; border-radius:14px;
+    background:rgba(255,255,255,.22); border:3px solid rgba(30,27,51,.45);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; color:#1E1B33; font-weight:bold;
   }
-  #knob {
-    position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px;
-    border-radius:50%; background:rgba(255,255,255,.55); border:3px solid rgba(30,27,51,.5);
-  }
+  #dpad div.press { background:rgba(255,255,255,.62); }
+  #d_up    { left:51px; top:0; }
+  #d_left  { left:0;    top:51px; }
+  #d_right { left:102px; top:51px; }
+  #d_down  { left:51px; top:102px; }
   #tJ {
     position:absolute; right:18px; bottom:18px; width:88px; height:88px; border-radius:50%;
     background:rgba(255,197,61,.5); border:4px solid rgba(30,27,51,.5);
@@ -235,14 +241,14 @@
       <table class="keys">
         <tr><td>Move</td><td><b>W A S D</b> or <b>arrow keys</b> (camera relative)</td></tr>
         <tr><td>Jump</td><td><b>SPACE</b> — hold longer to jump higher</td></tr>
-        <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air — <b>buy it in the Aura Shop</b> first</td></tr>
+        <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air. You always have it</td></tr>
         <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
         <tr><td>Save yourself</td><td><b>G</b> while falling — <b>one per life</b>, and you must be quick</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
         <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
         <tr><td style="color:#FF8A8A"><b>Any other key</b></td><td style="color:#FF8A8A"><b>x_x you die.</b> The keys above are the only ones the game will let you touch while you are playing</td></tr>
-        <tr><td>Phone / tablet</td><td>joystick + jump button, drag the right side to look</td></tr>
+        <tr><td>Phone / tablet</td><td><b>▲ ◀ ▶ ▼</b> buttons + jump, drag the screen to look. Two thumbs at once for diagonals</td></tr>
         <tr><td colspan="2" style="padding-top:9px;color:#9BE58A"><b>🐌 In Killer Snail only</b></td></tr>
         <tr><td>Throw salt</td><td><b>Z</b> — costs salt, aims itself at the snail</td></tr>
         <tr><td>Swing</td><td><b>K</b> — big damage, but you must be right next to it</td></tr>
@@ -281,7 +287,12 @@
   </div>
 
   <div id="touch">
-    <div id="stick"><div id="knob"></div></div>
+    <div id="dpad">
+      <div id="d_up"    data-dir="up">▲</div>
+      <div id="d_left"  data-dir="left">◀</div>
+      <div id="d_right" data-dir="right">▶</div>
+      <div id="d_down"  data-dir="down">▼</div>
+    </div>
     <div id="tJ">JUMP</div>
     <div class="act" id="tZ" title="Throw salt">🧂</div>
     <div class="act" id="tK" title="Swing">👊</div>
@@ -1059,7 +1070,7 @@ function postScore(id, value, lower) {
 }
 // every board: what it is called, how to print it, and which way is better
 function boardList() {
-  const rows = LEVELS.filter(L => !L.troll).map(L =>
+  const rows = LEVELS.map(L =>
     ({ id:'lvl:'+L.id, name:L.emoji + ' ' + L.name, sub:'fastest clear', lower:true, fmt:fmtTime }));
   rows.push({ id:'snail:time', name:'🐌 Killer Snail', sub:'longest survival', lower:false, fmt:fmtTime });
   rows.push({ id:'snail:kills', name:'🔪 Killer Snail', sub:'most snails beaten', lower:false, fmt:v => v + '' });
@@ -1082,26 +1093,22 @@ const SKINS = [
 const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
 const ownsSkin = id => save.owned.indexOf(id) >= 0;
 
-/* Powers are bought once and stay on for good — no equipping, no slots. */
+/* Powers are bought once and stay on for good — no equipping, no slots.
+   The double jump is NOT in here any more: everybody has it, from the first run,
+   for nothing. Selling something you already own would just be a trap. */
 const POWERS = [
-  { id:'doublejump', name:'Double Jump', price:150, em:'⏫',
-    desc:'Press jump again in mid-air. Comes back when you land.' },
   { id:'speed', name:'Speed Boots', price:200, em:'👟',
     desc:'Run 35% faster in every mode. Jumps carry further too.' },
   { id:'wings', name:'Aura Wings', price:500, em:'🪽',
-    desc:'They only stir in one place, and it is not down here.' }
+    desc:'Beautiful, and nothing more. They will not lift you.' }
 ];
-// Jetpack. TWO things keep it from deleting the game, and both matter:
-//   WHERE  — only inside Nightmare. Flight would skip straight over any course, so
-//            everywhere else the wings are dead weight and the courses are safe.
-//   FUEL   — WING_FUEL seconds of thrust per trip into the air, refilled the moment
-//            you land. One tankful climbs about 27, and Nightmare's portal is at 70,
-//            so the tank is what keeps the portal out of reach from anywhere but its
-//            own last deck. Do not raise it without re-measuring that.
-const WING_FUEL = 2.8, WING_LIFT = 55, WING_MAX_UP = 9.0;
-const ASCENT_DRIFT = 6;     // how fast you may still drift while riding up to the portal
-const GLIDE_FALL = 2.6;     // out of fuel: hold jump and you sink this slowly
-const JET_ACC = 2.4, JET_SPEED = 1.5;   // thrusting also drives you forward
+// The Aura Wings used to be a jetpack, and the only way anyone ever reached the
+// Nightmare portal. Flight was taken out at the player's request, knowing what it
+// costs: Nightmare's portal hangs at 70, a double jump reaches about 3.5, and there
+// is now nothing in the game that gains height. The level cannot be finished by
+// anyone, and there is no longer a secret hiding behind that.
+//
+// The wings are cosmetic now — you wear them, they do not lift you.
 // One emergency recovery per life. Slip off an edge and you have about half a second
 // to hit G before you are too far down for the boost to bring you back — miss the
 // window and it is spent for nothing, which is what keeps it from being a free net.
@@ -1113,7 +1120,7 @@ function runMax() { return RUN * (hasPower('speed') ? SPEED_BOOST : 1); }
 const hasPower = id => save.powers.indexOf(id) >= 0;
 
 /* =========================================================================
-   8. INPUT — keyboard, drag-to-look, touch stick
+   8. INPUT — keyboard, drag-to-look, touch D-pad
    ========================================================================= */
 const input = { fwd:0, side:0, jump:false, jumpPressed:false, look:0, lookPitch:0, manualLook:0 };
 const keys = {};
@@ -1174,7 +1181,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
-// the stick and the keyboard both feed the same intent; whichever is active wins
+// the D-pad and the keyboard both feed the same intent; whichever is active wins
 let stickFwd = 0, stickSide = 0, touchJump = false;
 function readKeys() {
   const up = keys.KeyW || keys.ArrowUp, dn = keys.KeyS || keys.ArrowDown;
@@ -1187,15 +1194,14 @@ function readKeys() {
   if (turn) { cam.yaw += turn * 2.2 * (1/60); input.manualLook = 1.4; }
 }
 
-// drag to look (mouse + touch), joystick on the left for touch
+// drag to look (mouse + touch), D-pad on the left for touch
 let dragId = null, dragX = 0, dragY = 0;
 stage.addEventListener('pointerdown', e => {
   if (game.screen !== 'play') return;
   // Anything you can press is not a place to start a camera drag. Without this the
   // stage captures the pointer and the ⛶ / 🔊 / 🎵 buttons never get their click,
   // so they are unpressable the whole time you are playing.
-  if (e.target.closest && e.target.closest('button')) return;
-  if (['knob','stick','tJ','tZ','tK','tT','tG'].includes(e.target.id)) return;
+  if (e.target.closest && e.target.closest('button, #dpad, #tJ, #tZ, #tK, #tT, #tG')) return;
   dragId = e.pointerId; dragX = e.clientX; dragY = e.clientY;
   stage.setPointerCapture(e.pointerId);
 });
@@ -1212,25 +1218,41 @@ stage.addEventListener('pointerup', endDrag);
 stage.addEventListener('pointercancel', endDrag);
 
 const touchWrap = document.getElementById('touch');
-const stickEl = document.getElementById('stick'), knobEl = document.getElementById('knob');
-let stickId = null;
-function stickMove(e) {
-  const r = stickEl.getBoundingClientRect();
-  let dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
-  const len = Math.hypot(dx,dy), max = r.width/2;
-  if (len > max) { dx = dx/len*max; dy = dy/len*max; }
-  knobEl.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-  stickSide = clamp(dx/max*1.4, -1, 1);
-  stickFwd  = clamp(-dy/max*1.4, -1, 1);
+
+/* The D-pad. Three things it has to get right, which a naive four-button pad does
+   not: two fingers at once must give you a diagonal; sliding your thumb from one
+   button onto its neighbour must hand the direction over instead of leaving the
+   first one stuck down; and a finger lifted anywhere on the screen must release
+   whatever it was holding. Hence a count per direction, a pointer-to-direction map,
+   and the release listeners on the window rather than on the buttons. */
+const PAD_DIRS = ['up','down','left','right'];
+const padHeld = { up:0, down:0, left:0, right:0 };
+const padOfPointer = new Map();
+
+function padPaint() {
+  for (const d of PAD_DIRS) document.getElementById('d_' + d).classList.toggle('press', padHeld[d] > 0);
+  stickFwd  = (padHeld.up    > 0 ? 1 : 0) - (padHeld.down > 0 ? 1 : 0);
+  stickSide = (padHeld.right > 0 ? 1 : 0) - (padHeld.left > 0 ? 1 : 0);
 }
-stickEl.addEventListener('pointerdown', e => { stickId = e.pointerId; stickEl.setPointerCapture(e.pointerId); stickMove(e); e.preventDefault(); });
-stickEl.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
-const stickEnd = e => {
-  if (e.pointerId !== stickId) return;
-  stickId = null; knobEl.style.transform = ''; stickSide = 0; stickFwd = 0;
-};
-stickEl.addEventListener('pointerup', stickEnd);
-stickEl.addEventListener('pointercancel', stickEnd);
+// hand this pointer to a direction, taking it off whatever it was on
+function padTake(id, dir) {
+  const prev = padOfPointer.get(id) || null;
+  if (prev === dir) return;
+  if (prev) padHeld[prev] = Math.max(0, padHeld[prev] - 1);
+  if (dir) { padHeld[dir]++; padOfPointer.set(id, dir); } else padOfPointer.delete(id);
+  padPaint();
+}
+function dirUnder(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return (el && el.dataset && el.dataset.dir) || null;
+}
+const padEl = document.getElementById('dpad');
+padEl.addEventListener('pointerdown', e => { e.preventDefault(); padTake(e.pointerId, dirUnder(e.clientX, e.clientY)); });
+addEventListener('pointermove', e => { if (padOfPointer.has(e.pointerId)) padTake(e.pointerId, dirUnder(e.clientX, e.clientY)); });
+const padRelease = e => { if (padOfPointer.has(e.pointerId)) padTake(e.pointerId, null); };
+addEventListener('pointerup', padRelease);
+addEventListener('pointercancel', padRelease);
+addEventListener('blur', () => { padOfPointer.clear(); for (const d of PAD_DIRS) padHeld[d] = 0; padPaint(); });
 
 const jbtn = document.getElementById('tJ');
 jbtn.addEventListener('pointerdown', e => { e.preventDefault(); jbtn.classList.add('press'); touchJump = true; input.jumpPressed = true; });
@@ -1607,7 +1629,7 @@ const LEVELS = [
   // low-gravity hop, in whatever order the seed says. See W.zones in buildCourse.
   { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true,
     shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare' },
-    blurb:'Every obstacle in the game, shuffled, with the floor changing under you. Nobody has ever finished it. Try anyway.' }
+    blurb:'Every obstacle in the game, shuffled, with the floor changing under you. The longest run there is.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
 const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id];
@@ -1685,10 +1707,11 @@ function buildCourse(cfg) {
     prev = sec;
   }
   b.plat(9, 10);
-  // The Nightmare portal sits far up in the sky. Nothing you can buy gains height:
-  // a jump is 1.8, a double jump about 3.5, and the wings only ever slow a fall.
-  // So it just hangs there, in plain sight, forever out of reach.
-  W.goal = { x:0, y: cfg.troll ? 70 : 0, z: b.z - 5 };
+  // The Nightmare portal used to hang 70 units up in the sky, out of reach of any
+  // jump — the level was a troll and the jetpack was its secret way through. The
+  // jetpack is gone now, so the portal came down to the ground with it. Nightmare
+  // is a real course again: brutally long and mixed, but finishable on foot.
+  W.goal = { x:0, y:0, z: b.z - 5 };
 
   W.endZ = b.z;
   // The Nightmare portal hangs in the sky (see updateObby). Nobody finishes it.
@@ -1844,9 +1867,7 @@ function makePlayer(sp) {
   return {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
-    coyote:0, buffer:0, jumpHeld:false, airJumps:0, gliding:false, thrusting:false, saves:1,
-    fuel:WING_FUEL,
-    ascending:false,
+    coyote:0, buffer:0, jumpHeld:false, airJumps:0, saves:1,
     yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
   };
@@ -1917,25 +1938,11 @@ function stepPlayer(dt) {
   // level, and not during the gauntlet either — every step of all six courses has
   // to be run on foot. Flight would skip straight over a course, so this is what
   // protects them; the wings are a key to one place, not a way around the game.
-  //
-  // THE NIGHTMARE SECRET: on the last deck, under the portal, the tank stops
-  // draining. Anywhere else one tankful tops out around 25 and the portal is at 70,
-  // so that deck is the only place anything reaches it.
-  // Nothing in the game says any of this. Do not sign-post it.
-  // The end zone has to be measured in TIME, not just distance. At the tuned run
-  // speed 12 units is about two seconds of deck; at SPEED_MUL 18.9 the same 12 units
-  // go by in a tenth of a second and you shoot straight through the one place the
-  // wings work, which reads as "the wings are broken".
-  const endZone = Math.min(60, 12 + runMax() * 0.3);
-  const atEnd = !!(W.troll && W.goal && Math.abs(p.z - W.goal.z) < endZone);
-  const canFly = hasPower('wings') && !!W.troll;
-  const jetting = canFly && !p.onGround && input.jump && p.buffer <= 0 &&
-                  (p.fuel > 0 || atEnd);
-  const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : jetting ? AIR_ACC*JET_ACC : AIR_ACC) * dt;
+  const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
     const sp = Math.hypot(p.vx, p.vz);
-    const top = runMax() * (jetting ? JET_SPEED : 1);
+    const top = runMax();
     if (sp > top) { p.vx = p.vx/sp*top; p.vz = p.vz/sp*top; }
     p.yaw = angLerp(p.yaw, Math.atan2(wx, wz), 1 - Math.pow(0.0001, dt));
   } else if (p.onGround) {
@@ -1959,7 +1966,7 @@ function stepPlayer(dt) {
       p.vy = JUMP_V * gScale; p.buffer = 0; p.coyote = 0; p.airJumps = 0;
       p.onGround = false; p.standing = null; p.jumpHeld = true; p.squash = -0.3;
       Sound.jump(); puff(p.x, p.y - PHY, p.z, 5);
-    } else if (p.airJumps < (hasPower('doublejump') ? AIR_JUMPS : 0)) {
+    } else if (p.airJumps < AIR_JUMPS) {          // the second jump is everyone's
       // set vy rather than add it, so it saves you even in a long fall
       p.airJumps++;
       p.vy = JUMP_V * DBL_JUMP * gScale; p.buffer = 0; p.jumpHeld = true; p.squash = -0.3;
@@ -1976,39 +1983,6 @@ function stepPlayer(dt) {
   if (p.vy <= 0) p.jumpHeld = false;
 
   p.vy = Math.max(-MAX_FALL, p.vy - GRAV*(W.gravity || 1)*dt);
-  // Aura Wings, as a jetpack: hold jump in the air and you climb while the tank
-  // lasts, then it turns into a slow glide. The tank refills when you land.
-  p.gliding = false; p.thrusting = false;
-  if (canFly && !p.onGround && input.jump && p.buffer <= 0) {
-    if (jetting) {
-      p.vy = Math.min(WING_MAX_UP, p.vy + WING_LIFT*dt);
-      if (!atEnd) p.fuel = Math.max(0, p.fuel - dt);
-      p.thrusting = true; p.gliding = true;
-      if (Math.random() < 0.5) puff(p.x, p.y - PHY, p.z, 1, '#C9A0FF');
-    } else if (p.vy < 0) {
-      p.vy = Math.max(p.vy, -GLIDE_FALL);            // out of fuel: glide down
-      p.gliding = true;
-    }
-  }
-  // The final Nightmare climb still ends at the portal no matter what you do — but
-  // you fly it, you are not carried. Your own steering still works; the portal just
-  // reels your x/z in harder than you can push away from it, so you cannot lift off
-  // the back of the deck and sail past it forever with no way to correct.
-  //
-  // ASCENT_DRIFT is a FIXED speed, deliberately not scaled by SPEED_MUL. The pull is
-  // a fraction of the remaining distance per second, so it can only ever win against
-  // a bounded velocity — leave the run speed uncapped here and arriving at 136 a
-  // second sends you 1800 units into the void with the portal shrinking behind you.
-  if (atEnd && !p.onGround && p.y > 3) {
-    const k = 1 - Math.pow(0.06, dt);
-    p.x = lerp(p.x, W.goal.x, k);
-    p.z = lerp(p.z, W.goal.z, k);
-    const sp = Math.hypot(p.vx, p.vz);
-    if (sp > ASCENT_DRIFT) { p.vx = p.vx/sp*ASCENT_DRIFT; p.vz = p.vz/sp*ASCENT_DRIFT; }
-    p.ascending = true;
-  } else p.ascending = false;
-
-  if (p.onGround) p.fuel = WING_FUEL;
 
   const wasGround = p.onGround;
   p.onGround = false; p.standing = null;
@@ -2247,17 +2221,18 @@ function updateObby(dt) {
 
   // Nightmare taunts you when you get to the end and find the portal in the sky.
   // It does not move — you simply cannot get up there. That is the joke.
+  // The gatekeeper still talks, he is just wrong now.
   if (W.troll && !game.won) {
     const d = Math.abs(W.goal.z - p.z);
-    if (!W.taunt1 && d < 12) {
+    if (!W.taunt1 && d < 24) {
       W.taunt1 = 1;
-      game.banner = { text:'💀 IT IS UP THERE. IT WAS ALWAYS UP THERE', t:3.4 };
+      game.banner = { text:'💀 YOU ARE NOT GOING TO MAKE IT', t:3.4 };
       Sound.devil();
     }
     if (!W.taunt2 && d < 12 && game.time > 3 && p.onGround) {
       W.taunt2 = 1;
-      game.speech = { text:'TOLD YOU. NOBODY GETS PAST ME', t:5,
-                      x:W.goal.x, y:W.goal.y - 8, z:W.goal.z };
+      game.speech = { text:'NOBODY GETS PAST ME', t:5,
+                      x:W.goal.x, y:W.goal.y + 3, z:W.goal.z };
     }
   }
 
@@ -2639,7 +2614,7 @@ function endRun() {
     if (isBest) save.best[game.levelId] = game.time;
     if (first) { save.orbs += 25; save.lifetimeOrbs += 25; }
     persist();
-    const rank = cfg.troll ? 0 : postScore('lvl:'+game.levelId, game.time, true);
+    const rank = postScore('lvl:'+game.levelId, game.time, true);
     const next = LEVELS[levelIndex(game.levelId)+1];
     showResult('🎉 ' + cfg.name + ' clear!',
       '⏱ ' + fmtTime(game.time) + (isBest ? '  <b>NEW BEST!</b>' : '') +
@@ -2823,13 +2798,11 @@ function drawCharacter(x, y, z, yaw, skinId, walk, squash, airborne) {
   }
 
   // skin extras
-  // Aura Wings, if you have bought them. They spread wide while you glide and fold
-  // back in when you do not, so you can see the power working.
+  // Aura Wings, if you have bought them. Cosmetic — they flap on your back and that
+  // is all they do now.
   if (hasPower('wings')) {
-    const p = game.player;
-    const glide = p && p.gliding;
-    const jet = p && p.thrusting;
-    const flap = Math.sin(performance.now()/(glide ? 260 : 150));
+    const glide = false, jet = false;
+    const flap = Math.sin(performance.now()/150);
     for (const side of [-1,1]) {
       m4translate(TMP_D, x, base + 1.15, z);
       m4rotY(TMP_B, ry); m4mul(MODEL, TMP_D, TMP_B);
@@ -3164,21 +3137,7 @@ function drawHUD(t) {
   H.fillStyle = '#fff';
   H.fillText(game.mode === 'obby' ? game.runOrbs + ' / ' + game.world.totalOrbs : String(game.runOrbs), 58, 39);
 
-  // jetpack fuel — only in the one level the wings work in. A gauge sitting there
-  // in a level where nothing happens would be a puzzle with no answer.
-  if (hasPower('wings') && game.player && game.world && game.world.troll) {
-    const f = clamp((game.player.fuel || 0) / WING_FUEL, 0, 1);
-    H.fillStyle = 'rgba(18,16,31,.55)';
-    rr2(14, 54, 150, 16, 8); H.fill();
-    H.fillStyle = 'rgba(255,255,255,.18)';
-    rr2(20, 59, 112, 6, 3); H.fill();
-    H.fillStyle = f > 0.25 ? '#C9A0FF' : '#FF8A8A';
-    rr2(20, 59, 112*f, 6, 3); H.fill();
-    H.font = 'bold 10px "Trebuchet MS", sans-serif';
-    H.fillStyle = 'rgba(255,255,255,.8)';
-    H.textAlign = 'left';
-    H.fillText('🪽', 138, 67);
-  }
+  // No fuel gauge: the wings are cosmetic, so there is nothing for one to say.
 
   // the one emergency recovery, lit while you still have it
   if (game.player) {
@@ -3378,7 +3337,7 @@ function drawHUD(t) {
     H.textAlign = 'center';
     H.font = 'bold 15px "Trebuchet MS", sans-serif';
     H.fillStyle = 'rgba(255,255,255,.85)';
-    H.fillText(TOUCH ? 'joystick to move · JUMP to jump · drag the screen to look around'
+    H.fillText(TOUCH ? '▲◀▶▼ to move · JUMP to jump · drag the screen to look around'
                      : 'W A S D to move · SPACE to jump · drag or Q/E to turn the camera', HW/2, HH-24);
   }
 
@@ -3400,9 +3359,8 @@ function drawDebug() {
   if (p) lines.push(
     'pos ' + n(p.x) + n(p.y) + n(p.z),
     'vel ' + n(p.vx) + n(p.vy) + n(p.vz) + '   speed ' + Math.hypot(p.vx,p.vz).toFixed(2),
-    'ground ' + (p.onGround ? 'yes' : 'no ') + (p.ascending ? '  ASCENT' : p.thrusting ? '  JET' : p.gliding ? '  GLIDE' : '') +
-      '  fuel ' + (p.fuel||0).toFixed(2) + '   airJumps ' + p.airJumps +
-      '/' + (hasPower('doublejump') ? AIR_JUMPS : 0) + '   coyote ' + p.coyote.toFixed(2),
+    'ground ' + (p.onGround ? 'yes' : 'no ') + '   airJumps ' + p.airJumps +
+      '/' + AIR_JUMPS + '   coyote ' + p.coyote.toFixed(2),
     'stand ' + (p.standing ? p.standing.kind : '-') + '   yaw ' + n(p.yaw));
   lines.push('cam yaw ' + n(cam.yaw) + '  pitch ' + n(cam.pitch) + '  dist ' + cam.dist.toFixed(1));
   if (game.mode === 'obby') lines.push('z ' + (p ? p.z.toFixed(1) : '-') + ' / ' + (W && W.endZ || 0) +
