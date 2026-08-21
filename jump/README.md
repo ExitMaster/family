@@ -104,7 +104,9 @@
 
 - **Realtime Database** — 싱가포르(`asia-southeast1`)
 - **Authentication** — 익명(Anonymous) 로그인 사용
-- 규칙(Realtime Database → 규칙):
+- 규칙(Realtime Database → 규칙) — 아래는 **이 게임 부분만** 적은 것입니다. 게시할 때는
+  저장소 루트의 [`firebase-rules.json`](../firebase-rules.json) **전체**를 붙여넣으세요.
+  이 조각만 게시하면 다른 게임 규칙이 지워집니다. → [게시하는 법](../FIREBASE.md)
 
 ```json
 {
