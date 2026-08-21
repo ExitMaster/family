@@ -252,11 +252,52 @@ worth **+12 aura**. Survive **60 seconds** to unlock the **Snail King** skin.
 
 ### ♾️ Infinity Challenge
 
-An endless tower going **down**. Every floor has one hole in it — find it and drop
-through. A ceiling of spikes follows you down and gets faster the deeper you go,
-so you can never stop and rest.
+**An obby with no end.** It used to be a fall down a spike-lined shaft; it is a run
+now, built from the same chunks the levels are, bolted on forever. No portal, no
+checkpoints, one life — you go until you miss a jump.
 
-Your **depth in metres** is the score, and your best depth is saved.
+The score is **how many jumps you made**, counted in `stepPlayer` at both jump sites
+so the second one in mid-air counts too. Higher is better; your best is saved as
+`save.best.jumps` and posted to the `inf:jumps` board.
+
+Two things get harder as you go, and they are deliberately separate:
+
+| | |
+|---|---|
+| **The pool opens up** | chunks 0–4 Angel, 5–11 Normal, 12–19 Devil, then anything in the game. Dropping a blinking causeway over lava on someone eight seconds into a run is not difficulty, it is a short run |
+| **The number climbs** | `d` goes `0.12 + i*0.03`, capped at **1**. Past 1 the zigzag's diagonal hop stops fitting inside the jump arc — see the difficulty ceiling below |
+
+The world is built `RUN_AHEAD` (130) in front of you and culled `RUN_KEEP` (70)
+behind, and `rebakeIfNeeded` rebuilds the static mesh whenever either end moves.
+That culling is not an optimisation, it is the thing that stops an endless level
+growing until the tab runs out of memory. Bot-verified: solid count holds flat around
+35 across a 278-unit run.
+
+### 👥 Everyone else
+
+The game is **multiplayer, and it is not a race.** Anyone playing the same level at
+the same moment appears beside you with their nickname over their head. Nobody can
+push you, nobody can hurt you, nothing about your run depends on theirs.
+
+Each player writes one small node to `obbyLive/<random id>` every `LIVE_RATE`
+(0.2s) — name, mode, level, position, yaw, walk phase, airborne, skin — and reads
+the whole node back. `onDisconnect().remove()` clears it when the tab closes or the
+wifi drops, so nobody is left standing in the level as a statue.
+
+Two decisions worth keeping:
+
+**Staleness is measured locally.** A player is dropped when *this* browser has not
+seen their position change for `LIVE_GONE` (8s). Comparing their clock against ours
+would require the two to agree, and they never do — `onDisconnect` is best-effort, so
+something has to catch the silent ones.
+
+**You only see people in the same place.** Same mode, and for an obby the same level.
+A ghost from Ice standing in mid-air in the middle of Devil is just confusing.
+
+Verified against a stand-in server: position pushed with name/mode/level, disconnect
+armed, two players in Angel visible while a third in Devil and a fourth in Killer
+Snail are filtered out, switching level swaps who you can see, and you never see
+yourself.
 
 ### 🏆 Leaderboard
 
@@ -265,7 +306,7 @@ Every entry carries a name, so a tablet the family shares becomes one shared
 scoreboard — type your name into "Playing as" before you play.
 
 Seven boards: fastest clear for each of the five finishable levels, plus longest
-survival and most snails beaten in Killer Snail, and deepest in Infinity. Nightmare
+survival and most snails beaten in Killer Snail, and most jumps in Infinity. Nightmare
 has no board, because nobody can finish it.
 
 Finish a run and the result screen tells you where you landed — "🥇 1st on this
@@ -317,10 +358,21 @@ is already there:
         ".write": "auth != null",
         ".validate": "$who.matches(/^[a-z0-9_-]{1,12}$/) && newData.hasChildren(['orbs'])"
       }
+    },
+    "obbyLive": {
+      ".read": "auth != null",
+      "$who": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['x','y','z']) && newData.child('x').isNumber() && newData.child('y').isNumber() && newData.child('z').isNumber()"
+      }
     }
   }
 }
 ```
+
+`obbyLive` is the one players write to several times a second while they are running.
+It is deliberately small and disposable: nothing under it is worth keeping, and every
+entry removes itself on disconnect.
 
 `exitmaster.github.io` must also be an authorised domain and anonymous sign-in must
 be on — both already done for `jump/`. Until the rule is published, writes are
