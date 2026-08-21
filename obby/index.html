@@ -249,6 +249,7 @@
         <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
         <tr><td style="color:#FF8A8A"><b>Any other key</b></td><td style="color:#FF8A8A"><b>x_x you die.</b> The keys above are the only ones the game will let you touch while you are playing</td></tr>
         <tr><td>Phone / tablet</td><td><b>▲ ◀ ▶ ▼</b> buttons + jump, drag the screen to look. Two thumbs at once for diagonals</td></tr>
+        <tr><td>Other players</td><td>Anyone playing the <b>same level at the same time</b> appears next to you, with their nickname. Nobody can push you or hurt you — it is not a race</td></tr>
         <tr><td colspan="2" style="padding-top:9px;color:#9BE58A"><b>🐌 In Killer Snail only</b></td></tr>
         <tr><td>Throw salt</td><td><b>Z</b> — costs salt, aims itself at the snail</td></tr>
         <tr><td>Swing</td><td><b>K</b> — big damage, but you must be right next to it</td></tr>
@@ -261,7 +262,9 @@
          <b>🐌 Killer Snail</b> flies through walls with a knife. You get <b>3 hearts</b> — fight back with
          salt (<b>Z</b>) and swings (<b>K</b>), and let the <b>soldiers</b> shoot it. Hide in the
          <b>🏠 safehouse</b> (<b>T</b>) — but the shield only lasts about 11 seconds, so you cannot camp.<br>
-         <b>♾️ Infinity</b> falls forever — find the hole in each floor before the spikes above catch you.</p>
+         <b>♾️ Infinity</b> is an obby with no end. It gets harder the further you go, there
+         are no checkpoints, and one miss finishes the run. The tracker counts your
+         <b>jumps</b> — every one, including the second one in mid-air.</p>
       <button class="ghost" id="btnHelpBack">⬅ Back</button>
     </div>
 
@@ -330,7 +333,7 @@ try {
     import(SDK + 'firebase-auth.js'),
     import(SDK + 'firebase-database.js')
   ]);
-  const { ref, get, set, serverTimestamp } = dbMod;
+  const { ref, get, set, onValue, onDisconnect, serverTimestamp } = dbMod;
   const app = appMod.initializeApp(firebaseConfig);
   const db = dbMod.getDatabase(app);
   await authMod.signInAnonymously(authMod.getAuth(app));
@@ -361,7 +364,14 @@ try {
     async putSave(key, data) {
       await set(ref(db, 'obbySaves/' + key), Object.assign({}, data, { at: serverTimestamp() }));
       return true;
-    }
+    },
+    // ---- who else is playing right now ----
+    // One small node per player, overwritten a few times a second. onDisconnect
+    // clears it when the tab closes or the wifi drops, so nobody is left standing
+    // in the level as a statue.
+    livePush(id, data) { return set(ref(db, 'obbyLive/' + id), data); },
+    liveWatch(cb) { return onValue(ref(db, 'obbyLive'), snap => cb(snap.val() || {})); },
+    liveLeave(id) { return onDisconnect(ref(db, 'obbyLive/' + id)).remove(); }
   };
   window.dispatchEvent(new Event('cloud-ready'));
 } catch (e) {
@@ -738,7 +748,7 @@ function snapshot() {
   };
 }
 // in save.best, level ids hold times (faster wins) and these three hold scores
-const bestIsTime = k => k !== 'snail' && k !== 'kills' && k !== 'depth';
+const bestIsTime = k => k !== 'snail' && k !== 'kills' && k !== 'depth' && k !== 'jumps';
 
 // the whole safety of this feature is in here: every field takes the better of
 // the two, so a merge can only ever hand you more than you walked in with.
@@ -1074,9 +1084,81 @@ function boardList() {
     ({ id:'lvl:'+L.id, name:L.emoji + ' ' + L.name, sub:'fastest clear', lower:true, fmt:fmtTime }));
   rows.push({ id:'snail:time', name:'🐌 Killer Snail', sub:'longest survival', lower:false, fmt:fmtTime });
   rows.push({ id:'snail:kills', name:'🔪 Killer Snail', sub:'most snails beaten', lower:false, fmt:v => v + '' });
-  rows.push({ id:'inf:depth', name:'♾️ Infinity', sub:'deepest', lower:false, fmt:v => v + ' m' });
+  rows.push({ id:'inf:jumps', name:'♾️ Infinity', sub:'most jumps', lower:false, fmt:v => v + '' });
   return rows;
 }
+
+/* =========================================================================
+   6d. EVERYONE ELSE — the game is multiplayer, but it is not a race.
+
+   Every player shouts where they are a few times a second, and reads everyone
+   else's shout. You see them running the same level next to you, with their
+   nickname over their head. Nobody can push you, nobody can hurt you, and nothing
+   about your run depends on theirs. They are company, not competition.
+
+   Two decisions worth keeping:
+
+   * Staleness is measured LOCALLY. A player counts as gone if THIS browser has not
+     seen their position change for LIVE_GONE seconds. Comparing their clock to
+     ours would need the two to agree, and they never do.
+   * You only see people in the same place as you — same mode, and same level. A
+     ghost from the Ice level standing in mid-air in Devil would just be confusing.
+   ========================================================================= */
+const LIVE_RATE = 0.2;      // seconds between shouts
+const LIVE_GONE = 8;        // seconds of silence before we stop drawing someone
+const MY_ID = 'p' + Math.random().toString(36).slice(2, 10);
+
+const Live = (function () {
+  let raw = {}, seen = {}, sub = null, wait = 0, joined = false;
+
+  function watch() {
+    const c = cloud();
+    if (!c || sub) return;
+    sub = c.liveWatch(m => {
+      const now = performance.now();
+      raw = m || {};
+      for (const id in raw) {
+        const o = raw[id];
+        const key = o ? o.x + ',' + o.y + ',' + o.z : '';
+        const was = seen[id];
+        if (!was || was.key !== key) seen[id] = { key, at: now };
+      }
+    });
+  }
+  function tick(dt) {
+    const c = cloud();
+    if (!c) return;
+    watch();
+    if (!joined) { joined = true; c.liveLeave(MY_ID); }
+    wait -= dt;
+    if (wait > 0) return;
+    wait = LIVE_RATE;
+    const p = game.player;
+    if (game.screen !== 'play' || !p || game.dead > 0) return;
+    c.livePush(MY_ID, {
+      n: playerName().slice(0, 10), m: game.mode, l: game.levelId || '',
+      x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2),
+      yaw: +p.yaw.toFixed(2), w: +(p.walk || 0).toFixed(2),
+      a: p.onGround ? 0 : 1, s: save.skin
+    }).catch(() => {});
+  }
+  // everyone who is here, now, in this level
+  function list() {
+    const now = performance.now(), out = [];
+    for (const id in raw) {
+      if (id === MY_ID) continue;
+      const o = raw[id];
+      if (!o || typeof o.x !== 'number' || typeof o.z !== 'number') continue;
+      const s = seen[id];
+      if (!s || (now - s.at) / 1000 > LIVE_GONE) continue;
+      if (o.m !== game.mode) continue;
+      if (game.mode === 'obby' && o.l !== game.levelId) continue;
+      out.push(o);
+    }
+    return out;
+  }
+  return { tick, list, id: MY_ID };
+})();
 
 /* =========================================================================
    7. SKINS
@@ -1592,6 +1674,9 @@ const CHUNKS = {
   lava: ch_lava, fireRun: ch_fireRun, spikes: ch_spikes, bounce: ch_bounce, pillars: ch_pillars,
   blink: ch_blink, blinkRun: ch_blinkRun, crossfire: ch_crossfire
 };
+// Infinity draws on every chunk in the game — its physics are normal, so the
+// exclusions the ice and space pools need do not apply here.
+const RUN_POOL = Object.keys(CHUNKS).map(k => CHUNKS[k]);
 const POOL = {
   angel: [ch_straight, ch_gap, ch_steps, ch_zigzag, ch_bounce, ch_moverSide, ch_beam, ch_gap, ch_straight],
   inu:   [ch_gap, ch_doubleGap, ch_zigzag, ch_moverSide, ch_moverLong, ch_lift, ch_crumble, ch_spikes,
@@ -1774,76 +1859,52 @@ function buildArena() {
 }
 
 /* ---- INFINITY TOWER (descending) ---- */
-const SHAFT = 26, LAYER = 8;
-function buildShaft() {
-  const W = newWorld('void', 'Infinity Challenge', 'shaft');
+/* ---- INFINITY: an obby with no end ----
+   It used to be a fall down a shaft with spikes chasing you. It is a RUN now: the
+   same chunks the levels are built from, bolted on forever, getting harder the
+   further you go. Nothing chases you and there are no checkpoints — you go until
+   you miss a jump, and that is the whole game. */
+const RUN_KEEP = 70;        // how far behind you the course is thrown away
+const RUN_AHEAD = 130;      // how far ahead of you it is built
+
+function buildRun() {
+  const W = newWorld('void', 'Infinity Challenge', 'endless');
   W.pal = THEMES.void;
   W.rng = mulberry32(90210);
-  W.nextLayer = 0;
-  W.startY = 0;
-  W.spawn = { x:0, y:1.2, z:0 };
-  W.solids.push(box(0, -THICK/2, 0, 5, THICK/2, 5, W.pal.top, 'plat'));
-  W.crusherY = 26;
-  W.lastHole = null;
-  for (let i=0;i<7;i++) addShaftLayer(W);
+  W.spawn = { x:0, y:1.2, z:3 };
+  W.chunks = 0;
+  W.lastFn = null;
+  W.b = builder(W, W.rng, 0.12);
+  W.b.plat(9, 12);                                 // somewhere to stand at the start
+  for (let i=0;i<6;i++) addRunChunk(W);
   return W;
 }
-function addShaftLayer(W) {
-  const i = W.nextLayer++;
-  const rng = W.rng, y = -6 - i*LAYER;
-  const diff = clamp(i/40, 0, 1);
-  const hs = 3.4 - diff*1.2;                       // hole half-size
-  const H = SHAFT/2;
-  const hx = (rng()-0.5) * (SHAFT - hs*2 - 6);
-  const hz = (rng()-0.5) * (SHAFT - hs*2 - 6);
-  const C = W.pal.top, S = W.pal.side;
+/* Two things get harder as you go, and they have to be separate.
 
-  // shaft walls for this layer's slice, so you can never leave the tower
-  const wy = y + LAYER/2;
-  W.solids.push(box(-(H+0.8), wy, 0, 0.8, LAYER/2, H+1.6, S, 'plat'));
-  W.solids.push(box( (H+0.8), wy, 0, 0.8, LAYER/2, H+1.6, S, 'plat'));
-  W.solids.push(box(0, wy, -(H+0.8), H+1.6, LAYER/2, 0.8, S, 'plat'));
-  W.solids.push(box(0, wy,  (H+0.8), H+1.6, LAYER/2, 0.8, S, 'plat'));
+   The POOL opens up: the first stretch is clouds and easy gaps, then it lets the
+   normal level's obstacles in, then hell's, and past chunk 18 anything in the game
+   can turn up. Throwing a blinking causeway over lava at someone eight seconds into
+   a run is not difficulty, it is just a short run.
 
-  // floor = 4 slabs around the hole
-  const seg = (x0,x1,z0,z1) => {
-    if (x1-x0 < 0.2 || z1-z0 < 0.2) return;
-    W.solids.push(box((x0+x1)/2, y-THICK/2, (z0+z1)/2, (x1-x0)/2, THICK/2, (z1-z0)/2, (i%2?C:S), 'floor'));
-  };
-  seg(-H, H, -H, hz-hs);
-  seg(-H, H, hz+hs, H);
-  seg(-H, hx-hs, hz-hs, hz+hs);
-  seg(hx+hs, H, hz-hs, hz+hs);
-
-  // spikes — never right under the hole above, that would be undodgeable
-  const drop = W.lastHole;
-  if (i > 1 && rng() < 0.3 + diff*0.45) {
-    for (let tries=0; tries<6; tries++) {
-      const sx = (rng()-0.5)*(SHAFT-8), sz = (rng()-0.5)*(SHAFT-8);
-      const near = Math.abs(sx-hx) < hs+2.4 && Math.abs(sz-hz) < hs+2.4;
-      const underDrop = drop && Math.abs(sx-drop.x) < drop.s+3.5 && Math.abs(sz-drop.z) < drop.s+3.5;
-      if (near || underDrop) continue;
-      W.hazards.push(spikeBox(sx, y, sz, 3.8, 3.8));
-      break;
-    }
-  }
-  // a mid-air ledge so the drop is not a free ride
-  if (rng() < 0.5) {
-    W.solids.push(Object.assign(
-      box(hx + (rng()-0.5)*5, y + LAYER/2 - THICK/2, hz + (rng()-0.5)*5, 1.9, THICK/2, 1.9,
-          rng() < 0.35 + diff*0.3 ? '#C08552' : W.pal.accent,
-          rng() < 0.35 + diff*0.3 ? 'crumble' : 'plat'), { timer:0, gone:0 }));
-  }
-  // a slider that covers the hole on and off
-  if (i > 4 && rng() < 0.2 + diff*0.35) {
-    const w = hs*2 + 1.6;
-    W.solids.push(Object.assign(
-      box(hx, y + 1.6, hz, w/2, THICK/2, w/2, W.pal.accent, 'move'),
-      { ax: hx-6, ay: y+1.6, az: hz, bx: hx+6, by: y+1.6, bz: hz, spd: 2.2 + diff*2.4, t: rng(), dx:0, dy:0, dz:0 }));
-  }
-  W.orbs.push({ x:hx, y:y+2.2, z:hz, got:false });
-  if (rng() < 0.55) W.orbs.push({ x:(rng()-0.5)*(SHAFT-8), y:y+LAYER-2.5, z:(rng()-0.5)*(SHAFT-8), got:false });
-  W.lastHole = { x:hx, z:hz, s:hs };
+   The NUMBER climbs to 1 and stops. Past 1 the zigzag's diagonal hop stops fitting
+   inside the jump arc and the course stops being fair — see the README. */
+function runPool(i) {
+  if (i < 5)  return POOL.angel;
+  if (i < 12) return POOL.inu;
+  if (i < 20) return POOL.devil;
+  return RUN_POOL;
+}
+function addRunChunk(W) {
+  const i = W.chunks++;
+  const d = Math.min(1, 0.12 + i*0.03);
+  const pool = runPool(i);
+  W.b.d = d;
+  let fn, guard = 0;
+  do { fn = pool[Math.floor(W.rng()*pool.length)]; guard++; }
+  while (fn === W.lastFn && guard < 8);
+  W.lastFn = fn;
+  fn(W.b, d);
+  W.endZ = W.b.z;
 }
 
 /* =========================================================================
@@ -1852,7 +1913,7 @@ function addShaftLayer(W) {
 const cam = { yaw: 0, pitch: 0.38, dist: 9.5, x:0, y:0, z:0, tx:0, ty:0, tz:0 };
 const game = {
   screen:'menu', mode:null, levelId:null, world:null, player:null,
-  time:0, runOrbs:0, deaths:0, dead:0, won:false, depth:0,
+  time:0, runOrbs:0, deaths:0, dead:0, won:false, jumps:0,
   banner:null, flash:0, shake:0, particles:[], snail:null, salts:[], orbTimer:0, speech:null,
   // killer-snail war: hearts, salt ammo, soldiers, safehouse shield
   debug:false,
@@ -1965,11 +2026,13 @@ function stepPlayer(dt) {
     if (p.coyote > 0) {
       p.vy = JUMP_V * gScale; p.buffer = 0; p.coyote = 0; p.airJumps = 0;
       p.onGround = false; p.standing = null; p.jumpHeld = true; p.squash = -0.3;
+      game.jumps++;
       Sound.jump(); puff(p.x, p.y - PHY, p.z, 5);
     } else if (p.airJumps < AIR_JUMPS) {          // the second jump is everyone's
       // set vy rather than add it, so it saves you even in a long fall
       p.airJumps++;
       p.vy = JUMP_V * DBL_JUMP * gScale; p.buffer = 0; p.jumpHeld = true; p.squash = -0.3;
+      game.jumps++;                                // the tracker counts these too
       Sound.dbl();
       for (let i=0;i<10;i++) {                       // a little ring of dust
         const a = i/10 * 6.283;
@@ -2589,20 +2652,20 @@ function updateInfinity(dt) {
   stepPlayer(dt);
   collectOrbs();
 
-  game.depth = Math.max(game.depth, Math.round(W.startY - p.y));
-  while (-6 - (W.nextLayer-1)*LAYER > p.y - 90) addShaftLayer(W);
+  // build ahead, throw away behind. Without the culling the world would grow until
+  // the tab ran out of memory, and every frame would redraw a course you left
+  // minutes ago.
+  while (W.b.z < p.z + RUN_AHEAD) addRunChunk(W);
+  const cut = p.z - RUN_KEEP;
+  if (W.solids.some(s => s.cz + s.hz < cut)) {
+    W.solids  = W.solids.filter(s => s.cz + s.hz >= cut);
+    W.hazards = W.hazards.filter(h => h.cz + h.hz >= cut);
+    W.orbs    = W.orbs.filter(o => o.z >= cut);
+    W.pads    = W.pads.filter(o => o.z >= cut);
+    W.spinners = W.spinners.filter(o => o.z >= cut);
+  }
 
-  const spd = clamp(1.85 + game.depth*0.0045, 1.85, 8.5);
-  W.crusherY -= spd*dt;
-  if (W.crusherY > p.y + 30) W.crusherY = p.y + 30;      // never lag too far behind
-
-  const cut = W.crusherY + 2;
-  W.solids = W.solids.filter(s => s.cy - s.hy < cut);
-  W.hazards = W.hazards.filter(h => h.cy - h.hy < cut);
-  W.orbs = W.orbs.filter(o => o.y < cut + 2);
-
-  if (p.y + PHY > W.crusherY - 0.2) killPlayer();
-  if (hitHazards()) killPlayer();
+  if (hitHazards() || p.y < W.deathY) killPlayer();
 }
 
 function endRun() {
@@ -2644,14 +2707,15 @@ function endRun() {
                 : (t < 60 ? '<br><span style="opacity:.7">Survive 60s to unlock the Snail King skin.</span>' : '')),
       null);
   } else {
-    const d = game.depth, isBest = d > (save.best.depth || 0);
-    if (isBest) save.best.depth = d;
+    const j = game.jumps, isBest = j > (save.best.jumps || 0);
+    if (isBest) save.best.jumps = j;
     persist();
-    const rank = postScore('inf:depth', d, false);
-    showResult('♾️ Squashed!',
-      '📉 Depth reached: <b>' + d + ' m</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
+    const rank = postScore('inf:jumps', j, false);
+    showResult('♾️ You fell.',
+      '⏫ Jumps made: <b>' + j + '</b>' + (isBest ? '  <b>NEW BEST!</b>' : '') +
       rankLine(rank) +
-      '<br>🏆 Best depth: ' + (save.best.depth || 0) + ' m' +
+      '<br>🏆 Best: ' + (save.best.jumps || 0) + ' jumps · ' +
+      Math.round(game.player.z) + ' units run' +
       '<br>💠 ' + (game.runOrbs * ORB_VALUE) + ' aura collected (' + game.runOrbs + ' orbs)', null);
   }
 }
@@ -3073,15 +3137,8 @@ function drawWorld(t) {
   }
   if (W.npc) drawDevilNpc(W.npc, t);
 
-  // infinity crusher
-  if (W.kind === 'shaft') {
-    const y = W.crusherY;
-    drawBox(0, y + 3.2, 0, SHAFT+4, 6, SHAFT+4, hex('#2A1140'));
-    for (let ix=-3; ix<=3; ix++) for (let iz=-3; iz<=3; iz++) {
-      compose(MODEL, ix*4, y - 0.7, iz*4, 0, Math.PI, 3.4, 1.6, 3.4);
-      drawMesh(meshes.pyr, MODEL, hex('#C9A0FF'), 0.25);
-    }
-  }
+  // everyone else, running the same level right now
+  for (const o of Live.list()) drawCharacter(o.x, o.y, o.z, o.yaw || 0, o.s, o.w || 0, 0, !!o.a);
 
   // player
   const p = game.player;
@@ -3153,7 +3210,7 @@ function drawHUD(t) {
 
   let label = 'TIME', big = fmtTime(game.time);
   if (game.mode === 'snail') label = 'SURVIVED';
-  if (game.mode === 'infinity') { label = 'DEPTH'; big = game.depth + ' m'; }
+  if (game.mode === 'infinity') { label = 'JUMPS'; big = game.jumps + ''; }
   H.textAlign = 'right';
   H.fillStyle = 'rgba(18,16,31,.6)';
   rr2(HW-250,12,150,38,12); H.fill();
@@ -3167,7 +3224,7 @@ function drawHUD(t) {
   H.fillStyle = 'rgba(255,255,255,.78)';
   H.fillText(game.mode === 'obby' ? '💀 ' + game.deaths
     : game.mode === 'snail' ? '🏆 ' + fmtTime(save.best.snail||0)
-    : '🏆 ' + (save.best.depth||0) + ' m', HW-114, 62);
+    : '🏆 ' + (save.best.jumps||0), HW-114, 62);
 
   // progress bar for obby
   if (game.mode === 'obby' && game.world.endZ) {
@@ -3274,17 +3331,37 @@ function drawHUD(t) {
     }
   }
 
-  // infinity danger tint
-  if (game.mode === 'infinity') {
-    const gap = game.world.crusherY - game.player.y;
-    const danger = clamp(1 - gap/18, 0, 1);
-    if (danger > 0.25) {
-      H.fillStyle = 'rgba(164,107,255,' + ((danger-0.25)*0.5) + ')';
-      H.fillRect(0,0,HW,HH);
+
+  // the devil's line, drawn as a speech bubble over his head
+  // a nickname over each of them, so you know who you are running with
+  for (const o of (game.player ? Live.list() : [])) {
+    const pt = project(o.x, o.y + 1.9, o.z);
+    if (!pt) continue;
+    const d = Math.hypot(o.x - game.player.x, o.z - game.player.z);
+    if (d > 70) continue;
+    H.globalAlpha = clamp(1.15 - d/70, 0.25, 1);
+    H.textAlign = 'center';
+    H.font = 'bold 13px "Trebuchet MS", sans-serif';
+    const name = safeName(o.n || 'player');
+    const w = H.measureText(name).width + 16;
+    H.fillStyle = 'rgba(18,16,31,.7)';
+    rr2(pt.x - w/2, pt.y - 18, w, 20, 8); H.fill();
+    H.fillStyle = '#C9F0FF';
+    H.fillText(name, pt.x, pt.y - 4);
+    H.globalAlpha = 1;
+  }
+  {
+    const n = Live.list().length;
+    if (n) {
+      H.textAlign = 'left';
+      H.font = 'bold 12px "Trebuchet MS", sans-serif';
+      H.fillStyle = 'rgba(18,16,31,.55)';
+      rr2(14, 92, 138, 22, 10); H.fill();
+      H.fillStyle = '#C9F0FF';
+      H.fillText('👥 ' + n + ' here with you', 22, 107);
     }
   }
 
-  // the devil's line, drawn as a speech bubble over his head
   if (game.speech && game.speech.t > 0) {
     const s = game.speech;
     const sn = game.snail;
@@ -3370,8 +3447,9 @@ function drawDebug() {
     '  dist ' + Math.hypot(p.x-game.snail.x, p.z-game.snail.z).toFixed(1) +
     '  wave ' + game.wave, 'hp ' + game.hp + '  ammo ' + game.ammo +
     '  shield ' + game.shield.toFixed(2) + '  safe ' + (game.inSafe ? 'yes' : 'no'));
-  if (game.mode === 'infinity' && W) lines.push('depth ' + game.depth +
-    '   crusher gap ' + (W.crusherY - p.y).toFixed(1) + '   layers ' + W.nextLayer);
+  if (game.mode === 'infinity' && W) lines.push('jumps ' + game.jumps +
+    '   z ' + Math.round(p.z) + '   built to ' + Math.round(W.b.z) +
+    '   chunks ' + W.chunks + '   solids ' + W.solids.length);
   lines.push('aura ' + save.orbs + '   skin ' + save.skin + '   powers ' + (save.powers.join(',') || '-'));
   const errs = Oops.total();
   if (errs) lines.push('ERRORS ' + errs + ': ' + Oops.last());
@@ -3414,11 +3492,12 @@ function bakeStatic(W) {
   }
   uploadStatic(batch);
 }
-// the shaft grows as you fall, so its static mesh is rebuilt as needed
+// the endless run grows in front of you and is culled behind you, so its static
+// mesh is rebuilt whenever either end has moved
 function rebakeIfNeeded(W) {
-  if (W.kind !== 'shaft') return;
-  if (W.bakedLayer !== W.nextLayer || W.bakedCut !== W.solids.length) {
-    W.bakedLayer = W.nextLayer; W.bakedCut = W.solids.length;
+  if (W.kind !== 'endless') return;
+  if (W.bakedChunks !== W.chunks || W.bakedCut !== W.solids.length) {
+    W.bakedChunks = W.chunks; W.bakedCut = W.solids.length;
     bakeStatic(W);
   }
 }
@@ -3453,16 +3532,15 @@ function startSnail() {
 }
 function startInfinity() {
   game.mode = 'infinity'; game.levelId = null;
-  game.world = buildShaft();
+  game.world = buildRun();
   resetRun();
-  game.depth = 0;
   bakeStatic(game.world);
-  game.banner = { text:'♾️  GO DOWN!', t:2.0 };
+  game.banner = { text:'♾️  RUN. IT NEVER ENDS.', t:2.4 };
   showScreen('play');
 }
 function resetRun() {
   game.player = makePlayer(game.world.spawn);
-  game.time = 0; game.runOrbs = 0; game.deaths = 0;
+  game.time = 0; game.runOrbs = 0; game.deaths = 0; game.jumps = 0;
   game.dead = 0; game.won = false; game.flash = 0; game.shake = 0;
   game.particles.length = 0; game.speech = null;
   if (game.mode !== 'snail') {
@@ -3496,6 +3574,7 @@ function update(dt) {
   else if (game.mode === 'snail') updateSnail(dt);
   else updateInfinity(dt);
   updateCamera(dt, false);
+  Live.tick(dt);
 }
 
 const STEP = 1/120;
@@ -3876,12 +3955,12 @@ requestAnimationFrame(frame);
 
 window.OBBY = {
   game, save, cam, input, LEVELS, SKINS, CHUNKS, POOL, update, readKeys, bakeStatic, resetRun,
-  buildCourse, buildArena, buildShaft, addShaftLayer,
+  buildCourse, buildArena, buildRun, addRunChunk,
   startLevel, startSnail, startInfinity, showScreen, persist,
   shoot: shootSalt, melee: meleeSwing, teleport: teleportHome, emergencySave, project, cam, endRun, Scores,
   Profiles, useProfile, mergeSave, snapshot, get profileKey() { return profileKey; },
-  GAME_KEYS, wrongKey, shuffleObstacles,
-  consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, SHAFT, LAYER, ARENA }
+  GAME_KEYS, wrongKey, shuffleObstacles, Live,
+  consts: { GRAV, RUN, JUMP_V, PAD_V, MAXGAP, PHX, PHY, PHZ, ARENA }
 };
 
 })();
