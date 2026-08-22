@@ -54,9 +54,11 @@ npm run deploy
 https://kkoongs.web.app
 ```
 
-Firebase Hosting 배포본에서는 `/__/firebase/init.json`으로 Web App 설정을 자동으로 읽으므로 production용 `config.js`는 필요하지 않습니다.
+multisite Hosting에서 `/__/firebase/init.json` 자동 설정이 안정적으로 동작하지 않아, `app.js`가 Firebase Web App config를 직접 들고 있습니다. 이 값은 공개되는 클라이언트 설정이며 비밀이 아닙니다. 접근 통제는 Firestore Rules와 `access/allowlist`가 담당합니다.
 
-로컬 테스트에서만 `config.example.js`를 `config.js`로 복사해 Firebase Web App config를 넣습니다.
+로컬 테스트에서 다른 프로젝트를 붙이고 싶을 때만 `config.example.js`를 `config.js`로 복사해 덮어씁니다.
+
+`family` 브랜치에 push하면 GitHub Actions가 위 명령과 **같은 대상**(Hosting + Firestore Rules)을 자동 배포합니다. 자동 배포 준비 상태와 서비스 계정 설정은 [DEPLOY.md](DEPLOY.md)를 보세요.
 
 ## 접근 보안
 
@@ -98,3 +100,13 @@ Firestore Rules는 다음을 모두 요구합니다.
 - **정산:** 3가정 대납 및 분담 상태
 - **간병:** 항암 1~12회, 진료/병문안 타임라인, 건강상태, Drive 의료자료 링크
 - **설정:** 가족 사용자, 8인 allowlist, 가정 연결, 기존자료 이관
+
+## 검증
+
+간병 기록 수정/삭제와 색상 구분을 헤드리스 Chromium으로 확인합니다.
+
+```bash
+node scripts/verify-care.mjs
+```
+
+실서버에 붙지 않습니다. `www.gstatic.com`의 Firebase SDK 요청을 `scripts/fake-firebase-module.js`로 가로채 인메모리 Firestore를 쓰고, 쓰기 권한은 `firestore.rules`의 `care_events`/`attachments` 규칙을 옮겨 적은 것으로 판정합니다. 규칙 파일 자체를 평가하지는 않으므로, 규칙을 고쳤다면 `npm run deploy` 후 실제 계정으로도 확인하세요.
