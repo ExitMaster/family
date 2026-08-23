@@ -209,6 +209,12 @@
   #map{ position:absolute; inset:0; }
   #mapMsg{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     color:var(--sub); font-size:14px; text-align:center; padding:20px; }
+  #mapDays{ position:absolute; top:8px; left:8px; right:48px; z-index:1001;
+    display:flex; gap:6px; flex-wrap:wrap; pointer-events:none; }
+  .mapDayChip{ pointer-events:auto; padding:7px 12px; border-radius:999px; font-size:12.5px;
+    background:rgba(255,255,255,.92); border:1px solid var(--line);
+    box-shadow:0 1px 4px rgba(0,0,0,.15); }
+  .mapDayChip.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
   .numIcon{ background:var(--brand2); color:#fff; border-radius:50%; border:2px solid #fff;
     display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;
     box-shadow:0 1px 4px rgba(0,0,0,.3); }
@@ -301,6 +307,7 @@
 
   <div id="mapPane">
     <div id="map"></div>
+    <div id="mapDays"></div>
     <div id="mapMsg" class="hidden">지도를 불러오지 못했어요.<br>인터넷 연결을 확인해 주세요.</div>
   </div>
 </div>
@@ -993,6 +1000,7 @@ function renderHome(){
 
 function openTrip(id){
   tripId = id;
+  mapDay = 0;                       // 여행을 바꾸면 지도는 전체 보기부터
   $("#home").classList.add("hidden");
   $("#planner").classList.remove("hidden");
   renderAll();
@@ -1489,14 +1497,37 @@ function initMap(){
   setTimeout(() => map.invalidateSize(), 60);
 }
 
+/* 지도 위 Day 필터 — 여행이 길면 모든 날의 선이 겹쳐 읽기 어려워서,
+   고른 날의 동선만 그린다. 0 = 전체. */
+let mapDay = 0;
+function renderMapDayChips(){
+  const wrap = $("#mapDays");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  if (!map || !tripId) return;
+  const n = dayCount(DB.trips[tripId]);
+  if (mapDay > n) mapDay = 0;
+  const mk = (label, val) => {
+    const b = document.createElement("button");
+    b.className = "mapDayChip" + (mapDay === val ? " on" : "");
+    b.textContent = label;
+    b.onclick = () => { mapDay = val; renderMap(); };
+    wrap.appendChild(b);
+  };
+  mk("전체", 0);
+  for (let d = 1; d <= n; d++) mk("Day " + d, d);
+}
+
 function renderMap(){
   if (!map || !tripId) return;
+  renderMapDayChips();
   mapLayer.clearLayers();
   markers = {};
   const bounds = [];
   const palette = ["#2E7BE8","#35C46A","#FF5FA2","#A96BFF","#17BEBB","#E2445C","#FF7A1A"];
   const n = dayCount(DB.trips[tripId]);
   for (let day = 1; day <= n; day++){
+    if (mapDay && day !== mapDay) continue;   // 고른 날만
     const dd = itin(day);
     const col = palette[(day-1) % palette.length];
     const pts = [];
@@ -1581,12 +1612,13 @@ function renderMap(){
     if (pts.length > 1)
       L.polyline(pts, { color: col, weight:3, dashArray:"6 6", opacity:.8 }).addTo(mapLayer);
   }
-  if (!bounds.length){    // 아직 일정이 없으면 카드들 위치라도 보여 준다
+  if (!bounds.length && !mapDay){   // (전체 보기) 아직 일정이 없으면 카드들 위치라도 보여 준다
     for (const id in (DB.cards[tripId] || {})){
       const c = DB.cards[tripId][id];
       if (typeof c.lat === "number") bounds.push([c.lat, c.lng]);
     }
   }
+  // 고른 날이 비어 있으면 화면을 옮기지 않고 그대로 둔다
   if (bounds.length) map.fitBounds(bounds, { padding:[36,36], maxZoom:15 });
 }
 
