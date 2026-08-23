@@ -140,6 +140,8 @@
     border:1px solid #F5CFA8; font-size:13px; }
   .dropHint{ height:4px; border-radius:2px; background:var(--brand); margin:2px 4px; }
   .dayBody.over{ background:#FFF4E8; border-radius:12px; }
+  .dayHead.over{ background:#FFF4E8; border-radius:16px 16px 0 0; }
+  .dayHead.over .stayHint{ border-color:var(--brand); border-style:solid; color:var(--brand); }
   .empty{ color:var(--sub); font-size:13px; text-align:center; padding:28px 8px; }
 
   /* 지도 */
@@ -866,10 +868,14 @@ function dragMove(ev){
   g.style.left = (ev.clientX - 110) + "px";
   g.style.top  = (ev.clientY - 24) + "px";
 
-  document.querySelectorAll(".dropHint").forEach(h => h.remove());
-  document.querySelectorAll(".dayBody.over").forEach(b => b.classList.remove("over"));
+  clearDropMarks();
   const t = target(ev);
-  if (t){
+  if (!t) return;
+  if (isStayDrag()){
+    // 숙소는 어디에 놓든 그 날의 '오늘 밤 숙소'가 되니, 머리 쪽을 밝힌다
+    const head = t.body.closest(".dayCol").querySelector(".dayHead");
+    if (head) head.classList.add("over");
+  } else {
     t.body.classList.add("over");
     const hint = document.createElement("div");
     hint.className = "dropHint";
@@ -879,29 +885,58 @@ function dragMove(ev){
   }
 }
 
+function clearDropMarks(){
+  document.querySelectorAll(".dropHint").forEach(h => h.remove());
+  document.querySelectorAll(".over").forEach(b => b.classList.remove("over"));
+}
+function draggedCard(){
+  if (!dragging) return null;
+  return dragging.from === "pool" ? cardById(dragging.cardId) : cardOf(dragging.item);
+}
+function isStayDrag(){
+  const c = draggedCard();
+  return !!c && c.category === "accommodation";
+}
+
 /* 지금 포인터가 가리키는 (요일, 끼워 넣을 자리) 계산 */
 function target(ev){
   const g = $("#ghost"); g.style.display = "none";
   const el = document.elementFromPoint(ev.clientX, ev.clientY);
   g.style.display = "";
-  const body = el && el.closest && el.closest(".dayBody");
-  if (!body) return null;
-  const day = +body.dataset.day;
-  const blocks = [...body.querySelectorAll(".tblock")];
-  let idx = blocks.length;
-  for (let i = 0; i < blocks.length; i++){
-    const r = blocks[i].getBoundingClientRect();
-    if (ev.clientY < r.top + r.height/2){ idx = i; break; }
+  if (!el || !el.closest) return null;
+
+  const body = el.closest(".dayBody");
+  if (body){
+    const day = +body.dataset.day;
+    const blocks = [...body.querySelectorAll(".tblock")];
+    let idx = blocks.length;
+    for (let i = 0; i < blocks.length; i++){
+      const r = blocks[i].getBoundingClientRect();
+      if (ev.clientY < r.top + r.height/2){ idx = i; break; }
+    }
+    return { body, day, idx };
   }
-  return { body, day, idx };
+
+  // 본문 밖이어도 그 날 칸 안이면 그 날로 친다.
+  // 숙소 안내 문구·오늘 밤 숙소 배지가 머리 쪽에 있어서, 거기 놓아도 받아야 한다.
+  const col = el.closest(".dayCol");
+  if (col){
+    const b = col.querySelector(".dayBody");
+    if (!b) return null;
+    const inHead = !!el.closest(".dayHead");
+    return { body:b, day:+col.dataset.day, head:true,
+             idx: inHead ? 0 : b.querySelectorAll(".tblock").length };
+  }
+  return null;
 }
 
 function drop(ev){
   const t = target(ev);
-  $("#ghost").classList.add("hidden");
+  const g = $("#ghost");
+  g.classList.add("hidden");
+  g.innerHTML = "";
   document.body.style.cursor = "";
-  document.querySelectorAll(".dropHint").forEach(h => h.remove());
-  document.querySelectorAll(".dayBody.over").forEach(b => b.classList.remove("over"));
+  clearDropMarks();
   const src = dragging;
   dragging = null;
   justDragged = true;
@@ -926,6 +961,11 @@ function drop(ev){
       const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
       insertWithLocks(itin(t.day), item, t.idx);
     }
+  } else if (cardOf(src.item) && cardOf(src.item).category === "accommodation"){
+    // 예전 데이터에서 타임라인에 들어가 있던 숙소 — 끌어다 놓으면 숙소 슬롯으로 옮긴다
+    const items = itin(src.day).items;
+    items.splice(items.indexOf(src.item), 1);
+    itin(t.day).stay = src.item.cardId;
   } else {
     const from = itin(src.day);
     const oldIdx = from.items.indexOf(src.item);
