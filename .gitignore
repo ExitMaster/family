@@ -1,2 +1,12 @@
 __pycache__/
 *.pyc
+
+# 이 저장소는 public 이다. 자격증명과 개인 데이터가 실수로도 올라가지 않게 넓게 막는다.
+.env
+.env.*
+private/
+*.pem
+*.p12
+*service-account*.json
+*service_account*.json
+*serviceaccount*.json
