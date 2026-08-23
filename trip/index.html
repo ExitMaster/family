@@ -337,6 +337,82 @@ const firebaseConfig = {
 const SDK = "https://www.gstatic.com/firebasejs/10.12.5/";
 let fb = null;                 // { db, ref, set, onValue, ... }
 let applyingRemote = false;    // 원격 스냅샷 반영 중엔 다시 업로드하지 않는다
+let firstSync = true;          // 연결 후 첫 스냅샷인가 (여기서만 물어본다)
+let syncPaused = false;        // 물어보는 동안엔 서버로 올리지도, 받지도 않는다
+
+/* 비교용 정규화 — Firebase는 빈 배열·빈 객체를 지우고 키 순서도 바꾸므로,
+   그대로 비교하면 같은 데이터도 다르다고 나온다. */
+function stableJson(v){
+  if (Array.isArray(v)) return "[" + v.map(stableJson).join(",") + "]";
+  if (v && typeof v === "object"){
+    const parts = [];
+    for (const k of Object.keys(v).sort()){
+      const x = v[k];
+      if (x == null) continue;
+      if (Array.isArray(x) && !x.length) continue;
+      if (typeof x === "object" && !Array.isArray(x) && !Object.keys(x).length) continue;
+      parts.push(JSON.stringify(k) + ":" + stableJson(x));
+    }
+    return "{" + parts.join(",") + "}";
+  }
+  return JSON.stringify(v);
+}
+/* 아직 아무것도 안 만진 기기인지 — 예시 데이터 그대로면 물어볼 것도 없다 */
+const FRESH_JSON = (() => {
+  const s = JSON.parse(JSON.stringify(SEED));
+  migrate(s);
+  return stableJson(s);
+})();
+
+function summarize(d){
+  const trips = Object.keys(d.trips || {}).length;
+  let cards = 0, placed = 0;
+  for (const t in (d.cards || {})) cards += Object.keys(d.cards[t]).length;
+  for (const t in (d.itins || {}))
+    for (const k in d.itins[t]){
+      placed += (d.itins[t][k].items || []).length;
+      if (d.itins[t][k].stay) placed++;
+    }
+  return `여행 ${trips}개 · 카드 ${cards}장 · 일정에 놓인 것 ${placed}개`;
+}
+
+function applyRemote(remote){
+  applyingRemote = true;
+  DB = remote;
+  migrate(DB);
+  saveLocal();
+  renderAll();
+  applyingRemote = false;
+  setDot("☁️ 함께 보는 중");
+}
+
+/* 처음 연결됐는데 서버 일정과 이 기기 일정이 서로 다를 때만 묻는다.
+   한 번 정하고 나면 그 뒤로는 조용히 같이 편집된다. */
+function askWhichWins(remote){
+  syncPaused = true;
+  showModal(`
+    <h3>☁️ 일정이 두 벌이에요</h3>
+    <p style="font-size:14.5px;line-height:1.6">이 기기에 있는 일정과 다른 기기(서버)의 일정이 서로 달라요.
+    어느 쪽으로 맞출까요? <b>고르지 않은 쪽은 사라집니다.</b></p>
+    <div style="background:var(--bg);border-radius:12px;padding:10px 14px;font-size:13.5px;line-height:1.8">
+      📱 <b>이 기기</b><br>${summarize(DB)}<br><br>
+      ☁️ <b>다른 기기</b><br>${summarize(remote)}
+    </div>
+    <div class="btns">
+      <button class="ghostBtn" id="mMine">📱 이 기기 것으로</button>
+      <button class="primary" id="mTheirs">☁️ 다른 기기 것으로</button>
+    </div>`, true);
+  $("#mMine").onclick = () => {          // 내 것을 서버에 올려 덮어쓴다
+    hideModal(true);
+    syncPaused = false;
+    pushToFirebase();
+  };
+  $("#mTheirs").onclick = () => {        // 서버 것을 받아 내 것을 버린다
+    hideModal(true);
+    syncPaused = false;
+    applyRemote(remote);
+  };
+}
 
 (async () => {
   try{
@@ -350,17 +426,25 @@ let applyingRemote = false;    // 원격 스냅샷 반영 중엔 다시 업로�
     const db = dbMod.getDatabase(app);
     fb = { db, ref:dbMod.ref, set:dbMod.set, onValue:dbMod.onValue };
     fb.onValue(fb.ref(db, "tripPlans"), snap => {
-      const v = snap.val();
-      if (!v) { pushToFirebase(); return; }   // 서버가 비어 있으면 내 것을 올린다
+      if (syncPaused) return;                 // 물어보는 중 — 답을 기다린다
       if (dragging) return;                   // 드래그 중엔 화면을 흔들지 않는다
-      applyingRemote = true;
-      DB = { trips: v.trips||{}, cards: v.cards||{}, itins: v.itins||{} };
-      if (!Object.keys(DB.trips).length) DB = JSON.parse(JSON.stringify(SEED));
-      migrate(DB);
-      saveLocal();
-      renderAll();
-      applyingRemote = false;
-      setDot("☁️ 함께 보는 중");
+      const v = snap.val();
+      const remote = { trips: v && v.trips || {}, cards: v && v.cards || {}, itins: v && v.itins || {} };
+      if (!Object.keys(remote.trips).length){ // 서버가 비어 있으면 내 것을 올린다
+        firstSync = false;
+        pushToFirebase();
+        return;
+      }
+      if (firstSync){
+        firstSync = false;
+        // 이 기기에 서버와 다른 작업물이 있으면, 덮어쓰기 전에 물어본다.
+        // (예시 데이터 그대로인 기기는 물어볼 것 없이 서버 것을 받는다)
+        if (stableJson(DB) !== FRESH_JSON && stableJson(DB) !== stableJson(remote)){
+          askWhichWins(remote);
+          return;
+        }
+      }
+      applyRemote(remote);
     });
   }catch(e){
     setDot("");  // 오프라인 — 이 기기에만 저장. 에러 배너까지는 띄우지 않는다.
@@ -368,7 +452,7 @@ let applyingRemote = false;    // 원격 스냅샷 반영 중엔 다시 업로�
 })();
 
 function pushToFirebase(){
-  if (!fb || applyingRemote) return;
+  if (!fb || applyingRemote || syncPaused) return;
   clearTimeout(fbTimer);
   fbTimer = setTimeout(() => {
     fb.set(fb.ref(fb.db, "tripPlans"), DB).then(
@@ -1004,11 +1088,17 @@ function insertWithLocks(dayData, item, wantIdx){
    ============================================================ */
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
-function showModal(html){
+let modalLocked = false;   // 잠긴 창은 배경을 눌러도 닫히지 않는다 (반드시 골라야 하는 질문)
+function showModal(html, locked){
+  modalLocked = !!locked;
   $("#modal").innerHTML = html;
   $("#modalBack").classList.remove("hidden");
 }
-function hideModal(){ $("#modalBack").classList.add("hidden"); }
+function hideModal(force){
+  if (modalLocked && !force) return;
+  modalLocked = false;
+  $("#modalBack").classList.add("hidden");
+}
 $("#modalBack").addEventListener("click", e => { if (e.target.id === "modalBack") hideModal(); });
 
 function tripModal(){
