@@ -126,12 +126,22 @@
     display:flex; align-items:center; justify-content:center; color:#8a94a0; font-size:11.5px; }
   .lateBadge{ position:absolute; right:10px; top:6px; background:var(--warn); color:#fff;
     font-size:11px; border-radius:8px; padding:2px 7px; }
+  /* 숙소 배지 — 왼쪽 굵은 띠 색이 숙소마다 달라서, 여러 곳에 묵어도 눈으로 구분된다.
+     연박 둘째 날부터(.cont)는 위 모서리를 각지게 해 앞 날과 이어져 보이게 한다. */
   .stayBadge{ display:flex; align-items:center; gap:6px; margin-top:6px;
-    background:#E8F4E9; border:1px solid #BFDFC4; border-radius:10px;
-    padding:5px 8px; font-size:12.5px; }
+    background:#F1F6F2; border:1px solid #DCE6DE; border-left:5px solid var(--stayc,var(--stay));
+    border-radius:10px; padding:5px 8px; font-size:12.5px; }
   .stayBadge b{ font-size:12.5px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stayBadge .stayNote{ font-size:11px; color:var(--sub); flex:none; }
   .stayBadge .rmStay{ width:26px; height:26px; border-radius:8px; background:rgba(0,0,0,.06); font-size:12px; flex:none; }
   .stayBadge.warnLate{ background:#FDEBEE; border-color:#F2B4BE; }
+  .stayBadge.cont{ opacity:.85; }
+  .moveNote{ margin-top:4px; font-size:11px; color:#8a6d3b; background:#FFF6E5;
+    border:1px solid #F0DCB0; border-radius:8px; padding:4px 8px; }
+  .nightRow{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .nightBtn{ flex:1 1 70px; min-height:48px; border-radius:12px; background:var(--bg);
+    border:1px solid var(--line); font-size:15px; font-weight:600; }
+  .nightBtn:active{ background:var(--brand); color:#fff; }
   .stayHint{ margin-top:6px; font-size:11.5px; color:var(--sub); border:1px dashed var(--line);
     border-radius:10px; padding:5px 8px; text-align:center; }
   .verifyBtn{ margin:0 10px 10px; padding:9px; border-radius:12px; background:var(--bg);
@@ -549,6 +559,71 @@ function itin(day){
 }
 function cardOf(item){ return (DB.cards[tripId] || {})[item.cardId]; }
 function cardById(id){ return id ? (DB.cards[tripId] || {})[id] : null; }
+
+/* ---------- 연박 ----------
+   숙소는 '날짜별 한 칸'(itins.dayN.stay)이 진짜 데이터다. 연박은 같은 카드가
+   이어진 날들일 뿐이라, 여러 호텔을 옮겨 다니는 일정도 그냥 표현된다. */
+function stayRun(day){                   // 이 날이 속한 연박 구간
+  const id = itin(day).stay;
+  if (!id) return { start:day, len:0, idx:0 };
+  let start = day;
+  while (start > 1 && itin(start - 1).stay === id) start--;
+  let end = day;
+  const n = dayCount(DB.trips[tripId]);
+  while (end < n && itin(end + 1).stay === id) end++;
+  return { start, len: end - start + 1, idx: day - start + 1 };
+}
+/* 숙소마다 다른 색 — 여러 곳에 묵을 때 눈으로 구분된다 */
+const STAY_COLORS = ["#35C46A","#5B7DB1","#C79A2E","#B4649B","#4FA8A5","#D07A4E"];
+function stayColor(id){
+  if (!id) return "#35C46A";
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return STAY_COLORS[h % STAY_COLORS.length];
+}
+/* 며칠 밤 묵을지 정해서 그 날부터 채운다 */
+function setStayNights(day, cardId, nights){
+  const n = dayCount(DB.trips[tripId]);
+  for (let k = day; k < day + nights && k <= n; k++) itin(k).stay = cardId;
+  persist(); renderAll();
+}
+function askNights(day, cardId){
+  const card = cardById(cardId);
+  const maxN = dayCount(DB.trips[tripId]) - day + 1;
+  if (maxN <= 1) return setStayNights(day, cardId, 1);   // 물어볼 것도 없다
+  const btns = [];
+  for (let k = 1; k <= Math.min(maxN, 6); k++)
+    btns.push(`<button class="nightBtn" data-n="${k}">${k}박</button>`);
+  if (maxN > 6) btns.push(`<button class="nightBtn" data-n="${maxN}">남은 전부 (${maxN}박)</button>`);
+  showModal(`
+    <h3>🏨 ${esc(card.title)}</h3>
+    <p style="font-size:14.5px;line-height:1.6">Day ${day}부터 <b>몇 밤</b> 묵어요?</p>
+    <div class="nightRow">${btns.join("")}</div>
+    <div class="btns"><button class="ghostBtn" id="mCancel">취소</button></div>`);
+  $("#mCancel").onclick = hideModal;
+  for (const b of document.querySelectorAll(".nightBtn"))
+    b.onclick = () => { hideModal(); setStayNights(day, cardId, +b.dataset.n); };
+}
+function removeStay(day){
+  const run = stayRun(day);
+  if (run.len <= 1){ delete itin(day).stay; persist(); renderAll(); return; }
+  const id = itin(day).stay;
+  showModal(`
+    <h3>🏨 숙소 빼기</h3>
+    <p style="font-size:14.5px;line-height:1.6">이 숙소는 <b>${run.len}박</b> 이어져 있어요.
+    어떻게 뺄까요?</p>
+    <div class="btns">
+      <button class="ghostBtn" id="mOne">이 날만</button>
+      <button class="primary" id="mAll">${run.len}박 전부</button>
+    </div>`);
+  $("#mOne").onclick = () => { hideModal(); delete itin(day).stay; persist(); renderAll(); };
+  $("#mAll").onclick = () => {
+    hideModal();
+    for (let k = run.start; k < run.start + run.len; k++)
+      if (itin(k).stay === id) delete itin(k).stay;
+    persist(); renderAll();
+  };
+}
 function usedCount(cardId){
   let n = 0;
   const t = DB.itins[tripId] || {};
@@ -683,22 +758,41 @@ function renderDays(){
 
     // 체크아웃 마감보다 늦게 출발하는 날은 배지가 빨개진다
     const lateOut = prevStay && prevStay.checkOut && parseTime(d.start) > parseTime(prevStay.checkOut);
+    const isLast = day === n;
     if (prevStay){
       const from = document.createElement("div");
       from.className = "stayBadge" + (lateOut ? " warnLate" : "");
+      from.style.setProperty("--stayc", stayColor(itin(day-1).stay));
+      const out = (!tonight || tonight !== prevStay);   // 오늘부터는 그 숙소에서 안 잔다
       from.innerHTML = `🧳 <b>${esc(prevStay.title)}에서 출발</b>` +
-        (lateOut ? `<span style="color:var(--warn);font-size:11.5px;flex:none">⚠️ 체크아웃 ${prevStay.checkOut} 지남</span>` : "");
+        (out ? `<span class="stayNote">체크아웃 ${prevStay.checkOut || "?"}</span>` : "") +
+        (lateOut ? `<span style="color:var(--warn);font-size:11.5px;flex:none">⚠️ 지남</span>` : "");
       head.appendChild(from);
     }
     if (tonight){
+      const run = stayRun(day);                 // 같은 숙소가 며칠 이어지는가
+      const moving = prevStay && prevStay !== tonight;
       const st = document.createElement("div");
-      st.className = "stayBadge";
-      st.innerHTML = `🏨 <b>오늘 밤: ${esc(tonight.title)}</b>` +
-        `<span style="font-size:11px;color:var(--sub);flex:none">체크인 ${tonight.checkIn || "?"}~</span>` +
-        `<button class="rmStay" title="숙소 빼기">✕</button>`;
-      st.querySelector(".rmStay").onclick = () => { delete d.stay; persist(); renderAll(); };
+      st.className = "stayBadge" + (run.idx > 1 ? " cont" : "");
+      st.style.setProperty("--stayc", stayColor(d.stay));
+      const label =
+        run.idx > 1                 ? `↳ <b>${esc(tonight.title)} · ${run.idx}박째</b>` :
+        moving                      ? `🔄 <b>오늘 밤부터: ${esc(tonight.title)}</b>` :
+                                      `🏨 <b>오늘 밤: ${esc(tonight.title)}</b>`;
+      const extra =
+        run.idx > 1 ? `<span class="stayNote">${run.len}박 중</span>` :
+        run.len > 1 ? `<span class="stayNote">${run.len}박 · 체크인 ${tonight.checkIn || "?"}~</span>`
+                    : `<span class="stayNote">체크인 ${tonight.checkIn || "?"}~</span>`;
+      st.innerHTML = label + extra + `<button class="rmStay" title="숙소 빼기">✕</button>`;
+      st.querySelector(".rmStay").onclick = () => removeStay(day);
       head.appendChild(st);
-    } else if (Object.values(DB.cards[tripId] || {}).some(c => c.category === "accommodation")){
+      if (moving){
+        const mv = document.createElement("div");
+        mv.className = "moveNote";
+        mv.textContent = "🧳 짐 옮기는 날 — 짐 맡길 시간도 생각해요";
+        head.appendChild(mv);
+      }
+    } else if (!isLast && Object.values(DB.cards[tripId] || {}).some(c => c.category === "accommodation")){
       const hint = document.createElement("div");
       hint.className = "stayHint";
       hint.textContent = "🏨 숙소 카드를 여기로 끌어오면 이 날 밤 숙소가 돼요";
@@ -1053,7 +1147,9 @@ function drop(ev){
   if (src.from === "pool"){
     const card = cardById(src.cardId);
     if (card && card.category === "accommodation"){
-      itin(t.day).stay = src.cardId;   // 숙소는 타임라인이 아니라 그 날의 '오늘 밤 숙소'가 된다
+      // 숙소는 타임라인이 아니라 그 날의 '오늘 밤 숙소'가 된다 — 몇 박인지 물어본다
+      askNights(t.day, src.cardId);
+      return;
     } else {
       const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
       // 카드에 기본 할 일이 있으면, 놓는 순간 그 날의 체크리스트로 복사된다
@@ -1065,7 +1161,9 @@ function drop(ev){
     // 예전 데이터에서 타임라인에 들어가 있던 숙소 — 끌어다 놓으면 숙소 슬롯으로 옮긴다
     const items = itin(src.day).items;
     items.splice(items.indexOf(src.item), 1);
-    itin(t.day).stay = src.item.cardId;
+    persist();
+    askNights(t.day, src.item.cardId);
+    return;
   } else {
     const from = itin(src.day);
     const oldIdx = from.items.indexOf(src.item);
