@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>🧳 가족 여행 플래너</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  /* ============================================================
+     아이패드 터치가 1순위. 버튼과 잡는 곳은 전부 44px 이상,
+     드래그 중에는 브라우저 스크롤이 끼어들지 않게 touch-action 제어.
+     ============================================================ */
+  :root{
+    --bg:#F4F1EA; --panel:#FFFFFF; --ink:#2B2B33; --sub:#8A8A96;
+    --line:#E7E2D6; --brand:#FF7A1A; --brand2:#2E7BE8;
+    --act:#A96BFF; --food:#FF5FA2; --shop:#17BEBB; --stay:#35C46A;
+    --transit:#B9C3CF;
+    --pxpm:2px; /* 1분 = 2px — 카드 높이가 곧 걸리는 시간 */
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+    overscroll-behavior:none;
+  }
+  button{ font:inherit; border:0; cursor:pointer; background:none; color:inherit; }
+  input,select{ font:inherit; }
+  .hidden{ display:none !important; }
+
+  /* ---------- 홈: 여행 고르기 ---------- */
+  #home{ min-height:100%; padding:max(20px,env(safe-area-inset-top)) 20px 40px; }
+  #home h1{ font-size:30px; margin:18px 4px 4px; }
+  #home .sub{ color:var(--sub); margin:0 4px 22px; }
+  #tripList{ display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); max-width:900px; }
+  .tripCard{
+    background:var(--panel); border:2px solid var(--line); border-radius:20px;
+    padding:20px 18px; text-align:left; min-height:110px;
+    display:flex; flex-direction:column; gap:6px; transition:transform .12s;
+  }
+  .tripCard:active{ transform:scale(.97); }
+  .tripCard b{ font-size:20px; }
+  .tripCard .dates{ color:var(--sub); font-size:14px; }
+  .tripCard.new{ border-style:dashed; color:var(--sub); align-items:center; justify-content:center; font-size:16px; }
+  #netNote{ margin-top:26px; color:var(--sub); font-size:13px; max-width:640px; line-height:1.6; }
+
+  /* ---------- 플래너 3분할 ----------
+     넓은 화면: [카드 풀 | 타임라인 | 지도]
+     좁은 화면: 지도(위, 접기 가능) / 타임라인(가운데) / 카드 풀(아래 가로 스트립) */
+  #planner{ height:100dvh; display:grid; overflow:hidden;
+    grid-template-columns:300px 1fr 340px;
+    grid-template-rows:auto 1fr;
+    grid-template-areas:"top top top" "pool days map"; }
+  #topBar{ grid-area:top; display:flex; align-items:center; gap:10px;
+    padding:calc(8px + env(safe-area-inset-top)) 14px 8px;
+    background:var(--panel); border-bottom:1px solid var(--line); }
+  #topBar h2{ font-size:18px; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #topBar .icoBtn{ width:44px; height:44px; border-radius:12px; font-size:20px; background:var(--bg); flex:none; }
+  #saveDot{ font-size:12px; color:var(--sub); flex:none; }
+
+  /* 카드 풀 */
+  #pool{ grid-area:pool; background:var(--panel); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; min-height:0; }
+  #poolHead{ padding:12px 14px 8px; }
+  #poolHead b{ font-size:15px; }
+  #catChips{ display:flex; gap:6px; flex-wrap:wrap; padding:0 12px 10px; }
+  .chip{ padding:8px 12px; border-radius:999px; background:var(--bg); font-size:13px; border:1px solid var(--line); }
+  .chip.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  #poolCards{ flex:1; overflow-y:auto; padding:4px 12px 20px; display:flex; flex-direction:column; gap:10px; }
+
+  .pcard{
+    background:var(--panel); border:2px solid var(--line); border-radius:16px;
+    padding:10px 12px; position:relative; touch-action:none; user-select:none; -webkit-user-select:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);
+  }
+  .pcard .cat{ position:absolute; left:0; top:10px; bottom:10px; width:5px; border-radius:0 4px 4px 0; }
+  .pcard b{ display:block; font-size:15px; padding-right:34px; }
+  .pcard .meta{ color:var(--sub); font-size:12.5px; margin-top:3px; }
+  .pcard .desc{ font-size:12.5px; margin-top:4px; color:#5a5a66; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .pcard .edit{ position:absolute; right:6px; top:6px; width:34px; height:34px; border-radius:10px; font-size:15px; opacity:.55; }
+  .pcard .used{ position:absolute; right:8px; bottom:8px; font-size:11px; background:var(--bg); border-radius:8px; padding:2px 7px; color:var(--sub); }
+
+  /* 타임라인 */
+  #days{ grid-area:days; overflow:auto; min-height:0; padding:14px;
+    display:flex; gap:14px; align-items:flex-start; }
+  .dayCol{ flex:none; width:240px; background:var(--panel); border-radius:18px;
+    border:1px solid var(--line); display:flex; flex-direction:column; }
+  .dayHead{ padding:12px 14px 8px; border-bottom:1px dashed var(--line); }
+  .dayHead b{ font-size:16px; }
+  .dayHead .d{ color:var(--sub); font-size:12.5px; margin-left:6px; }
+  .dayHead input[type=time]{ border:0; background:var(--bg); border-radius:8px; padding:4px 6px; font-size:13px; margin-top:6px; }
+  .dayBody{ padding:10px 10px 6px; min-height:120px; }
+  .daySum{ padding:8px 14px 12px; color:var(--sub); font-size:12.5px; border-top:1px dashed var(--line); }
+
+  .tblock{ /* 타임라인에 놓인 카드 — 높이 = durationMinutes × 2px */
+    position:relative; border-radius:12px; border:2px solid transparent;
+    color:#fff; padding:8px 10px; margin:0; overflow:hidden;
+    touch-action:none; user-select:none; -webkit-user-select:none;
+    display:flex; flex-direction:column;
+  }
+  .tblock b{ font-size:14px; line-height:1.25; padding-right:56px; }
+  .tblock .time{ font-size:11.5px; opacity:.9; }
+  .tblock .dur{ position:absolute; right:10px; bottom:6px; font-size:11px; opacity:.85; }
+  .tblock .lock,.tblock .rm{ position:absolute; width:34px; height:34px; border-radius:10px;
+    background:rgba(255,255,255,.25); font-size:15px; top:4px; }
+  .tblock .lock{ right:40px; }
+  .tblock .rm{ right:4px; }
+  .tblock.fixed{ border-color:var(--ink); box-shadow:0 0 0 2px #fff inset; }
+  .tblock.fixed .lock{ background:rgba(0,0,0,.35); }
+  .tblock.hl{ outline:3px solid var(--brand); outline-offset:2px; }
+
+  .transit{ /* 이동 시간 블록 — 높이도 이동 시간에 비례 */
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    color:#5d6b7a; font-size:12px; position:relative;
+    background:repeating-linear-gradient(180deg,transparent 0 4px,#dfe5ec 4px 8px);
+    background-size:3px 100%; background-repeat:no-repeat; background-position:18px 0;
+  }
+  .transit span{ background:var(--bg); border:1px solid var(--transit); border-radius:999px; padding:3px 10px; }
+
+  .dropHint{ height:4px; border-radius:2px; background:var(--brand); margin:2px 4px; }
+  .dayBody.over{ background:#FFF4E8; border-radius:12px; }
+  .empty{ color:var(--sub); font-size:13px; text-align:center; padding:28px 8px; }
+
+  /* 지도 */
+  #mapPane{ grid-area:map; border-left:1px solid var(--line); position:relative; min-height:0; background:#dfe8ef; }
+  #map{ position:absolute; inset:0; }
+  #mapMsg{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--sub); font-size:14px; text-align:center; padding:20px; }
+  .numIcon{ background:var(--brand2); color:#fff; border-radius:50%; border:2px solid #fff;
+    display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;
+    box-shadow:0 1px 4px rgba(0,0,0,.3); }
+  .numIcon.hl{ background:var(--brand); transform:scale(1.25); }
+
+  /* 드래그 고스트 */
+  #ghost{ position:fixed; z-index:99; pointer-events:none; width:220px; opacity:.92;
+    transform:rotate(2deg) scale(1.03); filter:drop-shadow(0 8px 16px rgba(0,0,0,.25)); }
+
+  /* 모달 */
+  #modalBack{ position:fixed; inset:0; background:rgba(30,30,40,.45); z-index:50;
+    display:flex; align-items:center; justify-content:center; padding:16px; }
+  #modal{ background:var(--panel); border-radius:20px; padding:20px; width:min(440px,100%);
+    max-height:90dvh; overflow-y:auto; }
+  #modal h3{ margin:0 0 14px; }
+  #modal label{ display:block; font-size:13px; color:var(--sub); margin:10px 0 4px; }
+  #modal input,#modal select,#modal textarea{ width:100%; padding:10px 12px; border:1px solid var(--line);
+    border-radius:12px; font:inherit; background:var(--bg); }
+  #modal .row{ display:flex; gap:10px; }
+  #modal .row>div{ flex:1; }
+  #modal .btns{ display:flex; gap:10px; margin-top:18px; }
+  #modal .btns button{ flex:1; padding:13px; border-radius:14px; font-size:15px; font-weight:600; }
+  .primary{ background:var(--brand); color:#fff; }
+  .ghostBtn{ background:var(--bg); }
+  .danger{ color:#E2445C; }
+
+  .err{ background:#FFE9E9; border:1px solid #F5B5B5; color:#8A1F2B; border-radius:12px;
+    padding:10px 14px; margin:10px; font-size:13px; }
+
+  /* ---------- 좁은 화면 (태블릿 세로 / 폰) ---------- */
+  @media (max-width:900px){
+    #planner{ grid-template-columns:1fr;
+      grid-template-rows:auto 200px 1fr 170px;
+      grid-template-areas:"top" "map" "days" "pool"; }
+    #mapPane{ border-left:0; border-bottom:1px solid var(--line); }
+    #planner.mapOff{ grid-template-rows:auto 0 1fr 170px; }
+    #planner.mapOff #mapPane{ display:none; }
+    #pool{ border-right:0; border-top:1px solid var(--line); }
+    #poolHead{ display:flex; align-items:center; gap:10px; padding:8px 12px 4px; }
+    #catChips{ padding:0 12px 6px; overflow-x:auto; flex-wrap:nowrap; }
+    #poolCards{ flex-direction:row; overflow-x:auto; overflow-y:hidden; padding:2px 12px 12px; }
+    .pcard{ width:190px; flex:none; }
+    .pcard .desc{ display:none; }
+    #days{ padding:10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 홈: 여행 고르기 ==================== -->
+<div id="home">
+  <h1>🧳 가족 여행 플래너</h1>
+  <p class="sub">여행을 고르면, 하고 싶은 것 카드를 끌어다가 하루 일정을 만들 수 있어요.</p>
+  <div id="tripList"></div>
+  <p id="netNote">일정은 이 기기(브라우저)에 항상 저장돼요. 인터넷과 Firebase가 연결되면
+  가족 모두의 기기에서 같은 일정이 보여요.</p>
+</div>
+
+<!-- ==================== 플래너 ==================== -->
+<div id="planner" class="hidden">
+  <div id="topBar">
+    <button class="icoBtn" id="backBtn" title="여행 목록으로">🏠</button>
+    <h2 id="tripTitle"></h2>
+    <span id="saveDot"></span>
+    <button class="icoBtn" id="mapToggle" title="지도 접기/펴기">🗺️</button>
+    <button class="icoBtn" id="addCardBtn" title="카드 만들기 (어른용)">➕</button>
+  </div>
+
+  <div id="pool">
+    <div id="poolHead"><b>🎴 카드 풀</b></div>
+    <div id="catChips"></div>
+    <div id="poolCards"></div>
+  </div>
+
+  <div id="days"></div>
+
+  <div id="mapPane">
+    <div id="map"></div>
+    <div id="mapMsg" class="hidden">지도를 불러오지 못했어요.<br>인터넷 연결을 확인해 주세요.</div>
+  </div>
+</div>
+
+<div id="ghost" class="hidden"></div>
+<div id="modalBack" class="hidden"><div id="modal"></div></div>
+
+<script type="module">
+/* ============================================================
+   가족 여행 플래너
+   - 데이터: trips(여행) / cards(카드 풀) / itineraries(하루 일정)
+   - 항상 localStorage에 저장하고, Firebase가 연결되면 거기에도 동기화.
+     연결이 안 되면 조용히 이 기기 전용으로 동작한다 (다른 앱들과 같은 방식).
+   ============================================================ */
+
+const $ = s => document.querySelector(s);
+const PXPM = 2;                 // 1분 = 2px
+const MIN_BLOCK = 36;           // 이보다 얇으면 글자를 못 읽는다 (18분 미만 카드)
+const STORE = "trip-planner-v1";
+
+const CATS = {
+  activity:      { name:"체험",  icon:"🎡", color:"var(--act)"  },
+  food:          { name:"먹기",  icon:"🍜", color:"var(--food)" },
+  shopping:      { name:"쇼핑",  icon:"🛍️", color:"var(--shop)" },
+  accommodation: { name:"숙소",  icon:"🏨", color:"var(--stay)" },
+};
+
+/* ---------- 처음 열었을 때 들어 있는 예시 여행 ----------
+   Firebase 없이 파일만 열어도 바로 만져 볼 수 있어야 해서 심어 둔다.
+   어른이 ➕ 버튼으로 진짜 카드를 만들면 그때부터는 그 데이터가 주인공. */
+const SEED = {
+  trips: {
+    tokyo_2026: { title:"도쿄 2026", startDate:"2026-01-02", endDate:"2026-01-04" },
+  },
+  cards: {
+    tokyo_2026: {
+      c_teamlab:  { title:"팀랩 플래닛",         description:"맨발로 물속을 걷는 빛의 미술관", category:"activity", durationMinutes:120, priceRange:"₩₩₩", lat:35.6493, lng:139.7891 },
+      c_skytree:  { title:"도쿄 스카이트리",     description:"도쿄에서 제일 높은 전망대",     category:"activity", durationMinutes:90,  priceRange:"₩₩",  lat:35.7101, lng:139.8107 },
+      c_sensoji:  { title:"아사쿠사 센소지",     description:"큰 빨간 등이 있는 오래된 절",   category:"activity", durationMinutes:60,  priceRange:"무료", lat:35.7148, lng:139.7967 },
+      c_ueno:     { title:"우에노 동물원",       description:"판다를 볼 수 있는 동물원",      category:"activity", durationMinutes:150, priceRange:"₩",   lat:35.7163, lng:139.7714 },
+      c_ichiran:  { title:"이치란 라멘",         description:"1인 좌석에서 먹는 돈코츠 라멘", category:"food",     durationMinutes:45,  priceRange:"₩₩",  lat:35.6595, lng:139.7005 },
+      c_sushiro:  { title:"스시로 회전초밥",     description:"레일 위로 초밥이 지나가요",     category:"food",     durationMinutes:60,  priceRange:"₩₩",  lat:35.6980, lng:139.7745 },
+      c_pokemon:  { title:"포켓몬 센터 메가도쿄",description:"포켓몬 굿즈가 가득한 가게",     category:"shopping", durationMinutes:60,  priceRange:"₩₩",  lat:35.7290, lng:139.7190 },
+      c_charstreet:{ title:"도쿄역 캐릭터 스트리트", description:"지하에 캐릭터 가게가 쭉",  category:"shopping", durationMinutes:50,  priceRange:"₩₩",  lat:35.6812, lng:139.7671 },
+      c_hotel:    { title:"호텔 (우에노)",       description:"짐 놓고 쉬는 우리 집",          category:"accommodation", durationMinutes:60, priceRange:"", lat:35.7110, lng:139.7770 },
+    },
+  },
+  itins: {},   // 일정은 비워 두고 아이들이 채운다
+};
+
+/* ---------- 상태 ---------- */
+let DB = null;                 // { trips, cards, itins }
+let tripId = null;             // 지금 열어 둔 여행
+let catFilter = "all";
+let map = null, mapLayer = null, markers = {};  // uid → Leaflet marker
+let saveTimer = 0, fbTimer = 0;
+
+function loadLocal(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(STORE) || "null");
+    if (raw && raw.trips) return raw;
+  }catch(e){ /* 시크릿 모드 등 — 예시 데이터로 시작하면 된다 */ }
+  return JSON.parse(JSON.stringify(SEED));
+}
+function saveLocal(){
+  try{ localStorage.setItem(STORE, JSON.stringify(DB)); }catch(e){}
+}
+
+DB = loadLocal();
+
+/* ---------- Firebase (없어도 되는 부분) ----------
+   리포의 다른 앱들과 같은 데이터베이스(unimai-game-hub)를 쓴다.
+   경로는 tripPlans/* 하나만 쓰고, 규칙은 리포의 firebase-rules.json 참고. */
+const firebaseConfig = {
+  apiKey:      "AIzaSyDNETb44pue8Kg9tYWqna7y6N7MlCoMpU0",
+  authDomain:  "unimai-game-hub.firebaseapp.com",
+  databaseURL: "https://unimai-game-hub-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:   "unimai-game-hub",
+  appId:       "1:527407328515:web:751f851d2a00e0a2980d36"
+};
+const SDK = "https://www.gstatic.com/firebasejs/10.12.5/";
+let fb = null;                 // { db, ref, set, onValue, ... }
+let applyingRemote = false;    // 원격 스냅샷 반영 중엔 다시 업로드하지 않는다
+
+(async () => {
+  try{
+    const [appMod, authMod, dbMod] = await Promise.all([
+      import(SDK + "firebase-app.js"),
+      import(SDK + "firebase-auth.js"),
+      import(SDK + "firebase-database.js"),
+    ]);
+    const app = appMod.initializeApp(firebaseConfig);
+    await authMod.signInAnonymously(authMod.getAuth(app));
+    const db = dbMod.getDatabase(app);
+    fb = { db, ref:dbMod.ref, set:dbMod.set, onValue:dbMod.onValue };
+    fb.onValue(fb.ref(db, "tripPlans"), snap => {
+      const v = snap.val();
+      if (!v) { pushToFirebase(); return; }   // 서버가 비어 있으면 내 것을 올린다
+      if (dragging) return;                   // 드래그 중엔 화면을 흔들지 않는다
+      applyingRemote = true;
+      DB = { trips: v.trips||{}, cards: v.cards||{}, itins: v.itins||{} };
+      if (!Object.keys(DB.trips).length) DB = JSON.parse(JSON.stringify(SEED));
+      saveLocal();
+      renderAll();
+      applyingRemote = false;
+      setDot("☁️ 함께 보는 중");
+    });
+  }catch(e){
+    setDot("");  // 오프라인 — 이 기기에만 저장. 에러 배너까지는 띄우지 않는다.
+  }
+})();
+
+function pushToFirebase(){
+  if (!fb || applyingRemote) return;
+  clearTimeout(fbTimer);
+  fbTimer = setTimeout(() => {
+    fb.set(fb.ref(fb.db, "tripPlans"), DB).then(
+      () => setDot("☁️ 저장됨"),
+      () => setDot("📱 이 기기에만 저장"),
+    );
+  }, 800);
+}
+
+function setDot(t){ $("#saveDot").textContent = t; }
+
+function persist(){          // 뭔가 바뀔 때마다 부른다
+  saveLocal();
+  pushToFirebase();
+}
+
+/* ---------- 날짜/시간 도우미 ---------- */
+const pad = n => String(n).padStart(2, "0");
+function dayCount(t){
+  const a = new Date(t.startDate+"T00:00"), b = new Date(t.endDate+"T00:00");
+  return Math.max(1, Math.round((b-a)/86400000) + 1);
+}
+function dayDate(t, day){
+  const d = new Date(t.startDate+"T00:00");
+  d.setDate(d.getDate() + day - 1);
+  return `${d.getMonth()+1}/${d.getDate()} (${"일월화수목금토"[d.getDay()]})`;
+}
+function fmtTime(mins){
+  mins = ((mins % 1440) + 1440) % 1440;
+  return pad(Math.floor(mins/60)) + ":" + pad(mins % 60);
+}
+function parseTime(s){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s || "");
+  return m ? (+m[1])*60 + (+m[2]) : 9*60;
+}
+
+/* ---------- 이동 시간 어림 계산 ----------
+   Directions API는 서버 키가 있어야 해서 정적 페이지에서는 못 부른다.
+   대신 직선거리로 어림한다: 가까우면 걷고, 멀면 대중교통.
+   (도시 대중교통 평균 25km/h + 기다리는 시간 8분, 걷기 75m/분) */
+function haversineKm(a, b){
+  const R = 6371, r = x => x*Math.PI/180;
+  const dLat = r(b.lat-a.lat), dLng = r(b.lng-a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function estTransit(a, b){
+  const km = haversineKm(a, b) * 1.3;      // 길은 직선보다 1.3배쯤 굽어 있다
+  if (km < 0.05) return null;              // 같은 곳이면 이동 블록을 안 만든다
+  if (km <= 0.9){
+    return { mode:"🚶 걷기", minutes: Math.max(3, Math.round(km*1000/75)), km };
+  }
+  return { mode:"🚇 대중교통", minutes: Math.round(8 + km/25*60), km };
+}
+
+/* ---------- 일정 데이터 접근 ---------- */
+function itin(day){
+  const t = DB.itins[tripId] || (DB.itins[tripId] = {});
+  const d = t["day"+day] || (t["day"+day] = { start:"09:00", items:[] });
+  if (!Array.isArray(d.items)) d.items = [];   // Firebase는 빈 배열을 지워 버린다
+  return d;
+}
+function cardOf(item){ return (DB.cards[tripId] || {})[item.cardId]; }
+function usedCount(cardId){
+  let n = 0;
+  const t = DB.itins[tripId] || {};
+  for (const k in t) for (const it of (t[k].items||[])) if (it.cardId === cardId) n++;
+  return n;
+}
+
+/* ============================================================
+   렌더링
+   ============================================================ */
+function renderAll(){
+  if (!tripId) { renderHome(); return; }
+  if (!DB.trips[tripId]) { openHome(); return; }   // 여행이 지워졌으면 홈으로
+  $("#tripTitle").textContent = DB.trips[tripId].title;
+  renderPool();
+  renderDays();
+  renderMap();
+}
+
+/* ---------- 홈 ---------- */
+function renderHome(){
+  const list = $("#tripList");
+  list.innerHTML = "";
+  for (const id in DB.trips){
+    const t = DB.trips[id];
+    const b = document.createElement("button");
+    b.className = "tripCard";
+    b.innerHTML = `<b>${esc(t.title)}</b><span class="dates">${t.startDate} ~ ${t.endDate} · ${dayCount(t)}일</span>`;
+    b.onclick = () => openTrip(id);
+    list.appendChild(b);
+  }
+  const add = document.createElement("button");
+  add.className = "tripCard new";
+  add.textContent = "＋ 새 여행 만들기";
+  add.onclick = tripModal;
+  list.appendChild(add);
+}
+
+function openTrip(id){
+  tripId = id;
+  $("#home").classList.add("hidden");
+  $("#planner").classList.remove("hidden");
+  renderAll();
+  initMap();
+}
+function openHome(){
+  tripId = null;
+  $("#planner").classList.add("hidden");
+  $("#home").classList.remove("hidden");
+  renderHome();
+}
+$("#backBtn").onclick = openHome;
+$("#mapToggle").onclick = () => {
+  $("#planner").classList.toggle("mapOff");
+  setTimeout(() => map && map.invalidateSize(), 60);
+};
+
+/* ---------- 카드 풀 ---------- */
+function renderPool(){
+  const chips = $("#catChips");
+  chips.innerHTML = "";
+  const cats = [["all","전체","🌈"], ...Object.entries(CATS).map(([k,v]) => [k, v.name, v.icon])];
+  for (const [k, name, icon] of cats){
+    const c = document.createElement("button");
+    c.className = "chip" + (catFilter === k ? " on" : "");
+    c.textContent = `${icon} ${name}`;
+    c.onclick = () => { catFilter = k; renderPool(); };
+    chips.appendChild(c);
+  }
+
+  const wrap = $("#poolCards");
+  wrap.innerHTML = "";
+  const cards = DB.cards[tripId] || {};
+  const ids = Object.keys(cards).filter(id => catFilter === "all" || cards[id].category === catFilter);
+  if (!ids.length){
+    wrap.innerHTML = `<div class="empty">카드가 없어요.<br>위의 ➕ 버튼으로 만들 수 있어요.</div>`;
+    return;
+  }
+  for (const id of ids){
+    const c = cards[id];
+    const cat = CATS[c.category] || CATS.activity;
+    const el = document.createElement("div");
+    el.className = "pcard";
+    el.dataset.cardId = id;
+    const n = usedCount(id);
+    el.innerHTML =
+      `<div class="cat" style="background:${cat.color}"></div>` +
+      `<b>${cat.icon} ${esc(c.title)}</b>` +
+      `<div class="meta">⏱ ${c.durationMinutes}분${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>` +
+      (c.description ? `<div class="desc">${esc(c.description)}</div>` : "") +
+      `<button class="edit" title="고치기">✏️</button>` +
+      (n ? `<span class="used">일정에 ${n}번</span>` : "");
+    el.querySelector(".edit").addEventListener("pointerdown", e => e.stopPropagation());
+    el.querySelector(".edit").onclick = e => { e.stopPropagation(); cardModal(id); };
+    el.addEventListener("pointerdown", e => beginDrag(e, { from:"pool", cardId:id }, el));
+    wrap.appendChild(el);
+  }
+}
+
+/* ---------- 타임라인 ---------- */
+function renderDays(){
+  const trip = DB.trips[tripId];
+  const wrap = $("#days");
+  wrap.innerHTML = "";
+  const n = dayCount(trip);
+  for (let day = 1; day <= n; day++){
+    const d = itin(day);
+    const col = document.createElement("div");
+    col.className = "dayCol";
+    col.dataset.day = day;
+
+    const head = document.createElement("div");
+    head.className = "dayHead";
+    head.innerHTML = `<b>Day ${day}</b><span class="d">${dayDate(trip, day)}</span><br>`;
+    const timeIn = document.createElement("input");
+    timeIn.type = "time";
+    timeIn.value = d.start || "09:00";
+    timeIn.title = "이 날 출발 시각";
+    timeIn.onchange = () => { d.start = timeIn.value || "09:00"; persist(); renderDays(); };
+    head.appendChild(timeIn);
+    col.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "dayBody";
+    body.dataset.day = day;
+
+    let clock = parseTime(d.start);
+    let moveTotal = 0, doTotal = 0;
+    let prevCard = null;
+
+    d.items.forEach((item, idx) => {
+      const c = cardOf(item);
+      if (!c) return;                        // 카드가 지워졌으면 조용히 건너뛴다
+      if (prevCard){
+        const tr = estTransit(prevCard, c);
+        if (tr){
+          const el = document.createElement("div");
+          el.className = "transit";
+          el.style.height = Math.max(26, tr.minutes * PXPM) + "px";
+          el.innerHTML = `<span>${tr.mode} ${tr.minutes}분 · ${tr.km.toFixed(1)}km</span>`;
+          body.appendChild(el);
+          clock += tr.minutes; moveTotal += tr.minutes;
+        }
+      }
+      const cat = CATS[c.category] || CATS.activity;
+      const el = document.createElement("div");
+      el.className = "tblock" + (item.isFixed ? " fixed" : "");
+      el.dataset.uid = item.uid;
+      el.dataset.idx = idx;
+      el.style.background = cat.color;
+      el.style.height = Math.max(MIN_BLOCK, c.durationMinutes * PXPM) + "px";
+      el.innerHTML =
+        `<span class="time">${fmtTime(clock)} ~ ${fmtTime(clock + c.durationMinutes)}</span>` +
+        `<b>${cat.icon} ${esc(c.title)}</b>` +
+        `<span class="dur">${c.durationMinutes}분</span>` +
+        `<button class="lock" title="고정">${item.isFixed ? "🔒" : "🔓"}</button>` +
+        `<button class="rm" title="빼기">✕</button>`;
+      for (const btn of el.querySelectorAll("button"))
+        btn.addEventListener("pointerdown", e => e.stopPropagation());
+      el.querySelector(".lock").onclick = () => { item.isFixed = !item.isFixed; persist(); renderDays(); };
+      el.querySelector(".rm").onclick = () => {
+        d.items.splice(d.items.indexOf(item), 1);
+        persist(); renderAll();
+      };
+      el.addEventListener("mouseenter", () => highlight(item.uid, true));
+      el.addEventListener("mouseleave", () => highlight(item.uid, false));
+      if (!item.isFixed)                     // 고정된 카드는 잡을 수 없다
+        el.addEventListener("pointerdown", e => beginDrag(e, { from:"day", day, item }, el));
+      body.appendChild(el);
+      clock += c.durationMinutes; doTotal += c.durationMinutes;
+      prevCard = c;
+    });
+
+    if (!d.items.length)
+      body.innerHTML = `<div class="empty">여기로 카드를<br>끌어다 놓아 보세요 👇</div>`;
+    col.appendChild(body);
+
+    const sum = document.createElement("div");
+    sum.className = "daySum";
+    sum.textContent = d.items.length
+      ? `놀기 ${Math.round(doTotal/6)/10}시간 · 이동 ${moveTotal}분 · ${fmtTime(parseTime(d.start))}~${fmtTime(clock)}`
+      : "아직 비어 있어요";
+    col.appendChild(sum);
+    wrap.appendChild(col);
+  }
+}
+
+/* ---------- 지도 (Leaflet + OpenStreetMap — 키가 필요 없다) ---------- */
+function initMap(){
+  if (map || !window.L){
+    if (!window.L) $("#mapMsg").classList.remove("hidden");
+    renderMap();
+    setTimeout(() => map && map.invalidateSize(), 60);
+    return;
+  }
+  map = L.map("map", { zoomControl:false });
+  L.control.zoom({ position:"bottomright" }).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution:"© OpenStreetMap",
+  }).addTo(map);
+  mapLayer = L.layerGroup().addTo(map);
+  map.setView([35.68, 139.77], 12);
+  renderMap();
+  setTimeout(() => map.invalidateSize(), 60);
+}
+
+function renderMap(){
+  if (!map || !tripId) return;
+  mapLayer.clearLayers();
+  markers = {};
+  const bounds = [];
+  const palette = ["#2E7BE8","#35C46A","#FF5FA2","#A96BFF","#17BEBB","#E2445C","#FF7A1A"];
+  const n = dayCount(DB.trips[tripId]);
+  for (let day = 1; day <= n; day++){
+    const items = itin(day).items;
+    const pts = [];
+    let order = 0;
+    for (const item of items){
+      const c = cardOf(item);
+      if (!c || typeof c.lat !== "number") continue;
+      order++;
+      const col = palette[(day-1) % palette.length];
+      const icon = L.divIcon({
+        className: "", iconSize:[28,28], iconAnchor:[14,14],
+        html: `<div class="numIcon" data-uid="${item.uid}" style="width:28px;height:28px;background:${col}">${order}</div>`,
+      });
+      const m = L.marker([c.lat, c.lng], { icon }).addTo(mapLayer);
+      m.bindTooltip(`Day${day} · ${esc(c.title)}`);
+      markers[item.uid] = m;
+      pts.push([c.lat, c.lng]);
+      bounds.push([c.lat, c.lng]);
+    }
+    if (pts.length > 1)
+      L.polyline(pts, { color: palette[(day-1) % palette.length], weight:3, dashArray:"6 6", opacity:.8 }).addTo(mapLayer);
+  }
+  if (!bounds.length){    // 아직 일정이 없으면 카드들 위치라도 보여 준다
+    for (const id in (DB.cards[tripId] || {})){
+      const c = DB.cards[tripId][id];
+      if (typeof c.lat === "number") bounds.push([c.lat, c.lng]);
+    }
+  }
+  if (bounds.length) map.fitBounds(bounds, { padding:[36,36], maxZoom:15 });
+}
+
+function highlight(uid, on){
+  const m = markers[uid];
+  if (!m) return;
+  const el = m.getElement() && m.getElement().querySelector(".numIcon");
+  if (el) el.classList.toggle("hl", on);
+  const block = document.querySelector(`.tblock[data-uid="${uid}"]`);
+  if (block) block.classList.toggle("hl", on);
+}
+
+/* ============================================================
+   드래그 앤 드롭 (Pointer Events — 터치/마우스 공용)
+   ============================================================ */
+let dragging = null;   // { from, cardId?|item?, day?, ghost }
+
+function beginDrag(e, src, el){
+  if (e.button > 0) return;
+  const startX = e.clientX, startY = e.clientY;
+  const pid = e.pointerId;
+  let started = false;
+
+  const move = ev => {
+    if (ev.pointerId !== pid) return;
+    if (!started){
+      if (Math.hypot(ev.clientX-startX, ev.clientY-startY) < 8) return;
+      started = true;
+      startGhost(src, el);
+    }
+    dragMove(ev);
+    ev.preventDefault();
+  };
+  const up = ev => {
+    if (ev.pointerId !== pid) return;
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    if (started) drop(ev);
+  };
+  window.addEventListener("pointermove", move, { passive:false });
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+}
+
+function startGhost(src, el){
+  dragging = src;
+  const g = $("#ghost");
+  g.innerHTML = "";
+  const clone = el.cloneNode(true);
+  clone.style.margin = "0"; clone.style.width = "100%";
+  g.appendChild(clone);
+  g.classList.remove("hidden");
+  document.body.style.cursor = "grabbing";
+}
+
+function dragMove(ev){
+  const g = $("#ghost");
+  g.style.left = (ev.clientX - 110) + "px";
+  g.style.top  = (ev.clientY - 24) + "px";
+
+  document.querySelectorAll(".dropHint").forEach(h => h.remove());
+  document.querySelectorAll(".dayBody.over").forEach(b => b.classList.remove("over"));
+  const t = target(ev);
+  if (t){
+    t.body.classList.add("over");
+    const hint = document.createElement("div");
+    hint.className = "dropHint";
+    const blocks = [...t.body.querySelectorAll(".tblock")];
+    if (t.idx >= blocks.length) t.body.appendChild(hint);
+    else t.body.insertBefore(hint, blocks[t.idx]);
+  }
+}
+
+/* 지금 포인터가 가리키는 (요일, 끼워 넣을 자리) 계산 */
+function target(ev){
+  const g = $("#ghost"); g.style.display = "none";
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  g.style.display = "";
+  const body = el && el.closest && el.closest(".dayBody");
+  if (!body) return null;
+  const day = +body.dataset.day;
+  const blocks = [...body.querySelectorAll(".tblock")];
+  let idx = blocks.length;
+  for (let i = 0; i < blocks.length; i++){
+    const r = blocks[i].getBoundingClientRect();
+    if (ev.clientY < r.top + r.height/2){ idx = i; break; }
+  }
+  return { body, day, idx };
+}
+
+function drop(ev){
+  const t = target(ev);
+  $("#ghost").classList.add("hidden");
+  document.body.style.cursor = "";
+  document.querySelectorAll(".dropHint").forEach(h => h.remove());
+  document.querySelectorAll(".dayBody.over").forEach(b => b.classList.remove("over"));
+  const src = dragging;
+  dragging = null;
+  if (!src) return;
+
+  if (!t){
+    // 타임라인 밖(카드 풀 등)에 놓으면 = 일정에서 빼기
+    if (src.from === "day"){
+      const items = itin(src.day).items;
+      items.splice(items.indexOf(src.item), 1);
+      persist(); renderAll();
+    }
+    return;
+  }
+
+  if (src.from === "pool"){
+    const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
+    insertWithLocks(itin(t.day), item, t.idx);
+  } else {
+    const from = itin(src.day);
+    const oldIdx = from.items.indexOf(src.item);
+    if (oldIdx < 0) return;
+    from.items.splice(oldIdx, 1);
+    let idx = t.idx;
+    if (t.day === src.day && idx > oldIdx) idx--;   // 자기 자신을 빼서 한 칸 당겨졌다
+    insertWithLocks(itin(t.day), src.item, idx);
+  }
+  persist();
+  renderAll();
+}
+
+/* 고정(🔒)된 카드는 자리 번호가 변하지 않는다. 나머지 카드들 사이에만 끼워 넣는다. */
+function insertWithLocks(dayData, item, wantIdx){
+  const items = dayData.items;
+  const n = items.length + 1;
+  const res = new Array(n).fill(null);
+  items.forEach((it, i) => { if (it.isFixed) res[Math.min(i, n-1)] = it; });
+  const free = items.filter(it => !it.isFixed);
+  const slots = [];
+  for (let i = 0; i < n; i++) if (!res[i]) slots.push(i);
+  let s = slots.findIndex(x => x >= wantIdx);
+  if (s < 0) s = slots.length - 1;
+  const order = free.slice();
+  order.splice(s, 0, item);
+  slots.forEach((slot, k) => res[slot] = order[k]);
+  dayData.items = res;
+}
+
+/* ============================================================
+   모달: 여행 만들기 / 카드 만들기·고치기 (어른용)
+   ============================================================ */
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+function showModal(html){
+  $("#modal").innerHTML = html;
+  $("#modalBack").classList.remove("hidden");
+}
+function hideModal(){ $("#modalBack").classList.add("hidden"); }
+$("#modalBack").addEventListener("click", e => { if (e.target.id === "modalBack") hideModal(); });
+
+function tripModal(){
+  showModal(`
+    <h3>새 여행 만들기</h3>
+    <label>여행 이름</label><input id="mTitle" placeholder="예) 제주 2027">
+    <div class="row">
+      <div><label>가는 날</label><input id="mStart" type="date"></div>
+      <div><label>오는 날</label><input id="mEnd" type="date"></div>
+    </div>
+    <div class="btns">
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mOk">만들기</button>
+    </div>`);
+  $("#mCancel").onclick = hideModal;
+  $("#mOk").onclick = () => {
+    const title = $("#mTitle").value.trim();
+    const s = $("#mStart").value, e = $("#mEnd").value;
+    if (!title || !s || !e || e < s) return alert("이름과 날짜를 확인해 주세요!");
+    const id = "trip_" + Date.now().toString(36);
+    DB.trips[id] = { title, startDate:s, endDate:e };
+    DB.cards[id] = DB.cards[id] || {};
+    persist(); hideModal(); renderHome();
+  };
+}
+
+$("#addCardBtn").onclick = () => cardModal(null);
+
+function cardModal(cardId){
+  const c = cardId ? DB.cards[tripId][cardId] : null;
+  const catOpts = Object.entries(CATS)
+    .map(([k,v]) => `<option value="${k}" ${c && c.category===k ? "selected":""}>${v.icon} ${v.name}</option>`).join("");
+  showModal(`
+    <h3>${c ? "카드 고치기" : "새 카드 만들기"}</h3>
+    <label>이름</label><input id="mTitle" value="${c ? esc(c.title) : ""}" placeholder="예) 아쿠아리움">
+    <label>설명</label><input id="mDesc" value="${c ? esc(c.description||"") : ""}" placeholder="한 줄 설명">
+    <div class="row">
+      <div><label>종류</label><select id="mCat">${catOpts}</select></div>
+      <div><label>걸리는 시간(분)</label><input id="mDur" type="number" min="10" step="5" value="${c ? c.durationMinutes : 60}"></div>
+    </div>
+    <div class="row">
+      <div><label>가격 느낌</label><input id="mPrice" value="${c ? esc(c.priceRange||"") : ""}" placeholder="₩₩ / 무료"></div>
+    </div>
+    <div class="row">
+      <div><label>위도(lat)</label><input id="mLat" type="number" step="any" value="${c ? c.lat : ""}"></div>
+      <div><label>경도(lng)</label><input id="mLng" type="number" step="any" value="${c ? c.lng : ""}"></div>
+    </div>
+    <label style="font-size:12px">💡 구글 지도에서 장소를 길게 누르면 위도, 경도가 나와요.</label>
+    <div class="btns">
+      ${c ? `<button class="ghostBtn danger" id="mDel">지우기</button>` : ""}
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mOk">저장</button>
+    </div>`);
+  $("#mCancel").onclick = hideModal;
+  if (c) $("#mDel").onclick = () => {
+    if (!confirm("이 카드를 지울까요? 일정에 놓인 것도 같이 사라져요.")) return;
+    delete DB.cards[tripId][cardId];
+    const t = DB.itins[tripId] || {};
+    for (const k in t) t[k].items = (t[k].items||[]).filter(it => it.cardId !== cardId);
+    persist(); hideModal(); renderAll();
+  };
+  $("#mOk").onclick = () => {
+    const title = $("#mTitle").value.trim();
+    const lat = parseFloat($("#mLat").value), lng = parseFloat($("#mLng").value);
+    const dur = parseInt($("#mDur").value, 10);
+    if (!title || !isFinite(lat) || !isFinite(lng) || !(dur > 0))
+      return alert("이름, 시간, 위도/경도를 확인해 주세요!");
+    const id = cardId || ("c_" + Date.now().toString(36));
+    (DB.cards[tripId] = DB.cards[tripId] || {})[id] = {
+      title, description: $("#mDesc").value.trim(), category: $("#mCat").value,
+      durationMinutes: dur, priceRange: $("#mPrice").value.trim(), lat, lng,
+    };
+    persist(); hideModal(); renderAll();
+  };
+}
+
+/* ---------- 시작 ---------- */
+renderHome();
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</body>
+</html>

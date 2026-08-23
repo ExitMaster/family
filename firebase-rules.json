@@ -30,6 +30,10 @@
         ".validate": "$who.matches(/^[a-z0-9_-]{1,12}$/) && newData.hasChildren(['orbs'])"
       }
     },
+    "tripPlans": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "obbyLive": {
       ".read": "auth != null",
       "$who": {
