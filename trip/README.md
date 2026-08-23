@@ -20,6 +20,37 @@
 4. **카드 만들기 (어른용)** — 위쪽 ➕ 버튼. 이름/종류/걸리는 시간/위도·경도를 넣습니다.
    구글 지도에서 장소를 길게 누르면 위도, 경도가 나옵니다. 카드의 ✏️로 고치거나 지웁니다.
 
+## 여행 데이터를 스프레드시트로 넣기
+
+프로그램을 몰라도 여행 데이터를 넣을 수 있게, **시트 1장 = 여행 1개** 양식이 있습니다:
+[`trip-template.xlsx`](trip-template.xlsx)
+
+1. 시트를 복제해서 파란 글씨 칸을 채웁니다 — 위쪽에 여행 이름/가는 날/오는 날,
+   아래 표에 카드(이름 · 종류 · 시간(분) · 가격 · 위도 · 경도 · 설명)를 한 줄에 하나씩.
+   구글 시트에 올려서 써도 됩니다 (탭 구분 복사만 되면 아무 스프레드시트나 OK).
+2. 시트 전체 선택(Ctrl+A) → 복사(Ctrl+C).
+3. 앱 홈의 **📋 표에서 가져오기**에 붙여넣기 → 가져오기.
+
+같은 이름의 여행이 이미 있으면 새로 만들지 않고 그 여행을 업데이트하며,
+카드도 이름으로 맞춰서 기존 일정이 끊어지지 않습니다. 위도/경도가 빈 줄은 건너뜁니다.
+
+## 데이터 형식 (DB)
+
+Firebase Realtime Database의 `tripPlans` 아래에 통째로 들어갑니다
+(localStorage `trip-planner-v1`에도 같은 모양):
+
+```jsonc
+{
+  "trips":  { "tokyo_2026": { "title":"도쿄 2026", "startDate":"2026-01-02", "endDate":"2026-01-04" } },
+  "cards":  { "tokyo_2026": { "c_teamlab": {
+      "title":"팀랩 플래닛", "description":"…", "category":"activity",  // activity|food|shopping|accommodation
+      "durationMinutes":120, "priceRange":"₩₩₩", "lat":35.6493, "lng":139.7891 } } },
+  "itins":  { "tokyo_2026": { "day1": {
+      "start":"09:00",
+      "items":[ { "uid":"c_teamlab_x3f2a", "cardId":"c_teamlab", "isFixed":false } ] } } }
+}
+```
+
 ## 저장
 
 - 항상 이 기기의 localStorage(`trip-planner-v1`)에 저장됩니다. 오프라인이어도 됩니다.

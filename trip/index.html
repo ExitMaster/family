@@ -180,8 +180,13 @@
   <h1>🧳 가족 여행 플래너</h1>
   <p class="sub">여행을 고르면, 하고 싶은 것 카드를 끌어다가 하루 일정을 만들 수 있어요.</p>
   <div id="tripList"></div>
+  <p style="margin-top:20px">
+    <button id="importBtn" class="chip" style="padding:12px 18px;font-size:14px">📋 표에서 가져오기 (어른용)</button>
+  </p>
   <p id="netNote">일정은 이 기기(브라우저)에 항상 저장돼요. 인터넷과 Firebase가 연결되면
-  가족 모두의 기기에서 같은 일정이 보여요.</p>
+  가족 모두의 기기에서 같은 일정이 보여요.<br>
+  여행 데이터는 <a href="trip-template.xlsx">스프레드시트 양식</a>(시트 1장 = 여행 1개)에 적은 뒤
+  전체 복사해서 위의 📋 버튼에 붙여넣으면 들어와요.</p>
 </div>
 
 <!-- ==================== 플래너 ==================== -->
@@ -851,6 +856,110 @@ function cardModal(cardId){
     persist(); hideModal(); renderAll();
   };
 }
+
+/* ============================================================
+   표에서 가져오기 — 스프레드시트(시트 1장 = 여행 1개)를 통째로
+   복사해 붙여넣으면 여행+카드가 들어온다. 양식: trip-template.xlsx
+   ============================================================ */
+const CAT_WORDS = {
+  "체험":"activity","활동":"activity","activity":"activity",
+  "먹기":"food","음식":"food","식당":"food","food":"food",
+  "쇼핑":"shopping","shopping":"shopping",
+  "숙소":"accommodation","호텔":"accommodation","accommodation":"accommodation",
+};
+function normDate(s){
+  const m = /^\s*(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/.exec(String(s||""));
+  return m ? `${m[1]}-${pad(+m[2])}-${pad(+m[3])}` : null;
+}
+function parseSheet(text){
+  const out = { title:null, startDate:null, endDate:null, cards:[] };
+  let inTable = false, cols = null;
+  for (const line of String(text).split(/\r?\n/)){
+    const cells = line.split("\t").map(c => c.trim());
+    const a = cells[0] || "";
+    if (!inTable){
+      if (a === "여행 이름" || a === "여행이름") out.title = cells[1] || out.title;
+      else if (a.startsWith("가는")) out.startDate = normDate(cells[1]) || out.startDate;
+      else if (a.startsWith("오는")) out.endDate = normDate(cells[1]) || out.endDate;
+      else if (a === "이름" && cells.includes("종류")){
+        inTable = true;   // 여기부터 카드 표. 열 순서는 머리글을 보고 정한다.
+        cols = {};
+        cells.forEach((h, i) => {
+          if (h === "이름") cols.title = i;
+          else if (h === "종류") cols.cat = i;
+          else if (h.startsWith("시간") || h.includes("분")) cols.dur = i;
+          else if (h.startsWith("가격")) cols.price = i;
+          else if (h.startsWith("위도") || h.toLowerCase() === "lat") cols.lat = i;
+          else if (h.startsWith("경도") || h.toLowerCase() === "lng") cols.lng = i;
+          else if (h.startsWith("설명")) cols.desc = i;
+        });
+      }
+      continue;
+    }
+    const title = cells[cols.title] || "";
+    if (!title || title.startsWith("예시)")) continue;
+    const lat = parseFloat(cells[cols.lat]), lng = parseFloat(cells[cols.lng]);
+    const dur = parseInt(cells[cols.dur], 10);
+    out.cards.push({
+      title,
+      category: CAT_WORDS[(cells[cols.cat]||"").toLowerCase()] || CAT_WORDS[cells[cols.cat]] || "activity",
+      durationMinutes: (dur > 0) ? dur : 60,
+      priceRange: cells[cols.price] || "",
+      lat: isFinite(lat) ? lat : null,
+      lng: isFinite(lng) ? lng : null,
+      description: cells[cols.desc] || "",
+    });
+  }
+  return out;
+}
+function applyImport(p){
+  // 같은 이름의 여행이 있으면 그 여행을 업데이트한다 — 카드도 이름으로 맞춰서
+  // 기존 id를 지킨다 (이미 일정에 놓인 카드가 끊어지지 않게).
+  let id = Object.keys(DB.trips).find(k => DB.trips[k].title === p.title);
+  let made = 0, updated = 0;
+  if (!id){
+    id = "trip_" + Date.now().toString(36);
+    DB.trips[id] = { title:p.title, startDate:p.startDate, endDate:p.endDate };
+    DB.cards[id] = {};
+  } else {
+    DB.trips[id].startDate = p.startDate;
+    DB.trips[id].endDate = p.endDate;
+    DB.cards[id] = DB.cards[id] || {};
+  }
+  for (const c of p.cards){
+    if (c.lat == null || c.lng == null) continue;
+    let cid = Object.keys(DB.cards[id]).find(k => DB.cards[id][k].title === c.title);
+    if (cid) updated++; else { cid = "c_" + Math.random().toString(36).slice(2,8); made++; }
+    DB.cards[id][cid] = c;
+  }
+  persist();
+  return { id, made, updated, skipped: p.cards.filter(c => c.lat == null || c.lng == null).length };
+}
+$("#importBtn").onclick = () => {
+  showModal(`
+    <h3>📋 표에서 가져오기</h3>
+    <label>스프레드시트에서 <b>시트 전체를 복사</b>(Ctrl+A → Ctrl+C)한 뒤 여기에 붙여넣으세요.
+    양식은 <a href="trip-template.xlsx">trip-template.xlsx</a> — 시트 1장이 여행 1개예요.</label>
+    <textarea id="mPaste" rows="10" placeholder="여기에 붙여넣기 (Ctrl+V)" style="resize:vertical"></textarea>
+    <div class="btns">
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mOk">가져오기</button>
+    </div>`);
+  $("#mCancel").onclick = hideModal;
+  setTimeout(() => $("#mPaste").focus(), 50);
+  $("#mOk").onclick = () => {
+    const p = parseSheet($("#mPaste").value);
+    if (!p.title || !p.startDate || !p.endDate)
+      return alert("여행 이름 / 가는 날 / 오는 날 줄을 찾지 못했어요.\n시트 전체를 복사했는지 확인해 주세요.");
+    if (!p.cards.length)
+      return alert("카드 표(이름·종류·시간… 줄 아래)를 찾지 못했어요.");
+    const r = applyImport(p);
+    hideModal();
+    alert(`"${p.title}" 가져왔어요!\n새 카드 ${r.made}장, 업데이트 ${r.updated}장` +
+          (r.skipped ? `\n(위도/경도가 비어서 건너뛴 줄 ${r.skipped}개)` : ""));
+    renderHome();
+  };
+};
 
 /* ---------- 시작 ---------- */
 renderHome();
