@@ -42,6 +42,7 @@ complete set lives in one file, and that file is the one you paste.
 | `obbyScores` | 🧗 오비 | 온라인 순위표 대신 이 기기 기록만 |
 | `obbySaves` | 🧗 오비 | 닉네임 진행도가 다른 기기로 안 따라감 |
 | `obbyLive` | 🧗 오비 | **멀티플레이가 안 됨** — 서로가 안 보임 |
+| `tripPlans` | 🧳 여행 플래너 | 일정이 기기마다 따로 저장됨 (같이 안 보임) |
 
 세 게임 모두 **규칙이 없어도 그냥 조용히 혼자 하는 게임으로 작동합니다.**
 빨간 오류가 뜨거나 게임이 멈추지는 않습니다.
