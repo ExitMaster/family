@@ -569,6 +569,14 @@ function fmtTime(mins){
   mins = ((mins % 1440) + 1440) % 1440;
   return pad(Math.floor(mins/60)) + ":" + pad(mins % 60);
 }
+/* 소요 시간(분)을 아이 눈높이로: 300 → "5시간", 95 → "1시간 35분", 40 → "40분" */
+function fmtDur(min){
+  min = Math.round(min);
+  if (min < 60) return min + "분";
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
 function parseTime(s){
   const m = /^(\d{1,2}):(\d{2})$/.exec(s || "");
   return m ? (+m[1])*60 + (+m[2]) : 9*60;
@@ -1099,12 +1107,12 @@ function renderPool(){
     const n = usedCount(id);
     const metaLine =
       c.category === "accommodation" ? `🌙 체크인 ${c.checkIn || "15:00"} · 아웃 ${c.checkOut || "11:00"}` :
-      c.category === "transport" && c.depTime && c.arrTime ? `🕑 ${c.depTime} → ${c.arrTime} (${blockMinutes(c)}분)` :
-      `⏱ ${c.durationMinutes}분`;
+      c.category === "transport" && c.depTime && c.arrTime ? `🕑 ${c.depTime} → ${c.arrTime} (${fmtDur(blockMinutes(c))})` :
+      `⏱ ${fmtDur(c.durationMinutes)}`;
     const dt = poolSort.on ? detours[id] : null;
     const dtBadge = dt == null ? "" :
-      dt.from === "stay" ? `<span class="detour">🏨 ${dt.min}분</span>` :
-      `<span class="detour">📍 +${dt.min}분</span>`;
+      dt.from === "stay" ? `<span class="detour">🏨 ${fmtDur(dt.min)}</span>` :
+      `<span class="detour">📍 +${fmtDur(dt.min)}</span>`;
     el.innerHTML =
       `<div class="cat" style="background:${cat.color}"></div>` +
       `<b>${cat.icon} ${esc(c.title)}</b>` +
@@ -1205,7 +1213,7 @@ function renderDays(){
         const t = document.createElement("div");
         t.className = "transit";
         t.style.height = Math.max(22, tr.minutes * PXPM) + "px";
-        t.innerHTML = `<span>${label || tr.mode} ${tr.minutes}분</span>`;
+        t.innerHTML = `<span>${label || tr.mode} ${fmtDur(tr.minutes)}</span>`;
         lb.appendChild(t);
         lc += tr.minutes; move += tr.minutes;
       };
@@ -1228,7 +1236,7 @@ function renderDays(){
             const w = document.createElement("div");
             w.className = "wait";
             w.style.height = Math.max(16, (at - lc) * PXPM) + "px";
-            w.textContent = `⏳ ${at - lc}분`;
+            w.textContent = `⏳ ${fmtDur(at - lc)}`;
             lb.appendChild(w);
             lc = at;
           } else if (lc > at){ late = lc - at; lc = at; }
@@ -1244,7 +1252,7 @@ function renderDays(){
         el.innerHTML =
           `<span class="time">${lit.bookTime && !isTrans ? "⏰" : ""}${fmtTime(lc)}~${fmtTime(lc + dur)}</span>` +
           `<b>${cat.icon} ${esc(c.title)}</b>` +
-          (late ? `<span class="lateBadge">⚠️ ${late}분</span>` : "") +
+          (late ? `<span class="lateBadge">⚠️ ${fmtDur(late)}</span>` : "") +
           (todos.length ? `<span class="todoBadge">✅ ${todos.filter(t => t.d).length}/${todos.length}</span>` : "") +
           `<button class="lock" title="고정">${lit.isFixed ? "🔒" : "🔓"}</button>` +
           `<button class="rm" title="빼기">✕</button>`;
@@ -1279,7 +1287,7 @@ function renderDays(){
       const el = document.createElement("div");
       el.className = "transit";
       el.style.height = Math.max(26, tr.minutes * PXPM) + "px";
-      el.innerHTML = `<span>${label || tr.mode} ${tr.minutes}분 · ${tr.km.toFixed(1)}km</span>`;
+      el.innerHTML = `<span>${label || tr.mode} ${fmtDur(tr.minutes)} · ${tr.km.toFixed(1)}km</span>`;
       body.appendChild(el);
       clock += tr.minutes; moveTotal += tr.minutes;
     };
@@ -1336,7 +1344,7 @@ function renderDays(){
             const w = document.createElement("div");
             w.className = "wait";
             w.style.height = Math.max(18, (join - r.end) * PXPM) + "px";
-            w.textContent = `⏳ 만나기까지 ${join - r.end}분`;
+            w.textContent = `⏳ 만나기까지 ${fmtDur(join - r.end)}`;
             lanes.children[ti].querySelector(".laneBody").appendChild(w);
           }
         });
@@ -1374,7 +1382,7 @@ function renderDays(){
           const w = document.createElement("div");
           w.className = "wait";
           w.style.height = Math.max(18, wait * PXPM) + "px";
-          w.textContent = `⏳ 기다리기 ${wait}분`;
+          w.textContent = `⏳ 기다리기 ${fmtDur(wait)}`;
           body.appendChild(w);
           clock = at;
         } else if (clock > at){              // 늦었다! — 계획표는 예정 시각으로 계속 가되 경고
@@ -1397,8 +1405,8 @@ function renderDays(){
         `<span class="time">${item.bookTime && !isTrans ? "⏰ 예약 " : ""}${fmtTime(clock)} ~ ${fmtTime(clock + dur)}</span>` +
         `<b>${cat.icon} ${esc(c.title)}</b>` +
         (isTrans && c.description ? `<span class="time">${esc(c.description)}</span>` : "") +
-        `<span class="dur">${dur}분</span>` +
-        (late ? `<span class="lateBadge">⚠️ ${late}분 늦어요</span>` : "") +
+        `<span class="dur">${fmtDur(dur)}</span>` +
+        (late ? `<span class="lateBadge">⚠️ ${fmtDur(late)} 늦어요</span>` : "") +
         (todos.length ? `<span class="todoBadge">✅ ${doneN}/${todos.length}</span>` : "") +
         `<button class="lock" title="고정"${late ? ' style="top:40px"' : ""}>${item.isFixed ? "🔒" : "🔓"}</button>` +
         `<button class="rm" title="빼기"${late ? ' style="top:40px"' : ""}>✕</button>`;
@@ -1436,7 +1444,7 @@ function renderDays(){
     const sum = document.createElement("div");
     sum.className = "daySum";
     sum.textContent = d.items.length
-      ? `놀기 ${Math.round(doTotal/6)/10}시간 · 이동 ${moveTotal}분 · ${fmtTime(parseTime(d.start))}~${fmtTime(clock)}`
+      ? `놀기 ${fmtDur(doTotal)} · 이동 ${fmtDur(moveTotal)} · ${fmtTime(parseTime(d.start))}~${fmtTime(clock)}`
       : "아직 비어 있어요";
     col.appendChild(sum);
 
@@ -1890,7 +1898,7 @@ function itemModal(day, item){
   if (!Array.isArray(item.todos)) item.todos = [];   // Firebase는 빈 배열을 지운다
   showModal(`
     <h3>${cat.icon} ${esc(c.title)}</h3>
-    <div style="color:var(--sub);font-size:13px;margin:-8px 0 8px">Day ${day} · ${c.durationMinutes}분${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>
+    <div style="color:var(--sub);font-size:13px;margin:-8px 0 8px">Day ${day} · ${fmtDur(c.durationMinutes)}${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>
     ${c.description ? `<div style="font-size:13.5px;margin-bottom:6px">${esc(c.description)}</div>` : ""}
     ${c.category !== "transport" ? `
     <label>⏰ 시작·예약 시각 — 이 날 이 일정에만</label>
@@ -2419,7 +2427,7 @@ function verifyModal(day){
     showModal(`
       <h3>✨ 동선 검사 — Day ${day}</h3>
       <p style="font-size:15px;line-height:1.6">🏆 <b>지금 동선이 이미 훌륭해요!</b><br>
-      하루 이동 시간 총 <b>${now}분</b>.<br>
+      하루 이동 시간 총 <b>${fmtDur(now)}</b>.<br>
       <span style="color:var(--sub);font-size:13px">${r
         ? `컴퓨터가 찾은 최선의 순서와 ${saved}분밖에 차이가 안 나요.`
         : "재배열할 수 있는 카드가 2장이 안 돼요 (🔒 고정과 🚄 교통은 자리를 지켜요)."}</span></p>
@@ -2437,9 +2445,9 @@ function verifyModal(day){
   }).join("");
   showModal(`
     <h3>✨ 동선 검사 — Day ${day}</h3>
-    <p style="font-size:14.5px;line-height:1.6">지금 순서는 이동에 <b>${now}분</b> 걸려요.<br>
-    아래 순서로 바꾸면 <b>${Math.round(r.cost)}분</b> —
-    <b style="color:var(--brand)">노는 시간이 ${saved}분 늘어나요!</b></p>
+    <p style="font-size:14.5px;line-height:1.6">지금 순서는 이동에 <b>${fmtDur(now)}</b> 걸려요.<br>
+    아래 순서로 바꾸면 <b>${fmtDur(r.cost)}</b> —
+    <b style="color:var(--brand)">노는 시간이 ${fmtDur(saved)} 늘어나요!</b></p>
     <div style="background:var(--bg);border-radius:12px;padding:8px 14px">${lines}</div>
     <p style="font-size:12px;color:var(--sub)">🔒 고정 카드와 🚄 교통 카드는 자리를 지켰어요.
     순서에 이유가 있다면(점심은 점심때!) 내 순서를 지켜도 좋아요.</p>
