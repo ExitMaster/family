@@ -42,6 +42,24 @@
   .tripCard b{ font-size:20px; }
   .tripCard .dates{ color:var(--sub); font-size:14px; }
   .tripCard.new{ border-style:dashed; color:var(--sub); align-items:center; justify-content:center; font-size:16px; }
+  .tripCard.done{ filter:grayscale(1); opacity:.62; }
+  .homeSection{ grid-column:1/-1; margin-top:14px; font-size:14px; font-weight:700; color:var(--sub); }
+  .trashBtn{ grid-column:1/-1; justify-self:start; margin-top:10px; padding:10px 16px;
+    border-radius:12px; background:transparent; border:1px dashed var(--line);
+    color:var(--sub); font-size:13.5px; }
+  .trashRow{ display:flex; align-items:center; gap:8px; padding:10px 2px;
+    border-bottom:1px dashed var(--line); }
+
+  /* 장소 검색 드롭다운 */
+  .searchWrap{ position:relative; }
+  .searchList{ position:absolute; left:0; right:0; top:100%; z-index:10;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 8px 20px rgba(0,0,0,.14); overflow:hidden; max-height:240px; overflow-y:auto; }
+  .searchRow{ display:block; width:100%; text-align:left; padding:11px 12px;
+    font-size:13px; line-height:1.4; border-bottom:1px solid var(--line); }
+  .searchRow:last-child{ border-bottom:0; }
+  .searchRow:hover{ background:var(--bg); }
+  .searchRow.dim{ color:var(--sub); cursor:default; }
   #netNote{ margin-top:26px; color:var(--sub); font-size:13px; max-width:640px; line-height:1.6; }
 
   /* ---------- 플래너 3분할 ----------
@@ -228,7 +246,8 @@
   <p id="netNote">일정은 이 기기(브라우저)에 항상 저장돼요. 인터넷과 Firebase가 연결되면
   가족 모두의 기기에서 같은 일정이 보여요.<br>
   여행 데이터는 <a href="trip-template.xlsx">스프레드시트 양식</a>(시트 1장 = 여행 1개)에 적은 뒤
-  전체 복사해서 위의 📋 버튼에 붙여넣으면 들어와요.</p>
+  전체 복사해서 위의 📋 버튼에 붙여넣으면 들어와요.<br>
+  여행 카드를 <b>길게 누르면</b> 휴지통으로 보낼 수 있어요 (30일 보관 후 삭제).</p>
 </div>
 
 <!-- ==================== 플래너 ==================== -->
@@ -276,6 +295,7 @@ const STANDALONE = false;   //__STANDALONE__
 const EXPORTED = null;      //__EXPORTED__
 
 const PXPM = 2;                 // 1분 = 2px
+const TRASH_KEEP_DAYS = 30;     // 휴지통 보관 일수 (시작 시 purgeTrash가 쓰므로 여기 있어야 한다)
 const MIN_BLOCK = 36;           // 이보다 얇으면 글자를 못 읽는다 (18분 미만 카드)
 const STORE = STANDALONE ? "trip-planner-shared-v1" : "trip-planner-v1";
 
@@ -345,6 +365,7 @@ function migrate(db){
     }
 }
 migrate(DB);
+if (purgeTrash()) saveLocal();   // 30일 지난 휴지통 항목은 앱을 열 때 정리
 
 /* ---------- Firebase (없어도 되는 부분) ----------
    리포의 다른 앱들과 같은 데이터베이스(unimai-game-hub)를 쓴다.
@@ -402,6 +423,7 @@ function applyRemote(remote){
   applyingRemote = true;
   DB = remote;
   migrate(DB);
+  purgeTrash();
   saveLocal();
   renderAll();
   applyingRemote = false;
@@ -455,7 +477,8 @@ function askWhichWins(remote){
       if (syncPaused) return;                 // 물어보는 중 — 답을 기다린다
       if (dragging) return;                   // 드래그 중엔 화면을 흔들지 않는다
       const v = snap.val();
-      const remote = { trips: v && v.trips || {}, cards: v && v.cards || {}, itins: v && v.itins || {} };
+      const remote = { trips: v && v.trips || {}, cards: v && v.cards || {}, itins: v && v.itins || {},
+                       trash: v && v.trash || {} };
       if (!Object.keys(remote.trips).length){ // 서버가 비어 있으면 내 것을 올린다
         firstSync = false;
         pushToFirebase();
@@ -649,23 +672,143 @@ function renderAll(){
   renderMap();
 }
 
+/* ---------- 휴지통 ----------
+   지운 여행은 바로 없애지 않고 trash에 통째로 옮겨 30일 보관한다.
+   trash도 DB의 일부라 Firebase로 같이 동기화된다 — 한 기기에서 지우면
+   모두에게서 사라지고, 복원도 어느 기기에서든 된다. */
+function purgeTrash(){
+  const t = DB.trash || {};
+  const limit = Date.now() - TRASH_KEEP_DAYS * 86400000;
+  let changed = false;
+  for (const id in t)
+    if ((t[id].deletedAt || 0) < limit){ delete t[id]; changed = true; }
+  return changed;
+}
+function deleteTrip(id){
+  if (!DB.trips[id]) return;
+  (DB.trash = DB.trash || {})[id] = {
+    deletedAt: Date.now(),
+    trip: DB.trips[id],
+    cards: DB.cards[id] || {},
+    itins: DB.itins[id] || {},
+  };
+  delete DB.trips[id];
+  delete DB.cards[id];
+  delete DB.itins[id];
+  persist(); hideModal(); renderHome();
+}
+function restoreTrip(id){
+  const e = (DB.trash || {})[id];
+  if (!e || !e.trip) return;
+  DB.trips[id] = e.trip;
+  DB.cards[id] = e.cards || {};
+  DB.itins[id] = e.itins || {};
+  delete DB.trash[id];
+  persist(); hideModal(); renderHome();
+}
+function confirmDeleteTrip(id){
+  const t = DB.trips[id];
+  if (!t) return;
+  showModal(`
+    <h3>🗑 휴지통으로 보낼까요?</h3>
+    <p style="font-size:14.5px;line-height:1.7"><b>${esc(t.title)}</b> 여행을 휴지통으로 보내요.<br>
+    <span style="color:var(--sub);font-size:13px">${TRASH_KEEP_DAYS}일 동안 보관했다가 저절로 지워지고,
+    그 전에는 언제든 되살릴 수 있어요.</span></p>
+    <div class="btns">
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mDel" style="background:var(--warn)">휴지통으로</button>
+    </div>`);
+  $("#mCancel").onclick = hideModal;
+  $("#mDel").onclick = () => deleteTrip(id);
+}
+function trashModal(){
+  const t = DB.trash || {};
+  const ids = Object.keys(t).sort((a, b) => (t[b].deletedAt||0) - (t[a].deletedAt||0));
+  if (!ids.length){ hideModal(); renderHome(); return; }
+  const rows = ids.map(id => {
+    const e = t[id];
+    const left = Math.max(1, Math.ceil((e.deletedAt + TRASH_KEEP_DAYS*86400000 - Date.now()) / 86400000));
+    return `<div class="trashRow" data-id="${id}">
+      <div style="flex:1;min-width:0"><b>${esc(e.trip ? e.trip.title : id)}</b><br>
+        <span style="font-size:12px;color:var(--sub)">${left}일 뒤 저절로 지워져요</span></div>
+      <button class="ghostBtn tRestore" style="padding:9px 12px;border-radius:10px">♻️ 되살리기</button>
+      <button class="ghostBtn danger tKill" style="padding:9px 12px;border-radius:10px">영구 삭제</button>
+    </div>`;
+  }).join("");
+  showModal(`
+    <h3>🗑 휴지통</h3>
+    <div>${rows}</div>
+    <div class="btns"><button class="ghostBtn" id="mClose">닫기</button></div>`);
+  $("#mClose").onclick = hideModal;
+  for (const row of document.querySelectorAll(".trashRow")){
+    const id = row.dataset.id;
+    row.querySelector(".tRestore").onclick = () => restoreTrip(id);
+    row.querySelector(".tKill").onclick = () => {
+      const name = t[id].trip ? t[id].trip.title : id;
+      if (!confirm(`"${name}" 여행을 영구히 지울까요?\n되살릴 수 없어요!`)) return;
+      delete DB.trash[id];
+      persist(); trashModal();
+    };
+  }
+}
+
 /* ---------- 홈 ---------- */
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 function renderHome(){
   const list = $("#tripList");
   list.innerHTML = "";
-  for (const id in DB.trips){
+  const today = todayStr();
+  // 오는 날이 지난 여행은 자동으로 '다녀온 여행'으로 내려간다 — 따로 표시할 필요 없다
+  const ids = Object.keys(DB.trips);
+  const coming = ids.filter(id => DB.trips[id].endDate >= today)
+                    .sort((a,b) => DB.trips[a].startDate < DB.trips[b].startDate ? -1 : 1);
+  const past = ids.filter(id => DB.trips[id].endDate < today)
+                  .sort((a,b) => DB.trips[a].endDate > DB.trips[b].endDate ? -1 : 1);
+
+  const tripBtn = (id, done) => {
     const t = DB.trips[id];
     const b = document.createElement("button");
-    b.className = "tripCard";
-    b.innerHTML = `<b>${esc(t.title)}</b><span class="dates">${t.startDate} ~ ${t.endDate} · ${dayCount(t)}일</span>`;
-    b.onclick = () => openTrip(id);
+    b.className = "tripCard" + (done ? " done" : "");
+    b.innerHTML = `<b>${esc(t.title)}</b><span class="dates">${t.startDate} ~ ${t.endDate} · ${dayCount(t)}일${done ? " · 다녀왔어요" : ""}</span>`;
+    // 길게 누르면(또는 우클릭) 휴지통으로 — 아이 손에 실수로 지워지지 않게 상시 버튼은 안 둔다
+    let pressT = 0, longPressed = false;
+    b.addEventListener("pointerdown", () => {
+      longPressed = false;
+      pressT = setTimeout(() => { longPressed = true; confirmDeleteTrip(id); }, 650);
+    });
+    for (const ev of ["pointerup", "pointerleave", "pointercancel"])
+      b.addEventListener(ev, () => clearTimeout(pressT));
+    b.addEventListener("contextmenu", e => { e.preventDefault(); confirmDeleteTrip(id); });
+    b.onclick = () => { if (longPressed){ longPressed = false; return; } openTrip(id); };
     list.appendChild(b);
-  }
+  };
+
+  for (const id of coming) tripBtn(id, false);
   const add = document.createElement("button");
   add.className = "tripCard new";
   add.textContent = "＋ 새 여행 만들기";
   add.onclick = tripModal;
   list.appendChild(add);
+
+  if (past.length){
+    const h = document.createElement("div");
+    h.className = "homeSection";
+    h.textContent = `🌅 다녀온 여행 (${past.length})`;
+    list.appendChild(h);
+    for (const id of past) tripBtn(id, true);
+  }
+
+  const trashN = Object.keys(DB.trash || {}).length;
+  if (trashN){
+    const tb = document.createElement("button");
+    tb.className = "trashBtn";
+    tb.textContent = `🗑 휴지통 (${trashN})`;
+    tb.onclick = trashModal;
+    list.appendChild(tb);
+  }
 }
 
 function openTrip(id){
@@ -1392,7 +1535,12 @@ function cardModal(cardId){
         <div><label>체크아웃 마감 시각</label><input id="mCo" type="time" value="${c && c.checkOut ? c.checkOut : "11:00"}"></div>
       </div>
     </div>
-    <label id="locLabel">📍 구글 지도 링크 붙여넣기 → 위도·경도 자동 입력</label>
+    <label id="locLabel">📍 위치</label>
+    <div class="searchWrap">
+      <input id="mSearch" placeholder="🔍 장소·주소 검색 (예: 도쿄타워)" autocomplete="off">
+      <div id="mSearchList" class="searchList hidden"></div>
+    </div>
+    <label style="font-size:12px">…또는 구글 지도 긴 주소 붙여넣기</label>
     <input id="mGmap" placeholder="https://www.google.com/maps/place/…">
     <div id="mGmapMsg" style="font-size:12px;margin-top:4px;color:var(--sub)"></div>
     <div class="row">
@@ -1400,7 +1548,12 @@ function cardModal(cardId){
       <div><label>경도(lng)</label><input id="mLng" type="number" step="any" value="${c ? c.lng : ""}"></div>
     </div>
     <div id="fTransDest" class="hidden">
-      <label>🏁 도착지 — 구글 지도 링크 붙여넣기</label>
+      <label>🏁 도착지</label>
+      <div class="searchWrap">
+        <input id="mSearch2" placeholder="🔍 도착지 검색 (예: 도쿄역)" autocomplete="off">
+        <div id="mSearchList2" class="searchList hidden"></div>
+      </div>
+      <label style="font-size:12px">…또는 구글 지도 긴 주소 붙여넣기</label>
       <input id="mGmap2" placeholder="공항·역이 다른 도시라면 도착지도 넣어 주세요">
       <div id="mGmapMsg2" style="font-size:12px;margin-top:4px;color:var(--sub)"></div>
       <div class="row">
@@ -1411,9 +1564,17 @@ function cardModal(cardId){
     <label style="font-size:12px">💡 지도에서 장소를 길게 누르면 위도, 경도 숫자도 볼 수 있어요.</label>
     <div class="btns">
       ${c ? `<button class="ghostBtn danger" id="mDel">지우기</button>` : ""}
+      ${c ? `<button class="ghostBtn" id="mDup" title="이 카드를 복사해 새 카드 만들기">⧉ 복제</button>` : ""}
       <button class="ghostBtn" id="mCancel">취소</button>
       <button class="primary" id="mOk">저장</button>
     </div>`);
+  if (c) $("#mDup").onclick = () => {
+    // 지금 카드를 그대로 복사해 새 카드로 — 같은 체인의 다른 지점 같은 걸 만들 때
+    const id = "c_" + Date.now().toString(36);
+    DB.cards[tripId][id] = { ...JSON.parse(JSON.stringify(c)), title: c.title + " (복사)" };
+    persist(); hideModal(); renderAll();
+    cardModal(id);            // 바로 이어서 이름·위치를 고치게 열어 준다
+  };
   $("#mCancel").onclick = hideModal;
 
   // 종류에 따라 보이는 칸이 달라진다
@@ -1449,6 +1610,55 @@ function cardModal(cardId){
   });
   wireGmap("#mGmap", "#mGmapMsg", "#mLat", "#mLng");
   wireGmap("#mGmap2", "#mGmapMsg2", "#mLat2", "#mLng2");
+
+  /* 🔍 장소 검색 — OpenStreetMap Nominatim (무료, 키 불필요).
+     유명 장소·역·주소는 잘 찾고, 작은 가게는 구글 링크 붙여넣기가 더 정확하다.
+     예의상(이용 정책) 타자마다가 아니라 잠깐 멈췄을 때 한 번만 묻는다. */
+  const wireSearch = (inp, listSel, latEl, lngEl, msgEl) => {
+    const input = $(inp), list = $(listSel);
+    let timer = 0, seq = 0;
+    const close = () => list.classList.add("hidden");
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2){ close(); return; }
+      timer = setTimeout(async () => {
+        const my = ++seq;
+        list.innerHTML = `<div class="searchRow dim">찾는 중…</div>`;
+        list.classList.remove("hidden");
+        try{
+          const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ko&q=" + encodeURIComponent(q));
+          const rows = await res.json();
+          if (my !== seq) return;               // 더 새 검색이 이미 나갔다
+          if (!rows.length){
+            list.innerHTML = `<div class="searchRow dim">못 찾았어요 — 아래에 구글 지도 주소를 붙여넣어 보세요</div>`;
+            return;
+          }
+          list.innerHTML = "";
+          for (const r of rows){
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "searchRow";
+            row.textContent = r.display_name;
+            row.onclick = () => {
+              $(latEl).value = (+r.lat).toFixed(6);
+              $(lngEl).value = (+r.lon).toFixed(6);
+              $(msgEl).textContent = `✅ 위치를 찾았어요! (${(+r.lat).toFixed(4)}, ${(+r.lon).toFixed(4)})`;
+              input.value = r.display_name.split(",")[0];
+              close();
+            };
+            list.appendChild(row);
+          }
+        }catch(e){
+          if (my !== seq) return;
+          list.innerHTML = `<div class="searchRow dim">검색이 안 돼요 (인터넷 확인) — 구글 지도 주소 붙여넣기를 써 보세요</div>`;
+        }
+      }, 650);
+    });
+    input.addEventListener("blur", () => setTimeout(close, 250));   // 결과 클릭할 틈은 준다
+  };
+  wireSearch("#mSearch", "#mSearchList", "#mLat", "#mLng", "#mGmapMsg");
+  wireSearch("#mSearch2", "#mSearchList2", "#mLat2", "#mLng2", "#mGmapMsg2");
 
   if (c) $("#mDel").onclick = () => {
     if (!confirm("이 카드를 지울까요? 일정에 놓인 것도 같이 사라져요.")) return;
