@@ -144,7 +144,18 @@
   .dayHead b{ font-size:16px; }
   .dayHead .d{ color:var(--sub); font-size:12.5px; margin-left:6px; }
   .dayHead input[type=time]{ border:0; background:var(--bg); border-radius:8px; padding:4px 6px; font-size:13px; margin-top:6px; }
-  .dayBody{ padding:10px 10px 6px; min-height:120px; }
+  .dayBody{ padding:10px 10px 6px; min-height:120px; position:relative; }
+  /* 밥때 음영 — 블록 뒤에 깔린다 */
+  /* 카드가 꽉 차 있어도 보이도록 위에 옅게 덮는다 (클릭·드래그는 통과) */
+  .mealBand{ position:absolute; left:2px; right:2px; z-index:2; pointer-events:none;
+    background:rgba(255,168,60,.16);
+    border-top:1px dashed rgba(190,110,20,.55); border-bottom:1px dashed rgba(190,110,20,.55);
+    border-radius:6px; }
+  .mealBand span{ position:absolute; right:5px; top:2px; font-size:10.5px; font-weight:700;
+    color:#8A4E0B; background:rgba(255,255,255,.8); border-radius:6px; padding:0 5px; }
+  .dayBody > .tblock, .dayBody > .transit, .dayBody > .wait, .dayBody > .splitBlock,
+  .dayBody > .empty{ position:relative; z-index:1; }
+  .mealWarn{ color:#B45309; font-size:12.5px; padding:0 14px 10px; }
   .daySum{ padding:8px 14px 12px; color:var(--sub); font-size:12.5px; border-top:1px dashed var(--line); }
 
   .tblock{ /* 타임라인에 놓인 카드 — 높이 = durationMinutes × 2px
@@ -1239,11 +1250,13 @@ function renderDays(){
     const body = document.createElement("div");
     body.className = "dayBody";
     body.dataset.day = day;
+    body.dataset.start = parseTime(d.start);
 
     let clock = parseTime(d.start);
     let moveTotal = 0, doTotal = 0;
     let prevPt = entryPt(prevStay);   // 전날 숙소가 있으면 거기가 출발점
     let skipTransitOnce = false;      // 분기 직후엔 이동이 레인 안에서 이미 끝났다
+    const meals = [];                 // 먹기 카드가 차지한 시간대 (밥때 챙겼는지 확인용)
 
     /* 분기 레인 하나를 그린다 — 본선 로직의 작은 판박이 */
     function renderLane(lb, tm, startClock, startPt, nextPt, splitItem, ti){
@@ -1310,6 +1323,7 @@ function renderDays(){
         });
         if (!lit.isFixed)
           el.addEventListener("pointerdown", e => beginDrag(e, { from:"lane", day, split:splitItem, team:ti, item:lit }, el));
+        if (c.category === "food") meals.push([lc, lc + dur]);
         lb.appendChild(el);
         lc += dur;
         if (isTrans) move += dur; else doMin += dur;
@@ -1327,6 +1341,7 @@ function renderDays(){
       el.className = "transit";
       el.style.height = Math.max(26, tr.minutes * PXPM) + "px";
       el.innerHTML = `<span>${label || tr.mode} ${fmtDur(tr.minutes)} · ${tr.km.toFixed(1)}km</span>`;
+      el.dataset.t0 = clock; el.dataset.t1 = clock + tr.minutes;   // 밥때 음영 위치 계산용
       body.appendChild(el);
       clock += tr.minutes; moveTotal += tr.minutes;
     };
@@ -1345,6 +1360,7 @@ function renderDays(){
         }
         if (!nextPt) nextPt = entryPt(tonight);
 
+        const splitT0 = clock;
         const wrapEl = document.createElement("div");
         wrapEl.className = "splitBlock";
         wrapEl.innerHTML = `<div class="splitHead"><b>👥 나눠 움직이기</b>
@@ -1387,6 +1403,7 @@ function renderDays(){
             lanes.children[ti].querySelector(".laneBody").appendChild(w);
           }
         });
+        wrapEl.dataset.t0 = splitT0; wrapEl.dataset.t1 = join;
         body.appendChild(wrapEl);
         // 하루 요약은 더 오래 걸린 팀 기준
         const longest = ends.reduce((a, b) => (b.end > a.end ? b : a), ends[0] || { end: clock, move: 0, doMin: 0 });
@@ -1422,6 +1439,7 @@ function renderDays(){
           w.className = "wait";
           w.style.height = Math.max(18, wait * PXPM) + "px";
           w.textContent = `⏳ 기다리기 ${fmtDur(wait)}`;
+          w.dataset.t0 = clock; w.dataset.t1 = at;
           body.appendChild(w);
           clock = at;
         } else if (clock > at){              // 늦었다! — 계획표는 예정 시각으로 계속 가되 경고
@@ -1464,6 +1482,8 @@ function renderDays(){
       });
       if (!item.isFixed)                     // 고정된 카드는 잡을 수 없다
         el.addEventListener("pointerdown", e => beginDrag(e, { from:"day", day, item }, el));
+      el.dataset.t0 = clock; el.dataset.t1 = clock + dur;
+      if (c.category === "food") meals.push([clock, clock + dur]);
       body.appendChild(el);
       clock += dur;
       if (isTrans) moveTotal += dur; else doTotal += dur;
@@ -1485,7 +1505,17 @@ function renderDays(){
     sum.textContent = d.items.length
       ? `놀기 ${fmtDur(doTotal)} · 이동 ${fmtDur(moveTotal)} · ${fmtTime(parseTime(d.start))}~${fmtTime(clock)}`
       : "아직 비어 있어요";
+    // 밥때를 지나가는데 먹기 카드가 없으면 알려 준다 — 놀다 보면 밥을 잊는다
+    const missed = MEAL_WINDOWS.filter(m =>
+      clock > m.from && parseTime(d.start) < m.to &&
+      !meals.some(([a, b]) => a < m.to && b > m.from));
     col.appendChild(sum);
+    if (d.items.length && missed.length){
+      const w = document.createElement("div");
+      w.className = "mealWarn";
+      w.textContent = `🍽 ${missed.map(m => m.name).join("·")} 카드가 없어요`;
+      col.appendChild(w);
+    }
 
     if (d.items.filter(it => cardOf(it)).length >= 2){
       const vb = document.createElement("button");
@@ -1506,6 +1536,43 @@ function renderDays(){
       col.appendChild(ub);
     }
     wrap.appendChild(col);
+  }
+  // 전부 붙은 뒤에 그린다 — 실제로 배치된 높이를 읽어야 위치가 정확하다
+  for (const b of wrap.querySelectorAll(".dayBody")) drawMealBands(b);
+}
+
+/* ---------- 밥때 음영 ----------
+   타임라인은 시계에 고정된 달력이 아니라 위에서부터 쌓이는 방식이라,
+   각 블록이 기록해 둔 시간 범위(data-t0/t1)와 실제 픽셀 높이를 이어서
+   "12시가 화면의 몇 px인지"를 되짚는다. */
+const MEAL_WINDOWS = [
+  { name:"점심", from:12*60, to:13*60 },
+  { name:"저녁", from:18*60, to:19*60 },
+];
+function drawMealBands(body){
+  const start = +body.dataset.start;
+  const kids = [...body.children].filter(k => k.dataset && k.dataset.t0 !== undefined);
+  const H = body.clientHeight;
+  const yAt = T => {
+    if (!kids.length) return (T - start) * PXPM;
+    for (const k of kids){
+      const t0 = +k.dataset.t0, t1 = +k.dataset.t1;
+      if (T <= t0) return k.offsetTop - (t0 - T) * PXPM;
+      if (T <= t1) return k.offsetTop + (t1 > t0 ? (T - t0) / (t1 - t0) * k.offsetHeight : 0);
+    }
+    const last = kids[kids.length - 1];
+    return last.offsetTop + last.offsetHeight + (T - (+last.dataset.t1)) * PXPM;
+  };
+  for (const m of MEAL_WINDOWS){
+    const y0 = Math.max(0, yAt(m.from));
+    const y1 = Math.min(H, yAt(m.to));
+    if (y1 - y0 < 8) continue;            // 화면에 거의 안 걸치면 그리지 않는다
+    const b = document.createElement("div");
+    b.className = "mealBand";
+    b.style.top = y0 + "px";
+    b.style.height = (y1 - y0) + "px";
+    b.innerHTML = `<span>🍽 ${m.name}</span>`;
+    body.insertBefore(b, body.firstChild);
   }
 }
 
