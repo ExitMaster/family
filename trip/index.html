@@ -959,6 +959,9 @@ function drop(ev){
       itin(t.day).stay = src.cardId;   // 숙소는 타임라인이 아니라 그 날의 '오늘 밤 숙소'가 된다
     } else {
       const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
+      // 카드에 기본 할 일이 있으면, 놓는 순간 그 날의 체크리스트로 복사된다
+      if (card && Array.isArray(card.todos) && card.todos.length)
+        item.todos = card.todos.map(t => ({ t: t.t, d: false }));
       insertWithLocks(itin(t.day), item, t.idx);
     }
   } else if (cardOf(src.item) && cardOf(src.item).category === "accommodation"){
@@ -1102,6 +1105,8 @@ function cardModal(cardId){
     <h3>${c ? "카드 고치기" : "새 카드 만들기"}</h3>
     <label>이름</label><input id="mTitle" value="${c ? esc(c.title) : ""}" placeholder="예) 아쿠아리움">
     <label>설명</label><input id="mDesc" value="${c ? esc(c.description||"") : ""}" placeholder="한 줄 설명 (교통이면 노선·환승·출구 메모)">
+    <label>✅ 기본 할 일 — ;로 구분 (일정에 놓을 때 체크리스트로 들어가요)</label>
+    <input id="mTodos" value="${c && c.todos ? esc(c.todos.map(t => t.t).join("; ")) : ""}" placeholder="예) 예약 확인; 우산 챙기기">
     <div class="row">
       <div><label>종류</label><select id="mCat">${catOpts}</select></div>
       <div><label>가격 느낌</label><input id="mPrice" value="${c ? esc(c.priceRange||"") : ""}" placeholder="₩₩ / 무료"></div>
@@ -1202,6 +1207,9 @@ function cardModal(cardId){
       priceRange: $("#mPrice").value.trim(), lat, lng,
       durationMinutes: 60,
     };
+    const todoTxt = $("#mTodos").value.trim();
+    if (todoTxt)
+      card.todos = todoTxt.split(/[;|]/).map(s => s.trim()).filter(Boolean).map(t => ({ t, d:false }));
     if (cat === "accommodation"){
       card.checkIn  = $("#mCi").value || "15:00";
       card.checkOut = $("#mCo").value || "11:00";
@@ -1261,12 +1269,15 @@ function parseSheet(text){
           else if (h.startsWith("가격")) cols.price = i;
           else if (h.startsWith("위도") || h.toLowerCase() === "lat") cols.lat = i;
           else if (h.startsWith("경도") || h.toLowerCase() === "lng") cols.lng = i;
+          else if (h.startsWith("도착지도") || h.startsWith("도착링크")) cols.link2 = i;  // '도착'보다 먼저
+          else if (h.startsWith("지도") || h.startsWith("위치링크") || h === "링크") cols.link = i;
           else if (h.startsWith("도착위")) cols.lat2 = i;    // '도착'보다 먼저 봐야 한다
           else if (h.startsWith("도착경")) cols.lng2 = i;
           else if (h.startsWith("체크인")) cols.ci = i;
           else if (h.startsWith("체크아웃")) cols.co = i;
           else if (h.startsWith("출발")) cols.dep = i;
           else if (h.startsWith("도착")) cols.arr = i;
+          else if (h.startsWith("할일") || h.startsWith("할 일") || h.startsWith("메모")) cols.memo = i;
           else if (h.startsWith("설명")) cols.desc = i;
         });
       }
@@ -1285,6 +1296,15 @@ function parseSheet(text){
       lng: isFinite(lng) ? lng : null,
       description: cells[cols.desc] || "",
     };
+    // 위도/경도가 비어 있으면 지도링크 열에서 좌표를 꺼내 본다
+    if ((card.lat == null || card.lng == null) && cells[cols.link]){
+      const p = parseGmapLink(cells[cols.link]);
+      if (p){ card.lat = p.lat; card.lng = p.lng; }
+    }
+    // 할일메모 열: "예약 확인; 우산 챙기기" → 일정에 놓을 때 체크리스트로 들어간다
+    const memo = (cells[cols.memo] || "").trim();
+    if (memo)
+      card.todos = memo.split(/[;|]/).map(s => s.trim()).filter(Boolean).map(t => ({ t, d:false }));
     if (card.category === "accommodation"){
       card.checkIn  = normTime(cells[cols.ci]) || "15:00";
       card.checkOut = normTime(cells[cols.co]) || "11:00";
@@ -1295,6 +1315,10 @@ function parseSheet(text){
       if (arr) card.arrTime = arr;
       const lat2 = parseFloat(cells[cols.lat2]), lng2 = parseFloat(cells[cols.lng2]);
       if (isFinite(lat2) && isFinite(lng2)){ card.lat2 = lat2; card.lng2 = lng2; }
+      else if (cells[cols.link2]){          // 도착 좌표가 비면 도착지도링크에서
+        const p = parseGmapLink(cells[cols.link2]);
+        if (p){ card.lat2 = p.lat; card.lng2 = p.lng; }
+      }
     }
     out.cards.push(card);
   }
@@ -1318,6 +1342,8 @@ function applyImport(p){
     if (c.lat == null || c.lng == null) continue;
     let cid = Object.keys(DB.cards[id]).find(k => DB.cards[id][k].title === c.title);
     if (cid) updated++; else { cid = "c_" + Math.random().toString(36).slice(2,8); made++; }
+    // 시트에 할일메모가 없다고 해서 앱에서 만든 기본 할 일을 지우지는 않는다
+    if (!c.todos && DB.cards[id][cid] && DB.cards[id][cid].todos) c.todos = DB.cards[id][cid].todos;
     DB.cards[id][cid] = c;
   }
   persist();
@@ -1344,7 +1370,8 @@ $("#importBtn").onclick = () => {
     const r = applyImport(p);
     hideModal();
     alert(`"${p.title}" 가져왔어요!\n새 카드 ${r.made}장, 업데이트 ${r.updated}장` +
-          (r.skipped ? `\n(위도/경도가 비어서 건너뛴 줄 ${r.skipped}개)` : ""));
+          (r.skipped ? `\n(위치를 못 읽어 건너뛴 줄 ${r.skipped}개 — 위도/경도가 비었거나,` +
+                       `\n 짧은 지도 링크(maps.app.goo.gl)는 좌표가 안 들어 있어요)` : ""));
     renderHome();
   };
 };
