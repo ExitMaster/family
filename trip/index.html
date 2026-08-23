@@ -66,6 +66,9 @@
   #catChips{ display:flex; gap:6px; flex-wrap:wrap; padding:0 12px 10px; }
   .chip{ padding:8px 12px; border-radius:999px; background:var(--bg); font-size:13px; border:1px solid var(--line); }
   .chip.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .chip.dayChip.on{ background:var(--brand); border-color:var(--brand); }
+  .detour{ display:inline-block; background:#FFF0E2; color:#B45309; border-radius:8px;
+    padding:1px 7px; margin-right:6px; font-weight:600; }
   #poolCards{ flex:1; overflow-y:auto; padding:4px 12px 20px; display:flex; flex-direction:column; gap:10px; }
 
   .pcard{
@@ -685,6 +688,33 @@ $("#mapToggle").onclick = () => {
 };
 
 /* ---------- 카드 풀 ---------- */
+
+/* 📍 가까운 순 — 이 카드를 그 날 일정에 끼워 넣을 때 "이동이 몇 분 늘어나는가"(우회 시간).
+   그냥 직선거리로 줄 세우면 지나온 동선 뒤쪽 가게가 위로 올라오니, 실제로 싸게
+   끼워지는 순서로 보여 준다. 동선 검사와 같은 seqCost를 재사용한다. */
+let poolSort = { on:false, day:1 };
+
+function detourFor(cardId, day){
+  const items = itin(day).items.filter(it => cardOf(it));
+  const fake = { uid:"_probe", cardId };
+  if (!items.length){
+    // 그 날이 비어 있으면 숙소가 기준점: 전날 밤 숙소 또는 오늘 숙소에서 얼마나 먼가
+    const anchor = (day > 1 && cardById(itin(day-1).stay)) || cardById(itin(day).stay);
+    const c = cardById(cardId);
+    if (!anchor || !entryPt(anchor) || !entryPt(c)) return null;
+    const tr = estTransit(entryPt(anchor), entryPt(c));
+    return { min: tr ? tr.minutes : 0, from:"stay" };
+  }
+  const base = seqCost(day, items);
+  let best = Infinity;
+  for (let k = 0; k <= items.length; k++){
+    const cand = items.slice();
+    cand.splice(k, 0, fake);
+    best = Math.min(best, seqCost(day, cand) - base);
+  }
+  return { min: Math.max(0, Math.round(best)), from:"itin" };
+}
+
 function renderPool(){
   const chips = $("#catChips");
   chips.innerHTML = "";
@@ -696,14 +726,43 @@ function renderPool(){
     c.onclick = () => { catFilter = k; renderPool(); };
     chips.appendChild(c);
   }
+  const sortChip = document.createElement("button");
+  sortChip.className = "chip" + (poolSort.on ? " on" : "");
+  sortChip.textContent = "📍 가까운 순";
+  sortChip.onclick = () => { poolSort.on = !poolSort.on; renderPool(); };
+  chips.appendChild(sortChip);
+  if (poolSort.on){
+    const n = dayCount(DB.trips[tripId]);
+    poolSort.day = Math.min(poolSort.day, n);
+    for (let day = 1; day <= n; day++){
+      const dchip = document.createElement("button");
+      dchip.className = "chip dayChip" + (poolSort.day === day ? " on" : "");
+      dchip.textContent = `Day ${day}`;
+      dchip.onclick = () => { poolSort.day = day; renderPool(); };
+      chips.appendChild(dchip);
+    }
+  }
 
   const wrap = $("#poolCards");
   wrap.innerHTML = "";
   const cards = DB.cards[tripId] || {};
-  const ids = Object.keys(cards).filter(id => catFilter === "all" || cards[id].category === catFilter);
+  let ids = Object.keys(cards).filter(id => catFilter === "all" || cards[id].category === catFilter);
   if (!ids.length){
     wrap.innerHTML = `<div class="empty">카드가 없어요.<br>위의 ➕ 버튼으로 만들 수 있어요.</div>`;
     return;
+  }
+  const detours = {};
+  if (poolSort.on){
+    for (const id of ids)
+      if (cards[id].category !== "accommodation")   // 숙소는 끼워 넣는 카드가 아니다
+        detours[id] = detourFor(id, poolSort.day);
+    ids = ids.slice().sort((a, b) => {
+      const da = detours[a], db2 = detours[b];
+      if (!da && !db2) return 0;
+      if (!da) return 1;
+      if (!db2) return -1;
+      return da.min - db2.min;
+    });
   }
   for (const id of ids){
     const c = cards[id];
@@ -716,10 +775,14 @@ function renderPool(){
       c.category === "accommodation" ? `🌙 체크인 ${c.checkIn || "15:00"} · 아웃 ${c.checkOut || "11:00"}` :
       c.category === "transport" && c.depTime && c.arrTime ? `🕑 ${c.depTime} → ${c.arrTime} (${blockMinutes(c)}분)` :
       `⏱ ${c.durationMinutes}분`;
+    const dt = poolSort.on ? detours[id] : null;
+    const dtBadge = dt == null ? "" :
+      dt.from === "stay" ? `<span class="detour">🏨 ${dt.min}분</span>` :
+      `<span class="detour">📍 +${dt.min}분</span>`;
     el.innerHTML =
       `<div class="cat" style="background:${cat.color}"></div>` +
       `<b>${cat.icon} ${esc(c.title)}</b>` +
-      `<div class="meta">${metaLine}${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>` +
+      `<div class="meta">${dtBadge}${metaLine}${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>` +
       (c.description ? `<div class="desc">${esc(c.description)}</div>` : "") +
       `<button class="edit" title="고치기">✏️</button>` +
       (n ? `<span class="used">일정에 ${n}번</span>` : "");
