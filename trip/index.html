@@ -13,8 +13,8 @@
   :root{
     --bg:#F4F1EA; --panel:#FFFFFF; --ink:#2B2B33; --sub:#8A8A96;
     --line:#E7E2D6; --brand:#FF7A1A; --brand2:#2E7BE8;
-    --act:#A96BFF; --food:#FF5FA2; --shop:#17BEBB; --stay:#35C46A;
-    --transit:#B9C3CF;
+    --act:#A96BFF; --food:#FF5FA2; --shop:#17BEBB; --stay:#35C46A; --trans:#5B7DB1;
+    --transit:#B9C3CF; --warn:#E2445C;
     --pxpm:2px; /* 1분 = 2px — 카드 높이가 곧 걸리는 시간 */
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -122,6 +122,22 @@
   }
   .transit span{ background:var(--bg); border:1px solid var(--transit); border-radius:999px; padding:3px 10px; }
 
+  .wait{ /* 교통편 출발까지 기다리는 시간 */
+    display:flex; align-items:center; justify-content:center; color:#8a94a0; font-size:11.5px; }
+  .lateBadge{ position:absolute; right:10px; top:6px; background:var(--warn); color:#fff;
+    font-size:11px; border-radius:8px; padding:2px 7px; }
+  .stayBadge{ display:flex; align-items:center; gap:6px; margin-top:6px;
+    background:#E8F4E9; border:1px solid #BFDFC4; border-radius:10px;
+    padding:5px 8px; font-size:12.5px; }
+  .stayBadge b{ font-size:12.5px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stayBadge .rmStay{ width:26px; height:26px; border-radius:8px; background:rgba(0,0,0,.06); font-size:12px; flex:none; }
+  .stayBadge.warnLate{ background:#FDEBEE; border-color:#F2B4BE; }
+  .stayHint{ margin-top:6px; font-size:11.5px; color:var(--sub); border:1px dashed var(--line);
+    border-radius:10px; padding:5px 8px; text-align:center; }
+  .verifyBtn{ margin:0 10px 10px; padding:9px; border-radius:12px; background:var(--bg);
+    border:1px solid var(--line); font-size:13px; }
+  .undoBtn{ margin:0 10px 10px; padding:9px; border-radius:12px; background:#FFF4E8;
+    border:1px solid #F5CFA8; font-size:13px; }
   .dropHint{ height:4px; border-radius:2px; background:var(--brand); margin:2px 4px; }
   .dayBody.over{ background:#FFF4E8; border-radius:12px; }
   .empty{ color:var(--sub); font-size:13px; text-align:center; padding:28px 8px; }
@@ -241,10 +257,11 @@ const MIN_BLOCK = 36;           // 이보다 얇으면 글자를 못 읽는다 (
 const STORE = "trip-planner-v1";
 
 const CATS = {   // color = 띠·아이콘용 원색, bg = 블록 배경용 파스텔
-  activity:      { name:"체험",  icon:"🎡", color:"var(--act)",  bg:"#F1EAFB" },
-  food:          { name:"먹기",  icon:"🍜", color:"var(--food)", bg:"#FBEAF1" },
-  shopping:      { name:"쇼핑",  icon:"🛍️", color:"var(--shop)", bg:"#E5F4F3" },
-  accommodation: { name:"숙소",  icon:"🏨", color:"var(--stay)", bg:"#E8F4E9" },
+  activity:      { name:"체험",  icon:"🎡", color:"var(--act)",   bg:"#F1EAFB" },
+  food:          { name:"먹기",  icon:"🍜", color:"var(--food)",  bg:"#FBEAF1" },
+  shopping:      { name:"쇼핑",  icon:"🛍️", color:"var(--shop)",  bg:"#E5F4F3" },
+  transport:     { name:"교통",  icon:"🚄", color:"var(--trans)", bg:"#E9EFF7" },
+  accommodation: { name:"숙소",  icon:"🏨", color:"var(--stay)",  bg:"#E8F4E9" },
 };
 
 /* ---------- 처음 열었을 때 들어 있는 예시 여행 ----------
@@ -264,7 +281,8 @@ const SEED = {
       c_sushiro:  { title:"스시로 회전초밥",     description:"레일 위로 초밥이 지나가요",     category:"food",     durationMinutes:60,  priceRange:"₩₩",  lat:35.6980, lng:139.7745 },
       c_pokemon:  { title:"포켓몬 센터 메가도쿄",description:"포켓몬 굿즈가 가득한 가게",     category:"shopping", durationMinutes:60,  priceRange:"₩₩",  lat:35.7290, lng:139.7190 },
       c_charstreet:{ title:"도쿄역 캐릭터 스트리트", description:"지하에 캐릭터 가게가 쭉",  category:"shopping", durationMinutes:50,  priceRange:"₩₩",  lat:35.6812, lng:139.7671 },
-      c_hotel:    { title:"호텔 (우에노)",       description:"짐 놓고 쉬는 우리 집",          category:"accommodation", durationMinutes:60, priceRange:"", lat:35.7110, lng:139.7770 },
+      c_hotel:    { title:"호텔 (우에노)",       description:"짐 놓고 쉬는 우리 집",          category:"accommodation", durationMinutes:60, priceRange:"", lat:35.7110, lng:139.7770, checkIn:"15:00", checkOut:"11:00" },
+      c_nex:      { title:"나리타 익스프레스",   description:"나리타공항→도쿄역 · JR 개찰 B1", category:"transport", durationMinutes:75, priceRange:"₩₩", lat:35.7720, lng:140.3929, lat2:35.6812, lng2:139.7671, depTime:"10:30", arrTime:"11:45" },
     },
   },
   itins: {},   // 일정은 비워 두고 아이들이 채운다
@@ -289,6 +307,20 @@ function saveLocal(){
 }
 
 DB = loadLocal();
+
+/* 옛 데이터 이어받기: 예전 숙소 카드는 체류시간만 있었다.
+   체크인/체크아웃이 없으면 흔한 기본값(15:00 / 11:00)을 넣어 준다. */
+function migrate(db){
+  for (const tid in (db.cards || {}))
+    for (const cid in db.cards[tid]){
+      const c = db.cards[tid][cid];
+      if (c.category === "accommodation"){
+        if (!c.checkIn)  c.checkIn  = "15:00";
+        if (!c.checkOut) c.checkOut = "11:00";
+      }
+    }
+}
+migrate(DB);
 
 /* ---------- Firebase (없어도 되는 부분) ----------
    리포의 다른 앱들과 같은 데이터베이스(unimai-game-hub)를 쓴다.
@@ -322,6 +354,7 @@ let applyingRemote = false;    // 원격 스냅샷 반영 중엔 다시 업로�
       applyingRemote = true;
       DB = { trips: v.trips||{}, cards: v.cards||{}, itins: v.itins||{} };
       if (!Object.keys(DB.trips).length) DB = JSON.parse(JSON.stringify(SEED));
+      migrate(DB);
       saveLocal();
       renderAll();
       applyingRemote = false;
@@ -389,6 +422,25 @@ function estTransit(a, b){
   return { mode:"🚇 대중교통", minutes: Math.round(8 + km/25*60), km };
 }
 
+/* 카드의 '들어가는 지점'과 '나오는 지점'. 교통 카드만 둘이 다르다(출발지 → 도착지). */
+function entryPt(c){ return (c && typeof c.lat === "number") ? { lat:c.lat, lng:c.lng } : null; }
+function exitPt(c){
+  if (c && c.category === "transport" && typeof c.lat2 === "number") return { lat:c.lat2, lng:c.lng2 };
+  return entryPt(c);
+}
+/* 타임라인에서 카드가 차지하는 분. 교통은 출발·도착 시각이 있으면 그걸 우선. */
+function blockMinutes(c){
+  if (c.category === "transport" && c.depTime && c.arrTime){
+    const d = parseTime(c.arrTime) - parseTime(c.depTime);
+    if (d > 0) return d;
+  }
+  return c.durationMinutes || 60;
+}
+function normTime(s){
+  const m = /(\d{1,2}):(\d{2})/.exec(String(s || ""));
+  return m ? pad(+m[1]) + ":" + m[2] : null;
+}
+
 /* ---------- 일정 데이터 접근 ---------- */
 function itin(day){
   const t = DB.itins[tripId] || (DB.itins[tripId] = {});
@@ -397,10 +449,14 @@ function itin(day){
   return d;
 }
 function cardOf(item){ return (DB.cards[tripId] || {})[item.cardId]; }
+function cardById(id){ return id ? (DB.cards[tripId] || {})[id] : null; }
 function usedCount(cardId){
   let n = 0;
   const t = DB.itins[tripId] || {};
-  for (const k in t) for (const it of (t[k].items||[])) if (it.cardId === cardId) n++;
+  for (const k in t){
+    for (const it of (t[k].items||[])) if (it.cardId === cardId) n++;
+    if (t[k].stay === cardId) n++;      // '오늘 밤 숙소'로 쓰인 것도 센다
+  }
   return n;
 }
 
@@ -482,10 +538,14 @@ function renderPool(){
     el.className = "pcard";
     el.dataset.cardId = id;
     const n = usedCount(id);
+    const metaLine =
+      c.category === "accommodation" ? `🌙 체크인 ${c.checkIn || "15:00"} · 아웃 ${c.checkOut || "11:00"}` :
+      c.category === "transport" && c.depTime && c.arrTime ? `🕑 ${c.depTime} → ${c.arrTime} (${blockMinutes(c)}분)` :
+      `⏱ ${c.durationMinutes}분`;
     el.innerHTML =
       `<div class="cat" style="background:${cat.color}"></div>` +
       `<b>${cat.icon} ${esc(c.title)}</b>` +
-      `<div class="meta">⏱ ${c.durationMinutes}분${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>` +
+      `<div class="meta">${metaLine}${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>` +
       (c.description ? `<div class="desc">${esc(c.description)}</div>` : "") +
       `<button class="edit" title="고치기">✏️</button>` +
       (n ? `<span class="used">일정에 ${n}번</span>` : "");
@@ -508,6 +568,10 @@ function renderDays(){
     col.className = "dayCol";
     col.dataset.day = day;
 
+    // 아침엔 전날 밤 숙소에서 출발하고, 밤엔 이 날 숙소로 돌아간다
+    const prevStay = day > 1 ? cardById(itin(day - 1).stay) : null;
+    const tonight  = cardById(d.stay);
+
     const head = document.createElement("div");
     head.className = "dayHead";
     head.innerHTML = `<b>Day ${day}</b><span class="d">${dayDate(trip, day)}</span><br>`;
@@ -517,6 +581,30 @@ function renderDays(){
     timeIn.title = "이 날 출발 시각";
     timeIn.onchange = () => { d.start = timeIn.value || "09:00"; persist(); renderDays(); };
     head.appendChild(timeIn);
+
+    // 체크아웃 마감보다 늦게 출발하는 날은 배지가 빨개진다
+    const lateOut = prevStay && prevStay.checkOut && parseTime(d.start) > parseTime(prevStay.checkOut);
+    if (prevStay){
+      const from = document.createElement("div");
+      from.className = "stayBadge" + (lateOut ? " warnLate" : "");
+      from.innerHTML = `🧳 <b>${esc(prevStay.title)}에서 출발</b>` +
+        (lateOut ? `<span style="color:var(--warn);font-size:11.5px;flex:none">⚠️ 체크아웃 ${prevStay.checkOut} 지남</span>` : "");
+      head.appendChild(from);
+    }
+    if (tonight){
+      const st = document.createElement("div");
+      st.className = "stayBadge";
+      st.innerHTML = `🏨 <b>오늘 밤: ${esc(tonight.title)}</b>` +
+        `<span style="font-size:11px;color:var(--sub);flex:none">체크인 ${tonight.checkIn || "?"}~</span>` +
+        `<button class="rmStay" title="숙소 빼기">✕</button>`;
+      st.querySelector(".rmStay").onclick = () => { delete d.stay; persist(); renderAll(); };
+      head.appendChild(st);
+    } else if (Object.values(DB.cards[tripId] || {}).some(c => c.category === "accommodation")){
+      const hint = document.createElement("div");
+      hint.className = "stayHint";
+      hint.textContent = "🏨 숙소 카드를 여기로 끌어오면 이 날 밤 숙소가 돼요";
+      head.appendChild(hint);
+    }
     col.appendChild(head);
 
     const body = document.createElement("div");
@@ -525,22 +613,46 @@ function renderDays(){
 
     let clock = parseTime(d.start);
     let moveTotal = 0, doTotal = 0;
-    let prevCard = null;
+    let prevPt = entryPt(prevStay);   // 전날 숙소가 있으면 거기가 출발점
+
+    const addTransit = (tr, label) => {
+      const el = document.createElement("div");
+      el.className = "transit";
+      el.style.height = Math.max(26, tr.minutes * PXPM) + "px";
+      el.innerHTML = `<span>${label || tr.mode} ${tr.minutes}분 · ${tr.km.toFixed(1)}km</span>`;
+      body.appendChild(el);
+      clock += tr.minutes; moveTotal += tr.minutes;
+    };
 
     d.items.forEach((item, idx) => {
       const c = cardOf(item);
       if (!c) return;                        // 카드가 지워졌으면 조용히 건너뛴다
-      if (prevCard){
-        const tr = estTransit(prevCard, c);
-        if (tr){
-          const el = document.createElement("div");
-          el.className = "transit";
-          el.style.height = Math.max(26, tr.minutes * PXPM) + "px";
-          el.innerHTML = `<span>${tr.mode} ${tr.minutes}분 · ${tr.km.toFixed(1)}km</span>`;
-          body.appendChild(el);
-          clock += tr.minutes; moveTotal += tr.minutes;
+      const isTrans = c.category === "transport";
+
+      // 자동 이동 블록 — 교통 카드 바로 앞에는 만들지 않는다 (그 카드가 곧 이동이니까)
+      if (prevPt && !isTrans && entryPt(c)){
+        const tr = estTransit(prevPt, entryPt(c));
+        if (tr) addTransit(tr);
+      }
+
+      const dur = blockMinutes(c);
+      let late = 0;
+      if (isTrans && c.depTime){
+        const dep = parseTime(c.depTime);
+        if (clock < dep){                    // 일찍 왔으면 출발까지 기다린다
+          const wait = dep - clock;
+          const w = document.createElement("div");
+          w.className = "wait";
+          w.style.height = Math.max(18, wait * PXPM) + "px";
+          w.textContent = `⏳ 기다리기 ${wait}분`;
+          body.appendChild(w);
+          clock = dep;
+        } else if (clock > dep){             // 늦었다! — 계획표는 예정 시각으로 계속 가되 경고
+          late = clock - dep;
+          clock = dep;
         }
       }
+
       const cat = CATS[c.category] || CATS.activity;
       const el = document.createElement("div");
       el.className = "tblock" + (item.isFixed ? " fixed" : "");
@@ -548,16 +660,18 @@ function renderDays(){
       el.dataset.idx = idx;
       el.style.background = cat.bg;
       el.style.setProperty("--stripe", cat.color);
-      el.style.height = Math.max(MIN_BLOCK, c.durationMinutes * PXPM) + "px";
+      el.style.height = Math.max(MIN_BLOCK, dur * PXPM) + "px";
       const todos = item.todos || [];
       const doneN = todos.filter(t => t.d).length;
       el.innerHTML =
-        `<span class="time">${fmtTime(clock)} ~ ${fmtTime(clock + c.durationMinutes)}</span>` +
+        `<span class="time">${fmtTime(clock)} ~ ${fmtTime(clock + dur)}</span>` +
         `<b>${cat.icon} ${esc(c.title)}</b>` +
-        `<span class="dur">${c.durationMinutes}분</span>` +
+        (isTrans && c.description ? `<span class="time">${esc(c.description)}</span>` : "") +
+        `<span class="dur">${dur}분</span>` +
+        (late ? `<span class="lateBadge">⚠️ ${late}분 늦어요</span>` : "") +
         (todos.length ? `<span class="todoBadge">✅ ${doneN}/${todos.length}</span>` : "") +
-        `<button class="lock" title="고정">${item.isFixed ? "🔒" : "🔓"}</button>` +
-        `<button class="rm" title="빼기">✕</button>`;
+        `<button class="lock" title="고정"${late ? ' style="top:40px"' : ""}>${item.isFixed ? "🔒" : "🔓"}</button>` +
+        `<button class="rm" title="빼기"${late ? ' style="top:40px"' : ""}>✕</button>`;
       for (const btn of el.querySelectorAll("button"))
         btn.addEventListener("pointerdown", e => e.stopPropagation());
       el.querySelector(".lock").onclick = () => { item.isFixed = !item.isFixed; persist(); renderDays(); };
@@ -574,9 +688,16 @@ function renderDays(){
       if (!item.isFixed)                     // 고정된 카드는 잡을 수 없다
         el.addEventListener("pointerdown", e => beginDrag(e, { from:"day", day, item }, el));
       body.appendChild(el);
-      clock += c.durationMinutes; doTotal += c.durationMinutes;
-      prevCard = c;
+      clock += dur;
+      if (isTrans) moveTotal += dur; else doTotal += dur;
+      prevPt = exitPt(c) || prevPt;
     });
+
+    // 하루의 끝: 숙소로 돌아가는 길
+    if (tonight && d.items.length && prevPt && entryPt(tonight)){
+      const tr = estTransit(prevPt, entryPt(tonight));
+      if (tr) addTransit(tr, "🏨 숙소 가기 —");
+    }
 
     if (!d.items.length)
       body.innerHTML = `<div class="empty">여기로 카드를<br>끌어다 놓아 보세요 👇</div>`;
@@ -588,6 +709,25 @@ function renderDays(){
       ? `놀기 ${Math.round(doTotal/6)/10}시간 · 이동 ${moveTotal}분 · ${fmtTime(parseTime(d.start))}~${fmtTime(clock)}`
       : "아직 비어 있어요";
     col.appendChild(sum);
+
+    if (d.items.filter(it => cardOf(it)).length >= 2){
+      const vb = document.createElement("button");
+      vb.className = "verifyBtn";
+      vb.textContent = "✨ 동선 검사";
+      vb.onclick = () => verifyModal(day);
+      col.appendChild(vb);
+    }
+    if (routeBackup[day]){
+      const ub = document.createElement("button");
+      ub.className = "undoBtn";
+      ub.textContent = "↩︎ 아까 내 순서로 되돌리기";
+      ub.onclick = () => {
+        itin(day).items = routeBackup[day];
+        delete routeBackup[day];
+        persist(); renderAll();
+      };
+      col.appendChild(ub);
+    }
     wrap.appendChild(col);
   }
 }
@@ -619,14 +759,16 @@ function renderMap(){
   const palette = ["#2E7BE8","#35C46A","#FF5FA2","#A96BFF","#17BEBB","#E2445C","#FF7A1A"];
   const n = dayCount(DB.trips[tripId]);
   for (let day = 1; day <= n; day++){
-    const items = itin(day).items;
+    const dd = itin(day);
+    const col = palette[(day-1) % palette.length];
     const pts = [];
     let order = 0;
-    for (const item of items){
+    const prevStay = day > 1 ? cardById(itin(day-1).stay) : null;
+    if (entryPt(prevStay)) pts.push([prevStay.lat, prevStay.lng]);   // 아침 출발점
+    for (const item of dd.items){
       const c = cardOf(item);
       if (!c || typeof c.lat !== "number") continue;
       order++;
-      const col = palette[(day-1) % palette.length];
       const icon = L.divIcon({
         className: "", iconSize:[28,28], iconAnchor:[14,14],
         html: `<div class="numIcon" data-uid="${item.uid}" style="width:28px;height:28px;background:${col}">${order}</div>`,
@@ -636,9 +778,25 @@ function renderMap(){
       markers[item.uid] = m;
       pts.push([c.lat, c.lng]);
       bounds.push([c.lat, c.lng]);
+      const ex = exitPt(c);                       // 교통 카드는 도착지까지 선을 잇는다
+      if (ex && (ex.lat !== c.lat || ex.lng !== c.lng)){
+        pts.push([ex.lat, ex.lng]);
+        bounds.push([ex.lat, ex.lng]);
+      }
+    }
+    const tonight = cardById(dd.stay);
+    if (entryPt(tonight)){                        // 오늘 밤 숙소
+      const icon = L.divIcon({
+        className: "", iconSize:[28,28], iconAnchor:[14,14],
+        html: `<div class="numIcon" style="width:28px;height:28px;background:#fff;color:${col};border-color:${col}">🏨</div>`,
+      });
+      L.marker([tonight.lat, tonight.lng], { icon }).addTo(mapLayer)
+        .bindTooltip(`Day${day} 밤 · ${esc(tonight.title)}`);
+      if (dd.items.length) pts.push([tonight.lat, tonight.lng]);
+      bounds.push([tonight.lat, tonight.lng]);
     }
     if (pts.length > 1)
-      L.polyline(pts, { color: palette[(day-1) % palette.length], weight:3, dashArray:"6 6", opacity:.8 }).addTo(mapLayer);
+      L.polyline(pts, { color: col, weight:3, dashArray:"6 6", opacity:.8 }).addTo(mapLayer);
   }
   if (!bounds.length){    // 아직 일정이 없으면 카드들 위치라도 보여 준다
     for (const id in (DB.cards[tripId] || {})){
@@ -761,8 +919,13 @@ function drop(ev){
   }
 
   if (src.from === "pool"){
-    const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
-    insertWithLocks(itin(t.day), item, t.idx);
+    const card = cardById(src.cardId);
+    if (card && card.category === "accommodation"){
+      itin(t.day).stay = src.cardId;   // 숙소는 타임라인이 아니라 그 날의 '오늘 밤 숙소'가 된다
+    } else {
+      const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
+      insertWithLocks(itin(t.day), item, t.idx);
+    }
   } else {
     const from = itin(src.day);
     const oldIdx = from.items.indexOf(src.item);
@@ -898,20 +1061,43 @@ function cardModal(cardId){
   showModal(`
     <h3>${c ? "카드 고치기" : "새 카드 만들기"}</h3>
     <label>이름</label><input id="mTitle" value="${c ? esc(c.title) : ""}" placeholder="예) 아쿠아리움">
-    <label>설명</label><input id="mDesc" value="${c ? esc(c.description||"") : ""}" placeholder="한 줄 설명">
+    <label>설명</label><input id="mDesc" value="${c ? esc(c.description||"") : ""}" placeholder="한 줄 설명 (교통이면 노선·환승·출구 메모)">
     <div class="row">
       <div><label>종류</label><select id="mCat">${catOpts}</select></div>
-      <div><label>걸리는 시간(분)</label><input id="mDur" type="number" min="10" step="5" value="${c ? c.durationMinutes : 60}"></div>
-    </div>
-    <div class="row">
       <div><label>가격 느낌</label><input id="mPrice" value="${c ? esc(c.priceRange||"") : ""}" placeholder="₩₩ / 무료"></div>
     </div>
-    <label>📍 구글 지도 링크 붙여넣기 → 위도·경도 자동 입력</label>
+    <div id="fDur">
+      <label>걸리는 시간(분)</label>
+      <input id="mDur" type="number" min="5" step="5" value="${c ? c.durationMinutes : 60}">
+    </div>
+    <div id="fTransTime" class="hidden">
+      <div class="row">
+        <div><label>출발 시각</label><input id="mDep" type="time" value="${c && c.depTime ? c.depTime : ""}"></div>
+        <div><label>도착 시각</label><input id="mArr" type="time" value="${c && c.arrTime ? c.arrTime : ""}"></div>
+      </div>
+      <label style="font-size:12px">💡 시각을 비우면 위의 '걸리는 시간(분)'을 씁니다. 시각을 넣으면 일정이 늦을 때 ⚠️ 경고가 떠요.</label>
+    </div>
+    <div id="fStay" class="hidden">
+      <div class="row">
+        <div><label>체크인 가능 시각</label><input id="mCi" type="time" value="${c && c.checkIn ? c.checkIn : "15:00"}"></div>
+        <div><label>체크아웃 마감 시각</label><input id="mCo" type="time" value="${c && c.checkOut ? c.checkOut : "11:00"}"></div>
+      </div>
+    </div>
+    <label id="locLabel">📍 구글 지도 링크 붙여넣기 → 위도·경도 자동 입력</label>
     <input id="mGmap" placeholder="https://www.google.com/maps/place/…">
     <div id="mGmapMsg" style="font-size:12px;margin-top:4px;color:var(--sub)"></div>
     <div class="row">
       <div><label>위도(lat)</label><input id="mLat" type="number" step="any" value="${c ? c.lat : ""}"></div>
       <div><label>경도(lng)</label><input id="mLng" type="number" step="any" value="${c ? c.lng : ""}"></div>
+    </div>
+    <div id="fTransDest" class="hidden">
+      <label>🏁 도착지 — 구글 지도 링크 붙여넣기</label>
+      <input id="mGmap2" placeholder="공항·역이 다른 도시라면 도착지도 넣어 주세요">
+      <div id="mGmapMsg2" style="font-size:12px;margin-top:4px;color:var(--sub)"></div>
+      <div class="row">
+        <div><label>도착 위도</label><input id="mLat2" type="number" step="any" value="${c && c.lat2 != null ? c.lat2 : ""}"></div>
+        <div><label>도착 경도</label><input id="mLng2" type="number" step="any" value="${c && c.lng2 != null ? c.lng2 : ""}"></div>
+      </div>
     </div>
     <label style="font-size:12px">💡 지도에서 장소를 길게 누르면 위도, 경도 숫자도 볼 수 있어요.</label>
     <div class="btns">
@@ -920,9 +1106,24 @@ function cardModal(cardId){
       <button class="primary" id="mOk">저장</button>
     </div>`);
   $("#mCancel").onclick = hideModal;
-  $("#mGmap").addEventListener("input", () => {
-    const url = $("#mGmap").value.trim();
-    const msg = $("#mGmapMsg");
+
+  // 종류에 따라 보이는 칸이 달라진다
+  const syncFields = () => {
+    const cat = $("#mCat").value;
+    $("#fStay").classList.toggle("hidden", cat !== "accommodation");
+    $("#fDur").classList.toggle("hidden", cat === "accommodation");
+    $("#fTransTime").classList.toggle("hidden", cat !== "transport");
+    $("#fTransDest").classList.toggle("hidden", cat !== "transport");
+    $("#locLabel").textContent = cat === "transport"
+      ? "📍 출발지 — 구글 지도 링크 붙여넣기"
+      : "📍 구글 지도 링크 붙여넣기 → 위도·경도 자동 입력";
+  };
+  $("#mCat").onchange = syncFields;
+  syncFields();
+
+  const wireGmap = (inp, msgEl, latEl, lngEl) => $(inp).addEventListener("input", () => {
+    const url = $(inp).value.trim();
+    const msg = $(msgEl);
     if (!url) { msg.textContent = ""; return; }
     if (/maps\.app\.goo\.gl|goo\.gl\/maps/.test(url)){
       msg.innerHTML = "⚠️ 짧은 링크에는 좌표가 안 들어 있어요. 링크를 한 번 <b>열고</b>, 브라우저 주소창의 긴 주소를 복사해서 붙여넣어 주세요.";
@@ -930,31 +1131,56 @@ function cardModal(cardId){
     }
     const p = parseGmapLink(url);
     if (p){
-      $("#mLat").value = p.lat;
-      $("#mLng").value = p.lng;
+      $(latEl).value = p.lat;
+      $(lngEl).value = p.lng;
       msg.textContent = `✅ 위치를 찾았어요! (${p.lat.toFixed(4)}, ${p.lng.toFixed(4)})`;
     } else {
       msg.textContent = "주소에서 좌표를 못 찾았어요. 구글 지도 장소 페이지의 주소인지 확인해 주세요.";
     }
   });
+  wireGmap("#mGmap", "#mGmapMsg", "#mLat", "#mLng");
+  wireGmap("#mGmap2", "#mGmapMsg2", "#mLat2", "#mLng2");
+
   if (c) $("#mDel").onclick = () => {
     if (!confirm("이 카드를 지울까요? 일정에 놓인 것도 같이 사라져요.")) return;
     delete DB.cards[tripId][cardId];
     const t = DB.itins[tripId] || {};
-    for (const k in t) t[k].items = (t[k].items||[]).filter(it => it.cardId !== cardId);
+    for (const k in t){
+      t[k].items = (t[k].items||[]).filter(it => it.cardId !== cardId);
+      if (t[k].stay === cardId) delete t[k].stay;
+    }
     persist(); hideModal(); renderAll();
   };
   $("#mOk").onclick = () => {
     const title = $("#mTitle").value.trim();
+    const cat = $("#mCat").value;
     const lat = parseFloat($("#mLat").value), lng = parseFloat($("#mLng").value);
-    const dur = parseInt($("#mDur").value, 10);
-    if (!title || !isFinite(lat) || !isFinite(lng) || !(dur > 0))
-      return alert("이름, 시간, 위도/경도를 확인해 주세요!");
-    const id = cardId || ("c_" + Date.now().toString(36));
-    (DB.cards[tripId] = DB.cards[tripId] || {})[id] = {
-      title, description: $("#mDesc").value.trim(), category: $("#mCat").value,
-      durationMinutes: dur, priceRange: $("#mPrice").value.trim(), lat, lng,
+    if (!title || !isFinite(lat) || !isFinite(lng))
+      return alert("이름과 위도/경도를 확인해 주세요!");
+    const card = {
+      title, description: $("#mDesc").value.trim(), category: cat,
+      priceRange: $("#mPrice").value.trim(), lat, lng,
+      durationMinutes: 60,
     };
+    if (cat === "accommodation"){
+      card.checkIn  = $("#mCi").value || "15:00";
+      card.checkOut = $("#mCo").value || "11:00";
+    } else {
+      const dur = parseInt($("#mDur").value, 10);
+      if (!(dur > 0)) return alert("걸리는 시간(분)을 확인해 주세요!");
+      card.durationMinutes = dur;
+    }
+    if (cat === "transport"){
+      const dep = $("#mDep").value, arr = $("#mArr").value;
+      if (dep && arr && parseTime(arr) <= parseTime(dep))
+        return alert("도착 시각이 출발 시각보다 늦어야 해요!");
+      if (dep) card.depTime = dep;
+      if (arr) card.arrTime = arr;
+      const lat2 = parseFloat($("#mLat2").value), lng2 = parseFloat($("#mLng2").value);
+      if (isFinite(lat2) && isFinite(lng2)){ card.lat2 = lat2; card.lng2 = lng2; }
+    }
+    const id = cardId || ("c_" + Date.now().toString(36));
+    (DB.cards[tripId] = DB.cards[tripId] || {})[id] = card;
     persist(); hideModal(); renderAll();
   };
 }
@@ -968,6 +1194,8 @@ const CAT_WORDS = {
   "먹기":"food","음식":"food","식당":"food","food":"food",
   "쇼핑":"shopping","shopping":"shopping",
   "숙소":"accommodation","호텔":"accommodation","accommodation":"accommodation",
+  "교통":"transport","이동":"transport","항공":"transport","비행기":"transport",
+  "기차":"transport","transport":"transport",
 };
 function normDate(s){
   const m = /^\s*(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/.exec(String(s||""));
@@ -993,6 +1221,12 @@ function parseSheet(text){
           else if (h.startsWith("가격")) cols.price = i;
           else if (h.startsWith("위도") || h.toLowerCase() === "lat") cols.lat = i;
           else if (h.startsWith("경도") || h.toLowerCase() === "lng") cols.lng = i;
+          else if (h.startsWith("도착위")) cols.lat2 = i;    // '도착'보다 먼저 봐야 한다
+          else if (h.startsWith("도착경")) cols.lng2 = i;
+          else if (h.startsWith("체크인")) cols.ci = i;
+          else if (h.startsWith("체크아웃")) cols.co = i;
+          else if (h.startsWith("출발")) cols.dep = i;
+          else if (h.startsWith("도착")) cols.arr = i;
           else if (h.startsWith("설명")) cols.desc = i;
         });
       }
@@ -1002,7 +1236,7 @@ function parseSheet(text){
     if (!title || title.startsWith("예시)")) continue;
     const lat = parseFloat(cells[cols.lat]), lng = parseFloat(cells[cols.lng]);
     const dur = parseInt(cells[cols.dur], 10);
-    out.cards.push({
+    const card = {
       title,
       category: CAT_WORDS[(cells[cols.cat]||"").toLowerCase()] || CAT_WORDS[cells[cols.cat]] || "activity",
       durationMinutes: (dur > 0) ? dur : 60,
@@ -1010,7 +1244,19 @@ function parseSheet(text){
       lat: isFinite(lat) ? lat : null,
       lng: isFinite(lng) ? lng : null,
       description: cells[cols.desc] || "",
-    });
+    };
+    if (card.category === "accommodation"){
+      card.checkIn  = normTime(cells[cols.ci]) || "15:00";
+      card.checkOut = normTime(cells[cols.co]) || "11:00";
+    }
+    if (card.category === "transport"){
+      const dep = normTime(cells[cols.dep]), arr = normTime(cells[cols.arr]);
+      if (dep) card.depTime = dep;
+      if (arr) card.arrTime = arr;
+      const lat2 = parseFloat(cells[cols.lat2]), lng2 = parseFloat(cells[cols.lng2]);
+      if (isFinite(lat2) && isFinite(lng2)){ card.lat2 = lat2; card.lng2 = lng2; }
+    }
+    out.cards.push(card);
   }
   return out;
 }
@@ -1062,6 +1308,128 @@ $("#importBtn").onclick = () => {
     renderHome();
   };
 };
+
+/* ============================================================
+   ✨ 동선 검사 — 잠긴(🔒) 카드와 교통(🚄) 카드는 자리를 지키고,
+   나머지 카드만 재배열해서 이동 시간이 가장 적은 순서를 찾는다.
+   전날 숙소가 출발점, 오늘 숙소가 도착점(있을 때).
+   고쳐 주는 게 아니라 비교해서 보여 주고, 바꿀지는 아이가 고른다.
+   ============================================================ */
+const routeBackup = {};   // day → 바꾸기 전 순서 (이 탭에서만 기억)
+
+function seqCost(day, items){
+  const prevStay = day > 1 ? cardById(itin(day - 1).stay) : null;
+  const tonight  = cardById(itin(day).stay);
+  let pt = entryPt(prevStay), cost = 0;
+  for (const item of items){
+    const c = cardOf(item);
+    if (!c) continue;
+    if (pt && c.category !== "transport" && entryPt(c)){
+      const tr = estTransit(pt, entryPt(c));
+      if (tr) cost += tr.minutes;
+    }
+    pt = exitPt(c) || pt;
+  }
+  if (tonight && pt && entryPt(tonight)){
+    const tr = estTransit(pt, entryPt(tonight));
+    if (tr) cost += tr.minutes;
+  }
+  return cost;
+}
+
+function bestOrder(day){
+  const items = itin(day).items;
+  const pinnedIdx = new Set(items.map((it, i) => {
+    const c = cardOf(it);
+    return (it.isFixed || (c && c.category === "transport")) ? i : -1;
+  }).filter(i => i >= 0));
+  const freeIdx = items.map((_, i) => i).filter(i => !pinnedIdx.has(i));
+  const free = freeIdx.map(i => items[i]);
+  if (free.length < 2) return null;
+
+  const build = perm => {
+    const res = items.slice();
+    freeIdx.forEach((slot, k) => res[slot] = perm[k]);
+    return res;
+  };
+  let best = null, bestCost = Infinity;
+  if (free.length <= 7){
+    // 7장까지는 모든 순서를 다 본다 (5040가지 — 순식간)
+    const rec = (rest, acc) => {
+      if (!rest.length){
+        const cand = build(acc), cost = seqCost(day, cand);
+        if (cost < bestCost){ bestCost = cost; best = cand; }
+        return;
+      }
+      for (let i = 0; i < rest.length; i++)
+        rec(rest.slice(0, i).concat(rest.slice(i + 1)), acc.concat([rest[i]]));
+    };
+    rec(free, []);
+  } else {
+    // 많으면 두 장씩 바꿔 보며 좋아질 때까지 (근사지만 충분히 좋다)
+    let cur = free.slice();
+    bestCost = seqCost(day, build(cur));
+    let improved = true;
+    while (improved){
+      improved = false;
+      for (let i = 0; i < cur.length; i++)
+        for (let j = i + 1; j < cur.length; j++){
+          const nxt = cur.slice();
+          [nxt[i], nxt[j]] = [nxt[j], nxt[i]];
+          const cost = seqCost(day, build(nxt));
+          if (cost < bestCost - 0.5){ bestCost = cost; cur = nxt; improved = true; }
+        }
+    }
+    best = build(cur);
+  }
+  return { order: best, cost: bestCost };
+}
+
+function verifyModal(day){
+  const d = itin(day);
+  const now = Math.round(seqCost(day, d.items));
+  const r = bestOrder(day);
+  const saved = r ? now - Math.round(r.cost) : 0;
+
+  if (!r || saved < 5){
+    showModal(`
+      <h3>✨ 동선 검사 — Day ${day}</h3>
+      <p style="font-size:15px;line-height:1.6">🏆 <b>지금 동선이 이미 훌륭해요!</b><br>
+      하루 이동 시간 총 <b>${now}분</b>.<br>
+      <span style="color:var(--sub);font-size:13px">${r
+        ? `컴퓨터가 찾은 최선의 순서와 ${saved}분밖에 차이가 안 나요.`
+        : "재배열할 수 있는 카드가 2장이 안 돼요 (🔒 고정과 🚄 교통은 자리를 지켜요)."}</span></p>
+      <div class="btns"><button class="primary" id="mClose">좋았어!</button></div>`);
+    $("#mClose").onclick = hideModal;
+    return;
+  }
+
+  const lines = r.order.map(it => {
+    const c = cardOf(it);
+    if (!c) return "";
+    const cat = CATS[c.category] || CATS.activity;
+    const pin = it.isFixed ? " 🔒" : (c.category === "transport" ? " 📌" : "");
+    return `<div style="padding:4px 0;font-size:14px">${cat.icon} ${esc(c.title)}${pin}</div>`;
+  }).join("");
+  showModal(`
+    <h3>✨ 동선 검사 — Day ${day}</h3>
+    <p style="font-size:14.5px;line-height:1.6">지금 순서는 이동에 <b>${now}분</b> 걸려요.<br>
+    아래 순서로 바꾸면 <b>${Math.round(r.cost)}분</b> —
+    <b style="color:var(--brand)">노는 시간이 ${saved}분 늘어나요!</b></p>
+    <div style="background:var(--bg);border-radius:12px;padding:8px 14px">${lines}</div>
+    <p style="font-size:12px;color:var(--sub)">🔒 고정 카드와 🚄 교통 카드는 자리를 지켰어요.
+    순서에 이유가 있다면(점심은 점심때!) 내 순서를 지켜도 좋아요.</p>
+    <div class="btns">
+      <button class="ghostBtn" id="mKeep">내 순서 지키기</button>
+      <button class="primary" id="mApply">이 순서로 바꿔보기</button>
+    </div>`);
+  $("#mKeep").onclick = hideModal;
+  $("#mApply").onclick = () => {
+    routeBackup[day] = d.items.slice();
+    d.items = r.order;
+    persist(); hideModal(); renderAll();
+  };
+}
 
 /* ---------- 시작 ---------- */
 renderHome();
