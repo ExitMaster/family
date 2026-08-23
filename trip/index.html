@@ -109,7 +109,10 @@
   #pool{ grid-area:pool; background:var(--panel); border-right:1px solid var(--line);
     display:flex; flex-direction:column; min-height:0; min-width:0; }
   #poolHead{ padding:12px 14px 8px; }
-  #poolHead b{ font-size:15px; }
+  #poolHead{ display:flex; align-items:center; gap:8px; }
+  #poolHead b{ font-size:15px; flex:1; }
+  .miniBtn{ font-size:11.5px; color:var(--sub); background:var(--bg); border:1px solid var(--line);
+    border-radius:9px; padding:5px 8px; flex:none; white-space:nowrap; }
   #catChips{ display:flex; gap:6px; flex-wrap:wrap; padding:0 12px 10px; }
   .chip{ padding:8px 12px; border-radius:999px; background:var(--bg); font-size:13px;
     border:1px solid var(--line); white-space:nowrap; flex:none; }
@@ -323,7 +326,7 @@
   </div>
 
   <div id="pool">
-    <div id="poolHead"><b>🎴 카드 풀</b></div>
+    <div id="poolHead"><b>🎴 카드 풀</b><button id="copySheetBtn" class="miniBtn" title="지금 카드들을 시트에 붙여넣을 표로 복사">📋 시트용 표 복사</button></div>
     <div id="catChips"></div>
     <div id="poolCards"></div>
   </div>
@@ -976,6 +979,66 @@ function removeSplit(day, item){
 }
 
 $("#familyBtn").onclick = familyModal;
+
+/* ---------- 📋 시트용 표 복사 ----------
+   앱에서 고친 카드를 스프레드시트(원본)에 되돌려 넣기 위한, 가져오기의 역방향.
+   앱이 시트에 직접 쓰려면 로그인이 필요해서, 붙여넣을 표를 만들어 주는 방식으로 한다. */
+const CAT_LABEL = { activity:"체험", food:"먹기", shopping:"쇼핑", transport:"교통", accommodation:"숙소" };
+const SHEET_COLS = ["이름","종류","시간(분)","가격","설명","지도링크","위도","경도","할일메모",
+                    "체크인","체크아웃","출발시각","도착시각","도착지도링크","도착위도","도착경도",
+                    "예약시각","사이트","카드ID"];
+function sheetTsv(){
+  const t = DB.trips[tripId];
+  const cell = v => String(v == null ? "" : v).replace(/[\t\r\n]+/g, " ").trim();
+  const rows = [
+    ["여행 이름", cell(t.title)],
+    ["가는 날", t.startDate],
+    ["오는 날", t.endDate],
+    [],
+    SHEET_COLS,
+  ];
+  const cards = DB.cards[tripId] || {};
+  for (const id of Object.keys(cards)){
+    const c = cards[id];
+    const stay = c.category === "accommodation", tr = c.category === "transport";
+    rows.push([
+      cell(c.title), CAT_LABEL[c.category] || "체험",
+      (stay || tr) ? "" : (c.durationMinutes || ""), cell(c.priceRange), cell(c.description),
+      "", c.lat != null ? c.lat : "", c.lng != null ? c.lng : "",
+      cell((c.todos || []).map(x => x.t).join("; ")),
+      stay ? (c.checkIn || "") : "", stay ? (c.checkOut || "") : "",
+      tr ? (c.depTime || "") : "", tr ? (c.arrTime || "") : "",
+      "", tr && c.lat2 != null ? c.lat2 : "", tr && c.lng2 != null ? c.lng2 : "",
+      (stay || tr) ? "" : (c.bookTime || ""), cell(c.url), id,
+    ]);
+  }
+  return rows.map(r => r.join("\t")).join("\n");
+}
+$("#copySheetBtn").onclick = async () => {
+  const tsv = sheetTsv();
+  let ok = false;
+  try{ await navigator.clipboard.writeText(tsv); ok = true; }catch(e){}
+  if (ok){
+    showModal(`
+      <h3>📋 복사했어요</h3>
+      <p style="font-size:14.5px;line-height:1.7">시트의 <b>A1 칸을 누르고 붙여넣기(Ctrl+V)</b> 하면
+      지금 카드들로 바뀝니다. (기존 내용 위에 덮어써요)</p>
+      <p style="font-size:12.5px;color:var(--sub)">시트를 고친 뒤에는 🔄 로 다시 읽어 오세요.</p>
+      <div class="btns"><button class="primary" id="mClose">알겠어요</button></div>`);
+    $("#mClose").onclick = hideModal;
+  } else {
+    // file:// 등에서 클립보드가 막히면 직접 고르게 한다
+    showModal(`
+      <h3>📋 시트용 표</h3>
+      <p style="font-size:13px;color:var(--sub)">아래를 전부 복사해서 시트 A1에 붙여넣으세요.</p>
+      <textarea id="mOut" rows="10" style="resize:vertical"></textarea>
+      <div class="btns"><button class="primary" id="mClose">닫기</button></div>`);
+    $("#mOut").value = tsv;
+    $("#mOut").select();
+    $("#mClose").onclick = hideModal;
+  }
+};
+
 
 /* 🔄 연결된 시트에서 카드만 다시 읽어 온다 — 아이들이 짜 둔 일정은 그대로 */
 $("#syncBtn").onclick = async () => {
@@ -2070,7 +2133,12 @@ function itemModal(day, item){
       <div style="flex:3"><input id="todoNew" placeholder="예) 3시 예약 시간 지키기"></div>
       <div style="flex:1"><button class="primary" id="todoAdd" style="width:100%;height:100%;border-radius:12px">추가</button></div>
     </div>
-    <div class="btns"><button class="ghostBtn" id="mClose">닫기</button></div>`);
+    <div class="btns">
+      <button class="ghostBtn" id="mEditCard">✏️ 카드 고치기</button>
+      <button class="ghostBtn" id="mClose">닫기</button>
+    </div>`);
+  // 카드 자체(이름·설명·시간…)를 고치면 카드 풀과 다른 날의 같은 카드까지 함께 바뀐다
+  $("#mEditCard").onclick = () => { hideModal(); cardModal(item.cardId); };
   const list = $("#todoList");
   const draw = () => {
     list.innerHTML = item.todos.length ? "" : `<div class="empty" style="padding:12px">아직 없어요</div>`;
@@ -2444,6 +2512,7 @@ function parseSheet(rows){
           else if (h.startsWith("출발")) cols.dep = i;
           else if (h.startsWith("도착")) cols.arr = i;
           else if (h.startsWith("사이트") || h.startsWith("홈페이지") || h.toLowerCase() === "url" || h.startsWith("웹")) cols.site = i;
+          else if (h.startsWith("카드ID") || h.toLowerCase() === "id") cols.cid = i;
           else if (h.startsWith("예약")) cols.book = i;
           else if (h.startsWith("할일") || h.startsWith("할 일") || h.startsWith("메모")) cols.memo = i;
           else if (h.startsWith("설명")) cols.desc = i;
@@ -2478,6 +2547,8 @@ function parseSheet(rows){
       card.bookTime = bk;   // 일정에 놓을 때 블록의 예약 시각 기본값이 된다
     const su = normUrl(cells[cols.site]);
     if (su) card.url = su;
+    const cid = (cells[cols.cid] || "").trim();
+    if (cid) card._id = cid;      // 이름이 바뀌어도 같은 카드로 이어 붙이기 위한 열쇠
     if (card.category === "accommodation"){
       card.checkIn  = normTime(cells[cols.ci]) || "15:00";
       card.checkOut = normTime(cells[cols.co]) || "11:00";
@@ -2513,8 +2584,12 @@ function applyImport(p){
   }
   for (const c of p.cards){
     if (c.lat == null || c.lng == null) continue;
-    let cid = Object.keys(DB.cards[id]).find(k => DB.cards[id][k].title === c.title);
-    if (cid) updated++; else { cid = "c_" + Math.random().toString(36).slice(2,8); made++; }
+    // 카드ID가 있으면 그걸로(이름을 바꿔도 안전), 없으면 이름으로 찾는다
+    const wanted = c._id;
+    delete c._id;
+    let cid = (wanted && DB.cards[id][wanted]) ? wanted
+            : Object.keys(DB.cards[id]).find(k => DB.cards[id][k].title === c.title);
+    if (cid) updated++; else { cid = wanted || ("c_" + Math.random().toString(36).slice(2,8)); made++; }
     // 시트에 할일메모가 없다고 해서 앱에서 만든 기본 할 일을 지우지는 않는다
     if (!c.todos && DB.cards[id][cid] && DB.cards[id][cid].todos) c.todos = DB.cards[id][cid].todos;
     DB.cards[id][cid] = c;
