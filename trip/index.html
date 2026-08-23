@@ -107,11 +107,12 @@
 
   /* 카드 풀 */
   #pool{ grid-area:pool; background:var(--panel); border-right:1px solid var(--line);
-    display:flex; flex-direction:column; min-height:0; }
+    display:flex; flex-direction:column; min-height:0; min-width:0; }
   #poolHead{ padding:12px 14px 8px; }
   #poolHead b{ font-size:15px; }
   #catChips{ display:flex; gap:6px; flex-wrap:wrap; padding:0 12px 10px; }
-  .chip{ padding:8px 12px; border-radius:999px; background:var(--bg); font-size:13px; border:1px solid var(--line); }
+  .chip{ padding:8px 12px; border-radius:999px; background:var(--bg); font-size:13px;
+    border:1px solid var(--line); white-space:nowrap; flex:none; }
   .chip.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
   .chip.dayChip.on{ background:var(--brand); border-color:var(--brand); }
   .detour{ display:inline-block; background:#FFF0E2; color:#B45309; border-radius:8px;
@@ -131,7 +132,8 @@
   .pcard .used{ position:absolute; right:8px; bottom:8px; font-size:11px; background:var(--bg); border-radius:8px; padding:2px 7px; color:var(--sub); }
 
   /* 타임라인 */
-  #days{ grid-area:days; overflow:auto; min-height:0; padding:14px;
+  /* min-width:0 이 없으면 그리드 아이템이 콘텐츠 폭만큼 늘어나 스크롤이 사라진다 */
+  #days{ grid-area:days; overflow:auto; min-height:0; min-width:0; padding:14px;
     display:flex; gap:14px; align-items:flex-start; }
   .dayCol{ flex:none; width:240px; background:var(--panel); border-radius:18px;
     border:1px solid var(--line); display:flex; flex-direction:column; }
@@ -249,6 +251,14 @@
   .todoRow .todoLab{ flex:1; display:flex; gap:10px; align-items:flex-start; font-size:14.5px; cursor:pointer; }
   .todoRow input[type=checkbox]{ width:20px; height:20px; flex:none; margin-top:1px; }
   .todoRow .todoDel{ width:36px; height:36px; border-radius:10px; background:var(--bg); flex:none; }
+
+  /* ---------- 넓은 화면에서 지도 접기 ----------
+     .mapOff 규칙이 좁은 화면 미디어쿼리 안에만 있어서, 큰 화면에선 버튼이
+     아무 일도 안 했다. 여기서 지도 열을 없애 타임라인이 넓어지게 한다. */
+  @media (min-width:901px){
+    #planner.mapOff{ grid-template-columns:300px 1fr 0; }
+    #planner.mapOff #mapPane{ display:none; }
+  }
 
   /* ---------- 좁은 화면 (태블릿 세로 / 폰) ---------- */
   @media (max-width:900px){
