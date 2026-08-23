@@ -50,6 +50,35 @@
   .trashRow{ display:flex; align-items:center; gap:8px; padding:10px 2px;
     border-bottom:1px dashed var(--line); }
 
+  /* 👥 나눠 움직이기 */
+  .pcard.special{ background:#FDF6E9; border-style:dashed; }
+  .dayCol.hasSplit{ width:340px; }
+  .splitBlock{ border:2px dashed var(--trans); border-radius:14px; padding:6px; background:#F7FAFD; }
+  .splitHead{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700;
+    color:#3D5A82; padding:2px 4px 6px; }
+  .splitHead .sBtn{ width:30px; height:30px; border-radius:8px; background:rgba(0,0,0,.06); font-size:13px; flex:none; }
+  .splitHead b{ flex:1; }
+  .lanes{ display:flex; gap:6px; align-items:flex-start; }
+  .lane{ flex:1; min-width:0; }
+  .laneHead{ text-align:center; font-size:14px; padding:3px 0 5px; background:var(--bg);
+    border-radius:8px; margin-bottom:4px; cursor:pointer; }
+  .laneBody{ min-height:70px; border-radius:8px; }
+  .laneBody.over{ background:#FFF4E8; }
+  .lane .tblock b{ font-size:12px; padding-right:2px; }
+  .lane .tblock{ padding:5px 6px 5px 10px; }
+  .lane .tblock .time{ font-size:10px; }
+  .lane .tblock .dur{ display:none; }
+  .lane .tblock .lock,.lane .tblock .rm{ width:26px; height:26px; font-size:12px; top:2px; }
+  .lane .tblock .lock{ right:30px; }
+  .lane .tblock .rm{ right:2px; }
+  .lane .transit span{ padding:2px 6px; font-size:10.5px; }
+  .lane .wait{ font-size:10.5px; }
+  .lane .empty{ padding:16px 4px; font-size:11.5px; }
+  .teamBox{ background:var(--bg); border-radius:12px; padding:10px 12px; margin-top:10px; }
+  .teamBox b{ font-size:13px; }
+  .teamChips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; min-height:38px; }
+  .famRow{ display:flex; gap:8px; margin-top:8px; }
+
   /* 장소 검색 드롭다운 */
   .searchWrap{ position:relative; }
   .searchList{ position:absolute; left:0; right:0; top:100%; z-index:10;
@@ -240,8 +269,9 @@
   <h1>🧳 가족 여행 플래너</h1>
   <p class="sub">여행을 고르면, 하고 싶은 것 카드를 끌어다가 하루 일정을 만들 수 있어요.</p>
   <div id="tripList"></div>
-  <p style="margin-top:20px">
+  <p style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
     <button id="importBtn" class="chip" style="padding:12px 18px;font-size:14px">📋 표에서 가져오기 (어른용)</button>
+    <button id="familyBtn" class="chip" style="padding:12px 18px;font-size:14px">👪 우리 가족</button>
   </p>
   <p id="netNote">일정은 이 기기(브라우저)에 항상 저장돼요. 인터넷과 Firebase가 연결되면
   가족 모두의 기기에서 같은 일정이 보여요.<br>
@@ -363,6 +393,11 @@ function migrate(db){
         if (!c.checkOut) c.checkOut = "11:00";
       }
     }
+  if (!Array.isArray(db.family) || !db.family.length)
+    db.family = [
+      { id:"f1", n:"아빠", e:"👨" }, { id:"f2", n:"엄마", e:"👩" },
+      { id:"f3", n:"인뉴", e:"🧑" }, { id:"f4", n:"뚜니", e:"🧒" },
+    ];
 }
 migrate(DB);
 if (purgeTrash()) saveLocal();   // 30일 지난 휴지통 항목은 앱을 열 때 정리
@@ -478,7 +513,8 @@ function askWhichWins(remote){
       if (dragging) return;                   // 드래그 중엔 화면을 흔들지 않는다
       const v = snap.val();
       const remote = { trips: v && v.trips || {}, cards: v && v.cards || {}, itins: v && v.itins || {},
-                       trash: v && v.trash || {} };
+                       trash: v && v.trash || {}, family: v && v.family || null };
+      migrate(remote);   // 비교 전에 보정 — 안 하면 기본 가족 명단 차이만으로 '일정이 두 벌' 창이 뜬다
       if (!Object.keys(remote.trips).length){ // 서버가 비어 있으면 내 것을 올린다
         firstSync = false;
         pushToFirebase();
@@ -654,7 +690,12 @@ function usedCount(cardId){
   let n = 0;
   const t = DB.itins[tripId] || {};
   for (const k in t){
-    for (const it of (t[k].items||[])) if (it.cardId === cardId) n++;
+    for (const it of (t[k].items||[])){
+      if (it.cardId === cardId) n++;
+      if (it.type === "split")
+        for (const tm of it.teams)
+          for (const l of (tm.items||[])) if (l.cardId === cardId) n++;
+    }
     if (t[k].stay === cardId) n++;      // '오늘 밤 숙소'로 쓰인 것도 센다
   }
   return n;
@@ -751,6 +792,137 @@ function trashModal(){
     };
   }
 }
+
+/* ---------- 👥 나눠 움직이기 ----------
+   분기는 하루 items 안의 컨테이너 하나다:
+   { uid, type:"split", teams:[{members:[가족id], items:[...]}, {...}] }
+   갈라진 지점의 시각·위치에서 두 팀이 각자 움직이고, 분기 아래 첫 공통
+   지점(다음 카드 또는 숙소)에 '늦게 오는 팀 기준'으로 자동 합류한다. */
+function famById(id){ return (DB.family || []).find(f => f.id === id); }
+function teamLabel(members){
+  return members.map(id => { const f = famById(id); return f ? f.e : "❓"; }).join("");
+}
+function findSplitItem(day, uid){
+  return itin(day).items.find(it => it.type === "split" && it.uid === uid);
+}
+/* 분기 안 팀 items 보정 — Firebase는 빈 배열을 지운다 */
+function fixSplit(item){
+  for (const tm of item.teams) if (!Array.isArray(tm.items)) tm.items = [];
+  return item;
+}
+
+function familyModal(){
+  const rows = (DB.family || []).map((f, i) => `
+    <div class="famRow" data-i="${i}">
+      <input class="famE" value="${esc(f.e)}" maxlength="4" style="width:56px;text-align:center">
+      <input class="famN" value="${esc(f.n)}" maxlength="8" style="flex:1">
+      <button class="ghostBtn famDel" style="width:40px;border-radius:10px">✕</button>
+    </div>`).join("");
+  showModal(`
+    <h3>👪 우리 가족</h3>
+    <p style="font-size:12.5px;color:var(--sub)">나눠 움직일 때 팀을 이 명단으로 나눠요. 이모지와 이름을 바꿀 수 있어요.</p>
+    <div id="famList">${rows}</div>
+    <div class="btns">
+      <button class="ghostBtn" id="famAdd">＋ 추가</button>
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mOk">저장</button>
+    </div>`);
+  $("#mCancel").onclick = hideModal;
+  $("#famAdd").onclick = () => {
+    const div = document.createElement("div");
+    div.className = "famRow";
+    div.innerHTML = `<input class="famE" value="🙂" maxlength="4" style="width:56px;text-align:center">
+      <input class="famN" value="" placeholder="이름" maxlength="8" style="flex:1">
+      <button class="ghostBtn famDel" style="width:40px;border-radius:10px">✕</button>`;
+    div.querySelector(".famDel").onclick = () => div.remove();
+    $("#famList").appendChild(div);
+  };
+  for (const b of document.querySelectorAll(".famDel"))
+    b.onclick = e => e.target.closest(".famRow").remove();
+  $("#mOk").onclick = () => {
+    const next = [...document.querySelectorAll("#famList .famRow")].map((row, i) => ({
+      id: (DB.family[+row.dataset.i] || {}).id || ("f_" + Date.now().toString(36) + i),
+      n: row.querySelector(".famN").value.trim() || "이름",
+      e: row.querySelector(".famE").value.trim() || "🙂",
+    }));
+    if (next.length < 2) return alert("두 명은 있어야 나눠 움직일 수 있어요!");
+    DB.family = next;
+    persist(); hideModal(); renderAll();
+  };
+}
+
+/* 팀 나누기/고치기 창 — 칩을 탭하면 팀1 ↔ 팀2 를 오간다 */
+function splitModal(day, idx, existing){
+  const fam = DB.family || [];
+  const side = {};   // 가족id → 0|1
+  if (existing){
+    existing.teams[0].members.forEach(id => side[id] = 0);
+    existing.teams[1].members.forEach(id => side[id] = 1);
+    fam.forEach(f => { if (!(f.id in side)) side[f.id] = 0; });
+  } else {
+    fam.forEach((f, i) => side[f.id] = i < Math.ceil(fam.length / 2) ? 0 : 1);
+  }
+  showModal(`
+    <h3>👥 팀 나누기</h3>
+    <p style="font-size:13px;color:var(--sub)">이름을 탭하면 팀이 바뀌어요.</p>
+    <div class="teamBox"><b>팀 1</b><div class="teamChips" data-team="0"></div></div>
+    <div class="teamBox"><b>팀 2</b><div class="teamChips" data-team="1"></div></div>
+    <div class="btns">
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mOk">${existing ? "바꾸기" : "나누기!"}</button>
+    </div>`);
+  const draw = () => {
+    for (const box of document.querySelectorAll(".teamChips")){
+      const team = +box.dataset.team;
+      box.innerHTML = "";
+      for (const f of fam){
+        if (side[f.id] !== team) continue;
+        const chip = document.createElement("button");
+        chip.className = "chip";
+        chip.textContent = `${f.e} ${f.n}`;
+        chip.onclick = () => { side[f.id] = 1 - side[f.id]; draw(); };
+        box.appendChild(chip);
+      }
+      if (!box.children.length) box.innerHTML = `<span style="color:var(--sub);font-size:12.5px">비어 있음</span>`;
+    }
+  };
+  draw();
+  $("#mCancel").onclick = hideModal;
+  $("#mOk").onclick = () => {
+    const t0 = fam.filter(f => side[f.id] === 0).map(f => f.id);
+    const t1 = fam.filter(f => side[f.id] === 1).map(f => f.id);
+    if (!t0.length || !t1.length) return alert("양쪽 팀에 한 명씩은 있어야 해요!");
+    if (existing){
+      existing.teams[0].members = t0;
+      existing.teams[1].members = t1;
+    } else {
+      const item = { uid: "sp_" + Math.random().toString(36).slice(2, 8), type: "split",
+                     teams: [{ members: t0, items: [] }, { members: t1, items: [] }] };
+      insertWithLocks(itin(day), item, idx);
+    }
+    persist(); hideModal(); renderAll();
+  };
+}
+
+function removeSplit(day, item){
+  const items = itin(day).items;
+  const idx = items.indexOf(item);
+  if (idx < 0) return;
+  const inside = [...(item.teams[0].items || []), ...(item.teams[1].items || [])];
+  const go = () => { items.splice(idx, 1, ...inside); persist(); hideModal(); renderAll(); };
+  if (!inside.length) return go();
+  showModal(`
+    <h3>👥 나누기를 없앨까요?</h3>
+    <p style="font-size:14px;line-height:1.6">안에 있던 카드 ${inside.length}장은 한 줄로 합쳐져요.</p>
+    <div class="btns">
+      <button class="ghostBtn" id="mCancel">취소</button>
+      <button class="primary" id="mGo">없애기</button>
+    </div>`);
+  $("#mCancel").onclick = hideModal;
+  $("#mGo").onclick = go;
+}
+
+$("#familyBtn").onclick = familyModal;
 
 /* ---------- 홈 ---------- */
 function todayStr(){
@@ -888,10 +1060,21 @@ function renderPool(){
 
   const wrap = $("#poolCards");
   wrap.innerHTML = "";
+
+  // 👥 나눠 움직이기 — DB에 없는 특수 카드. 항상 맨 위에 있다.
+  if ((DB.family || []).length >= 2){
+    const sp = document.createElement("div");
+    sp.className = "pcard special";
+    sp.innerHTML = `<b>👥 나눠 움직이기</b>` +
+      `<div class="meta">팀을 나눠 따로 움직여요 — 타임라인에 끌어다 놓기</div>`;
+    sp.addEventListener("pointerdown", e => beginDrag(e, { from:"pool", special:"split" }, sp));
+    wrap.appendChild(sp);
+  }
+
   const cards = DB.cards[tripId] || {};
   let ids = Object.keys(cards).filter(id => catFilter === "all" || cards[id].category === catFilter);
   if (!ids.length){
-    wrap.innerHTML = `<div class="empty">카드가 없어요.<br>위의 ➕ 버튼으로 만들 수 있어요.</div>`;
+    wrap.insertAdjacentHTML("beforeend", `<div class="empty">카드가 없어요.<br>위의 ➕ 버튼으로 만들 수 있어요.</div>`);
     return;
   }
   const detours = {};
@@ -1013,6 +1196,84 @@ function renderDays(){
     let clock = parseTime(d.start);
     let moveTotal = 0, doTotal = 0;
     let prevPt = entryPt(prevStay);   // 전날 숙소가 있으면 거기가 출발점
+    let skipTransitOnce = false;      // 분기 직후엔 이동이 레인 안에서 이미 끝났다
+
+    /* 분기 레인 하나를 그린다 — 본선 로직의 작은 판박이 */
+    function renderLane(lb, tm, startClock, startPt, nextPt, splitItem, ti){
+      let lc = startClock, lp = startPt, move = 0, doMin = 0;
+      const addT = (tr, label) => {
+        const t = document.createElement("div");
+        t.className = "transit";
+        t.style.height = Math.max(22, tr.minutes * PXPM) + "px";
+        t.innerHTML = `<span>${label || tr.mode} ${tr.minutes}분</span>`;
+        lb.appendChild(t);
+        lc += tr.minutes; move += tr.minutes;
+      };
+      const list = tm.items || [];
+      if (!list.length) lb.innerHTML = `<div class="empty">카드를<br>여기로 👇</div>`;
+      list.forEach(lit => {
+        const c = cardOf(lit);
+        if (!c) return;
+        const isTrans = c.category === "transport";
+        if (lp && !isTrans && entryPt(c)){
+          const tr = estTransit(lp, entryPt(c));
+          if (tr) addT(tr);
+        }
+        const dur = blockMinutes(c);
+        let late = 0;
+        const at0 = isTrans ? c.depTime : lit.bookTime;
+        if (at0){
+          const at = parseTime(at0);
+          if (lc < at){
+            const w = document.createElement("div");
+            w.className = "wait";
+            w.style.height = Math.max(16, (at - lc) * PXPM) + "px";
+            w.textContent = `⏳ ${at - lc}분`;
+            lb.appendChild(w);
+            lc = at;
+          } else if (lc > at){ late = lc - at; lc = at; }
+        }
+        const cat = CATS[c.category] || CATS.activity;
+        const el = document.createElement("div");
+        el.className = "tblock" + (lit.isFixed ? " fixed" : "");
+        el.dataset.uid = lit.uid;
+        el.style.background = cat.bg;
+        el.style.setProperty("--stripe", cat.color);
+        el.style.height = Math.max(30, dur * PXPM) + "px";
+        const todos = lit.todos || [];
+        el.innerHTML =
+          `<span class="time">${lit.bookTime && !isTrans ? "⏰" : ""}${fmtTime(lc)}~${fmtTime(lc + dur)}</span>` +
+          `<b>${cat.icon} ${esc(c.title)}</b>` +
+          (late ? `<span class="lateBadge">⚠️ ${late}분</span>` : "") +
+          (todos.length ? `<span class="todoBadge">✅ ${todos.filter(t => t.d).length}/${todos.length}</span>` : "") +
+          `<button class="lock" title="고정">${lit.isFixed ? "🔒" : "🔓"}</button>` +
+          `<button class="rm" title="빼기">✕</button>`;
+        for (const btn of el.querySelectorAll("button"))
+          btn.addEventListener("pointerdown", e => e.stopPropagation());
+        el.querySelector(".lock").onclick = () => { lit.isFixed = !lit.isFixed; persist(); renderDays(); };
+        el.querySelector(".rm").onclick = () => {
+          tm.items.splice(tm.items.indexOf(lit), 1);
+          persist(); renderAll();
+        };
+        el.addEventListener("mouseenter", () => highlight(lit.uid, true));
+        el.addEventListener("mouseleave", () => highlight(lit.uid, false));
+        el.addEventListener("click", e => {
+          if (e.target.closest("button") || justDragged) return;
+          itemModal(day, lit);
+        });
+        if (!lit.isFixed)
+          el.addEventListener("pointerdown", e => beginDrag(e, { from:"lane", day, split:splitItem, team:ti, item:lit }, el));
+        lb.appendChild(el);
+        lc += dur;
+        if (isTrans) move += dur; else doMin += dur;
+        lp = exitPt(c) || lp;
+      });
+      if (nextPt && lp){                       // 합류 지점까지 가는 길
+        const tr = estTransit(lp, nextPt);
+        if (tr) addT(tr, "🤝");
+      }
+      return { end: lc, move, doMin };
+    }
 
     const addTransit = (tr, label) => {
       const el = document.createElement("div");
@@ -1024,31 +1285,101 @@ function renderDays(){
     };
 
     d.items.forEach((item, idx) => {
+      /* ---- 👥 분기 컨테이너 ---- */
+      if (item.type === "split"){
+        fixSplit(item);
+        col.classList.add("hasSplit");
+        // 합류 지점: 분기 다음의 첫 카드, 없으면 오늘 밤 숙소
+        let nextPt = null;
+        for (let k = idx + 1; k < d.items.length; k++){
+          if (d.items[k].type === "split") break;
+          const nc = cardOf(d.items[k]);
+          if (nc && entryPt(nc)){ nextPt = entryPt(nc); break; }
+        }
+        if (!nextPt) nextPt = entryPt(tonight);
+
+        const wrapEl = document.createElement("div");
+        wrapEl.className = "splitBlock";
+        wrapEl.innerHTML = `<div class="splitHead"><b>👥 나눠 움직이기</b>
+          <button class="sBtn sEdit" title="팀 바꾸기">✎</button>
+          <button class="sBtn sRm" title="없애기">✕</button></div>`;
+        for (const b of wrapEl.querySelectorAll("button"))
+          b.addEventListener("pointerdown", e => e.stopPropagation());
+        wrapEl.querySelector(".sEdit").onclick = () => splitModal(day, idx, item);
+        wrapEl.querySelector(".sRm").onclick = () => removeSplit(day, item);
+        const lanes = document.createElement("div");
+        lanes.className = "lanes";
+        wrapEl.appendChild(lanes);
+
+        const ends = [];
+        item.teams.forEach((tm, ti) => {
+          const lane = document.createElement("div");
+          lane.className = "lane";
+          const lh = document.createElement("div");
+          lh.className = "laneHead";
+          lh.textContent = teamLabel(tm.members);
+          lh.title = "팀 바꾸기";
+          lh.onclick = () => { if (!justDragged) splitModal(day, idx, item); };
+          lane.appendChild(lh);
+          const lb = document.createElement("div");
+          lb.className = "laneBody";
+          lb.dataset.day = day;
+          lb.dataset.uid = item.uid;
+          lb.dataset.team = ti;
+          lane.appendChild(lb);
+          ends.push(renderLane(lb, tm, clock, prevPt, nextPt, item, ti));
+          lanes.appendChild(lane);
+        });
+        const join = Math.max(clock, ...ends.map(r => r.end));
+        ends.forEach((r, ti) => {              // 먼저 온 팀은 만날 때까지 기다린다
+          if (r.end < join){
+            const w = document.createElement("div");
+            w.className = "wait";
+            w.style.height = Math.max(18, (join - r.end) * PXPM) + "px";
+            w.textContent = `⏳ 만나기까지 ${join - r.end}분`;
+            lanes.children[ti].querySelector(".laneBody").appendChild(w);
+          }
+        });
+        body.appendChild(wrapEl);
+        // 하루 요약은 더 오래 걸린 팀 기준
+        const longest = ends.reduce((a, b) => (b.end > a.end ? b : a), ends[0] || { end: clock, move: 0, doMin: 0 });
+        moveTotal += longest.move;
+        doTotal += longest.doMin;
+        clock = join;
+        if (nextPt){ prevPt = nextPt; skipTransitOnce = true; }
+        return;
+      }
+
       const c = cardOf(item);
       if (!c) return;                        // 카드가 지워졌으면 조용히 건너뛴다
       const isTrans = c.category === "transport";
 
       // 자동 이동 블록 — 교통 카드 바로 앞에는 만들지 않는다 (그 카드가 곧 이동이니까)
-      if (prevPt && !isTrans && entryPt(c)){
+      // 분기 직후 한 번은 건너뛴다: 합류 이동이 레인 안에서 이미 계산됐다
+      const skipT = skipTransitOnce;
+      skipTransitOnce = false;
+      if (!skipT && prevPt && !isTrans && entryPt(c)){
         const tr = estTransit(prevPt, entryPt(c));
         if (tr) addTransit(tr);
       }
 
       const dur = blockMinutes(c);
       let late = 0;
-      if (isTrans && c.depTime){
-        const dep = parseTime(c.depTime);
-        if (clock < dep){                    // 일찍 왔으면 출발까지 기다린다
-          const wait = dep - clock;
+      // 시각이 박힌 블록: 교통은 출발 시각, 다른 카드는 예약·시작 시각(블록 상세창에서 입력)
+      const fixedAt = isTrans ? c.depTime : item.bookTime;
+      if (fixedAt){
+        const at = parseTime(fixedAt);
+        if (clock < at){                     // 일찍 왔으면 그 시각까지 기다린다
+          const wait = at - clock;
           const w = document.createElement("div");
           w.className = "wait";
           w.style.height = Math.max(18, wait * PXPM) + "px";
           w.textContent = `⏳ 기다리기 ${wait}분`;
           body.appendChild(w);
-          clock = dep;
-        } else if (clock > dep){             // 늦었다! — 계획표는 예정 시각으로 계속 가되 경고
-          late = clock - dep;
-          clock = dep;
+          clock = at;
+        } else if (clock > at){              // 늦었다! — 계획표는 예정 시각으로 계속 가되 경고
+          late = clock - at;
+          clock = at;
         }
       }
 
@@ -1063,7 +1394,7 @@ function renderDays(){
       const todos = item.todos || [];
       const doneN = todos.filter(t => t.d).length;
       el.innerHTML =
-        `<span class="time">${fmtTime(clock)} ~ ${fmtTime(clock + dur)}</span>` +
+        `<span class="time">${item.bookTime && !isTrans ? "⏰ 예약 " : ""}${fmtTime(clock)} ~ ${fmtTime(clock + dur)}</span>` +
         `<b>${cat.icon} ${esc(c.title)}</b>` +
         (isTrans && c.description ? `<span class="time">${esc(c.description)}</span>` : "") +
         `<span class="dur">${dur}분</span>` +
@@ -1165,6 +1496,51 @@ function renderMap(){
     const prevStay = day > 1 ? cardById(itin(day-1).stay) : null;
     if (entryPt(prevStay)) pts.push([prevStay.lat, prevStay.lng]);   // 아침 출발점
     for (const item of dd.items){
+      /* 분기: 두 팀이 갈라졌다 다음 공통 지점에서 만나는 걸 색이 다른 선으로 */
+      if (item.type === "split"){
+        const startPt = pts.length ? pts[pts.length - 1] : null;
+        if (pts.length > 1)
+          L.polyline(pts, { color: col, weight:3, dashArray:"6 6", opacity:.8 }).addTo(mapLayer);
+        let nextPt = null;
+        const rest = dd.items.slice(dd.items.indexOf(item) + 1);
+        for (const a of rest){
+          if (a.type === "split") break;
+          const ac = cardOf(a);
+          if (ac && typeof ac.lat === "number"){ nextPt = [ac.lat, ac.lng]; break; }
+        }
+        if (!nextPt){
+          const tn = cardById(dd.stay);
+          if (entryPt(tn)) nextPt = [tn.lat, tn.lng];
+        }
+        item.teams.forEach((tm, ti) => {
+          const tcol = ti === 0 ? col : "#E2445C";
+          const bpts = startPt ? [startPt.slice()] : [];
+          let lo = 0;
+          for (const lit of (tm.items || [])){
+            const lc = cardOf(lit);
+            if (!lc || typeof lc.lat !== "number") continue;
+            lo++;
+            const icon = L.divIcon({ className:"", iconSize:[24,24], iconAnchor:[12,12],
+              html: `<div class="numIcon" data-uid="${lit.uid}" style="width:24px;height:24px;background:${tcol};font-size:11px">${lo}</div>` });
+            const m = L.marker([lc.lat, lc.lng], { icon }).addTo(mapLayer);
+            m.bindTooltip(`Day${day} ${teamLabel(tm.members)} · ${esc(lc.title)}`);
+            markers[lit.uid] = m;
+            bpts.push([lc.lat, lc.lng]);
+            bounds.push([lc.lat, lc.lng]);
+            const ex = exitPt(lc);
+            if (ex && (ex.lat !== lc.lat || ex.lng !== lc.lng)){
+              bpts.push([ex.lat, ex.lng]);
+              bounds.push([ex.lat, ex.lng]);
+            }
+          }
+          if (nextPt) bpts.push(nextPt.slice());
+          if (bpts.length > 1)
+            L.polyline(bpts, { color: tcol, weight:3, dashArray:"2 6", opacity:.85 }).addTo(mapLayer);
+        });
+        pts.length = 0;   // 본선은 합류 지점부터 새로 시작한다
+        continue;
+      }
+
       const c = cardOf(item);
       if (!c || typeof c.lat !== "number") continue;
       order++;
@@ -1272,11 +1648,18 @@ function dragMove(ev){
     // 숙소는 어디에 놓든 그 날의 '오늘 밤 숙소'가 되니, 머리 쪽을 밝힌다
     const head = t.body.closest(".dayCol").querySelector(".dayHead");
     if (head) head.classList.add("over");
+  } else if (t.lane){
+    t.lane.el.classList.add("over");
+    const hint = document.createElement("div");
+    hint.className = "dropHint";
+    const blocks = [...t.lane.el.querySelectorAll(".tblock")];
+    if (t.idx >= blocks.length) t.lane.el.appendChild(hint);
+    else t.lane.el.insertBefore(hint, blocks[t.idx]);
   } else {
     t.body.classList.add("over");
     const hint = document.createElement("div");
     hint.className = "dropHint";
-    const blocks = [...t.body.querySelectorAll(".tblock")];
+    const blocks = [...t.body.querySelectorAll(":scope > .tblock, :scope > .splitBlock")];
     if (t.idx >= blocks.length) t.body.appendChild(hint);
     else t.body.insertBefore(hint, blocks[t.idx]);
   }
@@ -1302,10 +1685,25 @@ function target(ev){
   g.style.display = "";
   if (!el || !el.closest) return null;
 
+  // 분기 레인이 먼저 — 레인도 dayBody 안에 있으니 순서가 중요하다
+  const lb = el.closest(".laneBody");
+  if (lb){
+    const blocks = [...lb.querySelectorAll(".tblock")];
+    let idx = blocks.length;
+    for (let i = 0; i < blocks.length; i++){
+      const r = blocks[i].getBoundingClientRect();
+      if (ev.clientY < r.top + r.height/2){ idx = i; break; }
+    }
+    return { body: lb.closest(".dayCol").querySelector(".dayBody"),
+             lane: { uid: lb.dataset.uid, team: +lb.dataset.team, el: lb },
+             day: +lb.dataset.day, idx };
+  }
+
   const body = el.closest(".dayBody");
   if (body){
     const day = +body.dataset.day;
-    const blocks = [...body.querySelectorAll(".tblock")];
+    // 레인 안의 블록은 빼고 본선 블록만 (splitBlock 자체도 자리 계산에 넣는다)
+    const blocks = [...body.querySelectorAll(":scope > .tblock, :scope > .splitBlock")];
     let idx = blocks.length;
     for (let i = 0; i < blocks.length; i++){
       const r = blocks[i].getBoundingClientRect();
@@ -1322,7 +1720,7 @@ function target(ev){
     if (!b) return null;
     const inHead = !!el.closest(".dayHead");
     return { body:b, day:+col.dataset.day, head:true,
-             idx: inHead ? 0 : b.querySelectorAll(".tblock").length };
+             idx: inHead ? 0 : b.querySelectorAll(":scope > .tblock, :scope > .splitBlock").length };
   }
   return null;
 }
@@ -1340,13 +1738,51 @@ function drop(ev){
   setTimeout(() => justDragged = false, 250);
   if (!src) return;
 
+  // 원래 있던 자리에서 빼기 (day 본선 또는 분기 레인)
+  const removeFromSource = () => {
+    if (src.from === "day"){
+      const arr = itin(src.day).items;
+      const oi = arr.indexOf(src.item);
+      if (oi < 0) return -1;
+      arr.splice(oi, 1);
+      return oi;
+    }
+    if (src.from === "lane"){
+      const sp = findSplitItem(src.day, src.split.uid);
+      if (!sp) return -1;
+      const arr = fixSplit(sp).teams[src.team].items;
+      const oi = arr.indexOf(src.item);
+      if (oi < 0) return -1;
+      arr.splice(oi, 1);
+      return oi;
+    }
+    return -1;
+  };
+
   if (!t){
     // 타임라인 밖(카드 풀 등)에 놓으면 = 일정에서 빼기
-    if (src.from === "day"){
-      const items = itin(src.day).items;
-      items.splice(items.indexOf(src.item), 1);
-      persist(); renderAll();
+    if (src.from === "day" || src.from === "lane"){
+      if (removeFromSource() >= 0){ persist(); renderAll(); }
     }
+    return;
+  }
+
+  // 놓을 자리에 넣기
+  const insertTo = (item) => {
+    if (t.lane){
+      const sp = findSplitItem(t.day, t.lane.uid);
+      if (!sp) return false;
+      fixSplit(sp).teams[t.lane.team].items.splice(t.idx, 0, item);
+      return true;
+    }
+    insertWithLocks(itin(t.day), item, t.idx);
+    return true;
+  };
+
+  if (src.special === "split"){
+    // 👥 나눠 움직이기 특수 카드 — 본선에만 놓을 수 있다
+    if (t.lane){ alert("나누기 안에 또 나누기는 안 돼요!"); return; }
+    splitModal(t.day, t.idx);
     return;
   }
 
@@ -1356,28 +1792,29 @@ function drop(ev){
       // 숙소는 타임라인이 아니라 그 날의 '오늘 밤 숙소'가 된다 — 몇 박인지 물어본다
       askNights(t.day, src.cardId);
       return;
-    } else {
-      const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
-      // 카드에 기본 할 일이 있으면, 놓는 순간 그 날의 체크리스트로 복사된다
-      if (card && Array.isArray(card.todos) && card.todos.length)
-        item.todos = card.todos.map(t => ({ t: t.t, d: false }));
-      insertWithLocks(itin(t.day), item, t.idx);
     }
+    const item = { uid: src.cardId + "_" + Math.random().toString(36).slice(2,7), cardId: src.cardId, isFixed:false };
+    // 카드에 기본 할 일·예약 시각이 있으면, 놓는 순간 그 날 일정으로 복사된다
+    if (card && Array.isArray(card.todos) && card.todos.length)
+      item.todos = card.todos.map(t => ({ t: t.t, d: false }));
+    if (card && card.bookTime && card.category !== "transport")
+      item.bookTime = card.bookTime;
+    insertTo(item);
   } else if (cardOf(src.item) && cardOf(src.item).category === "accommodation"){
     // 예전 데이터에서 타임라인에 들어가 있던 숙소 — 끌어다 놓으면 숙소 슬롯으로 옮긴다
-    const items = itin(src.day).items;
-    items.splice(items.indexOf(src.item), 1);
+    if (removeFromSource() < 0) return;
     persist();
     askNights(t.day, src.item.cardId);
     return;
   } else {
-    const from = itin(src.day);
-    const oldIdx = from.items.indexOf(src.item);
+    const oldIdx = removeFromSource();
     if (oldIdx < 0) return;
-    from.items.splice(oldIdx, 1);
-    let idx = t.idx;
-    if (t.day === src.day && idx > oldIdx) idx--;   // 자기 자신을 빼서 한 칸 당겨졌다
-    insertWithLocks(itin(t.day), src.item, idx);
+    // 같은 통 안에서의 이동이면, 자기 자신을 빼서 한 칸 당겨졌다
+    const sameList =
+      (src.from === "day" && !t.lane && t.day === src.day) ||
+      (src.from === "lane" && t.lane && t.lane.uid === src.split.uid && t.lane.team === src.team);
+    if (sameList && t.idx > oldIdx) t.idx--;
+    insertTo(src.item);
   }
   persist();
   renderAll();
@@ -1455,6 +1892,13 @@ function itemModal(day, item){
     <h3>${cat.icon} ${esc(c.title)}</h3>
     <div style="color:var(--sub);font-size:13px;margin:-8px 0 8px">Day ${day} · ${c.durationMinutes}분${c.priceRange ? " · " + esc(c.priceRange) : ""}</div>
     ${c.description ? `<div style="font-size:13.5px;margin-bottom:6px">${esc(c.description)}</div>` : ""}
+    ${c.category !== "transport" ? `
+    <label>⏰ 시작·예약 시각 — 이 날 이 일정에만</label>
+    <div class="row">
+      <div><input id="bkTime" type="time" value="${item.bookTime || ""}"></div>
+      <div><button class="ghostBtn" id="bkClear" style="width:100%;padding:10px;border-radius:12px">지우기</button></div>
+    </div>
+    <div id="bkHint" style="font-size:12px;color:var(--sub);margin:4px 0 2px"></div>` : ""}
     <label>✅ 꼭 하기 · 잊지 말기</label>
     <div id="todoList"></div>
     <div class="row" style="margin-top:10px;align-items:stretch">
@@ -1488,6 +1932,29 @@ function itemModal(day, item){
   $("#todoAdd").onclick = add;
   $("#todoNew").addEventListener("keydown", e => { if (e.key === "Enter") add(); });
   $("#mClose").onclick = hideModal;
+  if ($("#bkTime")){
+    const hint = () => {
+      const h = $("#bkHint");
+      if (!h) return;
+      if (item.bookTime && !item.isFixed){
+        h.innerHTML = `예약이 있으면 자리를 잠가 두는 게 좋아요 <button class="ghostBtn" id="bkLock" style="padding:5px 10px;border-radius:8px;font-size:12px">🔒 고정하기</button>`;
+        $("#bkLock").onclick = () => { item.isFixed = true; persist(); renderDays(); hint(); };
+      } else if (item.bookTime){
+        h.textContent = "🔒 고정돼 있어요 — 동선 검사도 이 자리를 지켜요";
+      } else h.textContent = "";
+    };
+    $("#bkTime").onchange = () => {
+      const v = $("#bkTime").value;
+      if (v) item.bookTime = v; else delete item.bookTime;
+      persist(); renderDays(); hint();
+    };
+    $("#bkClear").onclick = () => {
+      delete item.bookTime;
+      $("#bkTime").value = "";
+      persist(); renderDays(); hint();
+    };
+    hint();
+  }
   draw();
 }
 
@@ -1521,6 +1988,10 @@ function cardModal(cardId){
     <div id="fDur">
       <label>걸리는 시간(분)</label>
       <input id="mDur" type="number" min="5" step="5" value="${c ? c.durationMinutes : 60}">
+    </div>
+    <div id="fBook">
+      <label>⏰ 예약·시작 시각 기본값 (선택 — 일정에 놓을 때 복사돼요)</label>
+      <input id="mBook" type="time" value="${c && c.bookTime ? c.bookTime : ""}">
     </div>
     <div id="fTransTime" class="hidden">
       <div class="row">
@@ -1582,6 +2053,7 @@ function cardModal(cardId){
     const cat = $("#mCat").value;
     $("#fStay").classList.toggle("hidden", cat !== "accommodation");
     $("#fDur").classList.toggle("hidden", cat === "accommodation");
+    $("#fBook").classList.toggle("hidden", cat === "accommodation" || cat === "transport");
     $("#fTransTime").classList.toggle("hidden", cat !== "transport");
     $("#fTransDest").classList.toggle("hidden", cat !== "transport");
     $("#locLabel").textContent = cat === "transport"
@@ -1666,6 +2138,10 @@ function cardModal(cardId){
     const t = DB.itins[tripId] || {};
     for (const k in t){
       t[k].items = (t[k].items||[]).filter(it => it.cardId !== cardId);
+      for (const it of t[k].items)
+        if (it.type === "split")
+          for (const tm of it.teams)
+            tm.items = (tm.items||[]).filter(l => l.cardId !== cardId);
       if (t[k].stay === cardId) delete t[k].stay;
     }
     persist(); hideModal(); renderAll();
@@ -1684,6 +2160,8 @@ function cardModal(cardId){
     const todoTxt = $("#mTodos").value.trim();
     if (todoTxt)
       card.todos = todoTxt.split(/[;|]/).map(s => s.trim()).filter(Boolean).map(t => ({ t, d:false }));
+    const mbk = $("#mBook").value;
+    if (mbk && cat !== "transport" && cat !== "accommodation") card.bookTime = mbk;
     if (cat === "accommodation"){
       card.checkIn  = $("#mCi").value || "15:00";
       card.checkOut = $("#mCo").value || "11:00";
@@ -1751,6 +2229,7 @@ function parseSheet(text){
           else if (h.startsWith("체크아웃")) cols.co = i;
           else if (h.startsWith("출발")) cols.dep = i;
           else if (h.startsWith("도착")) cols.arr = i;
+          else if (h.startsWith("예약")) cols.book = i;
           else if (h.startsWith("할일") || h.startsWith("할 일") || h.startsWith("메모")) cols.memo = i;
           else if (h.startsWith("설명")) cols.desc = i;
         });
@@ -1779,6 +2258,9 @@ function parseSheet(text){
     const memo = (cells[cols.memo] || "").trim();
     if (memo)
       card.todos = memo.split(/[;|]/).map(s => s.trim()).filter(Boolean).map(t => ({ t, d:false }));
+    const bk = normTime(cells[cols.book]);
+    if (bk && card.category !== "transport" && card.category !== "accommodation")
+      card.bookTime = bk;   // 일정에 놓을 때 블록의 예약 시각 기본값이 된다
     if (card.category === "accommodation"){
       card.checkIn  = normTime(cells[cols.ci]) || "15:00";
       card.checkOut = normTime(cells[cols.co]) || "11:00";
@@ -1882,7 +2364,8 @@ function bestOrder(day){
   const items = itin(day).items;
   const pinnedIdx = new Set(items.map((it, i) => {
     const c = cardOf(it);
-    return (it.isFixed || (c && c.category === "transport")) ? i : -1;
+    // 잠긴 카드, 교통 카드, 예약 시각·분기 블록은 자리를 지킨다
+    return (it.isFixed || it.bookTime || it.type === "split" || (c && c.category === "transport")) ? i : -1;
   }).filter(i => i >= 0));
   const freeIdx = items.map((_, i) => i).filter(i => !pinnedIdx.has(i));
   const free = freeIdx.map(i => items[i]);
