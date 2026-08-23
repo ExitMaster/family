@@ -88,6 +88,10 @@ Firebase Realtime Database의 `tripPlans` 아래에 통째로 들어갑니다
 ## 저장
 
 - 항상 이 기기의 localStorage(`trip-planner-v1`)에 저장됩니다. 오프라인이어도 됩니다.
+- **처음 연결될 때 이 기기의 일정과 서버의 일정이 서로 다르면**, 덮어쓰기 전에
+  "☁️ 일정이 두 벌이에요" 창이 떠서 어느 쪽으로 맞출지 묻습니다(양쪽 요약을 보여 줌).
+  한 번 고르고 나면 그 뒤로는 묻지 않고 조용히 같이 편집됩니다.
+  아직 아무것도 안 만진 기기이거나 양쪽이 같으면 묻지 않습니다.
 - Firebase(`unimai-game-hub`)가 연결되면 `tripPlans` 경로에 동기화되어
   **가족 모두의 기기에서 같은 일정**이 보입니다. 규칙은 리포 루트의
   [`firebase-rules.json`](../firebase-rules.json) 전체를 게시하세요 (조각 게시 금지 — [FIREBASE.md](../FIREBASE.md)).
