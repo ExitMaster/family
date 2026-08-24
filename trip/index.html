@@ -239,6 +239,13 @@
     box-shadow:0 1px 4px rgba(0,0,0,.3); }
   .numIcon.hl{ background:var(--brand); transform:scale(1.25); }
 
+  /* 잠깐 떴다 사라지는 알림 — 놓은 자리가 바뀐 이유처럼, 창을 띄울 만큼은 아닌 말 */
+  #toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:rgba(35,35,45,.92); color:#fff; padding:10px 16px; border-radius:14px;
+    font-size:14px; font-weight:700; z-index:120; pointer-events:none; max-width:min(90vw,420px);
+    text-align:center; line-height:1.5; opacity:0; transition:opacity .2s; }
+  #toast.on{ opacity:1; }
+
   /* 드래그 고스트 */
   #ghost{ position:fixed; z-index:99; pointer-events:none; width:220px; opacity:.92;
     transform:rotate(2deg) scale(1.03); filter:drop-shadow(0 8px 16px rgba(0,0,0,.25)); }
@@ -341,6 +348,7 @@
 </div>
 
 <div id="ghost" class="hidden"></div>
+<div id="toast"></div>
 <div id="modalBack" class="hidden"><div id="modal"></div></div>
 
 <script type="module">
@@ -1821,6 +1829,15 @@ function highlight(uid, on){
 /* ============================================================
    드래그 앤 드롭 (Pointer Events — 터치/마우스 공용)
    ============================================================ */
+let toastT = null;
+function toast(msg){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
 let dragging = null;    // { from, cardId?|item?, day?, ghost }
 let justDragged = false; // 드래그를 놓는 순간 따라오는 click이 상세창을 여는 걸 막는다
 
@@ -2047,21 +2064,16 @@ function drop(ev){
   renderAll();
 }
 
-/* 고정(🔒)된 카드는 자리 번호가 변하지 않는다. 나머지 카드들 사이에만 끼워 넣는다. */
+/* 카드는 "놓은 자리"에 그대로 들어간다.
+   예전에는 고정(🔒) 카드가 자리 번호까지 붙들고 있어서, 앞쪽이 고정 카드로 막혀 있으면
+   어디에 놓든 그 날 맨 끝으로 밀려났다. 고정의 뜻은 "끌 수 없고, 동선 검사가 순서를
+   바꾸지 않는다"로 충분하다 — 뒤로 밀리는 건 말로 알려 준다. */
 function insertWithLocks(dayData, item, wantIdx){
   const items = dayData.items;
-  const n = items.length + 1;
-  const res = new Array(n).fill(null);
-  items.forEach((it, i) => { if (it.isFixed) res[Math.min(i, n-1)] = it; });
-  const free = items.filter(it => !it.isFixed);
-  const slots = [];
-  for (let i = 0; i < n; i++) if (!res[i]) slots.push(i);
-  let s = slots.findIndex(x => x >= wantIdx);
-  if (s < 0) s = slots.length - 1;
-  const order = free.slice();
-  order.splice(s, 0, item);
-  slots.forEach((slot, k) => res[slot] = order[k]);
-  dayData.items = res;
+  const at = Math.max(0, Math.min(wantIdx, items.length));
+  const pushed = items.slice(at).some(it => it.isFixed);
+  items.splice(at, 0, item);
+  if (pushed) toast("🔒 고정한 카드가 그만큼 뒤로 밀려요");
 }
 
 /* ============================================================
