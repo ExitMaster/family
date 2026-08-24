@@ -2484,10 +2484,15 @@ async function fetchSheet(url){
   }catch(e){ return null; }   // CORS·네트워크 실패
 }
 
+/* 붙여넣은 글이 탭 표(시트 복사)인지 CSV(다른 AI가 만들어 준 표)인지 알아서 고른다 */
+function anyRows(text){
+  const head = String(text).split(/\r?\n/).find(l => l.trim()) || "";
+  return head.includes("\t") ? tsvRows(text) : csvRows(text);
+}
 function parseSheet(rows){
   const out = { title:null, startDate:null, endDate:null, cards:[] };
   let inTable = false, cols = null;
-  for (const cells of (typeof rows === "string" ? tsvRows(rows) : rows)){
+  for (const cells of (typeof rows === "string" ? anyRows(rows) : rows)){
     const a = cells[0] || "";
     if (!inTable){
       if (a === "여행 이름" || a === "여행이름") out.title = cells[1] || out.title;
