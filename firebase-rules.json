@@ -34,6 +34,24 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "hangulMarket": {
+      ".read": "auth != null",
+      "profiles": {
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      },
+      "products": {
+        "$product": {
+          ".write": "auth != null && ((!data.exists() && newData.child('owner').val() == auth.uid) || (data.child('owner').val() == auth.uid && (!newData.exists() || newData.child('owner').val() == auth.uid)))",
+          "reservations": {
+            "$uid": {
+              ".write": "auth != null && auth.uid == $uid"
+            }
+          }
+        }
+      }
+    },
     "obbyLive": {
       ".read": "auth != null",
       "$who": {
