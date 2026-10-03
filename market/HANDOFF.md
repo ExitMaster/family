@@ -36,10 +36,11 @@
 | `market/index.html` | UI, CSS, Firebase SDK 호출을 모두 포함한 단일 페이지 앱 |
 | `market/README.md` | 사용자/배포 담당자를 위한 짧은 소개와 준비 목록 |
 | `market/HANDOFF.md` | 개발 인수인계 문서(현재 파일) |
+| `market/tests/` | Realtime Database 규칙 테스트(Emulator) |
 | `firebase-rules.json` | 이 저장소의 모든 앱이 공유하는 Realtime Database 전체 규칙 |
 | `FIREBASE.md` | Firebase Console 설정, 전체 규칙 복사본, 배포 후 점검 절차 |
 
-빌드 시스템, 패키지 관리자, 번들러, 테스트 프레임워크는 없다. 정적 서버로 저장소 루트를
+앱에는 빌드 시스템, 패키지 관리자, 번들러가 없다(테스트 전용 `market/tests/package.json`만 있다). 정적 서버로 저장소 루트를
 서비스하면 `/market/`에서 실행된다. Firebase JavaScript SDK는 gstatic CDN의 ES module을
 직접 불러온다.
 
@@ -119,11 +120,16 @@ Firebase 웹 설정값은 공개 클라이언트 식별자이며 비밀번호가
         "createdAt": 1700000000000,
         "updatedAt": 1700000000000,
         "sold": false,
+        "slots": {
+          "0": "<buyer-anonymous-uid>",
+          "1": true
+        },
         "reservations": {
           "<buyer-anonymous-uid>": {
             "nickname": "구매친구",
             "contact": "010-0000-0000",
-            "at": 1700000001000
+            "at": 1700000001000,
+            "slot": "0"
           }
         }
       }
@@ -134,6 +140,11 @@ Firebase 웹 설정값은 공개 클라이언트 식별자이며 비밀번호가
 
 - `priceType`은 `price` 또는 `free`이며 무료나눔일 때 `price`는 `0`이다.
 - `quantity` 범위는 UI에서 1~99로 제한한다.
+- `slots`는 수량만큼의 예약 칸이다. 빈 칸은 `true`, 찬 칸은 예약자 UID다. 상품 등록 시
+  판매자가 만들고, 수정 시 판매자 트랜잭션이 찬 칸을 유지한 채 수량에 맞게 늘이거나 줄인다.
+  예약된 수보다 적게 줄일 수는 없다.
+- 예약은 `slots/<n>`과 `reservations/<uid>`(`slot: "<n>"`)를 한 번의 다중 경로 `update()`로
+  함께 쓰고, 취소는 칸을 `true`로 되돌리며 예약을 지운다. 둘 중 한쪽만 쓰면 규칙이 거부한다.
 - 한 UID는 같은 상품을 한 번만 예약할 수 있다.
 - 예약 개수는 `Object.keys(reservations).length`로 계산한다.
 - `sold=true`이면 수량과 무관하게 판매완료로 표시한다.
@@ -150,13 +161,14 @@ Firebase 웹 설정값은 공개 클라이언트 식별자이며 비밀번호가
 | `render()` | 최신순 목록, 판매자 필터, 찜 필터와 카드 렌더링 |
 | `status()` | `sold`, 수량, 예약 수를 이용해 판매 상태 계산 |
 | `openDetail()` | 상세 화면, 연락처, 사진, 예약/판매자 버튼 렌더링 |
-| `toggleReserve()` | 예약 취소 또는 `runTransaction` 기반 선착순 예약 |
+| `toggleReserve()` | 빈 예약 칸을 차례로 시도하는 선착순 예약, 또는 칸을 되돌리는 예약 취소 |
 | `openEditor()` | 신규 등록/기존 상품 수정 폼 초기화 |
 | `handlePhotos()` / `compress()` | 최대 5장 선택, 긴 변 900px, JPEG 품질 0.74로 압축 |
-| 폼 `onsubmit` | Firebase push key 생성 또는 기존 product 전체 교체 |
+| 폼 `onsubmit` | 신규 등록(`slots` 생성) 또는 판매자 트랜잭션으로 수정(`resizeSlots()`) |
 | `share()` | Web Share API 사용, 미지원 시 Clipboard API로 URL 복사 |
 
 상품 목록은 `hangulMarket/products`에 `onValue`를 걸어 전체 스냅샷을 다시 렌더링한다.
+열려 있는 상세 화면도 같은 스냅샷으로 다시 그려 예약 상태가 실시간 반영된다.
 20명 규모를 전제로 한 구현이며 페이지네이션이나 서버 검색은 없다.
 
 ## 8. 보안 규칙 의도
@@ -173,23 +185,26 @@ Firebase 웹 설정값은 공개 클라이언트 식별자이며 비밀번호가
 - 생성 이후 상품 수정/삭제는 원래 소유자만 가능
 - 예약은 예약자 자신의 UID 노드만 생성/삭제 가능
 
-### 반드시 먼저 재검증할 위험: 예약 트랜잭션과 규칙 경로
+### 예약 선착순 설계 (2026-10 수정)
 
-현재 클라이언트는 재고 경쟁을 막기 위해
-`hangulMarket/products/<product>/reservations` **부모 경로**에서 `runTransaction()`을
-실행한다. 반면 규칙은 `reservations/<uid>` **자식 경로**에 구매자 `.write`를 부여한다.
-Realtime Database 규칙은 쓰기를 수행한 경로에서 권한을 평가하므로, 비소유 구매자의
-부모 경로 트랜잭션이 `PERMISSION_DENIED`가 되는지 Emulator 또는 실제 테스트 프로젝트에서
-반드시 확인해야 한다. 문서 작성 시점에는 이 통합 테스트가 수행되지 않았다.
+처음 구현은 `reservations` 부모 경로에서 `runTransaction()`을 실행했는데, 규칙은
+`reservations/<uid>` 자식에만 구매자 쓰기를 허용해 구매자 예약이 항상
+`PERMISSION_DENIED`였다(Emulator에서 재현). 부모 경로에 쓰기를 열면 남의 예약을 덮어쓰거나
+수량을 넘길 수 있으므로, 서버 함수 없이 규칙만으로 선착순을 강제하는 **예약 칸** 방식으로
+바꿨다.
 
-수정할 때 단순히 `reservations` 부모에 `auth != null` 쓰기를 허용하면 다른 사용자의 예약을
-덮어쓰거나 수량을 초과할 수 있다. 다음 작업자는 Firebase Local Emulator Suite에서 동시
-예약과 악의적 쓰기를 함께 테스트한 뒤, 다음 중 하나를 설계해야 한다.
+- 구매자는 `slots/<n>`이 `true`일 때만 자기 UID로 바꿀 수 있고, 같은 쓰기에서
+  `reservations/<uid>/slot`이 `<n>`이어야 한다. 같은 칸을 동시에 노리면 한 명만 통과한다.
+- 칸은 판매자만 만들 수 있으므로 칸 수가 곧 수량 상한이다.
+- `reservations/<uid>`는 새로 만들기와 삭제만 가능해 한 사람이 두 칸을 가질 수 없다.
+- 판매완료(`sold == true`) 상품은 예약할 수 없다.
+- 취소는 본인 칸을 `true`로 되돌리는 동시에 본인 예약을 지울 때만 허용된다.
+- 판매자는 상품 전체 쓰기 권한이 있으므로 남의 예약도 지울 수 있다(판매자 재량으로 둠).
 
-1. 트랜잭션 경로와 규칙을 함께 재설계하고 `newData`로 예약 수/UID 변경을 검증한다.
-2. 예약 생성용 신뢰 가능한 서버 함수(Cloud Functions)를 둔다.
-3. 20명 규모에서 서버 측 직렬화를 포기할 경우 그 제한을 명시하되, 타인의 예약 삭제는
-   계속 차단한다.
+검증: `market/tests/`의 규칙 테스트 12건(아래 §12)과 두 브라우저 사용자로 수행한
+Emulator 통합 시나리오 15건(동시 예약 포함)이 통과했다. 이 변경 이전에 만든 상품에는
+`slots`가 없어 예약할 수 없으므로, 운영 데이터베이스에 시험 상품이 있다면 삭제 후 다시
+등록한다.
 
 ## 9. 추가로 알려진 제약과 기술 부채
 
@@ -209,7 +224,8 @@ Realtime Database 규칙은 쓰기를 수행한 경로에서 권한을 평가하
    예약된 상품은 “판매중”이다.
 9. **프로필 변경:** UI가 없고 상품에 판매자 이름/연락처를 복사 저장하므로 프로필만 바꿔도
    기존 상품 정보는 자동 갱신되지 않는다.
-10. **테스트 부재:** 자동 브라우저 테스트, Firebase Emulator 테스트, CI가 없다.
+10. **테스트:** Emulator 규칙 테스트(`market/tests/`)는 있으나 저장소에 포함된 자동 브라우저
+    테스트와 CI는 없다.
 
 ## 10. Firebase Console 준비 및 배포
 
@@ -259,6 +275,16 @@ git diff --check
 `market/index.html`의 module script를 임시 `.mjs` 파일로 추출해 `node --check`로 문법을
 검사할 수도 있다. CDN import는 Node에서 실행하지 말고 문법 검사만 한다.
 
+### 보안 규칙 테스트 (Firebase Emulator)
+
+Java 11 이상과 Node.js 18 이상이 필요하다. 운영 프로젝트에는 접속하지 않는다.
+
+```bash
+cd market/tests
+npm install
+npm test
+```
+
 ### 실제 브라우저/Firebase 통합 검사
 
 아래 검사는 판매자용 일반 창 A와 구매자용 시크릿 창 B처럼 서로 다른 익명 UID로 수행한다.
@@ -280,9 +306,9 @@ git diff --check
 
 ## 13. 권장 다음 작업 순서
 
-1. Firebase 예약 트랜잭션/보안 규칙 조합을 Emulator로 재현하고 먼저 수정한다.
+1. ~~예약 트랜잭션/보안 규칙 조합 수정~~ — 완료(§8).
 2. `hangulMarket` 규칙에 필드 스키마와 최대 길이/수량 검증을 추가한다.
-3. 두 익명 UID를 이용한 Emulator 규칙 테스트를 저장소에 추가한다.
+3. ~~두 익명 UID를 이용한 Emulator 규칙 테스트 추가~~ — 완료(`market/tests/`).
 4. 사진을 Firebase Storage로 이전할지 실제 예상 사진 수와 비용을 기준으로 결정한다.
 5. 프로필 수정, 오류 코드 표시, 접근성을 개선한다.
 6. 선택한 호스팅 환경에 배포 설정과 간단한 브라우저 스모크 테스트를 추가한다.

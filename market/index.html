@@ -73,7 +73,7 @@
     function enter(){
       $('#join').classList.add('hidden');$('#app').classList.remove('hidden');
       set(ref(db,`hangulMarket/profiles/${user.uid}`),profile).catch(()=>{});
-      onValue(ref(db,'hangulMarket/products'),snap=>{products=snap.val()||{};render();openFromUrl()});
+      onValue(ref(db,'hangulMarket/products'),snap=>{products=snap.val()||{};render();if(currentId&&!$('#detail').classList.contains('hidden'))products[currentId]?openDetail(currentId,false):closeDetail();openFromUrl()});
     }
     function render(){
       const seller=$('#sellerFilter').value;
@@ -96,11 +96,15 @@
       if(owner){$('#editItem').onclick=()=>openEditor(id);$('#soldItem').onclick=async()=>{await update(ref(db,`hangulMarket/products/${id}`),{sold:!p.sold,updatedAt:Date.now()});toast(p.sold?'다시 판매중이에요.':'판매 완료했어요.');closeDetail()};$('#deleteItem').onclick=async()=>{if(confirm('이 물건을 정말 삭제할까요?')){await remove(ref(db,`hangulMarket/products/${id}`));toast('삭제했어요.');closeDetail()}}}
     }
     async function toggleReserve(id,mine){
-      if(mine){await remove(ref(db,`hangulMarket/products/${id}/reservations/${user.uid}`));toast('예약을 취소했어요.');return}
+      const base=ref(db,`hangulMarket/products/${id}`);
+      if(mine){const slot=products[id]?.reservations?.[user.uid]?.slot;try{await update(base,{[`slots/${slot}`]:true,[`reservations/${user.uid}`]:null});toast('예약을 취소했어요.')}catch(e){toast('예약을 취소하지 못했어요. 다시 시도해 주세요.')}return}
       const product=products[id];if(!product||product.sold)return toast('판매가 끝난 물건이에요.');
-      const result=await runTransaction(ref(db,`hangulMarket/products/${id}/reservations`),r=>{r=r||{};if(Object.keys(r).length>=Number(product.quantity||1))return;r[user.uid]={nickname:profile.nickname,contact:profile.contact,at:Date.now()};return r});
-      toast(result.committed?'예약했어요! 판매자에게 연락해 보세요.':'아쉽게도 방금 예약이 찼어요.');
+      // 수량만큼 만든 예약 칸(slots) 중 빈 칸 하나를 내 UID로 채운다. 같은 칸을 동시에 노리면 규칙이 한 명만 통과시킨다.
+      const free=Object.keys(product.slots||{}).filter(k=>product.slots[k]===true).sort((a,b)=>a-b);
+      for(const slot of free){try{await update(base,{[`slots/${slot}`]:user.uid,[`reservations/${user.uid}`]:{nickname:profile.nickname,contact:profile.contact,at:Date.now(),slot}});return toast('예약했어요! 판매자에게 연락해 보세요.')}catch(e){}}
+      toast('아쉽게도 방금 예약이 찼어요.');
     }
+    function resizeSlots(slots,q){const out={};for(const[k,v]of Object.entries(slots||{}))if(v!==true)out[k]=v;let n=Object.keys(out).length;if(n>q)return null;for(let i=0;n<q;i++)if(!(i in out)){out[i]=true;n++}return out}
     function closeDetail(){currentId=null;$('#detail').classList.add('hidden');history.replaceState({},'',`?invite=${INVITE}`)}
     $('.back').onclick=closeDetail;window.onpopstate=()=>{const id=new URLSearchParams(location.search).get('item');id&&products[id]?openDetail(id,false):($('#detail').classList.add('hidden'),currentId=null)};
     $('#shareMarket').onclick=()=>share(location.origin+location.pathname+`?invite=${INVITE}`,'한글마켓에 놀러오세요');$('#shareItem').onclick=()=>share(location.origin+location.pathname+`?invite=${INVITE}&item=${currentId}`,'한글마켓 물건을 확인해 보세요');
@@ -111,7 +115,7 @@
     async function handlePhotos(e){const files=[...e.target.files].slice(0,5-photos.length);for(const file of files){if(!file.type.startsWith('image/'))continue;photos.push(await compress(file))}renderPhotos()}
     function compress(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const max=900,scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL('image/jpeg',.74))};img.onerror=reject;img.src=url})}
     $('#priceType').onchange=()=>{const free=$('#priceType').value==='free';$('#price').disabled=free;if(free)$('#price').value=0};
-    $('#productForm').onsubmit=async e=>{e.preventDefault();if(!photos.length)return toast('사진을 한 장 이상 추가해 주세요.');const old=editingId?products[editingId]:null,isEditing=!!editingId;const data={name:$('#productName').value.trim(),price:Number($('#price').value||0),priceType:$('#priceType').value,quantity:Number($('#quantity').value),description:$('#description').value.trim(),photos,owner:user.uid,sellerName:profile.nickname,sellerContact:profile.contact,createdAt:old?.createdAt||Date.now(),updatedAt:Date.now(),sold:old?.sold||false,reservations:old?.reservations||{}};const btn=e.submitter;btn.disabled=true;btn.textContent='저장 중...';try{if(editingId)await set(ref(db,`hangulMarket/products/${editingId}`),data);else await set(push(ref(db,'hangulMarket/products')),data);$('#editor').classList.add('hidden');toast(isEditing?'수정했어요.':'물건을 등록했어요!')}catch(err){toast('저장하지 못했어요. 다시 시도해 주세요.')}finally{btn.disabled=false;btn.textContent='등록 완료'}};
+    $('#productForm').onsubmit=async e=>{e.preventDefault();if(!photos.length)return toast('사진을 한 장 이상 추가해 주세요.');const isEditing=!!editingId,q=Number($('#quantity').value);const fields={name:$('#productName').value.trim(),price:Number($('#price').value||0),priceType:$('#priceType').value,quantity:q,description:$('#description').value.trim(),photos,sellerName:profile.nickname,sellerContact:profile.contact,updatedAt:Date.now()};if(isEditing){const taken=Object.values(products[editingId]?.slots||{}).filter(v=>v!==true).length;if(q<taken)return toast(`이미 ${taken}개가 예약돼 있어 그보다 줄일 수 없어요.`)}const btn=e.submitter;btn.disabled=true;btn.textContent='저장 중...';try{if(isEditing){const r=await runTransaction(ref(db,`hangulMarket/products/${editingId}`),p=>{if(!p)return p;const slots=resizeSlots(p.slots,q);if(!slots)return;return{...p,...fields,slots}});if(!r.committed)throw new Error('reserved')}else await set(push(ref(db,'hangulMarket/products')),{...fields,owner:user.uid,createdAt:Date.now(),sold:false,slots:resizeSlots({},q)});$('#editor').classList.add('hidden');toast(isEditing?'수정했어요.':'물건을 등록했어요!')}catch(err){toast(err.message==='reserved'?'방금 예약이 늘어 수량을 줄일 수 없어요.':'저장하지 못했어요. 다시 시도해 주세요.')}finally{btn.disabled=false;btn.textContent='등록 완료'}};
     boot();
   </script>
 </body>

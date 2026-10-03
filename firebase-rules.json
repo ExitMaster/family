@@ -44,9 +44,14 @@
       "products": {
         "$product": {
           ".write": "auth != null && ((!data.exists() && newData.child('owner').val() == auth.uid) || (data.child('owner').val() == auth.uid && (!newData.exists() || newData.child('owner').val() == auth.uid)))",
+          "slots": {
+            "$slot": {
+              ".write": "auth != null && ((data.val() == true && newData.val() == auth.uid && newData.parent().parent().child('reservations').child(auth.uid).child('slot').val() == $slot) || (data.val() == auth.uid && newData.val() == true && !newData.parent().parent().child('reservations').child(auth.uid).exists()))"
+            }
+          },
           "reservations": {
             "$uid": {
-              ".write": "auth != null && auth.uid == $uid"
+              ".write": "auth != null && auth.uid == $uid && ((!data.exists() && newData.child('slot').isString() && newData.parent().parent().child('sold').val() != true && newData.parent().parent().child('slots').child(newData.child('slot').val()).val() == auth.uid) || (data.exists() && !newData.exists() && newData.parent().parent().child('slots').child(data.child('slot').val()).val() == true))"
             }
           }
         }
