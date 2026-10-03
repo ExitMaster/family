@@ -139,21 +139,100 @@ complete set lives in one file, and that file is the one you paste.
       ".read": "auth != null",
       "profiles": {
         "$uid": {
-          ".write": "auth != null && auth.uid == $uid"
+          ".write": "auth != null && auth.uid == $uid",
+          ".validate": "newData.hasChildren(['nickname', 'contact'])",
+          "nickname": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12"
+          },
+          "contact": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+          },
+          "$other": {
+            ".validate": "false"
+          }
         }
       },
       "products": {
         "$product": {
           ".write": "auth != null && ((!data.exists() && newData.child('owner').val() == auth.uid) || (data.child('owner').val() == auth.uid && (!newData.exists() || newData.child('owner').val() == auth.uid)))",
+          ".validate": "newData.hasChildren(['name', 'price', 'priceType', 'quantity', 'description', 'thumb', 'photoCount', 'owner', 'sellerName', 'sellerContact', 'createdAt', 'updatedAt', 'sold', 'slots'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+          },
+          "price": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000000 && (newData.parent().child('priceType').val() != 'free' || newData.val() == 0)"
+          },
+          "priceType": {
+            ".validate": "newData.val() == 'price' || newData.val() == 'free'"
+          },
+          "quantity": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99 && newData.val() % 1 == 0"
+          },
+          "description": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 1000"
+          },
+          "thumb": {
+            ".validate": "newData.isString() && newData.val().beginsWith('data:image/jpeg;base64,') && newData.val().length <= 60000"
+          },
+          "photoCount": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5 && newData.val() % 1 == 0"
+          },
+          "owner": {
+            ".validate": "newData.isString()"
+          },
+          "sellerName": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12"
+          },
+          "sellerContact": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "sold": {
+            ".validate": "newData.isBoolean()"
+          },
           "slots": {
             "$slot": {
-              ".write": "auth != null && ((data.val() == true && newData.val() == auth.uid && newData.parent().parent().child('reservations').child(auth.uid).child('slot').val() == $slot) || (data.val() == auth.uid && newData.val() == true && !newData.parent().parent().child('reservations').child(auth.uid).exists()))"
+              ".write": "auth != null && ((data.val() == true && newData.val() == auth.uid && newData.parent().parent().child('reservations').child(auth.uid).child('slot').val() == $slot) || (data.val() == auth.uid && newData.val() == true && !newData.parent().parent().child('reservations').child(auth.uid).exists()))",
+              ".validate": "$slot.matches(/^[0-9]{1,3}$/) && (newData.val() == true || newData.isString())"
             }
           },
           "reservations": {
             "$uid": {
-              ".write": "auth != null && auth.uid == $uid && ((!data.exists() && newData.child('slot').isString() && newData.parent().parent().child('sold').val() != true && newData.parent().parent().child('slots').child(newData.child('slot').val()).val() == auth.uid) || (data.exists() && !newData.exists() && newData.parent().parent().child('slots').child(data.child('slot').val()).val() == true))"
+              ".write": "auth != null && auth.uid == $uid && ((!data.exists() && newData.child('slot').isString() && newData.parent().parent().child('sold').val() != true && newData.parent().parent().child('slots').child(newData.child('slot').val()).val() == auth.uid) || (data.exists() && !newData.exists() && newData.parent().parent().child('slots').child(data.child('slot').val()).val() == true))",
+              ".validate": "newData.hasChildren(['nickname', 'contact', 'at', 'slot'])",
+              "nickname": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12"
+              },
+              "contact": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "slot": {
+                ".validate": "newData.isString()"
+              },
+              "$other": {
+                ".validate": "false"
+              }
             }
+          },
+          "$other": {
+            ".validate": "false"
+          }
+        }
+      },
+      "photos": {
+        "$product": {
+          ".write": "auth != null && (data.parent().parent().child('products').child($product).child('owner').val() == auth.uid || newData.parent().parent().child('products').child($product).child('owner').val() == auth.uid)",
+          ".validate": "newData.hasChild('0')",
+          "$i": {
+            ".validate": "$i.matches(/^[0-4]$/) && newData.isString() && newData.val().beginsWith('data:image/jpeg;base64,') && newData.val().length <= 400000"
           }
         }
       }
@@ -209,7 +288,7 @@ HTML이 배포된 후 시크릿 창 또는 다른 휴대폰에서 **완전한 �
 5. 두 번째 기기에서 예약한 뒤 첫 번째 기기에서 **예약중** 표시를 확인합니다.
 6. 두 번째 기기에서 예약을 취소하고, 첫 번째 기기에서 판매 완료/수정/삭제를 시험합니다.
 7. Console의 **Realtime Database → 데이터(Data)** 탭에서
-   `hangulMarket/profiles`와 `hangulMarket/products`가 생성됐는지 확인합니다.
+   `hangulMarket/profiles`, `hangulMarket/products`, `hangulMarket/photos`가 생성됐는지 확인합니다.
 
 시험 데이터는 앱에서 상품을 삭제하고, 필요하면 Data 탭의 시험 프로필만 삭제합니다.
 실제 참여자의 프로필이나 익명 계정은 행사 중에 삭제하지 않는 편이 안전합니다.
