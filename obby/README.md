@@ -33,24 +33,29 @@ Seven courses. Reach the glowing portal at the end. Checkpoints land every **thr
 sections — every four in Devil and Nightmare — so dying sends you back a little, not
 to the start.
 
-Every level is **twice as long as it used to be** — the chunk counts were doubled, so
-Angel is 36 sections and Devil is 38 — and they were then **re-tuned to be harder**
-(see below). Saved best times from before those changes are not comparable with times
-set now; they were set on courses that were shorter and easier.
+**Every level is half as long as it was.** The chunk counts had been doubled at one
+point; that doubling has been undone, so Angel is 18 sections and Devil is 19. They
+were also **re-tuned to be harder** (see below), and the orb count was cut hard, so
+**saved best times from before are not comparable with times set now** — different
+length, different difficulty.
 
 | Level | Sections | Length | Orbs | Difficulty `d` | Checkpoints |
 |---|---|---|---|---|---|
-| Angel | 36 | 912 | 10 | 0.4 | 11 |
-| Normal | 30 | 800 | 14 | 0.95 | 9 |
-| Devil | 38 | 1027 | 9 | 1 | 9 |
-| Ice | 26 | 591 | 10 | 0.58 | 8 |
-| Space | 28 | 662 | 12 | 0.68 | 9 |
-| 🍬 Candy | 32 | 909 | 16 | 0.85 | 10 |
-| Nightmare | 54 | 1743 | 20 | 1, floor 0.85 | 47 |
+| Angel | 18 | 462 | 7 | 0.4 | 5 |
+| Normal | 15 | 399 | 8 | 0.95 | 4 |
+| Devil | 19 | 508 | 5 | 1 | 4 |
+| Ice | 13 | 335 | 3 | 0.58 | 4 |
+| Space | 14 | 363 | 3 | 0.68 | 4 |
+| 🍬 Candy | 16 | 454 | 8 | 0.85 | 5 |
+| Nightmare | 27 | 885 | 7 | 1, floor 0.85 | 21 |
+
+Halving the length halves the orbs with it, and `ORB_KEEP` had already cut them to a
+third — the two multiply, so Ice carries **3** orbs now where it once had 34. `ORB_KEEP`
+is the dial if that went too far.
 
 | Level | What is in it |
 |---|---|
-| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The gentle one — 36 sections, about 744 units |
+| 😇 **Angel** | Clouds, easy gaps, bounce pads, moving platforms. The gentle one — 18 sections, about 462 units |
 | 👦 **Normal** | Spinning bars, crumbling wood, ferries, spike patches, fireball runs |
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
@@ -103,13 +108,13 @@ It is not a course of its own. `LEVELS.nightmare` carries a `shuffle` spec inste
 a `chunks` count:
 
 ```js
-shuffle: { from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare', dMin:0.85 }
+shuffle: { from:['angel','inu','devil','ice','space','candy','nightmare'], n:27, song:'nightmare', dMin:0.85 }
 ```
 
-`buildCourse` rolls **54 sections of one chunk each**, and every one of them picks a
-course at random. Not six blocks in order — properly mixed, so a run of the 1313 seed
-goes ice, ice, devil, nightmare, space, nightmare, ice, devil, angel, devil… About
-**1771 units**, more than twice any other level, and around five minutes of running.
+`buildCourse` rolls **27 sections of one chunk each**, and every one of them picks a
+course at random. Not seven blocks in order — properly mixed, so the 1313 seed goes
+ice, ice, devil, nightmare, space, nightmare, ice, devil, angel, devil… About
+**885 units**, still nearly twice any other level, and a couple of minutes of running.
 
 A chunk brings **everything** from the course it came from: its obstacles, its
 difficulty (but never below `dMin`), its colours (the builder reads `W.pal` as it goes, so each chunk bakes
@@ -134,16 +139,17 @@ colours change and you run straight on.
 **The banner fires on floor changes, not chunk changes** (`floorName` in
 `updateZone`), and the song is fixed for the whole level by `shuffle.song`. Colours
 change every few seconds in here; a sign and a new song every few seconds would be
-noise, but walking onto ice without being told is a cheap death. That run of 54
-sections ends up carrying **47** decks and checkpoints between them.
+noise, but walking onto ice without being told is a cheap death. That run of 27
+sections ends up carrying **21** decks and checkpoints between them — far more than
+its `checkEvery:4` alone would give, because every floor change adds one.
 
 An ordinary level is simply a shuffle of one section that never rolls, so it runs the
 same code and behaves exactly as it always did.
 
 #### Nightmare was a troll level, and is not one any more
 
-Its portal hung **70 units up in the sky** and never moved. You walked all 54 sections,
-looked up, and there it was — visible and out of reach. The only way through was a
+Its portal hung **70 units up in the sky** and never moved. You walked the whole
+course, looked up, and there it was — visible and out of reach. The only way through was a
 secret: the Aura Wings were a jetpack whose tank stopped draining on the last deck, so
 you could fly up to it.
 
@@ -456,18 +462,20 @@ refused and the game quietly shows the device board instead.
 shop counts aura.
 
 **There are far fewer orbs than there used to be.** `ORB_KEEP` is `0.3`, and `b.orb`
-turns down most of the spots the chunks offer it: Angel went from 42 orbs to **10**,
-Devil from 45 to **9**, Nightmare from 73 to **20**. Doing it in the builder rather
-than by deleting `b.orb` calls out of 22 chunks means each chunk's orbs stay exactly
-where its author put them — there is just a fraction of them.
+turns down most of the spots the chunks offer it. On the full-length courses that took
+Angel from 42 orbs to 10 and Nightmare from 73 to 20; the levels were then halved, so
+today it is Angel **7**, Devil **5**, Ice **3**. Doing it in the builder rather than by
+deleting `b.orb` calls out of 22 chunks means each chunk's orbs stay exactly where its
+author put them — there is just a fraction of them.
 
 The coin flip is a **hash of the spot**, deliberately *not* the course `rng`. Drawing
 from `rng()` there would consume numbers the geometry is about to use and shift every
-platform placed after the first orb, quietly rebuilding all seven courses. Verified:
-course lengths are unchanged to the unit (Angel still 912, Devil still 1027).
+platform placed after the first orb, quietly rebuilding all seven courses. That was
+checked when it went in: course lengths came back unchanged to the unit.
 
-Worth knowing: aura income fell with the orb count, so the shop takes about three
-times as long to work through. Raise `ORB_VALUE` if that wants balancing.
+Worth knowing: aura income fell with the orb count **and** again with the length, so
+it is a small fraction of what it was. One run of Angel is about **210 aura**, Ice
+about **90**. `ORB_KEEP` and `ORB_VALUE` are the two dials.
 
 **Powers** are bought once and stay on for good — no equipping:
 
@@ -572,7 +580,8 @@ going and stopping still *feel* the same. It is back to **1** — a top speed of
 exactly the tuning every chunk in the game was built and verified against. Every level
 is beatable at this setting and none of them are at 4.
 
-What it does, measured with the bot on the doubled-length courses:
+What it does — measured with the bot back when the courses were double their current
+length and before the difficulty retune, so read the times as relative, not current:
 
 | SPEED_MUL | Top speed | Angel | Normal | Devil | Nightmare |
 |---|---|---|---|---|---|
@@ -713,7 +722,10 @@ not are all about *timing a jump onto a moving platform* — each of those chunk
 clears at the other speed settings with identical geometry, so it is the bot
 mistiming the hop, not an unfair course.
 
-Full levels, played by the bot end to end:
+Full levels, played by the bot end to end. **These are historical**: they were taken
+on the doubled-length courses, before the difficulty retune, before Candy, and before
+hearts. They have not been re-run, so treat them as a record of what the harness used
+to show rather than a description of the game today.
 
 | Level | Time | Deaths | Finished |
 |---|---|---|---|
@@ -722,12 +734,13 @@ Full levels, played by the bot end to end:
 | Devil | 169s | 7 | yes, 99% |
 | Ice | — | 7 | no — stalls around z 180 |
 | Space | — | 5 | no — stalls around z 170 |
-| Nightmare, all 54 chunks, no powers | 289s | 2 | walked 100% of 1771 |
+| Nightmare, 54 chunks, no powers | 289s | 2 | walked 100% of 1771 |
 
-Ice and Space are the two the bot has never finished, and both stall at the same
-**absolute** distance they always did — doubling the length did not move the wall, it
-only made the percentage look worse. Both stalls are the bot mistiming a hop onto a
-moving platform.
+Ice and Space were the two the bot never finished, and both stalled at the same
+**absolute** distance regardless of course length — doubling the length did not move
+the wall, it only made the percentage look worse. Both stalls were the bot mistiming a
+hop onto a moving platform. Note that Ice is only 335 units long now, so that z-180
+wall sits past the halfway point of the whole level.
 
 That last row is the one to re-run after touching the shuffle, the chunk pools or the
 physics. It walks the whole 1771 units on foot — through every floor change — and

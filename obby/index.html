@@ -1778,21 +1778,21 @@ const POOL = {
 };
 
 const LEVELS = [
-  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.4, chunks:36, checkEvery:3,
+  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.4, chunks:18, checkEvery:3,
     blurb:'Soft clouds — but the jumps are real jumps now, and the wood gives way.' },
   // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
-  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.95, chunks:30, checkEvery:3,
+  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.95, chunks:15, checkEvery:3,
     blurb:'Movers, spinners, crumbling wood, fire — and a saw on a tightrope.' },
-  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:38, checkEvery:4,
+  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:19, checkEvery:4,
     blurb:'Lava, fire, blinking platforms, saws — and checkpoints you have to earn.' },
-  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.58, chunks:26, checkEvery:3,
+  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.58, chunks:13, checkEvery:3,
     slip:1, blurb:'Everything is slippery, the gaps are wider, and some of it crumbles.' },
-  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.68, chunks:28, checkEvery:3,
+  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.68, chunks:14, checkEvery:3,
     gravity:0.62, blurb:'Low gravity. Big floaty jumps — over spikes, and onto ferries.' },
   // Sweet-looking and mean. It sits right in front of Nightmare on purpose: the pink
   // is the joke, the difficulty is not. This is the last thing between you and the
   // longest, meanest course in the game.
-  { id:'candy', name:'Candy Level', emoji:'🍬', theme:'candy', seed:5757, d:0.85, chunks:32, checkEvery:3,
+  { id:'candy', name:'Candy Level', emoji:'🍬', theme:'candy', seed:5757, d:0.85, chunks:16, checkEvery:3,
     blurb:'Bouncy, pink, and far nastier than it looks. Gumdrop pads over brittle candy.' },
   // Nightmare is not a course of its own — it is every obstacle in the game shuffled
   // into one level. Each chunk is drawn from a different course at random and brings
@@ -1803,7 +1803,7 @@ const LEVELS = [
     // to mean a 0.12 Angel section could land in the middle of Nightmare as a free
     // breather. Now nothing here plays below 0.85 — the obstacles come from everywhere,
     // the mercy does not.
-    shuffle:{ from:['angel','inu','devil','ice','space','candy','nightmare'], n:54, song:'nightmare', dMin:0.85 },
+    shuffle:{ from:['angel','inu','devil','ice','space','candy','nightmare'], n:27, song:'nightmare', dMin:0.85 },
     blurb:'Every obstacle in the game, shuffled, all of it at Devil difficulty, with the floor changing under you.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
