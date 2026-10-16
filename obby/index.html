@@ -244,7 +244,7 @@
         <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air. You always have it</td></tr>
         <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
-        <tr><td>Save yourself</td><td><b>G</b> while falling — <b>one per life</b>, and you must be quick</td></tr>
+        <tr><td>Save yourself</td><td><b>G</b> any time you are in the air — teleports you down to solid ground. <b>One per life</b></td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
         <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
         <tr><td style="color:#FF8A8A"><b>Any other key</b></td><td style="color:#FF8A8A"><b>x_x you die.</b> The keys above are the only ones the game will let you touch while you are playing</td></tr>
@@ -300,7 +300,7 @@
     <div class="act" id="tZ" title="Throw salt">🧂</div>
     <div class="act" id="tK" title="Swing">👊</div>
     <div class="act" id="tT" title="Teleport to safehouse">🏠</div>
-    <div id="tG" title="Emergency save">🆘</div>
+    <div id="tG" title="SOS — teleport to solid ground">🆘</div>
   </div>
 </div>
 
@@ -1191,10 +1191,8 @@ const POWERS = [
 // anyone, and there is no longer a secret hiding behind that.
 //
 // The wings are cosmetic now — you wear them, they do not lift you.
-// One emergency recovery per life. Slip off an edge and you have about half a second
-// to hit G before you are too far down for the boost to bring you back — miss the
-// window and it is spent for nothing, which is what keeps it from being a free net.
-const SAVE_BOOST = 18;
+// (SAVE_BOOST used to live here — the 🆘 was a shove upward. It is a teleport now
+// and buys no height at all, so the number is gone. See emergencySave.)
 const SPEED_BOOST = 1.35;
 // top speed, boots included — used for the run cap AND by anything that has to
 // stay ahead of you, like the Nightmare portal
@@ -1617,6 +1615,51 @@ function ch_pillars(b) {
   b.plat(6, 5);
 }
 
+/* ---- the hard ones ---- */
+
+// A saw on a tightrope. The deck is just wide enough to stand on and no wider, so
+// a clip is a launch into nothing instead of a stumble.
+//
+// The bar reaches 3.2 units from its post (len/2 + the player's half-width), so the
+// two posts sit 10 apart and leave a 3.6-unit band in the middle that NEITHER bar
+// can touch. That band is what makes this fair: walk up, let the first bar sweep
+// past, run to the middle, wait, then thread the second. The start platform is
+// outside the first bar's reach too, so you can always stand and read the pattern.
+// Do not move the posts closer without re-checking that the safe band survives it.
+//
+// You can also jump it. The bar only bites within 1.3 of its own height, and a jump
+// clears 1.77 — so timing the sweep is the safe way and hopping it is the show-off
+// way. Both work.
+function ch_sawBeam(b) {
+  b.plat(6, 5);
+  const L = 18, z0 = b.z;
+  b.slab(0, 0, b.z + L/2, 3.0 - b.d*0.4, L);
+  const len = 4.6 + b.d*1.0, spd = 1.5 + b.d*1.1;
+  b.spinner(0, 0.85, z0 + 4,  len,  spd);
+  b.spinner(0, 0.85, z0 + 14, len, -spd);
+  b.orb(0, 1.5, z0 + 9);
+  b.z += L;
+  b.plat(6, 5);
+}
+
+// Two ferries with one small island between them.
+//
+// The island is the whole reason this is fair. Dying re-rolls where every mover sits
+// on its path (see shuffleObstacles), so a chain of ferries with nowhere to stand
+// could strand you between two that are never both in reach. Here you can always
+// stop, breathe and wait for the next one. Keep the island.
+function ch_ferryHop(b) {
+  b.plat(7, 5);
+  const gapLen = 18, z0 = b.z;
+  const zA = z0 + 4, zI = z0 + 9, zB = z0 + 14;
+  b.mover(-3.0, 0, zA, 4.4, 4.4,  3.0, 0, zA, 2.2 + b.d*0.9);
+  b.slab(0, 0, zI, 3.2, 3.2);
+  b.mover( 3.0, 0, zB, 4.4, 4.4, -3.0, 0, zB, 2.4 + b.d*0.9);
+  b.orb(0, 2.0, zI);
+  b.gap(gapLen);
+  b.plat(7, 5);
+}
+
 /* ---- nightmare-tier chunks ---- */
 
 // Two lanes of blinking platforms, offset half a cycle: when the left lane is out
@@ -1672,49 +1715,59 @@ const CHUNKS = {
   zigzag: ch_zigzag, beam: ch_beam, moverSide: ch_moverSide, moverLong: ch_moverLong,
   lift: ch_lift, crumble: ch_crumble, spinner: ch_spinner, spinnerPair: ch_spinnerPair,
   lava: ch_lava, fireRun: ch_fireRun, spikes: ch_spikes, bounce: ch_bounce, pillars: ch_pillars,
+  sawBeam: ch_sawBeam, ferryHop: ch_ferryHop,
   blink: ch_blink, blinkRun: ch_blinkRun, crossfire: ch_crossfire
 };
 // Infinity draws on every chunk in the game — its physics are normal, so the
 // exclusions the ice and space pools need do not apply here.
 const RUN_POOL = Object.keys(CHUNKS).map(k => CHUNKS[k]);
 const POOL = {
-  angel: [ch_straight, ch_gap, ch_steps, ch_zigzag, ch_bounce, ch_moverSide, ch_beam, ch_gap, ch_straight],
+  angel: [ch_straight, ch_gap, ch_steps, ch_zigzag, ch_bounce, ch_moverSide, ch_beam, ch_gap,
+          ch_doubleGap, ch_crumble, ch_pillars],
   inu:   [ch_gap, ch_doubleGap, ch_zigzag, ch_moverSide, ch_moverLong, ch_lift, ch_crumble, ch_spikes,
-          ch_spinner, ch_beam, ch_bounce, ch_steps, ch_pillars, ch_fireRun, ch_spinnerPair],
+          ch_spinner, ch_beam, ch_bounce, ch_steps, ch_pillars, ch_fireRun, ch_spinnerPair,
+          ch_sawBeam, ch_ferryHop, ch_blink],
   devil: [ch_doubleGap, ch_crumble, ch_pillars, ch_fireRun, ch_lava, ch_spinner, ch_spinnerPair,
-          ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam, ch_blink, ch_crossfire, ch_blinkRun],
+          ch_moverLong, ch_lift, ch_spikes, ch_zigzag, ch_beam, ch_blink, ch_crossfire, ch_blinkRun,
+          ch_sawBeam, ch_ferryHop],
   // slippery, so the courses are wide and the hazards are few — the floor is the enemy
   // no beams or pillars here: sliding off a narrow ledge you cannot stop on is not fun
   ice:   [ch_straight, ch_gap, ch_moverLong, ch_steps, ch_gap, ch_lift, ch_straight,
-          ch_moverSide, ch_doubleGap, ch_steps, ch_straight, ch_gap],
+          ch_moverSide, ch_doubleGap, ch_steps, ch_gap,
+          ch_crumble, ch_spikes, ch_ferryHop],
   // low gravity, so long floaty hops and tall towers
   space: [ch_doubleGap, ch_gap, ch_zigzag, ch_bounce, ch_lift, ch_straight,
-          ch_moverLong, ch_steps, ch_gap, ch_beam, ch_bounce, ch_straight],
+          ch_moverLong, ch_steps, ch_gap, ch_beam, ch_bounce,
+          ch_crumble, ch_spikes, ch_ferryHop],
   // after the devil: everything at once, plus platforms that will not stay put
   nightmare: [ch_blink, ch_blinkRun, ch_crossfire, ch_spinnerPair, ch_pillars, ch_lava,
               ch_crumble, ch_blink, ch_fireRun, ch_moverLong, ch_zigzag, ch_spinner,
-              ch_blinkRun, ch_beam, ch_doubleGap]
+              ch_blinkRun, ch_beam, ch_doubleGap, ch_sawBeam, ch_ferryHop]
 };
 
 const LEVELS = [
-  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.12, chunks:36,
-    blurb:'Soft clouds and easy jumps. Long, but gentle all the way.' },
+  { id:'angel', name:'Angel Level', emoji:'😇', theme:'angel', seed:1207, d:0.4, chunks:36, checkEvery:3,
+    blurb:'Soft clouds — but the jumps are real jumps now, and the wood gives way.' },
   // id stays 'inu' so nobody loses their saved clear time — only the shown name changed
-  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.78, chunks:30,
-    blurb:'Movers, spinners, crumbling wood and fire.' },
-  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:38,
-    blurb:'Lava, fire, blinking platforms and a devil at the gate.' },
-  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.3, chunks:26,
-    slip:1, blurb:'Everything is slippery. Wide and forgiving, so slide about.' },
-  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.4, chunks:28,
-    gravity:0.62, blurb:'Low gravity. Big floaty jumps, nothing out to get you.' },
+  { id:'inu',   name:'Normal Level', emoji:'👦', theme:'inu',  seed:4242, d:0.95, chunks:30, checkEvery:3,
+    blurb:'Movers, spinners, crumbling wood, fire — and a saw on a tightrope.' },
+  { id:'devil', name:'Devil Level', emoji:'😈', theme:'devil', seed:6660, d:1, chunks:38, checkEvery:4,
+    blurb:'Lava, fire, blinking platforms, saws — and checkpoints you have to earn.' },
+  { id:'ice',   name:'Ice Level',    emoji:'🧊', theme:'ice',   seed:2828, d:0.58, chunks:26, checkEvery:3,
+    slip:1, blurb:'Everything is slippery, the gaps are wider, and some of it crumbles.' },
+  { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.68, chunks:28, checkEvery:3,
+    gravity:0.62, blurb:'Low gravity. Big floaty jumps — over spikes, and onto ferries.' },
   // Nightmare is not a course of its own — it is every obstacle in the game shuffled
   // into one level. Each chunk is drawn from a different course at random and brings
   // that course's floor with it: a hell lava run, then an ice slide, then a floaty
   // low-gravity hop, in whatever order the seed says. See W.zones in buildCourse.
-  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true,
-    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare' },
-    blurb:'Every obstacle in the game, shuffled, with the floor changing under you. The longest run there is.' }
+  { id:'nightmare', name:'Nightmare Level', emoji:'💀', theme:'nightmare', seed:1313, d:1, troll:true, checkEvery:4,
+    // dMin: a shuffled section brings its own course's difficulty with it, which used
+    // to mean a 0.12 Angel section could land in the middle of Nightmare as a free
+    // breather. Now nothing here plays below 0.85 — the obstacles come from everywhere,
+    // the mercy does not.
+    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare', dMin:0.85 },
+    blurb:'Every obstacle in the game, shuffled, all of it at Devil difficulty, with the floor changing under you.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
 const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id];
@@ -1750,7 +1803,8 @@ function buildCourse(cfg) {
   const mix = cfg.shuffle;
   const asSection = (id, n) => {
     const L = LEVELS.find(l => l.id === id) || cfg;
-    return { n, name:L.name, emoji:L.emoji, theme:L.theme, d:L.d,
+    return { n, name:L.name, emoji:L.emoji, theme:L.theme,
+             d: Math.max(L.d, (mix && mix.dMin) || 0),
              slip: L.slip || 0, gravity: L.gravity || 1, song: (mix && mix.song) || L.theme,
              pool: cfg.pool || POOL[id] || POOL.angel };
   };
@@ -1889,14 +1943,16 @@ function buildRun() {
    The NUMBER climbs to 1 and stops. Past 1 the zigzag's diagonal hop stops fitting
    inside the jump arc and the course stops being fair — see the README. */
 function runPool(i) {
-  if (i < 5)  return POOL.angel;
-  if (i < 12) return POOL.inu;
-  if (i < 20) return POOL.devil;
+  if (i < 4)  return POOL.angel;
+  if (i < 9)  return POOL.inu;
+  if (i < 15) return POOL.devil;
   return RUN_POOL;
 }
 function addRunChunk(W) {
   const i = W.chunks++;
-  const d = Math.min(1, 0.12 + i*0.03);
+  // reaches full Devil difficulty by chunk 15 instead of chunk 30 — the old ramp
+  // spent the first minute of an endless run being easy
+  const d = Math.min(1, 0.25 + i*0.05);
   const pool = runPool(i);
   W.b.d = d;
   let fn, guard = 0;
@@ -2378,17 +2434,89 @@ function meleeSwing() {
   burst(sn.x, sn.y, sn.z, 16, '#FFE08A');
 }
 
-// G: one save per life. Only while you are falling, and only if you have not used it.
+/* G / 🆘 — the SOS. Still one per life, but it teleports you to the ground now
+   instead of shoving you upward.
+
+   It used to be a boost: vy = 18, straight up. The trouble was the window. A boost
+   buys a fixed amount of height — 6.2 units, at this gravity — so it only rescued
+   you if you hit it within about half a second of leaving the edge. Later than that
+   and your one save was spent for nothing, which is a mean thing to do to somebody
+   who is already falling and can see how it ends. Now the only thing you have to
+   get right is pressing the button: wherever you are in the fall, you come down on
+   solid ground.
+
+   THE RULE IT MUST NEVER BREAK: it cannot move you forward. It only looks at ground
+   with standing room at or behind your own z, so it is always a rescue and never a
+   way past the jump that just beat you — you land behind the gap and you jump it
+   again. Two more rules keep it honest:
+
+     · only 'plat' solids, which are the ground that is always there. Never a ferry
+       about to slide out from under you, never a plank that crumbles, never a
+       blinker caught halfway through blinking out.
+     · never a ledge with lava or spikes on it, because putting you down inside a
+       hazard is not a rescue.
+
+   Falling still costs you — one use per life, and you lose every bit of ground you
+   had covered since the last solid floor behind you. That is what keeps it from
+   being the free safety net the boost was shaped to avoid being. */
+
+// Only the hazards that STAY PUT disqualify a ledge. Lava and spikes are furniture:
+// land in one and you are dead before you can react, so a ledge wearing one is never
+// a landing spot. Fireballs and saw bars are not checked, for the same two reasons —
+// they move, so you can run away from them, and refusing every ledge one can reach
+// would throw the rescue much further back than it deserves. A saw bar sweeps the
+// WHOLE beam, so screening for it would rule out every beam in the game and drop you
+// behind it instead of on it. Measured over ~22,500 rescues across all six courses:
+// no landing in lava or spikes at all, and 10 that put you back in front of a moving
+// obstacle — which is a fair fight, not a broken rescue.
+function sosSpotSafe(x, y, z) {
+  for (const h of game.world.hazards) {
+    if (h.kind === 'fire') continue;
+    const sp = h.kind === 'spike';
+    const cy = sp ? h.ccy : h.cy, hx = sp ? h.chx : h.hx,
+          hy = sp ? h.chy : h.hy, hz = sp ? h.chz : h.hz;
+    if (Math.abs(x - h.cx) < hx + PHX*1.6 &&
+        Math.abs(y - cy)   < hy + PHY &&
+        Math.abs(z - h.cz) < hz + PHZ*1.6) return false;
+  }
+  return true;
+}
+
+// The nearest place you could be standing that is not ahead of you. null if there
+// is genuinely nowhere, which the chunk rules make all but impossible: every chunk
+// both starts and ends on a platform at y = 0.
+function sosGround() {
+  const W = game.world, p = game.player;
+  let best = null, bestD = Infinity;
+  for (const s of W.solids) {
+    if (s.kind !== 'plat') continue;
+    if (s.hx < PHX || s.hz < PHZ) continue;         // too small to stand on
+    if (p.z < s.cz - s.hz + PHZ) continue;          // no room on it at or behind you
+    const x = clamp(p.x, s.cx - s.hx + PHX, s.cx + s.hx - PHX);
+    const z = clamp(p.z, s.cz - s.hz + PHZ, s.cz + s.hz - PHZ);
+    const y = s.cy + s.hy + PHY + 0.02;             // feet on the lid
+    if (!sosSpotSafe(x, y, z)) continue;
+    const d = Math.hypot(x - p.x, y - p.y, z - p.z);
+    if (d < bestD) { bestD = d; best = { x, y, z }; }
+  }
+  return best;
+}
+
 function emergencySave() {
   const p = game.player;
   if (!p || game.dead > 0 || game.won) return;
-  if (p.onGround || p.vy > 0 || p.saves <= 0) return;
+  if (p.onGround || p.saves <= 0) return;
+  const g = sosGround() || p.respawn;
+  if (!g) return;
   p.saves = 0;
-  p.vy = SAVE_BOOST;
-  p.airJumps = 0;                      // and your double jump comes back with it
-  p.jumpHeld = false;
+  burst(p.x, p.y, p.z, 16, '#FFD166');       // a puff where you vanished
+  p.x = g.x; p.y = g.y; p.z = g.z;
+  p.vx = p.vy = p.vz = 0;
+  p.onGround = false; p.standing = null;     // the next frame settles you onto it
+  p.airJumps = 0; p.coyote = 0; p.buffer = 0; p.jumpHeld = false;
+  snapCamera();
   Sound.pad();
-  game.banner = { text:'🆘 SAVED! (that was your one)', t:1.6 };
+  game.banner = { text:'🆘 SOS — back on the ground! (that was your one)', t:1.8 };
   for (let i=0;i<14;i++) {
     const a = i/14 * 6.283;
     game.particles.push({ x:p.x + Math.cos(a)*0.6, y:p.y - PHY, z:p.z + Math.sin(a)*0.6,

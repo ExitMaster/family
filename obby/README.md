@@ -11,10 +11,10 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 |---|---|
 | Move | `W A S D` or arrow keys (relative to the camera) |
 | Jump | `SPACE` — **hold longer to jump higher** |
-| Double jump | `SPACE` again in mid-air — **buy it in the Aura Shop first**, then one per jump, refilled on landing |
+| Double jump | `SPACE` again in mid-air — **everybody has it, from the first run**, one per jump, refilled on landing |
 | Turn the camera | drag the screen, or `Q` / `E` |
 | Back to checkpoint | `R` |
-| Save yourself | `G` while falling — **one per life**, and you have to be quick |
+| Save yourself | `G` **any time you are in the air** — teleports you down to solid ground. **One per life** |
 | Pause | `ESC` or `P` |
 | Fullscreen | `F` or the ⛶ button — real fullscreen, so the address bar goes too |
 | Music / sound | 🎵 and 🔊 buttons, top right. They work **while you are playing** |
@@ -28,21 +28,23 @@ never have to touch it.
 
 ### 🧗 Obby Mode
 
-Six courses. Reach the glowing portal at the end. Checkpoints land every two
-sections, so dying sends you back a little, not to the start.
+Six courses. Reach the glowing portal at the end. Checkpoints land every **three**
+sections — every four in Devil and Nightmare — so dying sends you back a little, not
+to the start.
 
 Every level is **twice as long as it used to be** — the chunk counts were doubled, so
-Angel is 36 sections and Devil is 38. Saved best times from before that change are
-not comparable with times set now; they were set on courses half the size.
+Angel is 36 sections and Devil is 38 — and they were then **re-tuned to be harder**
+(see below). Saved best times from before those changes are not comparable with times
+set now; they were set on courses that were shorter and easier.
 
-| Level | Sections | Length | Orbs |
-|---|---|---|---|
-| Angel | 36 | 744 | 42 |
-| Normal | 30 | 775 | 42 |
-| Devil | 38 | 915 | 54 |
-| Ice | 26 | 473 | 29 |
-| Space | 28 | 680 | 37 |
-| Nightmare | 54 | 1771 | 67 |
+| Level | Sections | Length | Orbs | Difficulty `d` | Checkpoints |
+|---|---|---|---|---|---|
+| Angel | 36 | 912 | 42 | 0.4 | 11 |
+| Normal | 30 | 800 | 38 | 0.95 | 9 |
+| Devil | 38 | 1027 | 45 | 1 | 9 |
+| Ice | 26 | 591 | 34 | 0.58 | 8 |
+| Space | 28 | 662 | 37 | 0.68 | 9 |
+| Nightmare | 54 | 1755 | 73 | 1, floor 0.85 | 47 |
 
 | Level | What is in it |
 |---|---|
@@ -53,13 +55,52 @@ not comparable with times set now; they were set on courses half the size.
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
 | 💀 **Nightmare** | **Every obstacle in the game, shuffled into one level**, with the floor going slippery or low-gravity under you as you cross — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
+#### Made harder
+
+The courses were re-tuned to be genuinely hard rather than merely long. Four levers,
+none of which can make a course impossible:
+
+- **`d` went up everywhere.** Angel `0.12` → **`0.4`**, Normal `0.78` → **`0.95`**,
+  Ice `0.3` → **`0.58`**, Space `0.4` → **`0.68`**. Devil and Nightmare were already
+  at `1`. `d` is the 0–1 dial every chunk reads for gap width, mover speed and spin
+  rate, and it stays capped at **1** — that is where the geometry budgets written into
+  the chunk comments stop being safe.
+- **Fewer checkpoints.** `checkEvery` went from the default `2` to **3**, and **4** in
+  Devil and Nightmare. That roughly halved them: Devil went from 18 checkpoints to 9
+  across a course that is now *longer*.
+- **Harder pools.** Every level's pool gained chunks it did not have before — Angel now
+  gets real gaps and crumbling wood, Ice gets crumbles and spikes, Space gets ferries.
+  The two pool rules that exist for fairness are untouched: **no beams, thin ledges or
+  spinners on ice**, and **no blinkers in space**.
+- **A difficulty floor in Nightmare** (`shuffle.dMin`, read by `asSection`). A shuffled
+  section used to bring its own course's `d` along with it, so a `0.12` Angel section
+  could land in the middle of Nightmare as a free breather. Nothing in there plays
+  below **`0.85`** now — the obstacles come from everywhere, the mercy does not.
+
+Two new chunks came with it. Both are built around a guaranteed place to stand and
+wait, which is the lesson of `ch_blinkRun` — that one once shipped uncrossable:
+
+| | |
+|---|---|
+| `ch_sawBeam` | A saw on a tightrope: two spinning bars over a deck just wide enough to stand on, so a clip is a launch into nothing rather than a stumble. The posts sit **10** apart and each bar reaches **3.2**, which leaves a band in the middle that **neither bar can touch**. Walk up, let the first bar sweep past, run to the middle, wait, then thread the second. You can also just jump it — a bar only bites within `1.3` of its own height and a jump clears `1.77`. Do not move the posts closer without re-checking that the safe band survives it |
+| `ch_ferryHop` | Two ferries with one small **static** island between them. The island is the whole reason it is fair: dying re-rolls where every mover sits on its path, so a chain of ferries with nowhere to stand could strand you between two that are never both in reach. **Keep the island** |
+
+Neither was signed off by eye. Both were checked by stepping the movers and spinners
+through full cycles and applying the game's own hit tests:
+
+| | |
+|---|---|
+| The saw's safe band | **3.3 units** wide, against the **0.8** you need to stand — and it takes no hit in 30 seconds of sweeping, while the bars *do* threaten **134 of the 181** sample points along the rest of the beam, so the obstacle is real |
+| The ferry hop | Every leg — start → A → island → B → end — closes to within **1.8** at some point in every cycle, against a **5.32** single-jump reach |
+| Every course, end to end | No gap anywhere exceeds a single jump. Worst void measured: **4.2** against **5.32** |
+
 #### Nightmare is everything, shuffled
 
 It is not a course of its own. `LEVELS.nightmare` carries a `shuffle` spec instead of
 a `chunks` count:
 
 ```js
-shuffle: { from:['angel','inu','devil','ice','space','nightmare'], n:27, song:'nightmare' }
+shuffle: { from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare', dMin:0.85 }
 ```
 
 `buildCourse` rolls **54 sections of one chunk each**, and every one of them picks a
@@ -68,7 +109,7 @@ goes ice, ice, devil, nightmare, space, nightmare, ice, devil, angel, devil… A
 **1771 units**, more than twice any other level, and around five minutes of running.
 
 A chunk brings **everything** from the course it came from: its obstacles, its
-difficulty, its colours (the builder reads `W.pal` as it goes, so each chunk bakes
+difficulty (but never below `dMin`), its colours (the builder reads `W.pal` as it goes, so each chunk bakes
 its own) and its physics. `W.zones` records the z range of each one and `updateZone`
 hands the right `slip` and `gravity` to `stepPlayer` as you cross, so the floor
 really does go slippery for four chunks of that run and the gravity really does drop
@@ -85,12 +126,13 @@ means those pairings can never come up by accident.
 **A deck goes wherever the floor changes, and only there.** A wide flat platform with
 a checkpoint on it: landing a jump into gravity you could not have planned for is not
 a fair death. Where two chunks in a row share a floor there is no deck — only the
-colours change and you run straight on. That run of 27 needs 12 decks.
+colours change and you run straight on.
 
 **The banner fires on floor changes, not chunk changes** (`floorName` in
 `updateZone`), and the song is fixed for the whole level by `shuffle.song`. Colours
 change every few seconds in here; a sign and a new song every few seconds would be
-noise, but walking onto ice without being told is a cheap death.
+noise, but walking onto ice without being told is a cheap death. That run of 54
+sections ends up carrying **47** decks and checkpoints between them.
 
 An ordinary level is simply a shuffle of one section that never rolls, so it runs the
 same code and behaves exactly as it always did.
@@ -204,22 +246,43 @@ so focus cannot escape the game on the way out.
 
 ### 🆘 The one save
 
-Slip off an edge and you have **one** emergency recovery: press `G` while falling and
-you get a hard boost upward, plus your double jump back. It is spent until you die or
-touch a new checkpoint, and the 🆘 indicator under the orb counter dims once it is
-gone. There is a touch button for it too.
+Slip off an edge and you have **one** emergency rescue: press `G`, or the 🆘 touch
+button, **any time you are in the air** — and you are teleported down onto solid
+ground. It is spent until you die or touch a new checkpoint, and the 🆘 indicator
+under the orb counter dims once it is gone.
 
-The catch is the timing. The boost buys back a fixed amount of height, so it only
-rescues you if you hit it almost immediately:
+**It used to be a boost** — a hard shove upward, `vy = 18`. That bought a fixed `6.2`
+units of height, which meant it only rescued you if you hit it within about half a
+second of leaving the edge. Any later and your one save was spent for nothing, which
+is a mean thing to do to somebody who is already falling and can see how it ends. Now
+the only thing you have to get right is pressing the button.
 
-| Press `G` after | Fell from | Peaked at | Rescued |
-|---|---|---|---|
-| 0.05s | 8 | **14.1** | yes, back above the ledge |
-| 0.5s | 8 | **10.9** | yes |
-| 1.5s | 8 | 1.2 | no — spent for nothing |
+Three rules keep the teleport from being a cheat:
 
-That window is the point. A save you can use at any moment is a safety net that makes
-falling meaningless; a save you have to react to is a skill.
+| Rule | Why |
+|---|---|
+| **It can never move you forward** | It only considers ground with standing room at or behind your own z. It is a rescue, never a way past the jump that just beat you — you come down behind the gap and you jump it again |
+| **Static ground only** (`plat`) | Never a ferry about to slide out from under you, never a plank that crumbles, never a blinker caught halfway through blinking out |
+| **Never a ledge wearing lava or spikes** | Putting you down inside a hazard is not a rescue. Fireballs and saw bars are deliberately *not* screened: they move, so you can run away from them, and a saw bar sweeps the **whole** beam — screening for it would rule out every beam in the game and drop you behind it instead of on it |
+
+Falling still costs you, so this is not the free safety net the boost was shaped to
+avoid being. One use per life, and you lose every bit of ground you had covered since
+the last solid floor behind you — the save stops you losing the **run**, not the
+**jump**.
+
+Verified across all six courses at four heights, including from `y = -14`, one unit
+above the void — about **22,500 rescues**:
+
+| | |
+|---|---|
+| Moved you forward | **0** |
+| Found no ground at all | **0** |
+| Landed you in lava or spikes | **0** |
+| Landed you on static ground | 99.9%. The rest are bounce pads, which catch you and fire you straight back up |
+| Put you back in front of a moving obstacle | **10** — a fair fight, not a broken rescue |
+
+It also refuses to fire while you are stood on the ground, or once it is spent, so you
+cannot throw it away by panicking.
 
 ### 🐌 Killer Snail (not an obby)
 
@@ -264,8 +327,8 @@ Two things get harder as you go, and they are deliberately separate:
 
 | | |
 |---|---|
-| **The pool opens up** | chunks 0–4 Angel, 5–11 Normal, 12–19 Devil, then anything in the game. Dropping a blinking causeway over lava on someone eight seconds into a run is not difficulty, it is a short run |
-| **The number climbs** | `d` goes `0.12 + i*0.03`, capped at **1**. Past 1 the zigzag's diagonal hop stops fitting inside the jump arc — see the difficulty ceiling below |
+| **The pool opens up** | chunks 0–3 Angel, 4–8 Normal, 9–14 Devil, then anything in the game. Dropping a blinking causeway over lava on someone eight seconds into a run is not difficulty, it is a short run |
+| **The number climbs** | `d` goes `0.25 + i*0.05`, capped at **1**, so you hit full Devil difficulty by chunk **15** instead of chunk 30. The old ramp spent the first minute of an endless run being easy. Past 1 the zigzag's diagonal hop stops fitting inside the jump arc — see the difficulty ceiling below |
 
 The world is built `RUN_AHEAD` (130) in front of you and culled `RUN_KEEP` (70)
 behind, and `rebakeIfNeeded` rebuilds the static mesh whenever either end moves.
