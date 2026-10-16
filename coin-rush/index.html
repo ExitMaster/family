@@ -504,7 +504,6 @@ function buildTrack(def){
     const boxes = spots(150, WALL+7, 120);
     const bx = placeInst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({color:0xffffff}), boxes, (d,p,i) => { const stack = 1 + Math.floor(rnd()*3); d.scale.set(2.5, 2.6*stack, 6 + rnd()*6); d.position.set(p[0], 1.3*stack, p[1]); d.rotation.set(0, Math.floor(rnd()*4)*Math.PI/2 + (rnd()-.5)*.2, 0); });
     const cols = [0xb8432f, 0x2c6aa0, 0x2f8a6a, 0xd59a2d, 0x6c4b8f, 0x8d949b]; boxes.forEach((p, i) => bx.setColorAt(i, new THREE.Color(cols[i%6])));
-    streetLamps(s, total, N, placeInst, '255,214,140', 0xffe2a0);
     const water = new THREE.Mesh(new THREE.PlaneGeometry(3000, 900), new THREE.MeshLambertMaterial({color:0x0a1a2c}));
     water.rotation.x = -Math.PI/2; water.position.set(0, 0.02, maxZ + 520); world.add(water);
     stars(rnd);
@@ -522,7 +521,6 @@ function buildTrack(def){
     const neon = blocks.filter((p, i) => i % 4 === 0);
     const nm = placeInst(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({color:0xffffff}), neon, (d,p,i) => { const m = new THREE.Matrix4(); tw.getMatrixAt(i*4, m); const pos = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(); m.decompose(pos, q, sc); d.position.set(pos.x, sc.y + 0.4, pos.z); d.quaternion.copy(q); d.scale.set(sc.x + 0.4, 0.8, sc.z + 0.4); d.rotation.setFromQuaternion(q); }, false);
     const ncols = [0xff3fa4, 0x38e1ff, 0xb46bff, 0xffe14d]; neon.forEach((p, i) => nm.setColorAt(i, new THREE.Color(ncols[i%4])));
-    streetLamps(s, total, N, placeInst, '200,225,255', 0xdfeeff);
     stars(rnd, 400);
   } else if (def.theme === 'beach'){
     // ocean along the north edge, wet sand strip, palms
@@ -603,15 +601,6 @@ function buildTrack(def){
   }
   buildMinimap();
   return t;
-}
-function streetLamps(s, total, N, placeInst, rgb, bulb){
-  const lamps = []; for (let d = 0, i = 0; d < total; d += 32, i++){ const k = Math.floor(d / total * N); lamps.push({s:s[k], side:i%2 ? 1 : -1}); }
-  const lp = l => [l.s.x + l.s.nx*(HALF+2.6)*l.side, l.s.z + l.s.nz*(HALF+2.6)*l.side];
-  placeInst(new THREE.CylinderGeometry(0.12, 0.16, 7, 6), new THREE.MeshLambertMaterial({color:0x3a414b}), lamps, (d,l) => { const p = lp(l); d.position.set(p[0], 3.5, p[1]); d.scale.set(1,1,1); d.rotation.set(0,0,0); });
-  placeInst(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({color:bulb}), lamps, (d,l) => { const p = [l.s.x + l.s.nx*(HALF+1.6)*l.side, l.s.z + l.s.nz*(HALF+1.6)*l.side]; d.position.set(p[0], 7, p[1]); }, false);
-  const glowTex = canvasTex(128, 128, (c, w, h) => { const g = c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2); g.addColorStop(0,`rgba(${rgb},.55)`); g.addColorStop(1,`rgba(${rgb},0)`); c.fillStyle = g; c.fillRect(0,0,w,h); });
-  const glow = placeInst(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({map:glowTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}), lamps, (d,l) => { const p = [l.s.x + l.s.nx*(HALF-1)*l.side, l.s.z + l.s.nz*(HALF-1)*l.side]; d.position.set(p[0], 0.08, p[1]); d.rotation.set(-Math.PI/2, 0, 0); }, false);
-  glow.receiveShadow = false;
 }
 function stars(rnd, n = 900){
   const sg = new THREE.BufferGeometry(), sp = new Float32Array(n*3);
