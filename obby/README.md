@@ -56,7 +56,7 @@ set now; they were set on courses that were shorter and easier.
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
 | 🍬 **Candy** | Gumdrop bounce pads over brittle candy, pink sky, far too cheerful a song — and it is **nastier than it looks**. Bounce-heavy, with crumbling floors, blinkers and a saw |
-| 💀 **Nightmare** | **Every obstacle in the game, shuffled into one level**, with the floor going slippery or low-gravity under you as you cross — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
+| 💀 **Nightmare** | **Every obstacle in the game, shuffled into one level**, with the floor going slippery or low-gravity under you as you cross — and a bone-white gatekeeper who swears you will not make it. **You can: the portal is on the ground and the level is finishable on foot** |
 
 #### Made harder
 
@@ -140,53 +140,26 @@ sections ends up carrying **47** decks and checkpoints between them.
 An ordinary level is simply a shuffle of one section that never rolls, so it runs the
 same code and behaves exactly as it always did.
 
-**Nightmare looks like a troll level, and that is deliberate.** Its portal hangs
-**70 units up in the sky** and never moves. You reach the end, look up, and there it
-is — visible, and apparently out of reach. `troll:true` puts the goal in the sky, in
-`buildCourse`, and fires the taunts in `updateObby`.
+#### Nightmare was a troll level, and is not one any more
 
-#### The secret — do not sign-post this
+Its portal hung **70 units up in the sky** and never moved. You walked all 54 sections,
+looked up, and there it was — visible and out of reach. The only way through was a
+secret: the Aura Wings were a jetpack whose tank stopped draining on the last deck, so
+you could fly up to it.
 
-**On the last deck, under the portal, the tank stops draining.** That is the only way
-anyone reaches the portal: buy the Aura Wings, walk all 54 chunks, and hold jump at
-the end. See `atEnd` in `stepPlayer` — it is on when `troll` is set and you are within
-12 of the goal's z.
+**Flight was taken out at the player's request, and the portal came down with it.**
+`W.goal` is now `{ x:0, y:0, z: b.z - 5 }` — ground level, in the middle of the final
+platform, exactly like every other level's. There is no `canFly`, no fuel tank, no
+`atEnd`, no `ASCENT_DRIFT` and no secret. Nightmare is a real course again: brutally
+long and mixed, but **finishable on foot**.
 
-Everywhere else in the level one tankful tops out at **27.8** against a portal at
-**70**, so that deck is the only place it can be done.
+It does not retreat, either. Nothing in the game moves `W.goal` after `buildCourse`
+sets it.
 
-Two numbers make that survive any `SPEED_MUL`. The end zone is
-`min(60, 12 + runMax() * 0.3)` rather than a flat 12, because at 136 a second a
-12-unit zone goes by in a tenth of a second and you shoot clean through the one place
-the wings work — which reads as "the wings are broken". And `ASCENT_DRIFT` caps how
-fast you may still move while riding up, at a **fixed** 6 that is deliberately not
-scaled: the portal's pull is a fraction of the remaining distance per second, so it
-can only win against a bounded speed. Arriving at 136 without that cap put the player
-**1818 units** into the void with the portal shrinking behind them.
-
-On that climb **you still fly it — you are not carried.** Your steering works the
-whole way up; the portal simply reels your x/z in harder than you can push away from
-it, so you always arrive. That pull is not decoration: without it you could lift off
-from the back of the deck and rise straight past the portal forever with no way to
-correct. Verified from five spots across the deck while actively holding a direction
-to fight it — all five reach the portal, all five win.
-
-Nothing in the game hints at it. The blurb still says nobody has finished it, the
-gatekeeper still says nobody gets past him, and there is no marker in the sky. Keep
-it that way.
-
-Outside Nightmare holding jump does nothing at all, so the level stays impossible for
-anyone who has not bought the wings, walked all 54 chunks, and thought to fly:
-
-| | Rise above the deck | Wins |
-|---|---|---|
-| Wings, on the last deck | **64.8** | **yes** |
-| Wings, anywhere else in Nightmare | 27.8 at most, swept across the whole course | no |
-| Wings, in Angel / Devil / Ice / Space | 1.8 — just a jump, and no glide either | no |
-| No wings, on the last deck | 1.7 | no |
-
-If someone reports "the last level is broken" and has not bought the wings, this is
-why.
+`troll:true` no longer places anything. All it does now is switch on the gatekeeper's
+taunts in `updateObby` — *"YOU ARE NOT GOING TO MAKE IT"* and *"NOBODY GETS PAST ME"*.
+He used to be telling the truth. Now he is just talking, and proving him wrong is the
+whole point of the level.
 
 **Inu is a name, not a dog.** He is the boy in the green cap you can buy in the shop.
 His level id is still `inu` in the code so saved clear times survive the rename, but
@@ -512,48 +485,24 @@ tug you off a ledge.
 **Skins** are `cat` 🐱 (140), `robot` 🤖 (240) and the rest of the list in `SKINS`;
 `snail` 🐌 is not for sale, you earn it by surviving 60 seconds in Killer Snail.
 
-> ⚠️ **The rest of this section is out of date and was already wrong before these
-> changes.** The code has no flight in it any more — `hasPower('wings')` sets
-> `glide = false, jet = false`, and the comment above `POWERS` records that flight was
-> removed at the player's request. The jetpack numbers, the fuel gauge and the
-> last-deck secret below describe a version of the game that no longer exists, which
-> also means **Nightmare is currently unfinishable by anyone**. Left in place rather
-> than deleted, because whether to bring flight back or drop the secret is a design
-> call, not a typo.
+**The Aura Wings do nothing at all.** `hasPower('wings')` sets `glide = false,
+jet = false` — they flap on your back and that is the whole feature. They were a
+jetpack once, and the only way anyone ever reached the Nightmare portal; flight was
+removed at the player's request and the portal came down to the ground, so there is
+nothing left for them to do. They are sold as exactly what they are: *"Beautiful, and
+nothing more. They will not lift you."*
 
-**The wings only work inside the Nightmare Level.** `canFly` in `stepPlayer` requires
-`W.troll`; in every other level holding jump in mid-air does nothing at all, and there
-is no glide there either. The fuel gauge is hidden outside that level too — a gauge
-sitting in a level where the wings are inert is a puzzle with no answer.
-
-That restriction is the design, not a limitation. Flight skips straight over any
-course, so letting it work everywhere would quietly delete every level in the game.
-Confined to one level it stops being a cheat and becomes a key.
-
-Inside Nightmare it is a real jetpack: **9 a second upward**, **1.5× running speed
-forward** (measured: 10.8 against a 7.2 run), sharper air steering, on a **2.8 second
-tank** that refills when you land. Run the tank dry and holding jump becomes a
-**glide** — you sink at 2.6 a second instead of 34, so a 38-unit drop takes 12 seconds
-instead of under 2. The wings flare white under thrust.
-
-The shop description is deliberately vague — *"They only stir in one place, and it is
-not down here."* It explains why nothing happens in a normal level without giving
-away where it does.
-
-| | Rise above the deck | Wins |
-|---|---|---|
-| Wings, on Nightmare's last deck | **64.8** | **yes** |
-| Wings, elsewhere in Nightmare | 27.8 | no |
-| Wings, in Angel / Devil / Ice / Space | **1.8** — just a jump, no glide | no |
-| No wings, on the last deck | 1.7 | no |
+Everything that used to be documented here — the fuel gauge, the 2.8 second tank, the
+glide, `canFly`, `ASCENT_DRIFT` and the last-deck secret — is gone from the code, and
+now from this file as well.
 
 `runMax()` is the one place top speed is decided, so anything that has to stay ahead
-of the player reads it too — the Nightmare portal retreats at `runMax() * 1.06`, and
-still cannot be caught while wearing the boots.
+of the player reads it too. Nothing does any more: the Nightmare portal used to
+retreat at `runMax() * 1.06` and now does not move at all.
 
 **Skins** are cosmetic:
-Angel (40), Inu (90), Ghost (120), Devil (160), Rainbow (320). Snail King is not
-for sale — you have to earn it in Killer Snail.
+Angel (40), Inu (90), Ghost (120), Cat (140), Devil (160), Robot (240), Rainbow (320).
+Snail King is not for sale — you have to earn it in Killer Snail.
 
 ### Don't start a camera drag on top of a control
 
