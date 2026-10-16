@@ -14,7 +14,8 @@ the 3D is drawn with raw WebGL written from scratch, so you just open it and pla
 | Double jump | `SPACE` again in mid-air — **everybody has it, from the first run**, one per jump, refilled on landing |
 | Turn the camera | drag the screen, or `Q` / `E` |
 | Back to checkpoint | `R` |
-| Save yourself | `G` **any time you are in the air** — teleports you down to solid ground. **One per life** |
+| Save yourself | `G` **any time you are in the air** — teleports you down to solid ground. **Twice per life** |
+| Hearts | **3 ❤️** per checkpoint. The first two deaths only cost a heart |
 | Pause | `ESC` or `P` |
 | Fullscreen | `F` or the ⛶ button — real fullscreen, so the address bar goes too |
 | Music / sound | 🎵 and 🔊 buttons, top right. They work **while you are playing** |
@@ -28,7 +29,7 @@ never have to touch it.
 
 ### 🧗 Obby Mode
 
-Six courses. Reach the glowing portal at the end. Checkpoints land every **three**
+Seven courses. Reach the glowing portal at the end. Checkpoints land every **three**
 sections — every four in Devil and Nightmare — so dying sends you back a little, not
 to the start.
 
@@ -39,12 +40,13 @@ set now; they were set on courses that were shorter and easier.
 
 | Level | Sections | Length | Orbs | Difficulty `d` | Checkpoints |
 |---|---|---|---|---|---|
-| Angel | 36 | 912 | 42 | 0.4 | 11 |
-| Normal | 30 | 800 | 38 | 0.95 | 9 |
-| Devil | 38 | 1027 | 45 | 1 | 9 |
-| Ice | 26 | 591 | 34 | 0.58 | 8 |
-| Space | 28 | 662 | 37 | 0.68 | 9 |
-| Nightmare | 54 | 1755 | 73 | 1, floor 0.85 | 47 |
+| Angel | 36 | 912 | 10 | 0.4 | 11 |
+| Normal | 30 | 800 | 14 | 0.95 | 9 |
+| Devil | 38 | 1027 | 9 | 1 | 9 |
+| Ice | 26 | 591 | 10 | 0.58 | 8 |
+| Space | 28 | 662 | 12 | 0.68 | 9 |
+| 🍬 Candy | 32 | 909 | 16 | 0.85 | 10 |
+| Nightmare | 54 | 1743 | 20 | 1, floor 0.85 | 47 |
 
 | Level | What is in it |
 |---|---|
@@ -53,6 +55,7 @@ set now; they were set on courses that were shorter and easier.
 | 😈 **Devil** | Lava pits, fireballs, twin spinners, thin pillars, blinking platforms — and **a devil at the gate who says WELCOME TO HELL** |
 | 🧊 **Ice** | Wide, gentle courses and effectively no grip — let go and you coast about two platform lengths before stopping |
 | 🚀 **Space** | Gravity at 0.62, so you hang in the air. Same jump height, but a much longer float |
+| 🍬 **Candy** | Gumdrop bounce pads over brittle candy, pink sky, far too cheerful a song — and it is **nastier than it looks**. Bounce-heavy, with crumbling floors, blinkers and a saw |
 | 💀 **Nightmare** | **Every obstacle in the game, shuffled into one level**, with the floor going slippery or low-gravity under you as you cross — and a bone-white gatekeeper. **It cannot be finished, on purpose** |
 
 #### Made harder
@@ -196,6 +199,11 @@ Ice and Space sit after Devil on purpose: they are the odd ones rather than the
 hardest, and Nightmare has to stay last because it can never be cleared — anything
 placed after it would be locked forever.
 
+**Candy was slotted in front of Nightmare**, which on its own would have re-locked
+Nightmare for everybody who had already opened it by clearing Space. `levelUnlocked`
+therefore accepts **either** key for Nightmare — Candy cleared, or Space cleared — so
+nobody loses a level they had already earned. New players go through Candy.
+
 ### 🔀 Dying shuffles the course
 
 `shuffleObstacles`, called from `afterDeath`, re-rolls the moving parts every time you
@@ -283,6 +291,28 @@ above the void — about **22,500 rescues**:
 
 It also refuses to fire while you are stood on the ground, or once it is spent, so you
 cannot throw it away by panicking.
+
+### ❤️ Hearts
+
+**You get three hearts per checkpoint, in obby mode only.** The first two deaths cost
+a heart and put you back on the nearest solid ground — the same ground the 🆘 would
+have picked, for free. They do **not** send you to the checkpoint, do **not** count as
+a death, and do **not** shuffle the course. Run out and the third one is a real death:
+back to the checkpoint, hearts and rescues refilled, obstacles re-rolled.
+
+Reaching a checkpoint hands all three back, along with both 🆘 rescues.
+
+**Infinity is deliberately left out.** One life is the whole premise there, and
+`killPlayer` only takes the hearts path when `game.mode === 'obby'`.
+
+The **moment of invulnerability** (`game.iframe`, 1.3s) is not decoration. Lava is
+something you can be standing in, and a fireball can be crossing the ledge you get put
+down on, so without it three hearts could drain in three frames and read as a bug.
+`updateObby` counts it down and skips hazard damage while it runs — but never skips
+the **void**, so falling is always fatal on schedule.
+
+Hearts reuse `game.hp` / `game.maxHp`, which Killer Snail already had. The HUD draws
+them under the 🆘 indicator in obby and keeps the snail's own row where it was.
 
 ### 🐌 Killer Snail (not an obby)
 
@@ -452,13 +482,44 @@ refused and the game quietly shows the device board instead.
 (`ORB_VALUE`). The counter on the HUD still shows orbs *found* — "9 / 21" — while the
 shop counts aura.
 
+**There are far fewer orbs than there used to be.** `ORB_KEEP` is `0.3`, and `b.orb`
+turns down most of the spots the chunks offer it: Angel went from 42 orbs to **10**,
+Devil from 45 to **9**, Nightmare from 73 to **20**. Doing it in the builder rather
+than by deleting `b.orb` calls out of 22 chunks means each chunk's orbs stay exactly
+where its author put them — there is just a fraction of them.
+
+The coin flip is a **hash of the spot**, deliberately *not* the course `rng`. Drawing
+from `rng()` there would consume numbers the geometry is about to use and shift every
+platform placed after the first orb, quietly rebuilding all seven courses. Verified:
+course lengths are unchanged to the unit (Angel still 912, Devil still 1027).
+
+Worth knowing: aura income fell with the orb count, so the shop takes about three
+times as long to work through. Raise `ORB_VALUE` if that wants balancing.
+
 **Powers** are bought once and stay on for good — no equipping:
 
 | | | |
 |---|---|---|
-| ⏫ **Double Jump** | 150 | A second jump in mid-air, back when you land |
+| ⏫ **Double Jump** | — | **Not sold any more. Everybody has it, from the first run, for nothing** |
 | 👟 **Speed Boots** | 200 | Run 35% faster everywhere. Jumps carry further too |
-| 🪽 **Aura Wings** | 500 | A jetpack — **but only inside Nightmare**. Dead weight in every other level |
+| 🪽 **Aura Wings** | 500 | Cosmetic. They flap on your back and that is all they do |
+| 🧲 **Orb Magnet** | 260 | Orbs fly to you from about a platform away (`MAGNET_R` = 6) |
+
+The magnet moves the **orb**, not you — an orb drifts in and is then picked up by the
+ordinary collect test, so one place decides what counts as collected. It will never
+tug you off a ledge.
+
+**Skins** are `cat` 🐱 (140), `robot` 🤖 (240) and the rest of the list in `SKINS`;
+`snail` 🐌 is not for sale, you earn it by surviving 60 seconds in Killer Snail.
+
+> ⚠️ **The rest of this section is out of date and was already wrong before these
+> changes.** The code has no flight in it any more — `hasPower('wings')` sets
+> `glide = false, jet = false`, and the comment above `POWERS` records that flight was
+> removed at the player's request. The jetpack numbers, the fuel gauge and the
+> last-deck secret below describe a version of the game that no longer exists, which
+> also means **Nightmare is currently unfinishable by anyone**. Left in place rather
+> than deleted, because whether to bring flight back or drop the secret is a design
+> call, not a typo.
 
 **The wings only work inside the Nightmare Level.** `canFly` in `stepPlayer` requires
 `W.troll`; in every other level holding jump in mid-air does nothing at all, and there
