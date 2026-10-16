@@ -1197,10 +1197,10 @@ const POWERS = [
     desc:'Orbs fly to you from about a platform away. You still have to get there.' }
 ];
 // The Aura Wings used to be a jetpack, and the only way anyone ever reached the
-// Nightmare portal. Flight was taken out at the player's request, knowing what it
-// costs: Nightmare's portal hangs at 70, a double jump reaches about 3.5, and there
-// is now nothing in the game that gains height. The level cannot be finished by
-// anyone, and there is no longer a secret hiding behind that.
+// Nightmare portal, which hung 70 units up in the sky. Flight was taken out at the
+// player's request — so the portal came down to the ground with it, see buildCourse.
+// Nothing in the game gains height any more, and nothing needs to: every level,
+// Nightmare included, is finishable on foot.
 //
 // The wings are cosmetic now — you wear them, they do not lift you.
 // (SAVE_BOOST used to live here — the 🆘 was a shove upward. It is a teleport now
@@ -1791,7 +1791,7 @@ const LEVELS = [
     gravity:0.62, blurb:'Low gravity. Big floaty jumps — over spikes, and onto ferries.' },
   // Sweet-looking and mean. It sits right in front of Nightmare on purpose: the pink
   // is the joke, the difficulty is not. This is the last thing between you and the
-  // level that cannot be finished.
+  // longest, meanest course in the game.
   { id:'candy', name:'Candy Level', emoji:'🍬', theme:'candy', seed:5757, d:0.85, chunks:32, checkEvery:3,
     blurb:'Bouncy, pink, and far nastier than it looks. Gumdrop pads over brittle candy.' },
   // Nightmare is not a course of its own — it is every obstacle in the game shuffled
@@ -1894,7 +1894,8 @@ function buildCourse(cfg) {
   W.goal = { x:0, y:0, z: b.z - 5 };
 
   W.endZ = b.z;
-  // The Nightmare portal hangs in the sky (see updateObby). Nobody finishes it.
+  // troll does not move the portal any more. All it switches on is the gatekeeper's
+  // taunts in updateObby — trash talk you are now allowed to beat.
   W.troll = !!cfg.troll;
   // start in the first section — updateZone hands over the rest as you cross
   W.zone = W.zones[0];
@@ -2089,13 +2090,9 @@ function stepPlayer(dt) {
 
   // ice cuts your grip: you get up to speed slowly and you do not stop when you stop steering
   const slip = W.slip || 0;
-  // The jetpack is decided here rather than after gravity, because the speed cap and
-  // the air acceleration below both need to know about it — that is what turns
-  // "hover upward" into "fly forward".
-  // The wings do nothing at all until the very end of Nightmare. Not in any other
-  // level, and not during the gauntlet either — every step of all six courses has
-  // to be run on foot. Flight would skip straight over a course, so this is what
-  // protects them; the wings are a key to one place, not a way around the game.
+  // A jetpack used to be resolved right here, ahead of the speed cap and the air
+  // acceleration, because both had to know about it. Flight is gone and so is that
+  // branch — every step of all seven courses is run on foot.
   const acc = (p.onGround ? ACC*(slip ? ICE_ACC : 1) : AIR_ACC) * dt;
   if (moving) {
     p.vx += wx*acc; p.vz += wz*acc;
@@ -2422,9 +2419,9 @@ function updateObby(dt) {
     }
   }
 
-  // Nightmare taunts you when you get to the end and find the portal in the sky.
-  // It does not move — you simply cannot get up there. That is the joke.
-  // The gatekeeper still talks, he is just wrong now.
+  // The gatekeeper talks you down on the approach to the portal. He used to be right:
+  // the portal hung out of reach and the level really was a troll. It sits on the
+  // ground now, so he is simply wrong, and proving him wrong is the point.
   if (W.troll && !game.won) {
     const d = Math.abs(W.goal.z - p.z);
     if (!W.taunt1 && d < 24) {
