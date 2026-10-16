@@ -244,7 +244,8 @@
         <tr><td>Double jump</td><td>press <b>SPACE</b> again in mid-air. You always have it</td></tr>
         <tr><td>Turn camera</td><td><b>drag the screen</b>, or <b>Q</b> / <b>E</b></td></tr>
         <tr><td>Restart</td><td><b>R</b> — back to your last checkpoint</td></tr>
-        <tr><td>Save yourself</td><td><b>G</b> any time you are in the air — teleports you down to solid ground. <b>One per life</b></td></tr>
+        <tr><td>Save yourself</td><td><b>G</b> any time you are in the air — teleports you down to solid ground. <b>Twice per life</b></td></tr>
+        <tr><td>Hearts</td><td><b>3 ❤️ per checkpoint.</b> The first two deaths just cost a heart and put you back on the ground. Run out and you go back to the checkpoint</td></tr>
         <tr><td>Pause</td><td><b>ESC</b> or <b>P</b> · Fullscreen <b>F</b></td></tr>
         <tr><td>Music / sound</td><td>🎵 and 🔊 buttons, top right — every level has its own song</td></tr>
         <tr><td style="color:#FF8A8A"><b>Any other key</b></td><td style="color:#FF8A8A"><b>x_x you die.</b> The keys above are the only ones the game will let you touch while you are playing</td></tr>
@@ -693,6 +694,9 @@ const PAD_V = 16;                // bounce pad -> 4.9 units high
 const MAX_FALL = 34;
 const COYOTE = 0.11, BUFFER = 0.13, CUT_JUMP = 0.42;
 const PHX = 0.4, PHY = 0.8, PHZ = 0.4;   // player half-extents
+const MAX_SAVES = 2;                     // 🆘 rescues per life
+const MAGNET_R = 6;                      // Orb Magnet reach — about one platform
+const ORB_KEEP = 0.3;                    // fraction of orb spots that get an orb
 const THICK = 0.6;               // standard platform thickness
 const MAXGAP = 4.2;              // never exceed this: max jump is ~5.3
 
@@ -954,6 +958,10 @@ const SONGS = {
   nightmare:{ bpm:160, vol:.042, lead:'sawtooth', bassW:'square',
     lead1:[73,0,73,76, 80,0,76,0, 73,0,71,0, 68,0,0,0,        73,0,73,76, 80,0,83,0, 81,0,80,76, 73,0,0,0],
     bass: [37,37,0,37, 37,0,37,0, 35,35,0,35, 35,0,35,0,      33,33,0,33, 33,0,33,0, 37,37,0,37, 36,0,36,0] },
+  // sugar rush: fast, major and far too cheerful for what it is
+  candy: { bpm:132, vol:.05, lead:'square', bassW:'triangle',
+    lead1:[72,0,76,0, 79,0,76,0, 81,0,79,0, 76,0,0,0,      74,0,77,0, 81,0,77,0, 84,0,81,0, 79,0,0,0],
+    bass: [48,0,48,0, 53,0,53,0, 45,0,45,0, 50,0,50,0,     47,0,47,0, 52,0,52,0, 48,0,48,0, 55,0,55,0] },
   // the menu hums quietly to itself
   menu:  { bpm:84, vol:.035, lead:'triangle', bassW:'sine',
     lead1:[72,0,0,76, 0,0,79,0, 0,76,0,0, 74,0,0,0,         71,0,0,74, 0,0,79,0, 0,77,0,0, 76,0,0,0],
@@ -1170,6 +1178,8 @@ const SKINS = [
   { id:'devil',   name:'Devil',      price:160, em:'😈', body:'#E23B3B', head:'#FF7A6B', desc:'Horns and a tail.' },
   { id:'ghost',   name:'Ghost',      price:120, em:'👻', body:'#D6E2FF', head:'#EEF4FF', desc:'Pale and floaty.' },
   { id:'rainbow', name:'Rainbow',    price:320, em:'🌈', body:'#FF00FF', head:'#FFFFFF', desc:'Colour-shifting aura.' },
+  { id:'cat',     name:'Cat',        price:140, em:'🐱', body:'#FFB45B', head:'#FFD9A0', desc:'Lands on its feet. Usually.' },
+  { id:'robot',    name:'Robot',      price:240, em:'🤖', body:'#9AA7B8', head:'#D7E0EA', desc:'Bolted together, scared of nothing.' },
   { id:'snail',   name:'Snail King', price:-1,  em:'🐌', body:'#7BD86B', head:'#B6F0A8', desc:'Survive 60s in Killer Snail.' }
 ];
 const skinById = id => SKINS.find(s => s.id === id) || SKINS[0];
@@ -1182,7 +1192,9 @@ const POWERS = [
   { id:'speed', name:'Speed Boots', price:200, em:'👟',
     desc:'Run 35% faster in every mode. Jumps carry further too.' },
   { id:'wings', name:'Aura Wings', price:500, em:'🪽',
-    desc:'Beautiful, and nothing more. They will not lift you.' }
+    desc:'Beautiful, and nothing more. They will not lift you.' },
+  { id:'magnet', name:'Orb Magnet', price:260, em:'🧲',
+    desc:'Orbs fly to you from about a platform away. You still have to get there.' }
 ];
 // The Aura Wings used to be a jetpack, and the only way anyone ever reached the
 // Nightmare portal. Flight was taken out at the player's request, knowing what it
@@ -1389,7 +1401,8 @@ const THEMES = {
   void:  { sky:'#150E2E', fog:'#241645', top:'#6B57A8', side:'#3A2A66', accent:'#A46BFF', light:[.3,1,.35] },
   nightmare:{ sky:'#05040D', fog:'#120A22', top:'#2A2140', side:'#171029', accent:'#00E5FF', light:[.3,1,.35] },
   ice:   { sky:'#BFE6F2', fog:'#DFF3FA', top:'#DCF3FF', side:'#8FC4DC', accent:'#5BE7FF', light:[.4,1,.35] },
-  space: { sky:'#07061A', fog:'#0E0B2E', top:'#4A6BC8', side:'#2A3A78', accent:'#FFD166', light:[.35,1,.4] }
+  space: { sky:'#07061A', fog:'#0E0B2E', top:'#4A6BC8', side:'#2A3A78', accent:'#FFD166', light:[.35,1,.4] },
+  candy: { sky:'#FFD6EC', fog:'#FFEAF5', top:'#FF8FC7', side:'#C94F93', accent:'#7CF5D5', light:[.4,1,.35] }
 };
 
 /* ---- level builder: chunks are strung along +Z and always line up ---- */
@@ -1435,7 +1448,21 @@ function builder(W, rng, d) {
       return this;
     },
     spinner(x,y,z, len, spd) { W.spinners.push({ x,y,z, len, spd, ang: rng()*6.28 }); return this; },
-    orb(x,y,z) { W.orbs.push({ x,y,z, got:false }); return this; },
+    /* Way fewer orbs than there used to be. Rather than pull the b.orb calls out of
+       22 chunks one by one, every orb spot still gets offered and most are turned
+       down here — so a chunk's orbs stay where its author put them, there is just a
+       fraction of them.
+
+       The coin flip is a hash of the SPOT, deliberately not the course rng. Drawing
+       from rng() here would consume numbers the geometry is about to use and shift
+       every platform placed after the first orb, which would quietly rebuild all six
+       courses. A hash of x/y/z is just as stable from the seed and touches nothing. */
+    orb(x,y,z) {
+      const h = Math.sin(x*12.9898 + y*78.233 + z*37.719) * 43758.5453;
+      if (h - Math.floor(h) >= ORB_KEEP) return this;
+      W.orbs.push({ x,y,z, got:false });
+      return this;
+    },
     pad(x,y,z) { W.pads.push({ x, y, z, hx:1.1, hy:0.35, hz:1.1, t:0 }); return this; },
     check() {
       this.plat(7, 4);
@@ -1739,6 +1766,11 @@ const POOL = {
   space: [ch_doubleGap, ch_gap, ch_zigzag, ch_bounce, ch_lift, ch_straight,
           ch_moverLong, ch_steps, ch_gap, ch_beam, ch_bounce,
           ch_crumble, ch_spikes, ch_ferryHop],
+  // gumdrop pads over brittle candy. Bounce-heavy — ch_bounce appears three times,
+  // which is the level's whole identity — and no lava, because that is Devil's.
+  candy: [ch_bounce, ch_zigzag, ch_doubleGap, ch_crumble, ch_moverSide, ch_bounce,
+          ch_blink, ch_spinner, ch_steps, ch_ferryHop, ch_bounce, ch_sawBeam,
+          ch_crumble, ch_pillars, ch_gap, ch_blinkRun],
   // after the devil: everything at once, plus platforms that will not stay put
   nightmare: [ch_blink, ch_blinkRun, ch_crossfire, ch_spinnerPair, ch_pillars, ch_lava,
               ch_crumble, ch_blink, ch_fireRun, ch_moverLong, ch_zigzag, ch_spinner,
@@ -1757,6 +1789,11 @@ const LEVELS = [
     slip:1, blurb:'Everything is slippery, the gaps are wider, and some of it crumbles.' },
   { id:'space', name:'Space Level',  emoji:'🚀', theme:'space', seed:9090, d:0.68, chunks:28, checkEvery:3,
     gravity:0.62, blurb:'Low gravity. Big floaty jumps — over spikes, and onto ferries.' },
+  // Sweet-looking and mean. It sits right in front of Nightmare on purpose: the pink
+  // is the joke, the difficulty is not. This is the last thing between you and the
+  // level that cannot be finished.
+  { id:'candy', name:'Candy Level', emoji:'🍬', theme:'candy', seed:5757, d:0.85, chunks:32, checkEvery:3,
+    blurb:'Bouncy, pink, and far nastier than it looks. Gumdrop pads over brittle candy.' },
   // Nightmare is not a course of its own — it is every obstacle in the game shuffled
   // into one level. Each chunk is drawn from a different course at random and brings
   // that course's floor with it: a hell lava run, then an ice slide, then a floaty
@@ -1766,11 +1803,15 @@ const LEVELS = [
     // to mean a 0.12 Angel section could land in the middle of Nightmare as a free
     // breather. Now nothing here plays below 0.85 — the obstacles come from everywhere,
     // the mercy does not.
-    shuffle:{ from:['angel','inu','devil','ice','space','nightmare'], n:54, song:'nightmare', dMin:0.85 },
+    shuffle:{ from:['angel','inu','devil','ice','space','candy','nightmare'], n:54, song:'nightmare', dMin:0.85 },
     blurb:'Every obstacle in the game, shuffled, all of it at Devil difficulty, with the floor changing under you.' }
 ];
 const levelIndex = id => LEVELS.findIndex(l => l.id === id);
-const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id];
+/* Candy was slotted in FRONT of Nightmare, which would otherwise re-lock Nightmare
+   for everybody who had already opened it by clearing Space. Honour either key, so
+   nobody loses a level they had already earned. */
+const levelUnlocked = i => i === 0 || !!save.cleared[LEVELS[i-1].id] ||
+  (LEVELS[i].id === 'nightmare' && !!save.cleared['space']);
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -1984,7 +2025,7 @@ function makePlayer(sp) {
   return {
     x:sp.x, y:sp.y, z:sp.z, hx:PHX, hy:PHY, hz:PHZ,
     vx:0, vy:0, vz:0, onGround:false, standing:null,
-    coyote:0, buffer:0, jumpHeld:false, airJumps:0, saves:1,
+    coyote:0, buffer:0, jumpHeld:false, airJumps:0, saves:MAX_SAVES,
     yaw:0, walk:0, squash:0,
     respawn:{ x:sp.x, y:sp.y, z:sp.z }
   };
@@ -2175,9 +2216,20 @@ function stepPlayer(dt) {
 }
 
 function collectOrbs() {
-  const p = game.player;
+  const p = game.player, pull = hasPower('magnet');
   for (const o of game.world.orbs) {
     if (o.got) continue;
+    /* The magnet moves the ORB, not you. It drifts in from up to MAGNET_R away and
+       is then picked up by the ordinary test below, so there is one place that
+       decides what counts as collected. It never tugs you off a ledge. */
+    if (pull) {
+      const dx = p.x-o.x, dy = p.y-o.y, dz = p.z-o.z;
+      const l = Math.hypot(dx, dy, dz);
+      if (l > 0.001 && l < MAGNET_R) {
+        const k = (1 - l/MAGNET_R) * 0.25;
+        o.x += dx*k; o.y += dy*k; o.z += dz*k;
+      }
+    }
     if (Math.abs(p.x-o.x) < 1.5 && Math.abs(p.y-o.y) < 1.9 && Math.abs(p.z-o.z) < 1.5) {
       o.got = true; game.runOrbs++;
       save.orbs += ORB_VALUE; save.lifetimeOrbs += ORB_VALUE;
@@ -2203,9 +2255,39 @@ function hitHazards() {
   return false;
 }
 
+/* Hearts, in obby only.
+
+   You get three. The first two deaths cost a heart and put you back on the nearest
+   solid ground — the same ground the 🆘 would have picked, for free — and they do
+   NOT send you to the checkpoint, do NOT count as a death and do NOT shuffle the
+   course. Run out and the third one is a real death: back to the checkpoint, hearts
+   and rescues refilled, obstacles re-rolled.
+
+   Infinity is deliberately left out of this. One life is the whole premise there.
+
+   The iframe is not decoration. Lava you can be standing in, and a fireball can be
+   sitting on the ledge you get put down on, so without a moment of invulnerability
+   three hearts could drain in three frames and read as a bug. updateObby counts it
+   down and skips hazard damage while it runs — but never skips the void, so falling
+   is always fatal on schedule. */
 function killPlayer() {
   if (game.dead > 0) return;
   const p = game.player;
+  if (game.mode === 'obby' && game.hp > 1) {
+    const g = sosGround();
+    if (g) {                                  // no ground to put you on -> real death
+      game.hp--; game.iframe = 1.3;
+      game.shake = 10; game.flash = 0.35;
+      Sound.die(); burst(p.x, p.y, p.z, 18, '#FF5B5B');
+      p.x = g.x; p.y = g.y; p.z = g.z;
+      p.vx = p.vy = p.vz = 0;
+      p.onGround = false; p.standing = null;
+      p.airJumps = 0; p.coyote = 0; p.buffer = 0; p.jumpHeld = false;
+      snapCamera();
+      game.banner = { text:'💔 ' + game.hp + (game.hp === 1 ? ' heart left' : ' hearts left'), t:1.6 };
+      return;
+    }
+  }
   game.dead = 0.6; game.deaths++; game.shake = 14; game.flash = 0.5;
   Sound.die(); burst(p.x, p.y, p.z, 24, '#FF5B5B');
   if (game.mode !== 'obby') endRun();
@@ -2272,7 +2354,8 @@ function afterDeath() {
   if (game.mode !== 'obby') return;
   p.x = p.respawn.x; p.y = p.respawn.y; p.z = p.respawn.z;
   p.vx = p.vy = p.vz = 0; p.onGround = false; p.standing = null;
-  p.saves = 1;                       // a fresh life gets a fresh recovery
+  p.saves = MAX_SAVES;               // a fresh life gets fresh rescues
+  game.hp = game.maxHp; game.iframe = 0;   // and fresh hearts
   for (const s of game.world.solids) if (s.kind === 'crumble') { s.gone = 0; s.timer = 0; }
   shuffleObstacles();                // it is not quite the same course any more
   snapCamera();
@@ -2319,7 +2402,8 @@ function updateObby(dt) {
     if (Math.abs(p.x-c.x) < 3 && Math.abs(p.z-c.z) < 2.6 && Math.abs(p.y-c.y) < 3) {
       c.hit = true;
       p.respawn = { x:c.x, y:c.y + 1.2, z:c.z };
-      p.saves = 1;                     // reaching a checkpoint hands it back
+      p.saves = MAX_SAVES;             // reaching a checkpoint hands them back
+      game.hp = game.maxHp;            // hearts too
       Sound.check(); burst(c.x, c.y+1.5, c.z, 12, '#5BE7FF');
       game.banner = { text:'🚩 Checkpoint!', t:1.3 };
     }
@@ -2355,7 +2439,9 @@ function updateObby(dt) {
     }
   }
 
-  if (hitHazards() || p.y < W.deathY) killPlayer();
+  // the invulnerable moment after losing a heart covers hazards, never the void
+  game.iframe = Math.max(0, game.iframe - dt);
+  if ((game.iframe <= 0 && hitHazards()) || p.y < W.deathY) killPlayer();
 
   // forgiving: crossing the portal's line anywhere on the end platform counts
   if (!game.won && p.z > W.goal.z - 1.4 && Math.abs(p.x-W.goal.x) < 4.6 && Math.abs(p.y-W.goal.y) < 4) {
@@ -2508,7 +2594,7 @@ function emergencySave() {
   if (p.onGround || p.saves <= 0) return;
   const g = sosGround() || p.respawn;
   if (!g) return;
-  p.saves = 0;
+  p.saves--;
   burst(p.x, p.y, p.z, 16, '#FFD166');       // a puff where you vanished
   p.x = g.x; p.y = g.y; p.z = g.z;
   p.vx = p.vy = p.vz = 0;
@@ -2516,7 +2602,9 @@ function emergencySave() {
   p.airJumps = 0; p.coyote = 0; p.buffer = 0; p.jumpHeld = false;
   snapCamera();
   Sound.pad();
-  game.banner = { text:'🆘 SOS — back on the ground! (that was your one)', t:1.8 };
+  game.banner = { text: p.saves > 0
+    ? '🆘 SOS — back on the ground! (' + p.saves + ' left)'
+    : '🆘 SOS — back on the ground! (that was your last one)', t:1.8 };
   for (let i=0;i<14;i++) {
     const a = i/14 * 6.283;
     game.particles.push({ x:p.x + Math.cos(a)*0.6, y:p.y - PHY, z:p.z + Math.sin(a)*0.6,
@@ -3324,15 +3412,27 @@ function drawHUD(t) {
 
   // No fuel gauge: the wings are cosmetic, so there is nothing for one to say.
 
-  // the one emergency recovery, lit while you still have it
+  // the emergency rescues, lit while you still have one, counting down as you spend them
   if (game.player) {
+    const sv = game.player.saves;
     H.textAlign = 'left';
     H.font = 'bold 15px "Trebuchet MS", sans-serif';
-    H.globalAlpha = game.player.saves > 0 ? 1 : 0.28;
+    H.globalAlpha = sv > 0 ? 1 : 0.28;
     H.fillStyle = 'rgba(18,16,31,.55)';
-    rr2(14, 54, 62, 26, 9); H.fill();
-    H.fillStyle = game.player.saves > 0 ? '#FFD166' : '#8A8AA0';
-    H.fillText('🆘 G', 24, 72);
+    rr2(14, 54, 78, 26, 9); H.fill();
+    H.fillStyle = sv > 0 ? '#FFD166' : '#8A8AA0';
+    H.fillText('🆘 G ×' + sv, 24, 72);
+    H.globalAlpha = 1;
+  }
+
+  // hearts — obby only; Killer Snail draws its own set further down
+  if (game.mode === 'obby' && game.player) {
+    H.textAlign = 'left';
+    H.font = 'bold 19px "Trebuchet MS", sans-serif';
+    for (let i = 0; i < game.maxHp; i++) {
+      H.globalAlpha = i < game.hp ? (game.iframe > 0 && i === game.hp - 1 ? 0.45 : 1) : 0.22;
+      H.fillText('❤️', 16 + i*25, 108);
+    }
     H.globalAlpha = 1;
   }
 
@@ -3670,6 +3770,7 @@ function resetRun() {
   game.player = makePlayer(game.world.spawn);
   game.time = 0; game.runOrbs = 0; game.deaths = 0; game.jumps = 0;
   game.dead = 0; game.won = false; game.flash = 0; game.shake = 0;
+  game.hp = game.maxHp; game.iframe = 0;
   game.particles.length = 0; game.speech = null;
   if (game.mode !== 'snail') {
     game.snail = null; game.salts = []; game.soldiers = []; game.bullets = [];
