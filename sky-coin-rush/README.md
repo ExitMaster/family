@@ -1,8 +1,12 @@
 # Sky Coin Rush
 
 A 3D flying game in **one HTML file** (three.js from a CDN, no build step), the plane
-version of Coin Rush. Fly a little red plane down an endless river canyon, grab coins,
-dodge rocks and balloons, and land on airstrips to refuel.
+version of Coin Rush. Two modes:
+
+- **Coin Rush**: fly a little red plane down an endless river canyon, grab coins, dodge
+  rocks and balloons, and land on airstrips to refuel.
+- **Free flight**: fly anywhere you like over an endless open world, as high as
+  19,700 ft above the clouds.
 
 > <https://exitmaster.github.io/family/sky-coin-rush/>
 
@@ -11,14 +15,38 @@ dodge rocks and balloons, and land on airstrips to refuel.
 | | |
 |---|---|
 | Steer (up / down / left / right) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
-| Autopilot | `Q` or the **AP** button |
+| Autopilot (Coin Rush) | `Q` or the **AP** button |
+| Boost (Free flight) | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Pause | `ESC` or `P` |
 | Phone / tablet | drag anywhere: a joystick appears where your finger lands |
 
 **Pilot-style controls** (on the start and pause cards) flip up and down, like a real
 control stick: push down to climb.
 
-## The flight cycle
+## Free flight
+
+Pick **Free flight** on the start card. You start on the home airfield's runway: the
+plane speeds up by itself, and you hold up to lift off once it says **Climb!**
+
+- **Fly anywhere.** Left/right banks the plane into a turn; up/down pitches the nose to
+  climb or dive (pilot-style controls flip this). Let go and the nose slowly levels out.
+  Hold **SPACE**, **SHIFT** or the **BOOST** button to fly fast.
+- **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
+  every direction, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
+  haze clears as you climb. The top is 19,700 ft (6,000 m); there's a call-out when you
+  pass 10,000 ft.
+- **HUD:** altitude (ft), airspeed (kt), compass heading (HDG, 000 = north) and **HOME**:
+  the distance to the airfield with an arrow pointing to it.
+- **Coins and orange rings** float in clusters all around you, some of them high in the
+  sky. Coins chain like in Coin Rush; rings give a boost.
+- **Land back home** on the runway any time (+100, once per 5 seconds). On the ground,
+  hold down to brake, or hold up past takeoff speed to fly again.
+- **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
+  put back in the air 220 m above the spot.
+- No lives, fuel or obstacles in Free flight. Pause and press **End flight** to go back
+  to the start card.
+
+## Coin Rush: the flight cycle
 
 1. **Takeoff.** Every flight starts on the river airstrip. The plane speeds down the
    runway on its own; when the speed reaches 58 kt the screen says **Climb!** Hold up
