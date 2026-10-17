@@ -24,8 +24,8 @@ them on new cars and upgrades.
 - **Race** — the Grand Prix: 3 big laps of an F1-style oval (grandstands, pit garages,
   five red start lights) against 5 rival formula cars — Blaze, Comet, Dash, Nova and Rocket — from a
   6-car grid — you start 3rd.
-  Rivals only appear here. They're fast — well past medal pace — but never faster than 95% of
-  your car's top speed, and they ease off when far ahead, so they stay beatable. Your position
+  Rivals only appear here. The quickest laps around silver-medal pace, the slowest near
+  bronze, and none go faster than 90% of your car's top speed, and they ease off when far ahead, so they stay beatable. Your position
   shows next to the lap counter.
 - **Champagne party:** win the Grand Prix and you get a 50-second celebration — two bottles
   spraying from your car, confetti over the screen, a cork pop and fizz. Tap (or press a key)
