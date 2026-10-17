@@ -174,7 +174,8 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     </div>
     <div class="freebar free-only">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
-      <span class="hint">Hold SPACE or BOOST to go fast. Follow the HOME arrow to land back on the runway.</span>
+      <button class="ap" id="btn-land" aria-label="Auto-land at home">LAND</button>
+      <span class="hint">Follow the HOME arrow and the yellow beacon, or tap LAND (L) and the plane flies home and lands.</span>
     </div>
     <div class="dock canyon-only">
       <button class="ap" id="btn-ap" aria-label="Autopilot">AP <small id="apCount">3</small></button>
@@ -689,7 +690,7 @@ function boot(hot){
   let spawnAcc = 0, nextGap = 60, beat = 0, dieT = 0, dieReason = '';
   // flight cycle: 'takeoff' (runway roll) -> 'cruise' -> 'rollout' (landed, refuelling) -> 'takeoff' ...
   let phase = 'cruise', rwyActive = false, approach = false, nextStrip = STRIP_EVERY, stopT = 0;
-  let apT = 0, apCharges = 3, landings = 0, topSpeed = 0, rollDecel = 18;
+  let apT = 0, apCharges = 3, landings = 0, topSpeed = 0, rollDecel = 18, landAssist = false;
   const toThreshold = () => -rwy.position.z;
   function placeRunway(z){ rwyActive = true; rwy.visible = true; rwy.position.set(0, 0, z); }
   function hideRunway(){ rwyActive = false; approach = false; rwy.visible = false; }
@@ -903,7 +904,8 @@ function boot(hot){
     if (e.target && e.target.tagName === 'INPUT') return;
     const k = KEYMAP[e.code];
     if (k){ keys[k] = true; if (state === 'play') e.preventDefault(); }
-    if (e.code === 'KeyQ' && state === 'play'){ e.preventDefault(); engageAP(); }
+    if (e.code === 'KeyQ' && state === 'play'){ e.preventDefault(); mode === 'free' ? toggleAutoLand() : engageAP(); }
+    if (e.code === 'KeyL' && state === 'play'){ e.preventDefault(); toggleAutoLand(); }
     if (e.code === 'Escape' || e.code === 'KeyP'){ state === 'play' ? pause() : state === 'paused' && resume(); }
     if ((e.code === 'Enter' || e.code === 'Space') && (state === 'attract' || state === 'over') && !(e.target && e.target.tagName === 'BUTTON')){ e.preventDefault(); startRun(); }
   });
@@ -960,6 +962,7 @@ function boot(hot){
   const holdBoost = on => e => { F.boostHeld = on; boostBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
   boostBtn.addEventListener('pointerdown', holdBoost(true));
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => boostBtn.addEventListener(n, holdBoost(false)));
+  $('btn-land').addEventListener('click', e => { toggleAutoLand(); e.currentTarget.blur(); });
   $('best-start').textContent = $('best-over').textContent = best.toLocaleString();
   syncToggles();
 
@@ -977,7 +980,7 @@ function boot(hot){
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
   const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), dist: $('dist'), fuel: $('fuel'), fill: $('fuelFill'), powers: $('powers'),
     approach: $('approach'), nextChip: $('nextStripChip'), nextStrip: $('nextStrip'), stripDist: $('stripDist'), glideMsg: $('glideMsg'),
-    papi: Array.from(document.querySelectorAll('#papi i')), hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), prompt: $('prompt'), apCount: $('apCount'), ap: $('btn-ap') };
+    papi: Array.from(document.querySelectorAll('#papi i')), hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), land: $('btn-land'), prompt: $('prompt'), apCount: $('apCount'), ap: $('btn-ap') };
   let powKey = '';
   function updatePowers(force){
     const parts = [];
@@ -1017,7 +1020,7 @@ function boot(hot){
       let msg = far ? 'Follow the coins down' : whites >= 3 ? 'Too high: descend' : whites <= 1 ? 'Too low: climb' : 'On glide path';
       if (Math.abs(px) > RWY_W / 2 - 1) msg = 'Line up: steer ' + (px > 0 ? 'left' : 'right');
       if (d <= 0) msg = Math.abs(px) > RWY_W / 2 - 1 ? msg : 'Touch down!';
-      if (apT > 0) msg = 'Autoland';
+      if (apT > 0 || landAssist) msg = 'Auto-landing';
       txt(H.glideMsg, msg);
     }
     let prompt = '';
@@ -1186,8 +1189,43 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, hiTold: false, ceilTold: false };
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false };
   const onHomeRunway = (x, z) => Math.abs(x) < RWY_W / 2 + 1 && z < 130 && z > -130;
+  // the whole flat meadow around the runway is fine to land on
+  const onAirfield = (x, z) => Math.abs(x) < 115 && Math.abs(z) < 345;
+  const restAt = (x, z) => (onHomeRunway(x, z) ? FREE_RWY : groundAt(x, z)) + PLANE_SCALE;
+  const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+  // a tall light beside the runway, seen from far away (no fog on it)
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1600, 12, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffc23d, transparent: true, opacity: 0.35, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+  beacon.position.set(-25, 800, 0); free.add(beacon);
+  function toggleAutoLand(){
+    if (mode !== 'free' || state !== 'play' || F.crashT > 0) return;
+    if (F.ground){ toast('Already on the ground', 'info'); return; }
+    F.auto = !F.auto; F.autoFinal = false; sfx.ap(F.auto);
+    toast(F.auto ? 'Auto-land: flying home' : 'Auto-land off', 'info');
+  }
+  // Auto-land: fly to a point 1.6 km north of the runway, turn onto the runway heading,
+  // then follow a 6% glide path down to the threshold.
+  function autoLandInput(){
+    const ahead = d => groundAt(F.x - Math.sin(F.yaw) * d, F.z - Math.cos(F.yaw) * d);
+    const gAhead = Math.max(groundAt(F.x, F.z), ahead(200), ahead(450), 0);
+    if (F.autoFinal && (Math.abs(F.x) > 220 || F.z < -200)) F.autoFinal = false;
+    if (!F.autoFinal && Math.abs(F.x) < 150 && F.z > 0 && F.z < 1900 && Math.abs(wrapA(F.yaw)) < 0.5) F.autoFinal = true;
+    let yawT, altT;
+    if (F.autoFinal){
+      yawT = clamp(F.x * 0.006, -0.35, 0.35);
+      altT = F.z > 40 ? restAt(0, 0) + (F.z - 40) * 0.06 : restAt(F.x, F.z) - 1;
+      if (F.z > 400) altT = Math.max(altT, gAhead + 40);
+    } else {
+      const vx = 0 - F.x, vz = 1600 - F.z, dist = Math.hypot(vx, vz);
+      yawT = dist > 150 ? Math.atan2(-vx, -vz) : 0;
+      altT = Math.max(gAhead + 110, dist < 1500 ? 110 : 200);
+    }
+    const e = wrapA(yawT - F.yaw);
+    const pitchT = clamp((altT - F.y) * 0.02, -0.3, 0.35);
+    return { ax: clamp(-e * 2.5, -1, 1), ay: clamp((pitchT - F.pitch) * 4, -1, 1) };
+  }
   function setWorld(m){
     mode = m;
     const c = m === 'canyon';
@@ -1207,7 +1245,7 @@ function boot(hot){
     setWorld('free');
     score = 0; coins = 0; chain = 0; mult = 1; lastCoinT = -9;
     boostT = magnetT = apT = invT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, hiTold: false, ceilTold: false });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false });
     rwy.visible = true; rwy.position.set(0, FREE_RWY - RWY_TOP, 130);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -1225,7 +1263,7 @@ function boot(hot){
     prefill(); show('start');
   }
   function crashFree(inWater){
-    F.crashT = 1.6; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
+    F.crashT = 1.6; F.auto = false; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
     if (inWater){ sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); }
     else { sfx.hit(); burst(F.x, F.y, F.z, 0xb7a998, 18, 1.4); }
     toast(inWater ? 'Splash!' : 'Crash!', 'warn');
@@ -1244,23 +1282,31 @@ function boot(hot){
     if (invertY) ay = -ay;
     if (Math.abs(ax) < 0.05) ax = 0;
     if (Math.abs(ay) < 0.05) ay = 0;
-    const boosting = !!(keys.b || F.boostHeld) || boostT > 0;
+    if (F.auto && !F.ground && F.crashT <= 0){
+      if (Math.abs(ax) > 0.5 || Math.abs(ay) > 0.5){ F.auto = false; toast('Auto-land off', 'info'); }
+      else { const a = autoLandInput(); ax = a.ax; ay = a.ay; }
+    }
+    const homeFar = Math.hypot(F.x, F.z - 1600) > 2500;
+    const boosting = !!(keys.b || F.boostHeld) || boostT > 0 || (F.auto && !F.autoFinal && homeFar);
     boostT = Math.max(0, boostT - dt); shake = Math.max(0, shake - dt * 1.6);
 
     if (F.crashT > 0){
       F.crashT -= dt;
       if (F.crashT <= 0) respawnFree();
     } else if (F.ground){
-      // rolling on the home runway: speeds up by itself, pull up to lift off, push down to brake
-      if (ay < -0.3) F.speed = Math.max(0, F.speed - 25 * dt);
+      // on the airfield. After a landing the brakes stop the plane by themselves; hold up to
+      // roll again and lift off. On the first takeoff it speeds up on its own.
+      if (ay > 0.3) F.autoBrake = false;
+      if (F.autoBrake || ay < -0.3) F.speed = Math.max(0, F.speed - 24 * dt);
       else F.speed = Math.min(F.speed + 13 * dt, 70);
       F.yaw -= ax * 0.5 * dt * Math.min(1, F.speed / 15);
-      F.roll *= 0.8; F.pitch = F.speed >= VR ? 0.08 : 0;
-      F.x += -Math.sin(F.yaw) * F.speed * dt; F.z += -Math.cos(F.yaw) * F.speed * dt; F.y = FREE_REST;
+      F.roll *= 0.8; F.pitch = F.speed >= VR && !F.autoBrake ? 0.08 : 0;
+      F.x += -Math.sin(F.yaw) * F.speed * dt; F.z += -Math.cos(F.yaw) * F.speed * dt;
       const g = groundAt(F.x, F.z);
-      if (F.speed >= VR && (ay > 0.3 || F.z < -100)){ F.ground = false; F.pitch = 0.22; F.liftT = t; toast('Airborne!', ''); }
-      else if (g > F.y - 0.6) crashFree(false);
-      else if (g < FREE_RWY - 1.5){ F.ground = false; F.liftT = t; }   // rolled off the edge of the meadow
+      F.y = restAt(F.x, F.z);
+      const leaving = !onAirfield(F.x, F.z);
+      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || F.z < -300)){ F.ground = false; F.pitch = 0.22; F.liftT = t; toast('Airborne!', ''); }
+      else if (g < 0.5) crashFree(true);
     } else {
       // bank to turn, pitch to climb or dive
       F.roll += (-ax * 1.0 - F.roll) * Math.min(1, dt * 3.5);
@@ -1281,8 +1327,8 @@ function boot(hot){
       if (F.y > 3048 && !F.hiTold){ F.hiTold = true; toast('10,000 ft!', ''); }
       if (F.y < 2900) F.hiTold = false;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
-      if (onHomeRunway(F.x, F.z) && F.y <= FREE_REST + 0.6 && F.pitch > -0.6 && F.pitch < 0.05 && t - F.liftT > 1){
-        F.ground = true; F.y = FREE_REST; F.pitch = 0; F.roll = 0;
+      if (onAirfield(F.x, F.z) && F.y <= restAt(F.x, F.z) + 0.8 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
+        F.ground = true; F.y = restAt(F.x, F.z); F.pitch = 0; F.roll = 0; F.auto = false; F.autoBrake = true;
         if (t - F.lastLand > 5){ score += 100; toast('Nice landing! +100', ''); sfx.land(); burst(F.x, FREE_RWY + 0.2, F.z, 0xf4f1ea, 10, 0.7); }
         F.lastLand = t;
       } else if (F.y < top + 1.4) crashFree(g < 0.5);
@@ -1295,6 +1341,9 @@ function boot(hot){
     if (tx !== treeCX || tz !== treeCZ) buildTrees(tx, tz);
     fTrunks.visible = fLeaves.visible = F.y < 2500;
     fWater.position.set(F.x, 0, F.z);
+    const bd = Math.hypot(F.x + 25, F.z);
+    beacon.scale.set(Math.max(3, bd * 0.004), 1, Math.max(3, bd * 0.004));
+    beacon.material.opacity = 0.25 + Math.sin(t * 3) * 0.1;
     for (const c of fClouds){
       const p = c.position;
       if (p.x - F.x > 3500) p.x -= 7000; else if (p.x - F.x < -3500) p.x += 7000;
@@ -1334,7 +1383,7 @@ function boot(hot){
     planeRoot.rotation.order = 'YXZ';
     planeRoot.rotation.set(F.pitch, F.yaw, F.roll);
     prop.rotation.z += dt * 42;
-    const gTop = Math.max(groundAt(F.x, F.z), F.ground || onHomeRunway(F.x, F.z) ? FREE_RWY : 0);
+    const gTop = Math.max(onHomeRunway(F.x, F.z) ? FREE_RWY : groundAt(F.x, F.z), 0);
     planeShadow.position.set(F.x, gTop + 0.08, F.z);
     const alt = F.y - gTop; planeShadow.scale.setScalar(1 + alt * 0.05);
     M.shadow.opacity = planeRoot.visible ? clamp(0.32 - alt * 0.006, 0, 0.3) : 0;
@@ -1381,12 +1430,18 @@ function boot(hot){
     txt(H.home, (Math.hypot(F.x, F.z) / 1000).toFixed(1));
     H.homeArrow.style.transform = 'rotate(' + (Math.atan2(-F.x, F.z) + F.yaw).toFixed(3) + 'rad)';
     let prompt = '';
+    const up = invertY ? 'DOWN' : 'UP';
     if (F.crashT <= 0 && F.ground){
-      if (t - F.lastLand < 8 && F.speed > 1) prompt = 'Landed! Hold DOWN to brake';
-      else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : (invertY ? 'Climb! Hold DOWN or drag down' : 'Climb! Hold UP or drag up');
+      if (F.autoBrake) prompt = F.speed > 1 ? 'Landed! Braking…' : 'Hold ' + up + ' to take off again';
+      else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : 'Climb! Hold ' + up + ' or drag ' + up.toLowerCase();
+    } else if (F.crashT <= 0 && F.auto){
+      prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying home';
+    } else if (F.crashT <= 0 && onAirfield(F.x, F.z) && F.y < 80){
+      prompt = 'Airfield below: go down gently to land';
     }
     H.prompt.hidden = !prompt; txt(H.prompt, prompt);
-    H.prompt.classList.toggle('go', F.ground && F.speed >= VR);
+    H.prompt.classList.toggle('go', F.ground && F.speed >= VR && !F.autoBrake);
+    H.land.classList.toggle('on', F.auto);
     updatePowers(false);
   }
 
@@ -1425,7 +1480,7 @@ function boot(hot){
         placeRunway(SPAWN_Z - 260); approach = true; spawnGlidePath();
         toast('Airstrip ahead', 'info');
       }
-      if (approach && phase === 'cruise' && rwy.position.z > RWY_LEN - 70){
+      if (approach && phase === 'cruise' && rwy.position.z > RWY_LEN - 55){
         approach = false; nextStrip = dist + STRIP_EVERY * 0.8; fuelDist = nextFuel;
         toast('Missed the strip', 'warn');
       }
@@ -1445,6 +1500,20 @@ function boot(hot){
       ay = clamp((keys.u ? 1 : 0) - (keys.d ? 1 : 0) + stick.y, -1, 1);
       if (invertY) ay = -ay;
       if (apT > 0 && phase === 'cruise') steerTo(apTarget());
+      // landing helper: near an airstrip the plane eases onto the centreline and the glide
+      // path by itself; once it is close in, lined up and low, it lands on its own
+      landAssist = false;
+      if (approach && rwyActive && phase === 'cruise' && apT <= 0){
+        const d = toThreshold();
+        if (d < 300){
+          const g = apTarget();
+          if (d < 100 && Math.abs(px) < 9 && py < REST_Y + 9){ steerTo(g); landAssist = true; }
+          else {
+            ax = clamp(ax + (g.tx - px) * 0.12, -1, 1);
+            if (Math.abs(ay) < 0.1) ay = clamp((g.ty - py) * 0.25, -1, 1);
+          }
+        }
+      }
     } else if (state === 'attract' || state === 'over') steerTo(apTarget());
     if (live && phase === 'takeoff'){
       px += (0 - px) * Math.min(1, dt * 3); vx = 0; py = REST_Y; vy = 0;
@@ -1475,7 +1544,7 @@ function boot(hot){
       // on approach the floor drops to wheel height so the plane can reach the runway
       const lowOK = live && approach && rwyActive && toThreshold() < 300;
       const rz = rwy.position.z;
-      if (lowOK && rz > 3 && rz < RWY_LEN - 90 && Math.abs(px) < RWY_W / 2 - 0.4 && py <= REST_Y + 0.35){
+      if (lowOK && rz > -2 && rz < RWY_LEN - 60 && Math.abs(px) < RWY_W / 2 + 1.5 && py <= REST_Y + 1.2){
         const sink = vy; touchdown(sink);
         // stop with at least 100 m of runway left for the next takeoff
         rollDecel = Math.max(18, speed * speed / (2 * Math.max(20, RWY_LEN - 100 - rz)));
