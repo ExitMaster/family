@@ -22,7 +22,8 @@ them on new cars and upgrades.
 
 - **Time Trial** — solo, pick any of the 7 tracks below and chase medal times.
 - **Race** — the Grand Prix: 3 big laps of an F1-style oval (grandstands, pit garages,
-  five red start lights) against 5 rival formula cars — Blaze, Comet, Dash, Nova and Rocket.
+  five red start lights) against 9 rival formula cars — Blaze, Comet, Viper, Dash, Storm, Nova, Rocket, Bolt
+  and Flash — from a 10-car grid (you start last).
   Rivals only appear here. They're fast — well past medal pace — but never faster than 95% of
   your car's top speed, and they ease off when far ahead, so they stay beatable. Your position
   shows next to the lap counter.
