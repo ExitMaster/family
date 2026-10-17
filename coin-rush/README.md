@@ -16,7 +16,7 @@ them on new cars and upgrades.
 | Nitro | `SHIFT` |
 | Back on track | `R` |
 | Pause | `ESC` |
-| Phone / tablet | drag anywhere on the screen to steer; GAS, BRAKE and NITRO buttons on the right |
+| Phone / tablet | one thumb: hold anywhere to drive, slide left/right to steer, pull down to brake or reverse (no nitro on phones) |
 
 ## Coins
 

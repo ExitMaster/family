@@ -129,15 +129,16 @@ kbd{font-family:var(--ui);font-size:10px;border:1px solid var(--line);padding:0 
 /* ---------- Touch ---------- */
 #touch{position:absolute;inset:0;pointer-events:none;touch-action:none;}
 .t-steer{position:absolute;left:0;right:0;bottom:0;top:120px;pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none;}
-.t-hint{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:max(22px,env(safe-area-inset-bottom,0px));padding:12px 16px;border:1px dashed rgba(255,255,255,.3);background:rgba(15,20,27,.35);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7);transition:opacity .4s;}
+.t-hint{position:absolute;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);text-align:center;line-height:1.5;bottom:max(22px,env(safe-area-inset-bottom,0px));padding:12px 16px;border:1px dashed rgba(255,255,255,.3);background:rgba(15,20,27,.35);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7);transition:opacity .4s;}
 .t-steer.used .t-hint{opacity:0;}
-.t-ring{position:absolute;width:184px;height:56px;margin:-28px 0 0 -92px;border-radius:28px;border:1px solid rgba(255,255,255,.3);background:rgba(15,20,27,.4);opacity:0;transition:opacity .15s;pointer-events:none;}
+.t-ring{position:absolute;width:184px;height:136px;margin:-48px 0 0 -92px;border-radius:44px;border:1px solid rgba(255,255,255,.3);background:rgba(15,20,27,.4);opacity:0;transition:opacity .15s;pointer-events:none;}
 .t-ring.on{opacity:1;}
-.t-ring i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,201,60,.55);border:2px solid var(--coin);}
+.t-ring.brk i{background:rgba(255,70,60,.6);border-color:#ff5a4f;}
+.t-ring::after{content:'';position:absolute;left:12px;right:12px;top:82px;border-top:1px dashed rgba(255,90,80,.6);}
+.t-ring i{position:absolute;left:50%;top:48px;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,201,60,.55);border:2px solid var(--coin);}
 #touch button{pointer-events:auto;touch-action:none;background:rgba(15,20,27,.55);border:1px solid rgba(255,255,255,.18);font-weight:700;font-size:13px;letter-spacing:.06em;}
 #touch button.on{background:rgba(255,201,60,.35);border-color:var(--coin);}
-.t-right{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:64px 84px;grid-template-rows:56px 84px;gap:10px;}
-.t-right .t-gas{grid-row:1/span 2;grid-column:2;}
+body.touch .h-nitro, body.touch .nitro-l span:first-child{display:none;}
 body.touch .hud-br{bottom:auto;right:auto;left:max(16px,env(safe-area-inset-left,0px));top:calc(max(14px,env(safe-area-inset-top,0px)) + 132px);transform:scale(.7);transform-origin:top left;}
 body.touch .keys{display:none;}
 
@@ -236,8 +237,7 @@ body.touch .keys{display:none;}
   <div id="countdown" hidden></div>
 
   <div id="touch" hidden>
-    <div class="t-steer" id="steerPad" aria-label="Drag left or right to steer"><div class="t-hint">◀ Drag to steer ▶</div><div class="t-ring" id="steerRing"><i id="steerKnob"></i></div></div>
-    <div class="t-right"><button type="button" data-t="nitro">NITRO</button><button type="button" data-t="gas" class="t-gas">GAS</button><button type="button" data-t="brake">BRAKE</button></div>
+    <div class="t-steer" id="steerPad" aria-label="Hold to drive, slide to steer, pull down to brake"><div class="t-hint">Hold to drive · slide ◀ ▶ to steer · pull ▼ to brake</div><div class="t-ring" id="steerRing"><i id="steerKnob"></i></div></div>
   </div>
 
   <div id="results" class="screen center" hidden>
@@ -845,13 +845,14 @@ document.querySelectorAll('#touch button').forEach(b => {
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
   b.addEventListener('contextmenu', e => e.preventDefault());
 });
-// drag anywhere below the HUD to steer: the anchor sits where the thumb lands and follows it past full lock
-const steerPad = $('#steerPad'), steerRing = $('#steerRing'), steerKnob = $('#steerKnob'), STEER_R = 70;
-let steerId = null, steerX0 = 0;
-function steerReset(){ steerId = null; touch.steer = 0; steerRing.classList.remove('on'); }
+// one-thumb driving: holding a finger down is the gas, sliding sideways steers, pulling down brakes/reverses.
+// The anchor sits where the thumb lands and follows it past full lock.
+const steerPad = $('#steerPad'), steerRing = $('#steerRing'), steerKnob = $('#steerKnob'), STEER_R = 70, BRAKE_DY = 34;
+let steerId = null, steerX0 = 0, steerY0 = 0;
+function steerReset(){ steerId = null; touch.steer = 0; touch.gas = false; touch.brake = false; steerRing.classList.remove('on', 'brk'); }
 steerPad.addEventListener('pointerdown', e => {
   if (steerId !== null) return;
-  e.preventDefault(); steerId = e.pointerId; steerX0 = e.clientX; touch.steer = 0;
+  e.preventDefault(); steerId = e.pointerId; steerX0 = e.clientX; steerY0 = e.clientY; touch.steer = 0; touch.gas = true; touch.brake = false;
   try { steerPad.setPointerCapture(e.pointerId); } catch (x) {}
   const r = steerPad.getBoundingClientRect();
   steerRing.style.left = (e.clientX - r.left) + 'px'; steerRing.style.top = (e.clientY - r.top) + 'px';
@@ -862,7 +863,9 @@ steerPad.addEventListener('pointermove', e => {
   let dx = e.clientX - steerX0;
   if (Math.abs(dx) > STEER_R){ steerX0 = e.clientX - Math.sign(dx)*STEER_R; dx = Math.sign(dx)*STEER_R; }
   const r = steerPad.getBoundingClientRect();
-  steerRing.style.left = (steerX0 - r.left) + 'px'; steerKnob.style.transform = `translateX(${dx}px)`;
+  const dy = Math.max(-10, Math.min(70, e.clientY - steerY0)), brk = dy > BRAKE_DY;
+  steerRing.style.left = (steerX0 - r.left) + 'px'; steerKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  touch.gas = !brk; touch.brake = brk; steerRing.classList.toggle('brk', brk);
   touch.steer = -Math.sign(dx) * Math.max(0, Math.abs(dx) - 6) / (STEER_R - 6);
 });
 ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => steerPad.addEventListener(ev, e => { if (e.pointerId === steerId) steerReset(); }));
@@ -876,7 +879,7 @@ function readInput(){
     brake: (k.KeyS || k.ArrowDown || touch.brake) ? 1 : 0,
     steer: Math.max(-1, Math.min(1, ((k.KeyA || k.ArrowLeft) ? 1 : 0) - ((k.KeyD || k.ArrowRight) ? 1 : 0) + (touch.steer || 0))),
     hand: !!(k.Space),
-    nitro: !!(k.ShiftLeft || k.ShiftRight || touch.nitro),
+    nitro: !!(k.ShiftLeft || k.ShiftRight),
   };
 }
 const NO_INPUT = {throttle:0, brake:0, steer:0, hand:false, nitro:false};
@@ -1066,11 +1069,11 @@ function renderGarage(){
     ['0–100', c.accel/38, st.accel/38, (100/3.6/st.accel*1.35).toFixed(1) + ' s'],
     ['Grip', c.grip/12.5, st.grip/12.5, st.grip.toFixed(1)],
     ['Nitro', 2/6, st.nitro/6, st.nitro.toFixed(1) + ' s'],
-  ];
+  ].filter(b => !(isTouch && b[0] === 'Nitro'));
   let html = `<h2>Workshop</h2><div><div class="car-title">${c.name}</div><div class="car-blurb">${c.blurb}</div></div>`;
   html += `<div class="stats">${bars.map(b => `<span class="lb">${b[0]}</span><span class="bar"><i style="width:${(b[1]*100).toFixed(1)}%"></i><i style="left:${(b[1]*100).toFixed(1)}%;width:${((b[2]-b[1])*100).toFixed(1)}%"></i></span><span class="val">${b[3]}</span>`).join('')}</div>`;
   if (owned){
-    html += `<div class="upgs">${UPGRADES.map(g => {
+    html += `<div class="upgs">${UPGRADES.filter(g => !(isTouch && g.key === 'nitro')).map(g => {
       const lv = u[g.key], maxed = lv >= MAX_LVL, cost = upgCost(c.id, lv);
       return `<div class="upg"><div><span class="un">${g.name}</span> <span class="ud">Lv ${lv}/${MAX_LVL} · ${g.desc}</span></div><div class="pips">${Array.from({length:MAX_LVL}, (_, i) => `<span class="${i < lv ? 'on' : ''}"></span>`).join('')}</div>`
         + `<button type="button" data-up="${g.key}" ${maxed || save.coins < cost ? 'disabled' : ''}>${maxed ? 'MAXED' : 'Buy · ' + cost.toLocaleString()}</button></div>`;
