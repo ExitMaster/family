@@ -1241,7 +1241,7 @@ function stepCar(dt, inp){
   const sf = Math.min(1, sp/5) * (1 - 0.42*Math.min(1, sp/(S.top*1.15)));
   car.h += S.turn * car.steer * sf * (inp.hand ? 1.5 : 1) * (fwd < 0 ? -1 : 1) * dt;
   const grip = S.grip * (inp.hand ? 0.17 : 1) * (off ? 0.6 : 1) * (track.def.grip || 1) * (1 - 0.45*Math.pow(wear, 1.5));
-  if (track.pit && mode === 'race') car.wear = Math.min(1, wear + Math.abs(fwd)*dt/2000 + (car.slip > 3 ? car.slip*dt*0.004 : 0));
+  if (track.pit && mode === 'race') car.wear = Math.min(1, wear + Math.abs(fwd)*dt/3200 + (car.slip > 3 ? car.slip*dt*0.0025 : 0));
   const dec = Math.exp(-grip*dt); lx *= dec; lz *= dec;
   car.slip = Math.hypot(lx, lz);
   car.vx = fx*fwd + lx; car.vz = fz*fwd + lz; car.fwd = fwd;

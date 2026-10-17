@@ -30,7 +30,7 @@ them on new cars and upgrades.
 - **Champagne party:** win the Grand Prix and you get a 50-second celebration — two bottles
   spraying from your car, confetti over the screen, a cork pop and fizz. Tap (or press a key)
   to bring up the results while the party keeps going.
-- **Pit stops (Grand Prix):** tires wear fast as you drive (worn out early in lap 2) (faster when you slide), costing grip
+- **Pit stops (Grand Prix):** tires wear as you drive (worn out around the end of lap 2) (faster when you slide), costing grip
   and a little top speed — watch the TIRES bar. The pit lane is on the right of the main
   straight: the inner wall swings out to let you in, there's a 72 km/h limiter, and you stop
   in the yellow PIT box in front of your garage for a 2.5 s stop that fits fresh tires and
