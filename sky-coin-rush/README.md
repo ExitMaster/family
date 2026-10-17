@@ -10,7 +10,7 @@ the home airfield and fly anywhere you like over an endless open world, as high 
 
 | | |
 |---|---|
-| Fly (left/right turns, up climbs, down dives) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
+| Fly (left/right turns, up climbs, down dives; hold up to loop) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Auto-land at home | `L` (or `Q`) or the **LAND** button |
 | Pause | `ESC` or `P` |
@@ -25,6 +25,10 @@ control stick: push down to climb.
   when it says **Climb!** hold up to lift off.
 - **Fly anywhere.** Left/right banks the plane into a turn; up/down pitches the nose to
   climb or dive. Let go and the nose slowly levels out.
+- **Loops.** There's no limit on how far the nose can go: keep holding up and the plane
+  flies right over the top, upside down, and round to level again (+200 for each full
+  loop). The camera follows you round. Let go while upside down and the plane rolls back
+  right way up by itself.
 - **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
   every direction, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
   haze clears as you climb. The top is 19,700 ft (6,000 m); there's a call-out when you
