@@ -21,7 +21,7 @@ them on new cars and upgrades.
 ## Modes
 
 - **Time Trial** — solo, pick any of the 7 tracks below and chase medal times.
-- **Race** — the Grand Prix: 5 big laps of an F1-style oval (grandstands, pit garages,
+- **Race** — the Grand Prix: 3 big laps of an F1-style oval (grandstands, pit garages,
   five red start lights) against 5 rival formula cars — Blaze, Comet, Dash, Nova and Rocket.
   Rivals only appear here. They're tuned to be beatable: a clean run at bronze-medal pace
   wins, and they ease off if they get far ahead. Your position shows next to the lap counter.
@@ -44,12 +44,14 @@ Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo
 
 ## Tracks (7)
 
+Every race is 3 laps.
+
 | Track | Laps | Notes |
 |---|---|---|
-| Pine Loop | 2 | forest, the easy one |
-| Red Canyon | 2 | desert rocks and mesas |
-| Harbor Night | 2 | night — headlights on |
-| Sunset Coast | 2 | beach, palms, ocean |
-| Speed Bowl | 4 | oval with grandstands, flat-out |
-| Frost Pass | 2 | falling snow, slippery road |
+| Pine Loop | 3 | forest, the easy one |
+| Red Canyon | 3 | desert rocks and mesas |
+| Harbor Night | 3 | night — headlights on |
+| Sunset Coast | 3 | beach, palms, ocean |
+| Speed Bowl | 3 | oval with grandstands, flat-out |
+| Frost Pass | 3 | falling snow, slippery road |
 | Neon City | 3 | night city — headlights on |
