@@ -105,6 +105,10 @@ kbd{font-family:var(--ui);font-size:10px;border:1px solid var(--line);padding:0 
 .hud-tl{position:absolute;top:max(14px,env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:2px;padding:10px 18px 8px 14px;}
 .h-lap{font-size:12px;letter-spacing:.16em;color:var(--mute);}
 .h-lap b{color:var(--fg);font-size:15px;}
+.h-pos{margin-left:16px;}
+.h-pos b{color:var(--coin);font-size:20px;}
+.stand li.me span{color:var(--coin);font-weight:700;}
+.stand .sw{display:inline-block;width:9px;height:9px;margin-right:8px;vertical-align:0;}
 .h-time{font-family:var(--display);font-size:52px;line-height:.85;font-variant-numeric:tabular-nums;}
 .h-sub{font-size:13px;font-variant-numeric:tabular-nums;color:var(--mute);display:flex;gap:6px;align-items:center;}
 .pb{background:var(--pb);color:#fff;font-weight:700;font-size:10px;padding:1px 5px;letter-spacing:.08em;}
@@ -219,7 +223,7 @@ body.touch .keys{display:none;}
 
   <div id="hud" hidden>
     <div class="hud-tl panel">
-      <div class="h-lap">LAP <b id="hLap">1</b> / <span id="hLaps">2</span></div>
+      <div class="h-lap">LAP <b id="hLap">1</b> / <span id="hLaps">2</span><span class="h-pos">POS <b id="hPos">4</b> / 4</span></div>
       <div class="h-time" id="hTime">0:00.000</div>
       <div class="h-sub"><span class="pb">PB</span><span id="hBest">--:--.---</span></div>
       <div class="h-target"><span class="medal" id="hTargetDot"></span><span id="hTarget"></span></div>
@@ -242,10 +246,11 @@ body.touch .keys{display:none;}
 
   <div id="results" class="screen center" hidden>
     <div class="card panel">
-      <div class="r-head"><h2>Finish</h2><span class="r-flag" id="rFlag"></span></div>
+      <div class="r-head"><h2 id="rPlace">Finish</h2><span class="r-flag" id="rFlag"></span></div>
       <div class="r-time" id="rTime">0:00.000</div>
       <div class="r-medal" id="rMedal"></div>
       <div class="targets" id="rTargets"></div>
+      <ol class="laps stand" id="rStand"></ol>
       <ul class="laps" id="rLaps"></ul>
       <div class="coins" id="rCoins"></div>
       <div class="btns"><button type="button" class="pri" id="againBtn">Race again</button><button type="button" id="toGarageBtn">Garage</button></div>
@@ -646,6 +651,7 @@ function buildMinimap(){
 }
 function drawMinimap(){
   const S = mini.width; mctx.clearRect(0, 0, S, S); mctx.drawImage(miniBase, 0, 0);
+  ais.forEach(a => { const [ax, ay] = miniMap(a.x, a.z); mctx.fillStyle = hex(a.def.color); mctx.strokeStyle = '#0b0f14'; mctx.lineWidth = 3; mctx.beginPath(); mctx.arc(ax, ay, 7, 0, Math.PI*2); mctx.stroke(); mctx.fill(); });
   const [x, y] = miniMap(car.x, car.z);
   mctx.save(); mctx.translate(x, y); mctx.rotate(-car.h);
   mctx.fillStyle = '#ffc93c'; mctx.strokeStyle = '#0b0f14'; mctx.lineWidth = 3;
@@ -674,6 +680,9 @@ function glowCanvas(w, h, cx, cy, r, rgb, a0){
 const addMat = (map, opacity) => new THREE.MeshBasicMaterial({map, transparent:true, opacity, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4});
 function buildCar(def){
   if (carMesh){ scene.remove(carMesh.root); disposeTree(carMesh.root); }
+  return (carMesh = makeCarMesh(def));
+}
+function makeCarMesh(def){
   const sh = SHAPES[def.shape], root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const paint = new THREE.MeshStandardMaterial({color:def.color, metalness:0.35, roughness:0.38});
   const dark = new THREE.MeshStandardMaterial({color:0x1a1d22, metalness:0.2, roughness:0.7});
@@ -772,8 +781,7 @@ function buildCar(def){
     root.add(pivot); wheels.push(spin); if (i < 2) pivots.push(pivot);
   });
   scene.add(root);
-  carMesh = {root, body, wheels, pivots, r:sh.r, len:sh.L, w:sh.W, night, tailM, tailGlowM, tailSprites, bar:extra.bar};
-  return carMesh;
+  return {root, body, wheels, pivots, r:sh.r, len:sh.L, w:sh.W, night, tailM, tailGlowM, tailSprites, bar:extra.bar};
 }
 
 /* ================= Effects: skid marks + smoke ================= */
@@ -942,6 +950,114 @@ function stepCar(dt, inp){
 }
 function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 
+/* ================= AI rivals ================= */
+// Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
+// scaled so a clean lap lands just slower than bronze pace. They ease off when far ahead (beatable on purpose).
+const RIVALS = [{name:'Blaze', pace:1.02, lane:-2.4}, {name:'Comet', pace:1.1, lane:2.4}, {name:'Dash', pace:1.2, lane:0}];
+let ais = [];
+function trackPoint(d){
+  const L = track.length, N = track.N, u = (((d % L) + L) % L) / L * N, i = Math.floor(u) % N, f = u - Math.floor(u), a = track.s[i], b = track.s[(i + 1) % N];
+  const tx = a.tx + (b.tx - a.tx)*f, tz = a.tz + (b.tz - a.tz)*f, l = Math.hypot(tx, tz) || 1;
+  return {x:a.x + (b.x - a.x)*f, z:a.z + (b.z - a.z)*f, nx:-tz/l, nz:tx/l, h:Math.atan2(tx, tz), i};
+}
+function aiProfile(){
+  if (track.ai) return track.ai;
+  const s = track.s, N = track.N, ds = track.length / N, K = 6, LAT = 13;
+  const v = new Float32Array(N), ins = new Float32Array(N);
+  for (let i = 0; i < N; i++){
+    const a = s[(i - K + N) % N], b = s[(i + K) % N], dtx = b.tx - a.tx, dtz = b.tz - a.tz;
+    const kap = Math.hypot(dtx, dtz) / (2*K*ds);
+    v[i] = Math.min(60, Math.sqrt(LAT / Math.max(kap, 1e-4)));
+    ins[i] = Math.sign(dtx*s[i].nx + dtz*s[i].nz) * Math.min(1, kap*25) * 3;
+  }
+  for (let pass = 0; pass < 2; pass++) for (let j = N - 1; j >= 0; j--){ const n = (j + 1) % N; v[j] = Math.min(v[j], Math.sqrt(v[n]*v[n] + 2*LAT*ds)); }
+  let T = 0; for (let i = 0; i < N; i++) T += ds / v[i];
+  return (track.ai = {v, ins, lapT:T});
+}
+function nameTag(text, color){
+  const t = canvasTex(256, 64, (c, w, h) => { c.fillStyle = 'rgba(12,16,22,.78)'; c.fillRect(0, 8, w, h - 16); c.fillStyle = color; c.fillRect(0, 8, 10, h - 16); c.font = '600 40px Teko, Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#fff'; c.fillText(text.toUpperCase(), w/2 + 5, h/2 + 2); });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:t, transparent:true, depthWrite:false})); sp.scale.set(2.8, 0.7, 1); sp.position.y = 2.7; return sp;
+}
+function clearAis(){ ais.forEach(a => { scene.remove(a.m.root); disposeTree(a.m.root); }); ais = []; }
+function spawnAis(){
+  clearAis();
+  const prof = aiProfile(), bronzeLap = track.medals.bronze / track.laps;
+  const pool = CARS.filter(c => c.id !== save.selected), rnd = mulberry(Date.now() % 100000);
+  const grid = [[-6, -2.8], [-6, 2.8], [-14, -2.8]];
+  RIVALS.forEach((r, k) => {
+    const def = pool.splice(Math.floor(rnd()*pool.length), 1)[0], m = makeCarMesh(def);
+    m.root.add(nameTag(r.name, hex(def.color)));
+    const a = {name:r.name, def, m, k:prof.lapT / (bronzeLap * r.pace), d:grid[k][0], lat:grid[k][1], latT:grid[k][1], lane:r.lane, v:0, fin:null, x:0, z:0, h:0};
+    ais.push(a); poseAi(a, 0, 0);
+  });
+}
+function poseAi(a, dt, latVel){
+  const p = trackPoint(a.d), h = p.h - Math.atan2(latVel, Math.max(a.v, 2));
+  const dh = Math.atan2(Math.sin(h - a.h), Math.cos(h - a.h));
+  a.x = p.x + p.nx*a.lat; a.z = p.z + p.nz*a.lat; a.h = h;
+  const m = a.m; m.root.position.set(a.x, 0, a.z); m.root.rotation.y = h;
+  if (dt > 0){ m.wheels.forEach(w => w.rotation.x += a.v*dt / m.r); const st = Math.max(-0.45, Math.min(0.45, dh / dt * 0.35)); m.pivots.forEach(pv => pv.rotation.y += (st - pv.rotation.y) * Math.min(1, dt*8)); }
+}
+function playerDist(){
+  let d = track.s[car.idx].dist;
+  if (race.hit.size === 0 && car.idx > track.N*0.5) d -= track.length;
+  return (race.lap - 1)*track.length + d;
+}
+function updateAis(dt){
+  if (!ais.length) return;
+  const L = track.length, N = track.N, prof = track.ai, go = mode === 'race' || mode === 'results';
+  const pd = mode === 'results' ? race.finD : playerDist();
+  const others = [{d:pd, lat:car.lat, v:Math.max(0, car.fwd)}].concat(ais);
+  ais.forEach(a => {
+    let target = 0, latT = a.latT;
+    if (go){
+      const i = Math.floor((((a.d % L) + L) % L) / L * N) % N, lim = HALF - 1.4;
+      target = prof.v[i] * a.k;
+      const lead = a.d - pd;
+      if (mode === 'race' && lead > 40) target *= Math.max(0.78, 1 - (lead - 40) / 300);
+      else if (mode === 'race' && lead < -90) target *= 1.05;
+      latT = Math.max(-lim, Math.min(lim, a.lane*0.5 + prof.ins[(i + 14) % N]));
+      others.forEach(o => {
+        if (o === a) return;
+        const gap = o.d - a.d;
+        if (gap > 0 && gap < 16 && Math.abs(o.lat - a.lat) < 2.5){
+          const side = a.lat >= o.lat ? 1 : -1;
+          let c = o.lat + side*3.2; if (Math.abs(c) > lim) c = o.lat - side*3.2;
+          latT = Math.max(-lim, Math.min(lim, c));
+          if (gap < 7) target = Math.min(target, o.v * 0.97);
+        }
+      });
+    }
+    a.latT = latT;
+    const v0 = a.v;
+    a.v = a.v < target ? Math.min(target, a.v + 11*dt) : Math.max(target, a.v - 20*dt);
+    a.d += a.v*dt;
+    const dl = Math.max(-2.4*dt, Math.min(2.4*dt, a.latT - a.lat)); a.lat += dl;
+    if (a.fin === null && a.d >= track.laps*L && mode !== 'countdown') a.fin = race.time;
+    poseAi(a, dt, dt > 0 ? dl / dt : 0);
+    carLights(a.m, a.v < v0 - 6*dt && a.v > 1);
+  });
+}
+function collideAis(){
+  ais.forEach(a => {
+    const dx = car.x - a.x, dz = car.z - a.z, d = Math.hypot(dx, dz), R = 2.4;
+    if (d >= R || d < 1e-3) return;
+    const nx = dx/d, nz = dz/d, push = R - d, p = trackPoint(a.d);
+    car.x += nx*push*0.6; car.z += nz*push*0.6;
+    a.lat -= (nx*p.nx + nz*p.nz) * push*0.4;
+    const ax = Math.sin(a.h), az = Math.cos(a.h), rel = (car.vx - ax*a.v)*nx + (car.vz - az*a.v)*nz;
+    if (rel < 0){
+      car.vx -= nx*rel*0.8; car.vz -= nz*rel*0.8;
+      a.v = Math.max(0, a.v + rel*0.5*-(nx*ax + nz*az));
+      car.bump = Math.min(1, Math.max(car.bump, -rel/12));
+      if (rel < -3) beep(90, 0.12, 'triangle', 0.1);
+    }
+  });
+}
+function racePosition(){ const pd = playerDist(); return 1 + ais.filter(a => a.fin !== null || a.d > pd).length; }
+const ORD = n => n + (['th','st','nd','rd'][n] || 'th');
+
 /* ================= Game state ================= */
 let mode = 'garage';
 let viewCar = save.selected;
@@ -954,8 +1070,9 @@ function startRace(){
   const def = carById(save.selected);
   buildCar(def);
   car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0;
-  placeCar(track.N - 9, 0);
+  { const p = trackPoint(-14); car.x = p.x + p.nx*2.8; car.z = p.z + p.nz*2.8; car.h = p.h; car.vx = car.vz = car.fwd = car.steer = car.slip = 0; car.idx = nearest(car.x, car.z, 0, true); }
   clearSkids();
+  spawnAis();
   Object.assign(race, {time:0, lap:1, lapStart:0, lapTimes:[], hit:new Set(), prevIdx:car.idx, count:3.6, countStep:4, finished:false});
   race.cps = [0.25, 0.5, 0.75].map(f => Math.floor(track.N * f));
   mode = 'countdown';
@@ -1006,13 +1123,19 @@ const MEDAL_NAME = {gold:'Gold', silver:'Silver', bronze:'Bronze'};
 const MEDAL_RANK = {gold:3, silver:2, bronze:1};
 
 function finishRace(){
+  race.finD = track.laps * track.length;
   mode = 'results';
   const T = race.time, id = track.def.id, prev = save.best[id], medal = medalFor(T);
+  // final order: rivals still running get an estimate from their remaining distance at race pace
+  const field = [{name:'You', me:true, t:T, color:carMesh ? hex(carById(save.selected).color) : '#fff'}].concat(ais.map(a => ({name:a.name, t:a.fin !== null ? a.fin : T + Math.max(0, track.laps*track.length - a.d) / (track.length / (track.ai.lapT / a.k)), color:hex(a.def.color)})));
+  field.sort((p, q) => p.t - q.t);
+  const place = field.findIndex(p => p.me) + 1;
+  const placeBonus = Math.round(track.pay * ([0, 0.5, 0.25, 0.1][place] || 0) / 5) * 5;
   const isPB = !prev || T < prev;
   const timeCoins = Math.max(10, Math.round(track.pay * track.medals.bronze / T));
   const medalBonus = medal === 'gold' ? track.pay : medal === 'silver' ? Math.round(track.pay*0.5) : medal === 'bronze' ? Math.round(track.pay*0.25) : 0;
   const pbBonus = isPB && prev ? 30 : 0;
-  const total = timeCoins + medalBonus + pbBonus;
+  const total = timeCoins + medalBonus + pbBonus + placeBonus;
   save.coins += total;
   if (isPB) save.best[id] = T;
   if (medal && (!save.medal[id] || MEDAL_RANK[medal] > MEDAL_RANK[save.medal[id]])) save.medal[id] = medal;
@@ -1022,9 +1145,12 @@ function finishRace(){
   $('#rFlag').innerHTML = isPB ? '<span class="pb">PERSONAL BEST</span>' : `<span style="color:var(--mute)">PB ${fmt(prev)} · +${fmt(T - prev, true)}</span>`;
   $('#rMedal').innerHTML = medal ? `<span class="medal ${medal}"></span>${MEDAL_NAME[medal]} medal · ${track.def.name}` : `<span class="medal"></span>No medal yet · beat ${fmt(track.medals.bronze)} for Bronze`;
   $('#rTargets').innerHTML = ['gold','silver','bronze'].map(m => `<div class="${T <= track.medals[m] ? 'hit' : ''}"><span class="medal ${m}"></span>${fmt(track.medals[m])}</div>`).join('');
+  $('#rPlace').textContent = place === 1 ? '1st place!' : ORD(place) + ' place';
+  $('#rStand').innerHTML = field.map((p, i) => `<li class="${p.me ? 'me' : ''}"><span>${i + 1}. <i class="sw" style="background:${p.color}"></i>${p.name}</span><span>${p.me || ais.find(a => a.name === p.name).fin !== null ? fmt(p.t) : '+' + fmt(p.t - T, true)}</span></li>`).join('');
   const bestLap = Math.min(...race.lapTimes);
   $('#rLaps').innerHTML = race.lapTimes.map((t, i) => `<li class="${t === bestLap && race.lapTimes.length > 1 ? 'best' : ''}"><span>Lap ${i+1}</span><span>${fmt(t)}</span></li>`).join('');
   $('#rCoins').innerHTML = `<div><span>Time bonus (${fmt(track.medals.bronze)} pays ${track.pay})</span><span>+${timeCoins}</span></div>`
+    + (placeBonus ? `<div><span>${ORD(place)} place</span><span>+${placeBonus}</span></div>` : '')
     + (medalBonus ? `<div><span>${MEDAL_NAME[medal]} medal</span><span>+${medalBonus}</span></div>` : '')
     + (pbBonus ? `<div><span>New personal best</span><span>+${pbBonus}</span></div>` : '')
     + `<div class="tot"><span>Earned</span><span id="rTot">+0</span></div>`;
@@ -1042,6 +1168,7 @@ function resumeGame(){ if (mode !== 'paused') return; mode = race.pausedFrom; $(
 function toGarage(){
   mode = 'garage'; viewCar = save.selected;
   ['#hud', '#touch', '#results', '#pause', '#countdown'].forEach(s => $(s).hidden = true);
+  clearAis();
   $('#garage').hidden = false;
   showPreview(); renderGarage();
 }
@@ -1161,6 +1288,7 @@ function frame(now){
     if (mode === 'countdown') updateCountdown(dt);
     const sub = 3, h = dt / sub;
     for (let k = 0; k < sub; k++) stepCar(h, mode === 'countdown' ? NO_INPUT : inp);
+    updateAis(dt); collideAis();
     if (mode === 'race') updateRace(dt, inp);
     syncCarMesh(dt, inp);
     effects(dt, inp);
@@ -1241,6 +1369,7 @@ function setText(id, v){ if (hudLast[id] !== v){ hudLast[id] = v; document.getEl
 function updateHud(dt){
   setText('hTime', fmt(race.time));
   setText('hLap', String(race.lap));
+  setText('hPos', String(racePosition()));
   const sp = Math.abs(car.fwd);
   setText('hSpd', String(kmh(sp)));
   const r = Math.max(0, car.fwd) / car.stats.top * 6;

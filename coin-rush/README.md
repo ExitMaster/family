@@ -18,9 +18,16 @@ them on new cars and upgrades.
 | Pause | `ESC` |
 | Phone / tablet | one thumb: hold anywhere to drive, slide left/right to steer, pull down to brake or reverse (no nitro on phones) |
 
+## Rivals
+
+Three computer drivers (Blaze, Comet, Dash) race you every time, in random cars from the
+showroom. They're tuned to be beatable: a clean run at bronze-medal pace wins, and they
+ease off if they get far ahead. Your position shows next to the lap counter.
+
 ## Coins
 
 - Every finish pays coins: beating the bronze time pays the track's full rate, slower times pay less.
+- Finishing 1st / 2nd / 3rd adds a place bonus.
 - Gold / silver / bronze medals add a bonus, and a new personal best adds +30.
 - Progress is saved in the browser (`localStorage`).
 
