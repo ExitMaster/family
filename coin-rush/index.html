@@ -233,7 +233,7 @@ body.touch .keys{display:none;}
       <section class="panel" id="shop" aria-label="Workshop"></section>
     </div>
     <footer class="g-bottom panel">
-      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 7 tracks</small></button><button type="button" data-mode="race">Race<small>vs 9 rivals</small></button></div>
+      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 7 tracks</small></button><button type="button" data-mode="race">Race<small>vs 5 rivals</small></button></div>
       <div class="tracks" id="trackList" role="group" aria-label="Choose a track"></div>
       <div class="race-col">
         <button class="race-btn" id="raceBtn" type="button">RACE</button>
@@ -1036,15 +1036,11 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
 // scaled well past medal pace, but capped below your car's top speed and slowed when far ahead, so they stay beatable.
 const RIVALS = [
-  {name:'Blaze',  pace:0.57, lane:-5,   color:0xe0473c, box:-50,  pitLap:2},
-  {name:'Comet',  pace:0.59, lane:5,    color:0x2fd1d6, box:-30,  pitLap:1},
-  {name:'Viper',  pace:0.60, lane:-2.5, color:0x1fae74, box:-10,  pitLap:2},
-  {name:'Dash',   pace:0.62, lane:2.5,  color:0xffc21f, box:10,   pitLap:1},
-  {name:'Storm',  pace:0.64, lane:-6,   color:0x9aa3ad, box:30,   pitLap:2},
-  {name:'Nova',   pace:0.65, lane:6,    color:0x3d6cf5, box:50,   pitLap:1},
-  {name:'Rocket', pace:0.68, lane:0,    color:0xff7a3d, box:70,   pitLap:2},
-  {name:'Bolt',   pace:0.70, lane:-4,   color:0xb46bff, box:-106, pitLap:1},
-  {name:'Flash',  pace:0.73, lane:4,    color:0xff5fa2, box:-126, pitLap:2},
+  {name:'Blaze',  pace:0.80, lane:-5,   color:0xe0473c, box:-50,  pitLap:2},
+  {name:'Comet',  pace:0.83, lane:5,    color:0x2fd1d6, box:-30,  pitLap:1},
+  {name:'Dash',   pace:0.88, lane:2.5,  color:0xffc21f, box:10,   pitLap:1},
+  {name:'Nova',   pace:0.93, lane:6,    color:0x3d6cf5, box:50,   pitLap:1},
+  {name:'Rocket', pace:1.00, lane:0,    color:0xff7a3d, box:70,   pitLap:2},
 ];
 // two-wide grid, 8 m between rows; the last slot is yours
 const GRID = Array.from({length:RIVALS.length + 1}, (_, i) => [-6 - Math.floor(i/2)*8 - (i === RIVALS.length ? 1 : 0), i % 2 ? 5.5 : -5.5]);
@@ -1110,8 +1106,8 @@ function updateAis(dt){
       const lead = a.d - pd;
       if (mode === 'race' && lead > 50) target *= Math.max(0.72, 1 - (lead - 50) / 250);
       else if (mode === 'race' && lead < -90) target *= 1.05;
-      // never faster than 95% of your car's top speed, so you can always reel them in on a straight
-      target = Math.min(target, car.stats.top * 0.95);
+      // never faster than 90% of your car's top speed, so you can always reel them in on a straight
+      target = Math.min(target, car.stats.top * 0.9);
       latT = Math.max(-lim, Math.min(lim, a.lane*0.5 + prof.ins[(i + 14) % N]));
       others.forEach(o => {
         if (o === a) return;
