@@ -52,6 +52,9 @@ each; crushed cars pop back up after 5 s), Apex GT, Drift King (low grip, loves 
 Jet Streak (3,000 coins, tops out at 1,440 km/h — floor it down a straight and it breaks the
 sound barrier with a sonic boom at Mach 1, 1,235 km/h; its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
 
+Every car except the Jet Streak got a +50% boost to top speed and acceleration (the Grand Prix
+rivals too).
+
 Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo**
 (acceleration), **Tires** (grip and steering), **Nitro** (boost length).
 
