@@ -16,6 +16,7 @@ version of Coin Rush. Two modes:
 |---|---|
 | Steer (up / down / left / right) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
 | Autopilot (Coin Rush) | `Q` or the **AP** button |
+| Auto-land at home (Free flight) | `L` (or `Q`) or the **LAND** button |
 | Boost (Free flight) | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Pause | `ESC` or `P` |
 | Phone / tablet | drag anywhere: a joystick appears where your finger lands |
@@ -39,8 +40,14 @@ plane speeds up by itself, and you hold up to lift off once it says **Climb!**
   the distance to the airfield with an arrow pointing to it.
 - **Coins and orange rings** float in clusters all around you, some of them high in the
   sky. Coins chain like in Coin Rush; rings give a boost.
-- **Land back home** on the runway any time (+100, once per 5 seconds). On the ground,
-  hold down to brake, or hold up past takeoff speed to fly again.
+- **Land back home** any time (+100, once per 5 seconds). The whole flat meadow around
+  the runway counts, not just the runway, and a tall yellow **beacon** beside the runway
+  shows where it is from far away. Below 80 m over the airfield the screen says
+  "Airfield below". After touching down the brakes stop the plane by themselves; hold up
+  to roll again and take off.
+- **Auto-land:** tap **LAND** (or press `L`) and the plane flies itself home (boosting
+  when it's far away), lines up 1.6 km out, follows a 6% glide path down and lands.
+  Steer yourself, or tap LAND again, to take back control.
 - **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
   put back in the air 220 m above the spot.
 - No lives, fuel or obstacles in Free flight. Pause and press **End flight** to go back
@@ -59,6 +66,10 @@ plane speeds up by itself, and you hold up to lift off once it says **Climb!**
    **PAPI lights** like a real airport: two white and two red means you're on the glide
    path, more white means too high, more red means too low. Line up with the runway and
    touch down on it.
+   - **Landing helper:** in the last 300 m the plane eases itself onto the centreline and
+     down the glide path when you're not pushing up or down (your own input always wins).
+     Within 100 m of the runway, lined up and low, it lands by itself ("Auto-landing").
+     Touching down anywhere within a few metres of the runway's sides counts.
    - Landing gives a full tank, +1 life (up to 3), +1 autopilot charge (up to 5) and a
      bonus: 200 points, up to +150 for landing near the centreline, +150 more for a soft
      "butter" landing.
