@@ -248,7 +248,7 @@ body.touch .keys{display:none;}
       <section class="panel" id="shop" aria-label="Workshop"></section>
     </div>
     <footer class="g-bottom panel">
-      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 7 tracks</small></button><button type="button" data-mode="race">Race<small>vs 5 rivals</small></button></div>
+      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 11 tracks</small></button><button type="button" data-mode="race">Race<small>vs 5 rivals</small></button></div>
       <div class="tracks" id="trackList" role="group" aria-label="Choose a track"></div>
       <div class="race-col">
         <button class="race-btn" id="raceBtn" type="button">RACE</button>
@@ -355,6 +355,14 @@ const TRACKS = [
    pts:[[0,0],[150,0],[210,30],[230,90],[210,150],[150,180],[0,180],[-150,180],[-210,150],[-230,90],[-210,30],[-150,0]]},
   {id:'city', name:'Neon City', laps:2, pay:1.3, theme:'city', scale:1.2, pace:0.95,
    pts:[[0,0],[140,0],[165,25],[165,115],[140,140],[70,140],[45,165],[45,215],[20,240],[-95,240],[-120,215],[-120,25],[-95,0]]},
+  {id:'volcano', name:'Volcano Ridge', laps:2, pay:1.3, theme:'volcano', scale:1.3,
+   pts:[[0,0],[150,-20],[260,30],[280,140],[200,200],[100,170],[30,230],[-90,220],[-170,140],[-150,40]]},
+  {id:'jungle', name:'Jungle Run', laps:2, pay:1.2, theme:'jungle', scale:1.25,
+   pts:[[0,0],[120,-40],[230,-10],[275,90],[195,155],[235,245],[130,295],[30,245],[-60,295],[-175,235],[-160,130],[-215,40],[-110,-25]]},
+  {id:'moon', name:'Moon Base', laps:2, pay:1.3, theme:'moon', scale:1.2, pace:0.9, grip:0.85,
+   pts:[[0,0],[180,0],[280,80],[240,200],[120,240],[0,180],[-120,240],[-240,180],[-260,60],[-150,-10]]},
+  {id:'candy', name:'Candy Land', laps:2, pay:1.1, theme:'candy', scale:1.3,
+   pts:[[0,0],[150,-30],[250,40],[210,145],[265,235],[155,290],[60,225],[-40,280],[-155,230],[-130,130],[-195,50],[-110,-25]]},
 ];
 const HALF = 15;          // half road width, meters
 const WALL = HALF + 4;    // tire wall distance from center line
@@ -428,6 +436,10 @@ const THEMES = {
   oval:  {sky:0xa4d2f2, fog:[180,700], ground:'#4f8a3d', asphalt:'#383c42', hemi:[0xe4f2ff,0x4f7a3a,0.8], sun:[0xfff6e4,0.95], night:false},
   f1:    {sky:0x8cc8f0, fog:[220,800], ground:'#4c8c3c', asphalt:'#34383e', hemi:[0xe8f4ff,0x4f7a3a,0.82], sun:[0xfff6e4,1.0], night:false, wall:'#e0473c'},
   snow:  {sky:0xc9d6e2, fog:[90,430], ground:'#e8edf2', asphalt:'#4b5059', hemi:[0xf2f7ff,0x9aa9b8,0.85], sun:[0xffffff,0.8], night:false, wall:'#c63b30'},
+  volcano:{sky:0x7a3420, fog:[140,620], ground:'#4a3a34', asphalt:'#3a3432', hemi:[0xffb48a,0x4a2e24,0.9], sun:[0xffb07a,0.95], night:false, wall:'#ff6a10'},
+  jungle:{sky:0xa6dcb4, fog:[70,380], ground:'#2f6b2a', asphalt:'#3a3d40', hemi:[0xe0ffe0,0x2e5a26,0.8], sun:[0xfff2c8,0.85], night:false, wall:'#f2d23c'},
+  moon:  {sky:0x020205, fog:[220,950], ground:'#8d8f94', asphalt:'#4a4c52', hemi:[0xdfe6ff,0x3a3a40,0.55], sun:[0xffffff,1.1], night:false, wall:'#e9eef4'},
+  candy: {sky:0xffd3ea, fog:[150,620], ground:'#f27cb8', asphalt:'#5a3a2a', hemi:[0xfff0fa,0xff9ac8,0.72], sun:[0xffffff,0.75], night:false, wall:'#ff4fa0'},
   city:  {sky:0x111430, fog:[60,380], ground:'#2b2e35', asphalt:'#3b3f46', hemi:[0x8a94d0,0x22252c,0.62], sun:[0xa8b4e0,0.3], night:true, wall:'#e0389a'},
 };
 
@@ -677,6 +689,77 @@ function buildTrack(def){
     placeInst(new THREE.SphereGeometry(2.6, 8, 6), new THREE.MeshLambertMaterial({color:0x3a7a36}), trees, (d,p) => { const k = 0.8 + rnd()*0.7; d.position.set(p[0], 3*k, p[1]); d.scale.set(k, k*1.1, k); d.rotation.set(0,0,0); });
     placeInst(new THREE.CylinderGeometry(0.25, 0.35, 2, 6), new THREE.MeshLambertMaterial({color:0x5b3a24}), trees, (d,p) => { d.position.set(p[0], 1, p[1]); d.scale.set(1,1,1); d.rotation.set(0,0,0); });
     mountains(0x7f9fb0, 600, 22, rnd);
+  } else if (def.theme === 'volcano'){
+    // black rocks, glowing lava pools, a smoking volcano on the horizon
+    const rocks = spots(220, WALL+5, 150);
+    const rk = placeInst(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({color:0xffffff}), rocks, (d,p) => { const k = 1 + rnd()*4; d.position.set(p[0], k*0.3, p[1]); d.scale.set(k*(0.8+rnd()*0.6), k*(0.5+rnd()*0.8), k*(0.8+rnd()*0.6)); d.rotation.set(rnd()*3, rnd()*3, rnd()*3); });
+    const dk = [0x2b2422, 0x3a302c, 0x1f1a19]; rocks.forEach((p, i) => rk.setColorAt(i, new THREE.Color(dk[i%3])));
+    const pools = spots(36, WALL+16, 140).map(p => ({x:p[0], z:p[1], k:4 + rnd()*7, e:0.6 + rnd()*0.6}));
+    const lavaM = new THREE.MeshBasicMaterial({color:0xff5a10});
+    placeInst(new THREE.CircleGeometry(1, 22), lavaM, pools, (d,q) => { d.position.set(q.x, 0.06, q.z); d.rotation.set(-Math.PI/2, 0, 0); d.scale.set(q.k, q.k*q.e, 1); }, false);
+    const glowM = new THREE.MeshBasicMaterial({map:glowCanvas(128, 128, .5, .5, .5, '255,110,30', .65), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
+    placeInst(new THREE.PlaneGeometry(1, 1), glowM, pools, (d,q) => { d.position.set(q.x, 0.09, q.z); d.rotation.set(-Math.PI/2, 0, 0); d.scale.set(q.k*3.4, q.k*3.4*q.e, 1); }, false);
+    mountains(0x3a2a26, 560, 22, rnd);
+    const va = rnd()*Math.PI*2, vx = Math.cos(va)*620, vz = Math.sin(va)*620;
+    const cone = new THREE.Mesh(new THREE.CylinderGeometry(40, 230, 260, 12), new THREE.MeshLambertMaterial({color:0x2e2320})); cone.position.set(vx, 128, vz); world.add(cone);
+    const crater = new THREE.Mesh(new THREE.CircleGeometry(36, 20), new THREE.MeshBasicMaterial({color:0xff6a10, fog:false})); crater.rotation.x = -Math.PI/2; crater.position.set(vx, 258.5, vz); world.add(crater);
+    const smokeM = new THREE.SpriteMaterial({map:smokeTex, color:0x4a3a36, transparent:true, opacity:0.7, depthWrite:false, fog:false});
+    const puffsV = Array.from({length:14}, (_, i) => { const sp = new THREE.Sprite(smokeM); sp.userData.t = i/14; world.add(sp); return sp; });
+    let vt = 0;
+    t.anim = dt => {
+      vt += dt;
+      lavaM.color.setRGB(1, 0.33 + 0.08*Math.sin(vt*2.2), 0.06); glowM.opacity = 0.85 + 0.15*Math.sin(vt*2.2);
+      puffsV.forEach(sp => { const u = (sp.userData.t + vt*0.04) % 1; sp.position.set(vx + u*60, 270 + u*220, vz + Math.sin(u*5)*20); sp.scale.setScalar(60 + u*160); });
+    };
+  } else if (def.theme === 'jungle'){
+    // tall trees with big leafy crowns, bushes underneath
+    const trees = spots(480, WALL+4, 150).map(p => ({x:p[0], z:p[1], h:7 + rnd()*8, c:3 + rnd()*3}));
+    placeInst(new THREE.CylinderGeometry(0.4, 0.65, 1, 7), new THREE.MeshLambertMaterial({color:0x5b4128}), trees, (d,q) => { d.position.set(q.x, q.h/2, q.z); d.scale.set(1, q.h, 1); d.rotation.set(0, 0, 0); });
+    const cr = placeInst(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshLambertMaterial({color:0xffffff}), trees, (d,q) => { d.position.set(q.x, q.h + q.c*0.5, q.z); d.scale.set(q.c, q.c*0.75, q.c); d.rotation.set(0, rnd()*3, 0); });
+    const greens = [0x2f7d32, 0x3f9a3a, 0x1f6a2e, 0x4caf50, 0x2a5d23]; trees.forEach((q, i) => cr.setColorAt(i, new THREE.Color(greens[i%5])));
+    const bush = spots(260, WALL+2.5, 120);
+    const bm = placeInst(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({color:0xffffff}), bush, (d,p) => { const k = 1 + rnd()*1.8; d.position.set(p[0], k*0.5, p[1]); d.scale.set(k*1.3, k, k*1.3); d.rotation.set(0, rnd()*3, 0); });
+    bush.forEach((p, i) => bm.setColorAt(i, new THREE.Color(greens[(i + 2)%5])));
+    const flowers = spots(120, WALL+2, 100);
+    const fm = placeInst(new THREE.SphereGeometry(0.35, 8, 6), new THREE.MeshLambertMaterial({color:0xffffff}), flowers, (d,p) => { d.position.set(p[0], 0.4, p[1]); d.scale.set(1,1,1); d.rotation.set(0,0,0); }, false);
+    const fc = [0xff4f7a, 0xffd23f, 0xff8a1f, 0xb46bff]; flowers.forEach((p, i) => fm.setColorAt(i, new THREE.Color(fc[i%4])));
+    mountains(0x3f6e3c, 520, 24, rnd);
+  } else if (def.theme === 'moon'){
+    // craters, grey rocks, a moon base, the Earth hanging in a black sky
+    const craters = spots(70, WALL+10, 170).map(p => ({x:p[0], z:p[1], k:4 + rnd()*12}));
+    placeInst(new THREE.TorusGeometry(1, 0.14, 6, 28), new THREE.MeshLambertMaterial({color:0xa4a6ac}), craters, (d,q) => { d.position.set(q.x, 0.05, q.z); d.rotation.set(-Math.PI/2, 0, 0); d.scale.set(q.k, q.k, q.k*0.9); });
+    placeInst(new THREE.CircleGeometry(1, 24), new THREE.MeshLambertMaterial({color:0x6f7177}), craters, (d,q) => { d.position.set(q.x, 0.04, q.z); d.rotation.set(-Math.PI/2, 0, 0); d.scale.set(q.k*0.95, q.k*0.95, 1); }, false);
+    const rocks = spots(140, WALL+4, 150);
+    placeInst(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({color:0x9a9ca2}), rocks, (d,p) => { const k = 0.6 + rnd()*2.5; d.position.set(p[0], k*0.3, p[1]); d.scale.set(k, k*0.7, k*1.1); d.rotation.set(rnd()*3, rnd()*3, rnd()*3); });
+    const domes = spots(5, WALL+30, 80);
+    const domeM = new THREE.MeshLambertMaterial({color:0xf2f4f7});
+    domes.forEach(p => {
+      const k = 8 + rnd()*7;
+      const dm = new THREE.Mesh(new THREE.SphereGeometry(k, 20, 10, 0, Math.PI*2, 0, Math.PI/2), domeM); dm.position.set(p[0], 0, p[1]); dm.castShadow = true; world.add(dm);
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 6, 6), new THREE.MeshLambertMaterial({color:0xcfd4da})); ant.position.set(p[0], k + 3, p[1]); world.add(ant);
+      const bl = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), new THREE.MeshBasicMaterial({color:0xff3b30})); bl.position.set(p[0], k + 6.2, p[1]); world.add(bl);
+    });
+    const earthT = canvasTex(256, 128, (c, w, h) => { c.fillStyle = '#1f5fbf'; c.fillRect(0, 0, w, h); const r2 = mulberry(5); c.fillStyle = '#3f9a4a'; for (let k = 0; k < 14; k++){ c.beginPath(); c.ellipse(r2()*w, 20 + r2()*(h - 40), 10 + r2()*30, 6 + r2()*16, r2()*3, 0, Math.PI*2); c.fill(); } c.fillStyle = 'rgba(255,255,255,.8)'; for (let k = 0; k < 18; k++){ c.beginPath(); c.ellipse(r2()*w, r2()*h, 8 + r2()*26, 2 + r2()*5, 0, 0, Math.PI*2); c.fill(); } });
+    const earth = new THREE.Mesh(new THREE.SphereGeometry(70, 32, 20), new THREE.MeshBasicMaterial({map:earthT, fog:false})); earth.position.set(380, 300, -760); world.add(earth);
+    mountains(0x6f7177, 600, 22, rnd);
+    stars(rnd, 1400);
+  } else if (def.theme === 'candy'){
+    // lollipops, candy canes and gumdrops
+    const swirl = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.strokeStyle = '#d8d8d8'; c.lineWidth = 9; c.beginPath(); for (let a = 0; a < Math.PI*8; a += 0.1){ const r = a*2.4; c.lineTo(w/2 + Math.cos(a)*r, h/2 + Math.sin(a)*r); } c.stroke(); });
+    const pops = spots(110, WALL+4, 140).map(p => ({x:p[0], z:p[1], h:4 + rnd()*4, r:1.6 + rnd()*1.2, a:rnd()*3}));
+    placeInst(new THREE.CylinderGeometry(0.13, 0.13, 1, 6), new THREE.MeshLambertMaterial({color:0xfafafa}), pops, (d,q) => { d.position.set(q.x, q.h/2, q.z); d.scale.set(1, q.h, 1); d.rotation.set(0, 0, 0); });
+    const pm = placeInst(new THREE.CylinderGeometry(1, 1, 0.35, 28), new THREE.MeshLambertMaterial({map:swirl}), pops, (d,q) => { d.position.set(q.x, q.h + q.r*0.9, q.z); d.scale.set(q.r, 1, q.r); d.rotation.set(Math.PI/2, q.a, 0, 'YXZ'); });
+    const pc = [0xff4f7a, 0x3fc5ff, 0xffd23f, 0x8a4dff, 0x2fd68a, 0xff8a1f]; pops.forEach((q, i) => pm.setColorAt(i, new THREE.Color(pc[i%6])));
+    const caneT = canvasTex(32, 128, (c, w, h) => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = '#e8202a'; for (let y = -h; y < h*2; y += 24){ c.beginPath(); c.moveTo(0, y); c.lineTo(w, y + 16); c.lineTo(w, y + 28); c.lineTo(0, y + 12); c.closePath(); c.fill(); } });
+    caneT.repeat.set(1, 3);
+    const canes = spots(50, WALL+4, 120).map(p => ({x:p[0], z:p[1], a:rnd()*6}));
+    const caneM = new THREE.MeshLambertMaterial({map:caneT});
+    placeInst(new THREE.CylinderGeometry(0.3, 0.3, 6, 10), caneM, canes, (d,q) => { d.position.set(q.x, 3, q.z); d.scale.set(1,1,1); d.rotation.set(0, q.a, 0); });
+    placeInst(new THREE.TorusGeometry(0.9, 0.3, 8, 16, Math.PI), caneM, canes, (d,q) => { d.position.set(q.x + Math.cos(q.a)*0.9, 6, q.z - Math.sin(q.a)*0.9); d.scale.set(1,1,1); d.rotation.set(0, q.a, 0); });
+    const gums = spots(170, WALL+3, 140);
+    const gm = placeInst(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshLambertMaterial({color:0xffffff}), gums, (d,p) => { const k = 1.2 + rnd()*1.6; d.position.set(p[0], 0, p[1]); d.scale.set(k, k*1.1, k); d.rotation.set(0,0,0); });
+    gums.forEach((p, i) => gm.setColorAt(i, new THREE.Color(pc[(i + 3)%6])));
+    mountains(0xffc4e1, 540, 22, rnd);
   } else if (def.theme === 'snow'){
     const trees = spots(380, WALL+5, 140);
     placeInst(new THREE.CylinderGeometry(0.25, 0.4, 2.4, 6), new THREE.MeshLambertMaterial({color:0x4a3222}), trees, (d,p,i) => { const k = 0.8+((i*37)%10)/12; d.position.set(p[0], 1.2*k, p[1]); d.scale.set(k,k,k); d.rotation.set(0,0,0); });

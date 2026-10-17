@@ -20,7 +20,7 @@ them on new cars and upgrades.
 
 ## Modes
 
-- **Time Trial** — solo, pick any of the 7 tracks below and chase medal times.
+- **Time Trial** — solo, pick any of the 11 tracks below and chase medal times.
 - **Race** — the Grand Prix: 3 big laps of an F1-style oval (grandstands, pit garages,
   five red start lights) against 5 rival formula cars — Blaze, Comet, Dash, Nova and Rocket — from a
   6-car grid — you start 3rd.
@@ -63,7 +63,7 @@ black with red stealth lines), **Cat** (orange tabby stripes, cat ears and a tai
 **Chrome**, **Lava** (black rock with glowing cracks), **Galaxy** (purple space with stars),
 **Rainbow** and **Zebra**.
 
-## Tracks (7)
+## Tracks (11)
 
 Time Trial races are 2 laps; the Race-mode Grand Prix is 3 laps.
 
@@ -76,3 +76,7 @@ Time Trial races are 2 laps; the Race-mode Grand Prix is 3 laps.
 | Speed Bowl | 2 | oval with grandstands, flat-out |
 | Frost Pass | 2 | falling snow, slippery road |
 | Neon City | 2 | night city — headlights on |
+| Volcano Ridge | 2 | black rock, glowing lava pools, a smoking volcano |
+| Jungle Run | 2 | tall jungle trees, bushes and flowers |
+| Moon Base | 2 | craters, domes, the Earth in a black sky — less grip |
+| Candy Land | 2 | lollipops, candy canes and gumdrops on a chocolate road |
