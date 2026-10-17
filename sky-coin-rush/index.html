@@ -95,6 +95,13 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 .btn:focus-visible,.toggle input:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 .btn.secondary{background:transparent;box-shadow:inset 0 0 0 2px var(--ink);font-size:17px;padding:13px 18px}
 .btns{display:grid;gap:10px}
+.planes{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:8px}
+.pl{appearance:none;border:2px solid transparent;background:var(--paper-2);border-radius:10px;padding:8px 10px;text-align:left;cursor:pointer;display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;font:inherit;color:var(--ink);min-width:0}
+.pl .sw{grid-row:span 2;width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(27,35,64,.35)}
+.pl b{font:400 15px/1.1 var(--display);min-width:0}
+.pl small{font-size:11px;line-height:1.25;opacity:.75;min-width:0}
+.pl[aria-pressed="true"]{border-color:var(--ink);background:var(--gold)}
+.pl:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
 .toggle{display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;line-height:1.3}
 .toggle input{width:18px;height:18px;accent-color:var(--teal);flex:none;margin:0}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;font-variant-numeric:tabular-nums}
@@ -148,6 +155,10 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-body">
       <h1>Sky Coin <em>Rush</em></h1>
       <p class="lede">Take off from the home airfield and fly anywhere you like: over hills, lakes and snowy mountains, through the clouds and up to 19,700 ft. Grab the coins floating in the sky, then land back home.</p>
+      <div>
+        <p class="label">Choose your plane</p>
+        <div class="planes" id="planes" role="group" aria-label="Choose your plane"></div>
+      </div>
       <button class="btn" id="btn-play">Take off</button>
       <hr class="perf">
       <div class="keys">
@@ -242,10 +253,10 @@ const sfx = (() => {
     splash(){ noise(0.9, 0.5, 2500, 200); },
     land(){ noise(0.25, 0.35, 3000, 900, 'bandpass'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, 0.15 + i * 0.09)); },
     ap(on){ tone(on ? 660 : 880, 0.12, 'sine', 0.08); tone(on ? 880 : 660, 0.14, 'sine', 0.08, 0.1); },
-    engine(on, speed){
+    engine(on, speed, mul, vol){
       if (!engine) return;
-      const now = ctx.currentTime, f = 48 + speed * 0.75;
-      engine.g.gain.setTargetAtTime(on ? 0.045 : 0, now, 0.2);
+      const now = ctx.currentTime, f = (48 + speed * 0.75) * (mul || 1);
+      engine.g.gain.setTargetAtTime(on ? (vol || 0.045) : 0, now, 0.2);
       engine.o1.frequency.setTargetAtTime(f, now, 0.15);
       engine.o2.frequency.setTargetAtTime(f * 1.006, now, 0.15);
     },
@@ -336,31 +347,190 @@ function boot(hot){
   const TREE_COLS = [0x3f7d3a, 0x4f8f3f, 0x2f6b3a, 0x6a9a3a, 0x3a7348, 0xc9a23a];
   const cloudGeo = new THREE.IcosahedronGeometry(1, 0);
 
-  /* ---------------- The plane ---------------- */
+  /* ---------------- The planes ---------------- */
+  // Every model faces -z and its wheels (or floats, skids, legs) touch y = -1, so all of
+  // them sit on the runway at the same height. cruise/boost are m/s; pitch and turn are
+  // rad/s; cam pushes the chase camera back for big planes; sound tunes the engine.
+  const PLANES = [
+    { id: 'cub', name: 'Red Cub', note: 'The all-rounder', color: '#e8432e', cruise: 65, boost: 150, pitch: 1.5, turn: 1.3 },
+    { id: 'biplane', name: 'Barnstormer', note: 'Slow and super loopy', color: '#ffc23d', cruise: 55, boost: 120, pitch: 2.1, turn: 1.6 },
+    { id: 'seaplane', name: 'Puffin', note: 'Lands on lakes too', color: '#2f6fbf', cruise: 60, boost: 130, pitch: 1.4, turn: 1.2, water: true },
+    { id: 'zippy', name: 'Zippy', note: 'Stunt plane, spins fast', color: '#ff4f9a', cruise: 70, boost: 160, pitch: 2.5, turn: 2.0 },
+    { id: 'glider', name: 'Feather', note: 'Long wings, very quiet', color: '#e9e4d8', cruise: 45, boost: 95, pitch: 1.3, turn: 1.2, cam: 1.3, sound: { mul: 2.4, vol: 0.012 } },
+    { id: 'hauler', name: 'Hauler', note: 'Big cargo, two props', color: '#6b7a3a', cruise: 60, boost: 125, pitch: 1.0, turn: 0.9, cam: 1.25, sound: { mul: 0.8, vol: 0.05 } },
+    { id: 'swift', name: 'Swift', note: 'Fast jet', color: '#2a6ccc', cruise: 95, boost: 220, pitch: 1.6, turn: 1.4, sound: { mul: 2.2, vol: 0.035 } },
+    { id: 'thunder', name: 'Thunder', note: 'Fighter, very fast', color: '#4a5262', cruise: 110, boost: 260, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
+    { id: 'stealth', name: 'Shadow', note: 'Stealth flying wing', color: '#2b2f3a', cruise: 100, boost: 240, pitch: 1.5, turn: 1.4, cam: 1.1, sound: { mul: 2.0, vol: 0.025 } },
+    { id: 'jumbo', name: 'Jumbo', note: 'Huge airliner', color: '#c9d2dc', cruise: 90, boost: 200, pitch: 0.9, turn: 0.8, cam: 1.6, sound: { mul: 1.8, vol: 0.04 } },
+    { id: 'rocket', name: 'Rocket', note: 'Space plane, wild boost', color: '#f4f1ea', cruise: 120, boost: 320, pitch: 1.3, turn: 1.1, cam: 1.15, sound: { mul: 1.4, vol: 0.05 } },
+    { id: 'saucer', name: 'Saucer', note: 'Is that a UFO?', color: '#7fd1a6', cruise: 80, boost: 200, pitch: 2.2, turn: 2.0, cam: 1.1, sound: { mul: 3.2, vol: 0.03 } }
+  ];
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
-  planeBody.rotation.order = 'YXZ'; planeRoot.add(planeBody); scene.add(planeRoot);
-  const prop = new THREE.Group();
-  (function buildPlane(){
-    const red = lam(0xe8432e), cream = M.cream, dark = M.dark;
-    const glass = new THREE.MeshPhongMaterial({ color: 0x7fd3e8, emissive: 0x113344, shininess: 100, specular: 0xffffff });
-    const box = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); planeBody.add(b); return b; };
-    box(1.15, 1.05, 4.0, red, 0, 0, 0);
-    box(1.25, 1.15, 0.7, cream, 0, 0, -2.2);
-    box(0.72, 0.7, 1.5, red, 0, 0.12, 2.6);
-    box(7.4, 0.16, 1.45, cream, 0, -0.12, -0.55);
-    box(0.9, 0.2, 1.48, red, 3.3, -0.12, -0.55); box(0.9, 0.2, 1.48, red, -3.3, -0.12, -0.55);
-    box(2.8, 0.12, 0.8, cream, 0, 0.2, 3.05);
-    box(0.14, 1.15, 0.95, red, 0, 0.8, 3.05);
-    box(0.85, 0.5, 1.0, glass, 0, 0.72, -0.45);
-    box(0.25, 0.5, 0.25, dark, 0.8, -0.75, -0.9); box(0.25, 0.5, 0.25, dark, -0.8, -0.75, -0.9);
-    const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.6, 8), dark);
-    spinner.rotation.x = -Math.PI / 2; spinner.position.set(0, 0, -2.85); planeBody.add(spinner);
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.22, 0.06), dark);
-    const blade2 = blade.clone(); blade2.rotation.z = Math.PI / 2; prop.add(blade, blade2);
-    const blur = new THREE.Mesh(new THREE.CircleGeometry(1.55, 24), new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
-    prop.position.set(0, 0, -2.72); planeBody.add(prop, blur); blur.position.set(0, 0, -2.74);
+  planeRoot.add(planeBody); scene.add(planeRoot);
+  const matCache = {};
+  const mat = hex => matCache[hex] || (matCache[hex] = lam(hex));
+  const glassMat = new THREE.MeshPhongMaterial({ color: 0x7fd3e8, emissive: 0x113344, shininess: 100, specular: 0xffffff });
+  const darkGlass = new THREE.MeshPhongMaterial({ color: 0x223344, emissive: 0x050a10, shininess: 100, specular: 0xffffff });
+  const silverMat = new THREE.MeshPhongMaterial({ color: 0xc9d2dc, specular: 0xffffff, shininess: 90 });
+  const blurMat = new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  let spinners = [], flames = [];
+  const RED = 0xe8432e, CREAM = 0xfff1d6, DARK = 0x2a2f45, WHITE = 0xf4f1ea, GRAY = 0xc9d2dc;
+  function buildPlane(def){
+    planeBody.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    planeBody.clear(); spinners = []; flames = [];
+    const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); planeBody.add(o); return o; };
+    const box = (w, h, d, m, x, y, z, rx, ry, rz) => { const o = add(new THREE.BoxGeometry(w, h, d), m, x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); return o; };
+    const both = (fn, x, ...rest) => { fn(x, 1, ...rest); fn(-x, -1, ...rest); };   // build a part on each side
+    // a cylinder along z (r1 at the back, r2 at the front) and cones pointing forward or back
+    const tube = (r1, r2, len, m, x, y, z) => { const o = add(new THREE.CylinderGeometry(r1, r2, len, 14), m, x, y, z); o.rotation.x = Math.PI / 2; return o; };
+    const nose = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = -Math.PI / 2; return o; };
+    const tail = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = Math.PI / 2; return o; };
+    const wheel = (x, z) => box(0.28, 0.5, 0.28, DARK, x, -0.75, z);
+    const propeller = (x, y, z, size) => {
+      const g = new THREE.Group(), b = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, 0.06), mat(DARK)), b2 = b.clone();
+      b2.rotation.z = Math.PI / 2;
+      const blur = new THREE.Mesh(new THREE.CircleGeometry(size * 0.52, 20), blurMat); blur.position.z = -0.02;
+      g.add(b, b2, blur); g.position.set(x, y, z); planeBody.add(g);
+      spinners.push({ o: g, axis: 'z', rate: 42 });
+    };
+    const flame = (x, y, z, r, idle) => {
+      const geo = new THREE.ConeGeometry(r, 2.2, 10); geo.translate(0, 1.1, 0);
+      const o = new THREE.Mesh(geo, flameMat); o.rotation.x = Math.PI / 2; o.position.set(x, y, z);
+      o.userData.idle = idle || 0.35; planeBody.add(o); flames.push(o);
+    };
+    switch (def.id){
+      case 'cub':
+        box(1.15, 1.05, 4.0, RED, 0, 0, 0); box(1.25, 1.15, 0.7, CREAM, 0, 0, -2.2); box(0.72, 0.7, 1.5, RED, 0, 0.12, 2.6);
+        box(7.4, 0.16, 1.45, CREAM, 0, -0.12, -0.55); both((x) => box(0.9, 0.2, 1.48, RED, x, -0.12, -0.55), 3.3);
+        box(2.8, 0.12, 0.8, CREAM, 0, 0.2, 3.05); box(0.14, 1.15, 0.95, RED, 0, 0.8, 3.05);
+        box(0.85, 0.5, 1.0, glassMat, 0, 0.72, -0.45);
+        wheel(0.8, -0.9); wheel(-0.8, -0.9);
+        nose(0.32, 0.6, DARK, -2.85); propeller(0, 0, -2.72, 3.0);
+        break;
+      case 'biplane': {
+        const Y = 0xffc23d;
+        box(1.0, 1.0, 4.0, Y, 0, 0, 0); box(1.1, 1.1, 0.6, RED, 0, 0, -2.1);
+        nose(0.3, 0.5, DARK, -2.65); propeller(0, 0, -2.5, 2.8);
+        box(7.0, 0.14, 1.3, Y, 0, -0.45, -0.6); box(7.4, 0.14, 1.3, Y, 0, 1.15, -0.8);
+        both((x) => { box(0.09, 1.55, 0.09, RED, x, 0.35, -1.1); box(0.09, 1.55, 0.09, RED, x, 0.35, -0.2); }, 2.6);
+        both((x) => box(0.08, 0.7, 0.08, DARK, x, 0.8, -0.8), 0.4);
+        box(0.6, 0.3, 0.8, DARK, 0, 0.55, 0.4);
+        box(2.6, 0.1, 0.8, RED, 0, 0.15, 2.6); box(0.12, 1.1, 0.9, RED, 0, 0.7, 2.6);
+        wheel(0.7, -1.1); wheel(-0.7, -1.1);
+        break;
+      }
+      case 'seaplane': {
+        const B = 0x2f6fbf;
+        box(1.1, 1.1, 4.2, CREAM, 0, 0, 0); box(1.12, 0.35, 4.22, B, 0, -0.3, 0); box(1.2, 1.15, 0.6, B, 0, 0, -2.2);
+        nose(0.3, 0.5, DARK, -2.75); propeller(0, 0, -2.6, 3.0);
+        box(8.0, 0.16, 1.4, B, 0, 0.68, -0.4); box(0.9, 0.45, 1.0, glassMat, 0, 0.45, -0.9);
+        box(2.8, 0.12, 0.8, CREAM, 0, 0.25, 2.8); box(0.14, 1.2, 0.9, B, 0, 0.85, 2.8);
+        both((x) => { box(0.45, 0.4, 4.4, CREAM, x, -0.8, -0.2); box(0.08, 0.5, 0.08, DARK, x, -0.4, -1.2); box(0.08, 0.5, 0.08, DARK, x, -0.4, 0.6); }, 1.15);
+        break;
+      }
+      case 'zippy': {
+        const P = 0xff4f9a, V = 0x7a5ad8;
+        box(0.95, 0.95, 3.4, V, 0, 0, 0); box(1.0, 1.0, 0.6, P, 0, 0, -1.9);
+        nose(0.3, 0.5, WHITE, -2.45); propeller(0, 0, -2.3, 2.6);
+        for (let i = -3; i <= 3; i++) box(0.8, 0.14, 1.3, i % 2 ? P : WHITE, i * 0.8, -0.15, -0.3);
+        box(0.7, 0.45, 0.9, glassMat, 0, 0.62, -0.2);
+        box(2.6, 0.12, 0.9, P, 0, 0.15, 2.0); box(0.14, 1.4, 1.0, V, 0, 0.85, 2.0);
+        wheel(0.65, -0.7); wheel(-0.65, -0.7);
+        break;
+      }
+      case 'glider':
+        box(0.6, 0.7, 4.4, WHITE, 0, 0, 0.2); nose(0.33, 1.0, WHITE, -2.5);
+        box(0.5, 0.4, 1.2, glassMat, 0, 0.42, -1.2);
+        box(11.5, 0.1, 0.85, WHITE, 0, 0.2, -0.4); both((x) => box(0.9, 0.12, 0.87, RED, x, 0.2, -0.4), 5.4);
+        box(0.1, 1.3, 0.8, WHITE, 0, 0.9, 2.2); box(2.4, 0.08, 0.6, RED, 0, 1.55, 2.3);
+        box(0.25, 0.65, 0.4, DARK, 0, -0.68, -0.2);
+        break;
+      case 'hauler': {
+        const O = 0x6b7a3a, O2 = 0x5a6830;
+        box(1.6, 1.5, 5.0, O, 0, 0, 0); box(1.5, 1.2, 0.8, O, 0, -0.1, -2.8); box(1.3, 0.4, 0.4, glassMat, 0, 0.35, -3.0);
+        box(1.0, 0.9, 2.2, O, 0, 0.45, 3.4, -0.2);
+        box(9.6, 0.2, 1.6, O2, 0, 0.85, -0.6);
+        both((x) => { tube(0.38, 0.42, 2.0, GRAY, x, 0.55, -1.2); propeller(x, 0.55, -2.3, 2.6); }, 2.4);
+        box(0.16, 1.6, 1.1, O, 0, 1.5, 4.2); box(3.2, 0.14, 0.9, O, 0, 2.3, 4.4);
+        wheel(0.9, 0.2); wheel(-0.9, 0.2); wheel(0, -2.4);
+        break;
+      }
+      case 'swift': {
+        const B = 0x2a6ccc;
+        box(0.95, 0.9, 5.0, GRAY, 0, 0, 0.2); nose(0.48, 1.6, GRAY, -3.1);
+        box(0.6, 0.45, 1.3, glassMat, 0, 0.6, -1.3);
+        both((x, sd) => box(3.6, 0.12, 1.6, B, x, -0.1, 0.6, 0, -0.5 * sd), 1.9);
+        box(0.12, 1.4, 1.3, B, 0, 0.85, 2.3, 0.4);
+        both((x, sd) => box(1.6, 0.1, 0.8, GRAY, x, 0.1, 2.5, 0, -0.4 * sd), 0.9);
+        tube(0.4, 0.45, 0.6, DARK, 0, 0, 2.9); flame(0, 0, 3.2, 0.35);
+        box(0.2, 0.6, 0.2, DARK, 0, -0.7, -1.8); wheel(0.6, 0.6); wheel(-0.6, 0.6);
+        break;
+      }
+      case 'thunder': {
+        const D = 0x4a5262, D2 = 0x3a4150;
+        box(1.2, 0.85, 5.4, D, 0, 0, 0.3); nose(0.5, 1.8, D, -3.3);
+        box(0.62, 0.5, 1.4, glassMat, 0, 0.62, -1.5);
+        both((x) => box(0.4, 0.6, 1.6, D2, x, -0.1, -0.4), 0.75);
+        both((x, sd) => box(4.0, 0.12, 2.2, D, x, -0.05, 1.0, 0, -0.62 * sd), 2.1);
+        both((x, sd) => { box(0.12, 1.3, 1.2, D, x, 0.85, 2.4, 0.45, 0, -0.25 * sd); box(0.13, 0.3, 0.9, RED, x + 0.1 * sd, 1.35, 2.7, 0.45, 0, -0.25 * sd); }, 0.55);
+        both((x, sd) => box(1.8, 0.1, 0.9, D, x, 0, 2.8, 0, -0.35 * sd), 1.2);
+        both((x) => { tube(0.32, 0.36, 0.6, DARK, x, 0, 3.2); flame(x, 0, 3.5, 0.3); }, 0.35);
+        box(0.2, 0.65, 0.2, DARK, 0, -0.68, -1.8); wheel(0.8, 1.0); wheel(-0.8, 1.0);
+        break;
+      }
+      case 'stealth': {
+        const K = 0x2b2f3a;
+        box(1.8, 0.55, 3.2, K, 0, 0, 0.2); box(1.2, 0.4, 1.2, K, 0, 0, -1.6, 0, Math.PI / 4);
+        both((x, sd) => box(5.2, 0.22, 2.0, K, x, -0.05, 0.9, 0, -0.75 * sd), 2.6);
+        box(0.8, 0.25, 1.0, darkGlass, 0, 0.35, -0.6);
+        both((x) => flame(x, 0, 1.9, 0.22, 0.3), 0.5);
+        box(0.2, 0.6, 0.2, DARK, 0, -0.7, -1.2); wheel(0.9, 0.4); wheel(-0.9, 0.4);
+        break;
+      }
+      case 'jumbo': {
+        const B = 0x2a4fa8;
+        tube(0.8, 0.8, 8.0, WHITE, 0, 0, 0.4); nose(0.8, 1.4, WHITE, -4.3); tail(0.8, 1.6, WHITE, 5.2);
+        box(1.62, 0.12, 6.0, 0x1b2340, 0, 0.25, 0.2); box(1.62, 0.18, 7.6, B, 0, -0.15, 0.4);
+        box(1.0, 0.2, 0.3, DARK, 0, 0.4, -3.7);
+        both((x, sd) => box(5.0, 0.16, 1.8, WHITE, x, -0.35, 0.6, 0, -0.45 * sd), 2.8);
+        both((x) => { tube(0.32, 0.38, 1.4, GRAY, x, -0.6, 0.1); tube(0.3, 0.36, 1.3, GRAY, x * 1.9, -0.55, 0.9); }, 1.9);
+        box(0.14, 2.2, 1.6, B, 0, 1.6, 4.7, 0.35);
+        both((x, sd) => box(2.6, 0.12, 1.0, WHITE, x, 0.3, 4.9, 0, -0.4 * sd), 1.4);
+        box(0.25, 0.5, 0.25, DARK, 0, -0.75, -3.0); wheel(0.9, 0.8); wheel(-0.9, 0.8);
+        break;
+      }
+      case 'rocket': {
+        const K = 0x2b2f3a;
+        box(1.4, 1.3, 5.6, WHITE, 0, 0, 0.3); nose(0.7, 1.6, WHITE, -3.25);
+        box(1.42, 0.3, 6.0, K, 0, -0.55, 0.1); box(0.9, 0.25, 0.5, K, 0, 0.55, -2.1);
+        both((x, sd) => box(3.2, 0.18, 3.0, WHITE, x, -0.4, 1.4, 0, -0.55 * sd), 1.7);
+        box(0.16, 1.8, 1.6, WHITE, 0, 1.4, 2.6, 0.4);
+        [[0, 0.25], [0.45, -0.2], [-0.45, -0.2]].forEach(([x, y]) => { tube(0.3, 0.38, 0.6, DARK, x, y, 3.3); flame(x, y, 3.6, 0.3, 0.8); });
+        box(0.25, 0.5, 0.25, DARK, 0, -0.75, -2.0); wheel(0.7, 1.0); wheel(-0.7, 1.0);
+        break;
+      }
+      case 'saucer': {
+        add(new THREE.CylinderGeometry(3.0, 3.2, 0.5, 28), silverMat, 0, 0, 0);
+        add(new THREE.CylinderGeometry(1.6, 3.0, 0.5, 28), silverMat, 0, -0.5, 0);
+        const dome = add(new THREE.SphereGeometry(1.2, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0x9ff5d0, transparent: true, opacity: 0.45, shininess: 120, specular: 0xffffff }), 0, 0.25, 0);
+        dome.renderOrder = 1;
+        add(new THREE.SphereGeometry(0.45, 14, 10), 0x7fd1a6, 0, 0.6, 0);
+        both((x) => box(0.12, 0.16, 0.06, DARK, x, 0.68, -0.42), 0.16);
+        const ring = new THREE.Group(), cols = [0xff4f7a, 0xffc23d, 0x5fe0d0, 0x7a5ad8];
+        for (let i = 0; i < 12; i++){
+          const a = i / 12 * Math.PI * 2, l = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), new THREE.MeshBasicMaterial({ color: cols[i % 4] }));
+          l.position.set(Math.cos(a) * 3.15, 0, Math.sin(a) * 3.15); ring.add(l);
+        }
+        planeBody.add(ring); spinners.push({ o: ring, axis: 'y', rate: 2.5 });
+        for (let i = 0; i < 3; i++){ const a = i / 3 * Math.PI * 2; box(0.12, 0.5, 0.12, DARK, Math.cos(a) * 1.4, -0.75, Math.sin(a) * 1.4); }
+        break;
+      }
+    }
     planeBody.scale.setScalar(PLANE_SCALE);
-  })();
+  }
+  let plane = PLANES.find(pl => pl.id === store.get('scr.plane', 'cub')) || PLANES[0];
+  buildPlane(plane);
   const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
 
@@ -504,6 +674,16 @@ function boot(hot){
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => boostBtn.addEventListener(n, holdBoost(false)));
   $('btn-land').addEventListener('click', e => { toggleAutoLand(); e.currentTarget.blur(); });
   syncToggles();
+  const pickerEl = $('planes');
+  pickerEl.innerHTML = PLANES.map(pl => '<button type="button" class="pl" data-id="' + pl.id + '" aria-pressed="false"><span class="sw" style="background:' + pl.color + '"></span><b>' + pl.name + '</b><small>' + pl.note + '</small></button>').join('');
+  function choosePlane(id){
+    plane = PLANES.find(pl => pl.id === id) || PLANES[0];
+    store.set('scr.plane', plane.id);
+    buildPlane(plane);
+    pickerEl.querySelectorAll('.pl').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === plane.id)));
+  }
+  pickerEl.addEventListener('click', e => { const b = e.target.closest('.pl'); if (b) choosePlane(b.dataset.id); });
+  choosePlane(plane.id);
 
   let toastTimer = 0;
   function toast(text, cls){
@@ -678,7 +858,9 @@ function boot(hot){
   const onHomeRunway = (x, z) => Math.abs(x) < RWY_W / 2 + 1 && z < 130 && z > -130;
   // the whole flat meadow around the runway is fine to land on
   const onAirfield = (x, z) => Math.abs(x) < 115 && Math.abs(z) < 345;
-  const restAt = (x, z) => (onHomeRunway(x, z) ? FREE_RWY : groundAt(x, z)) + PLANE_SCALE;
+  // the seaplane can also land on (and take off from) any lake
+  const onWater = (x, z) => !!plane.water && groundAt(x, z) < 0.3;
+  const restAt = (x, z) => { const g = groundAt(x, z); return (onHomeRunway(x, z) ? FREE_RWY : plane.water ? Math.max(g, 0) : g) + PLANE_SCALE; };
   const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
   // The plane's orientation is a quaternion so the nose can go all the way round a loop.
   // F.yaw / F.pitch / F.roll are read back from it for the HUD, camera and autopilots.
@@ -803,37 +985,41 @@ function boot(hot){
       F.x += -Math.sin(F.yaw) * F.speed * dt; F.z += -Math.cos(F.yaw) * F.speed * dt;
       const g = groundAt(F.x, F.z);
       F.y = restAt(F.x, F.z);
-      const leaving = !onAirfield(F.x, F.z);
+      const leaving = !onAirfield(F.x, F.z) && !onWater(F.x, F.z);
       if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || F.z < -300)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
-      else if (g < 0.5) crashFree(true);
+      else if (g < 0.5 && !plane.water) crashFree(true);
     } else {
       // up/down pitches around the wings with no limit, so holding up flies a full loop
       const pulling = Math.abs(ay) > 0.2;
-      rotLocal(AX, ay * 1.5 * dt);
+      rotLocal(AX, ay * plane.pitch * dt);
       // left/right banks; let go (and stop pulling) and it rolls back level, which also
       // turns the plane right way up after half a loop
-      if (ax || !pulling) rotLocal(AZ, clamp(wrapA(-ax * 1.0 - F.roll) * 3, -3, 3) * dt);
+      if (ax || !pulling) rotLocal(AZ, clamp(wrapA(-ax * 1.0 - F.roll) * 3, -3, 3) * (plane.turn / 1.3) * dt);
       readAxes();
-      rotWorld(AY, vRight.y * 1.3 * dt);                      // a banked plane turns
+      rotWorld(AY, vRight.y * plane.turn * dt);               // a banked plane turns
       if (!ay && vUp.y > 0.3) rotLocal(AX, -F.pitch * 0.35 * dt); // nose eases back to level
       if (F.y > CEIL - 400 && vFwd.y > 0) rotLocal(AX, -(vUp.y < 0 ? -1 : 1) * dt * 1.2 * (F.y - (CEIL - 400)) / 400);
       Q.normalize(); readAxes();
       if (live && pulling){
-        F.loopAcc += ay * 1.5 * dt;
+        F.loopAcc += ay * plane.pitch * dt;
         if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); }
       } else F.loopAcc *= Math.max(0, 1 - dt * 2);
-      const cruise = boosting ? 150 : 65;
+      const cruise = boosting ? plane.boost : plane.cruise;
       F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8) - vFwd.y * 14 * dt;
-      F.speed = clamp(F.speed, 30, 190);
+      F.speed = clamp(F.speed, 30, plane.boost + 40);
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
       if (F.y >= CEIL){ F.y = CEIL; if (!F.ceilTold){ F.ceilTold = true; toast('Max altitude!', 'info'); } }
       if (F.y < CEIL - 800) F.ceilTold = false;
       if (F.y > 3048 && !F.hiTold){ F.hiTold = true; toast('10,000 ft!', ''); }
       if (F.y < 2900) F.hiTold = false;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
-      if (onAirfield(F.x, F.z) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
+      const water = onWater(F.x, F.z);
+      if ((onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
         F.ground = true; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
-        if (t - F.lastLand > 5){ score += 100; toast('Nice landing! +100', ''); sfx.land(); burst(F.x, FREE_RWY + 0.2, F.z, 0xf4f1ea, 10, 0.7); }
+        if (t - F.lastLand > 5){
+          score += 100; toast(water ? 'Splashdown! +100' : 'Nice landing! +100', ''); sfx.land();
+          burst(F.x, F.y - PLANE_SCALE + 0.2, F.z, water ? 0xe6f4ff : 0xf4f1ea, 10, 0.7);
+        }
         F.lastLand = t;
       } else if (F.y < top + 1.4) crashFree(g < 0.5);
     }
@@ -885,7 +1071,8 @@ function boot(hot){
     // the plane
     planeRoot.position.set(F.x, F.y, F.z);
     planeRoot.quaternion.copy(Q);
-    prop.rotation.z += dt * 42;
+    for (const sp of spinners) sp.o.rotation[sp.axis] += dt * sp.rate;
+    for (const fl of flames) fl.scale.y = (boosting && !F.ground ? 1.5 : fl.userData.idle) * (0.85 + Math.random() * 0.3);
     const gTop = Math.max(onHomeRunway(F.x, F.z) ? FREE_RWY : groundAt(F.x, F.z), 0);
     planeShadow.position.set(F.x, gTop + 0.08, F.z);
     const alt = F.y - gTop; planeShadow.scale.setScalar(1 + alt * 0.05);
@@ -896,7 +1083,8 @@ function boot(hot){
     const lean = clamp((0.85 - vUp.y) / 0.85, 0, 1);
     camUp.set(0, 1, 0).lerp(vUp, lean).normalize();
     camUpS.lerp(camUp, 1 - Math.exp(-dt * 5)).normalize();
-    camT.set(F.x, F.y, F.z).addScaledVector(vFwd, -13).addScaledVector(camUpS, 4);
+    const camK = plane.cam || 1;
+    camT.set(F.x, F.y, F.z).addScaledVector(vFwd, -13 * camK).addScaledVector(camUpS, 4 * camK);
     camBase.lerp(camT, 1 - Math.exp(-dt * 6));
     const camFloor = Math.max(groundAt(camBase.x, camBase.z), 0) + 1.5;
     if (camBase.y < camFloor) camBase.y = camFloor;
@@ -921,7 +1109,7 @@ function boot(hot){
     sunLight.position.set(F.x + sunDir.x * 100, F.y + Math.max(0.2, sunDir.y) * 100 + 30, F.z + sunDir.z * 100);
     sunLight.target.position.set(F.x, F.y, F.z);
 
-    if (audioTick <= 0){ audioTick = 0.1; sfx.engine(live, F.speed); }
+    if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live, Math.min(F.speed, 190), snd.mul, snd.vol); }
     if (live) updateFreeHud();
   }
   function updateFreeHud(){
@@ -944,6 +1132,8 @@ function boot(hot){
       prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying home';
     } else if (F.crashT <= 0 && onAirfield(F.x, F.z) && F.y < 80){
       prompt = 'Airfield below: go down gently to land';
+    } else if (F.crashT <= 0 && onWater(F.x, F.z) && F.y < 50){
+      prompt = 'Lake below: go down gently to land on it';
     }
     H.prompt.hidden = !prompt; txt(H.prompt, prompt);
     H.prompt.classList.toggle('go', F.ground && F.speed >= VR && !F.autoBrake);

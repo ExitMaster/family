@@ -19,6 +19,28 @@ the home airfield and fly anywhere you like over an endless open world, as high 
 **Pilot-style controls** (on the start and pause cards) flip up and down, like a real
 control stick: push down to climb.
 
+## Planes
+
+Pick one on the start card (your choice is remembered). The plane flying behind the menu
+changes straight away so you can see it. Each one has its own speed (normal and boost)
+and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
+turns):
+
+| Plane | | Cruise / boost | Handling |
+|---|---|---|---|
+| **Red Cub** | the all-rounder | 126 / 292 kt | medium |
+| **Barnstormer** | yellow biplane | 107 / 233 kt | very loopy, turns fast |
+| **Puffin** | seaplane on floats: **can land on and take off from any lake** | 117 / 253 kt | gentle |
+| **Zippy** | stunt plane | 136 / 311 kt | fastest loops and turns |
+| **Feather** | glider with very long wings, almost silent | 87 / 185 kt | gentle |
+| **Hauler** | big cargo plane with two propellers | 117 / 243 kt | slow to turn |
+| **Swift** | jet, afterburner flame when boosting | 185 / 428 kt | medium |
+| **Thunder** | twin-tail fighter, two flames | 214 / 505 kt | quick |
+| **Shadow** | black stealth flying wing | 194 / 467 kt | medium |
+| **Jumbo** | four-engine airliner | 175 / 389 kt | slowest to turn |
+| **Rocket** | space plane, three engines always glowing | 233 / 622 kt | gentle |
+| **Saucer** | a UFO with a little green alien inside | 156 / 389 kt | very quick |
+
 ## Flying
 
 - **Takeoff.** You start on the home airfield's runway. The plane speeds up by itself;
@@ -47,7 +69,9 @@ control stick: push down to climb.
 
 ## Landing
 
-- **Land anywhere on the airfield** (+100, once per 5 seconds). The whole flat meadow
+- **Land anywhere on the airfield** (+100, once per 5 seconds). With the **Puffin**
+  seaplane you can also land on any lake ("Splashdown!") and take off from it again; any
+  other plane that hits the water splashes. The whole flat meadow
   around the runway counts, not just the runway. A tall yellow **beacon** beside the
   runway shows where it is from far away, and below 80 m over the airfield the screen
   says "Airfield below".
@@ -59,4 +83,4 @@ control stick: push down to climb.
 
 ## Saved in the browser
 
-The pilot-style control setting and sound on/off are kept in `localStorage`.
+Your plane, the pilot-style control setting and sound on/off are kept in `localStorage`.
