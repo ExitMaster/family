@@ -12,7 +12,7 @@ the home airfield and fly anywhere you like over an endless open world, as high 
 |---|---|
 | Fly (left/right turns, up climbs, down dives; hold up to loop) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
-| Auto-land at home | `L` (or `Q`) or the **LAND** button |
+| Auto-land at the nearest airport | `L` (or `Q`) or the **LAND** button |
 | Pause | `ESC` or `P` |
 | Phone / tablet | drag anywhere: a joystick appears where your finger lands |
 
@@ -56,8 +56,8 @@ turns):
   haze clears as you climb. The top is 19,700 ft (6,000 m); there's a call-out when you
   pass 10,000 ft. The sky also moves from morning to noon to golden hour to dusk as you
   fly.
-- **HUD:** altitude (ft), airspeed (kt), compass heading (HDG, 000 = north) and **HOME**:
-  the distance to the airfield with an arrow pointing to it.
+- **HUD:** altitude (ft), airspeed (kt), compass heading (HDG, 000 = north) and the
+  **nearest airport**: its name, distance and an arrow pointing to it.
 - **Coins and orange rings** float in clusters all around you, some of them high in the
   sky. Coins are 10 points each; grab them less than about a second apart to build a
   chain (every 5 in a row adds one to the multiplier, up to x5). Rings give a 3-second
@@ -67,18 +67,27 @@ turns):
 - Pause and press **End flight** to go back to the start card, where the plane keeps
   cruising over the hills.
 
+## Airports
+
+The world has airports everywhere: one in most 5 km squares of an endless grid, each with
+its own name (Pine Valley, Otter Bay, Snowcap…) and its runway pointing its own way. You
+start at **Home Field**. The ground around each one is flattened into a meadow: an airport
+on a lake becomes an island strip, and one on a mountain sits on a high plateau (up to
+about 3,000 ft). Every airport has a tall light **beacon** beside its runway that the haze
+doesn't hide: yellow at Home Field, teal everywhere else.
+
 ## Landing
 
-- **Land anywhere on the airfield** (+100, once per 5 seconds). With the **Puffin**
-  seaplane you can also land on any lake ("Splashdown!") and take off from it again; any
-  other plane that hits the water splashes. The whole flat meadow
-  around the runway counts, not just the runway. A tall yellow **beacon** beside the
-  runway shows where it is from far away, and below 80 m over the airfield the screen
-  says "Airfield below".
+- **Land anywhere on an airport's meadow**, not just the runway. Below 80 m over it the
+  screen says "*Airport name* below". The first landing at a new airport gives
+  "Welcome to *name*! +400"; landing again gives +100 (once per 5 seconds). With the
+  **Puffin** seaplane you can also land on any lake ("Splashdown!") and take off from it
+  again; any other plane that hits the water splashes.
 - After touching down the brakes stop the plane by themselves; hold up to roll again and
   take off.
-- **Auto-land:** tap **LAND** (or press `L`) and the plane flies itself home (boosting
-  when it's far away), lines up 1.6 km out, follows a 6% glide path down and lands.
+- **Auto-land:** tap **LAND** (or press `L`) and the plane picks the **nearest airport**,
+  flies there (boosting when it's far away), lines up 1.6 km out with that airport's
+  runway, follows a 6% glide path down and lands. The HUD shows where it's going.
   Steer yourself, or tap LAND again, to take back control.
 
 ## Saved in the browser

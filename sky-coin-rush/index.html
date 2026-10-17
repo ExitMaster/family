@@ -51,6 +51,7 @@ body{
 .chip{background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:8px;padding:5px 8px;font-size:11px;letter-spacing:.1em;font-variant-numeric:tabular-nums;white-space:nowrap}
 .chip b{font-size:14px;letter-spacing:0;margin-left:3px}
 .chip.power{background:var(--teal)}
+.apname{text-transform:uppercase}
 .chip.power.boost{background:var(--coral)}
 .iconbtn{pointer-events:auto;width:38px;height:38px;border-radius:10px;border:0;background:var(--glass);color:var(--hud-fg);font:700 14px/1 var(--hud);cursor:pointer;display:grid;place-items:center}
 .iconbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
@@ -133,7 +134,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <span class="chip">ALT<b id="alt">0</b> ft</span>
       <span class="chip">IAS<b id="spd">0</b> kt</span>
       <span class="chip">HDG<b id="hdg">000</b></span>
-      <span class="chip">HOME<b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
+      <span class="chip"><span class="apname" id="apName">Home Field</span><b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
     </div>
     <div class="row" id="powers"></div>
   </div>
@@ -142,8 +143,8 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
   <div class="bottom">
     <div class="freebar">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
-      <button class="ap" id="btn-land" aria-label="Auto-land at home">LAND</button>
-      <span class="hint">Follow the HOME arrow and the yellow beacon, or tap LAND (L) and the plane flies home and lands.</span>
+      <button class="ap" id="btn-land" aria-label="Auto-land at the nearest airport">LAND</button>
+      <span class="hint">Airports are everywhere: follow the arrow and the light beacons, or tap LAND (L) to fly to the nearest one and land.</span>
     </div>
   </div>
 </div>
@@ -534,14 +535,21 @@ function boot(hot){
   const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
 
-  /* ---------------- Home runway ---------------- */
-  // Local z runs from 0 (the threshold, reached first) to -RWY_LEN (the far end).
-  const rwy = new THREE.Group();
-  (function buildRunway(){
-    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); rwy.add(m); return m; };
-    add(new THREE.BoxGeometry(18, 1.0, RWY_LEN + 50), lam(0xdcc791), 0, RWY_TOP - 0.55, -RWY_LEN / 2);
-    add(new THREE.BoxGeometry(RWY_W, 0.2, RWY_LEN), lam(0x4a4f5c), 0, RWY_TOP - 0.1, -RWY_LEN / 2);
-    const paint = lam(0xf4f1ea, { emissive: 0x3a3a3a }), y = RWY_TOP + 0.01;
+  /* ---------------- Runway model ---------------- */
+  // Every airport uses this one merged, vertex-coloured geometry (runway, markings, lights,
+  // tower, windsock). Local z runs from 0 (the threshold, reached first when landing) to
+  // -RWY_LEN (the far end).
+  const rwyMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const rwyGeo = (function buildRunway(){
+    const parts = [];
+    const add = (geo, color, x, y, z, rx) => {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      g.applyMatrix4(new THREE.Matrix4().makeRotationX(rx || 0).setPosition(x, y, z));
+      parts.push([g, new THREE.Color(color)]);
+    };
+    add(new THREE.BoxGeometry(18, 1.0, RWY_LEN + 50), 0xdcc791, 0, RWY_TOP - 0.55, -RWY_LEN / 2);
+    add(new THREE.BoxGeometry(RWY_W, 0.2, RWY_LEN), 0x4a4f5c, 0, RWY_TOP - 0.1, -RWY_LEN / 2);
+    const paint = 0xf4f1ea, y = RWY_TOP + 0.01;
     const dash = new THREE.BoxGeometry(0.35, 0.02, 6);
     for (let z = -22; z > -RWY_LEN + 20; z -= 14) add(dash, paint, 0, y, z);
     const bar = new THREE.BoxGeometry(0.55, 0.02, 9);
@@ -549,20 +557,32 @@ function boot(hot){
     const tdz = new THREE.BoxGeometry(1.3, 0.02, 9);
     [-40, -70].forEach(z => { add(tdz, paint, 2.4, y, z); add(tdz, paint, -2.4, y, z); });
     const lightGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-    const edge = new THREE.MeshBasicMaterial({ color: 0xfff1c0 }), green = new THREE.MeshBasicMaterial({ color: 0x4dff88 }), red = new THREE.MeshBasicMaterial({ color: 0xff4a3a });
+    const edge = 0xfff1c0, green = 0x4dff88, red = 0xff4a3a;
     for (let z = 0; z >= -RWY_LEN; z -= 20){ add(lightGeo, edge, RWY_W / 2 + 0.5, RWY_TOP + 0.15, z); add(lightGeo, edge, -RWY_W / 2 - 0.5, RWY_TOP + 0.15, z); }
     for (let x = -4.5; x <= 4.5; x += 1.5){ add(lightGeo, green, x, RWY_TOP + 0.15, 1); add(lightGeo, red, x, RWY_TOP + 0.15, -RWY_LEN - 1); }
     // PAPI lights beside the touchdown zone: two white over two red is "on the glide path"
     [0, 1, 2, 3].forEach(i => add(new THREE.BoxGeometry(0.5, 0.4, 0.4), i < 2 ? edge : red, -RWY_W / 2 - 1.5 - i * 0.8, RWY_TOP + 0.2, -40));
-    // control tower and windsock on the sandbar
-    add(new THREE.BoxGeometry(1.6, 6, 1.6), lam(0xfff1d6), 7.6, RWY_TOP + 3, -90);
-    add(new THREE.BoxGeometry(2.4, 1.3, 2.4), new THREE.MeshPhongMaterial({ color: 0x7fd3e8, emissive: 0x113344, shininess: 100 }), 7.6, RWY_TOP + 6.6, -90);
-    add(new THREE.BoxGeometry(2.8, 0.3, 2.8), lam(0xe8432e), 7.6, RWY_TOP + 7.4, -90);
-    add(new THREE.CylinderGeometry(0.08, 0.08, 4, 5), M.dark, 7.4, RWY_TOP + 2, -25);
-    const sock = add(new THREE.ConeGeometry(0.45, 2, 8, 1, true), lam(0xff8a3d, { side: THREE.DoubleSide }), 7.4, RWY_TOP + 3.7, -24);
-    sock.rotation.x = -Math.PI / 2.3;
+    // control tower and windsock
+    add(new THREE.BoxGeometry(1.6, 6, 1.6), 0xfff1d6, 7.6, RWY_TOP + 3, -90);
+    add(new THREE.BoxGeometry(2.4, 1.3, 2.4), 0x7fd3e8, 7.6, RWY_TOP + 6.6, -90);
+    add(new THREE.BoxGeometry(2.8, 0.3, 2.8), 0xe8432e, 7.6, RWY_TOP + 7.4, -90);
+    add(new THREE.CylinderGeometry(0.08, 0.08, 4, 5), 0x2a2f45, 7.4, RWY_TOP + 2, -25);
+    add(new THREE.ConeGeometry(0.45, 2, 8), 0xff8a3d, 7.4, RWY_TOP + 3.7, -24, -Math.PI / 2.3);
+    let n = 0; parts.forEach(([g]) => n += g.attributes.position.count);
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    let o = 0;
+    parts.forEach(([g, c]) => {
+      const cnt = g.attributes.position.count;
+      pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3);
+      for (let i = 0; i < cnt; i++){ col[(o + i) * 3] = c.r; col[(o + i) * 3 + 1] = c.g; col[(o + i) * 3 + 2] = c.b; }
+      o += cnt; g.dispose();
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return geo;
   })();
-  scene.add(rwy);
 
   /* ---------------- Coins and boost rings ---------------- */
   const coinGeo = new THREE.CylinderGeometry(0.95, 0.95, 0.2, 18); coinGeo.rotateX(Math.PI / 2);
@@ -693,7 +713,7 @@ function boot(hot){
   }
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
   const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), powers: $('powers'),
-    hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), land: $('btn-land'), prompt: $('prompt') };
+    hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), land: $('btn-land'), prompt: $('prompt') };
   let powKey = '';
   function updatePowers(force){
     const parts = [];
@@ -720,17 +740,69 @@ function boot(hot){
     const a = hash2(xi, zi), b = hash2(xi + 1, zi), c = hash2(xi, zi + 1), d = hash2(xi + 1, zi + 1);
     return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
   }
-  function freeH(x, z){
+  function baseH(x, z){
     let n = 0, amp = 1, f = 1 / 900, sum = 0;
     for (let o = 0; o < 5; o++){ n += amp * vnoise(x * f + o * 17.3, z * f - o * 9.1); sum += amp; amp *= 0.5; f *= 2.03; }
     n /= sum;
     const cont = vnoise(x / 4200 + 50, z / 4200 - 30);              // where the mountain ranges are
     const r = 1 - Math.abs(vnoise(x / 650 + 11, z / 650 + 7) * 2 - 1); // ridged peaks
-    const h = (n - 0.42) * 240 + Math.max(0, cont - 0.42) * 2 * r * r * 1100;
-    // the home airfield is a flat meadow around the runway
-    const dx = Math.max(0, Math.abs(x) - 120), dz = Math.max(0, Math.abs(z) - 350);
-    const w = Math.min(1, Math.hypot(dx, dz) / 260), sm = w * w * (3 - 2 * w);
-    return 5.5 + (h - 5.5) * sm;
+    return (n - 0.42) * 240 + Math.max(0, cont - 0.42) * 2 * r * r * 1100;
+  }
+
+  // Airports: one in most 5 km cells of an endless grid, placed, named and pointed by a
+  // hash of the cell. Cells are centred on multiples of AP_CELL and an airport stays within
+  // 1.5 km of its cell's centre, so its flat meadow never reaches into another cell. Home
+  // Field sits at the origin. In an airport's own coordinates u runs along the landing
+  // direction from the middle of the runway and v runs across it to the right.
+  const AP_CELL = 5000, AP_HALF_L = 345, AP_HALF_W = 115, AP_BLEND = 260;
+  const AP_NAMES = ['Pine Valley', 'Eagle Peak', 'Lakeside', 'Sunny Meadow', 'Cloud Hill', 'Fox Creek', 'Maple Ridge', 'Blue Lagoon',
+    'Owl Rock', 'Windy Point', 'Honey Farm', 'Bear Lake', 'Snowcap', 'Rainbow Fields', 'Otter Bay', 'Tall Pines', 'Golden Sands',
+    'Misty Glen', 'Puffin Isle', 'Thunder Bluff', 'Daisy Downs', 'Kite Hill', 'Moose Marsh', 'Starfall', 'Cherry Hill',
+    'Seagull Cove', 'Dragon Rock', 'Sleepy Hollow', 'Pebble Beach', 'Lighthouse Point', 'Lavender Fields', 'Crystal Lake'];
+  const airports = new Map();
+  function airportOfCell(i, j){
+    const key = i + ',' + j;
+    if (airports.has(key)) return airports.get(key);
+    let a = null;
+    if (i === 0 && j === 0) a = { x: 0, z: 0, hdg: 0, elev: 5.5, name: 'Home Field' };
+    else if (hash2(i * 31 + 7, j * 17 - 3) < 0.8){
+      const x = (i + (hash2(i, j + 101) - 0.5) * 0.6) * AP_CELL, z = (j + (hash2(i + 211, j) - 0.5) * 0.6) * AP_CELL;
+      // on a lake the airport becomes an island strip; on a mountain, a high plateau
+      a = { x, z, hdg: hash2(i + 3, j - 77) * Math.PI * 2, elev: clamp(baseH(x, z), 4, 900), name: AP_NAMES[(((3 * i + 7 * j) % 32) + 32) % 32] };   // never repeats within 5 x 5 cells
+    }
+    if (a){ a.key = key; a.fx = -Math.sin(a.hdg); a.fz = -Math.cos(a.hdg); a.rx = Math.cos(a.hdg); a.rz = -Math.sin(a.hdg); }
+    airports.set(key, a);
+    return a;
+  }
+  const cellOf = v => Math.floor(v / AP_CELL + 0.5);
+  let lastCI = NaN, lastCJ = NaN, lastAp = null;
+  function airportNear(x, z){
+    const i = cellOf(x), j = cellOf(z);
+    if (i !== lastCI || j !== lastCJ){ lastCI = i; lastCJ = j; lastAp = airportOfCell(i, j); }
+    return lastAp;
+  }
+  // a point in an airport's own coordinates; a.x/a.z is the middle of its runway
+  const apLocal = (a, x, z) => { const dx = x - a.x, dz = z - a.z; return { a, u: dx * a.fx + dz * a.fz, v: dx * a.rx + dz * a.rz }; };
+  const rwyTop = a => a.elev + 0.5;
+  function freeH(x, z){
+    const h = baseH(x, z), a = airportNear(x, z);
+    if (!a) return h;
+    const dx = x - a.x, dz = z - a.z;   // apLocal, inlined: this runs for every terrain vertex
+    const du = Math.max(0, Math.abs(dx * a.fx + dz * a.fz) - AP_HALF_L - 5), dv = Math.max(0, Math.abs(dx * a.rx + dz * a.rz) - AP_HALF_W - 5);
+    const w = Math.min(1, Math.hypot(du, dv) / AP_BLEND), sm = w * w * (3 - 2 * w);
+    return a.elev + (h - a.elev) * sm;
+  }
+  function nearestAirport(x, z){
+    const ci = cellOf(x), cj = cellOf(z);
+    for (let r = 1; r <= 3; r++){
+      let best = null, bd = Infinity;
+      for (let j = cj - r; j <= cj + r; j++) for (let i = ci - r; i <= ci + r; i++){
+        const a = airportOfCell(i, j); if (!a) continue;
+        const d = Math.hypot(a.x - x, a.z - z); if (d < bd){ bd = d; best = a; }
+      }
+      if (best) return best;
+    }
+    return airportOfCell(0, 0);
   }
   // height of the rendered surface (same triangles as the mesh's inner lattice)
   function groundAt(x, z){
@@ -802,7 +874,7 @@ function boot(hot){
     for (let gz = cz - TR; gz <= cz + TR; gz++) for (let gx = cx - TR; gx <= cx + TR; gx++) for (let s = 0; s < 2 && n < FT; s++){
       if (hash2(gx * 7 + s, gz * 13 - s) < 0.4) continue;
       const x = (gx + hash2(gx + 101 * s, gz + 3)) * TC, z = (gz + hash2(gx - 7, gz + 59 + s)) * TC;
-      if (Math.abs(x) < 60 && Math.abs(z) < 420) continue;
+      { const a = airportNear(x, z), l = a && apLocal(a, x, z); if (l && Math.abs(l.v) < AP_HALF_W + 25 && Math.abs(l.u) < AP_HALF_L + 75) continue; }
       const h = groundAt(x, z); if (h < 3 || h > 360) continue;
       const k = 2.6 + hash2(gx, gz * 3 + s) * 2;
       d.position.set(x, h - 0.6, z); d.rotation.y = hash2(gx, gz) * 6; d.scale.set(k, k * (0.9 + hash2(gz, gx) * 0.5), k); d.updateMatrix();
@@ -854,13 +926,24 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0 };
-  const onHomeRunway = (x, z) => Math.abs(x) < RWY_W / 2 + 1 && z < 130 && z > -130;
-  // the whole flat meadow around the runway is fine to land on
-  const onAirfield = (x, z) => Math.abs(x) < 115 && Math.abs(z) < 345;
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']) };
+  // the airport whose meadow the point is on (null if none), in its own coordinates
+  function airfieldAt(x, z){
+    const a = airportNear(x, z); if (!a) return null;
+    const l = apLocal(a, x, z);
+    return Math.abs(l.v) < AP_HALF_W && Math.abs(l.u) < AP_HALF_L ? l : null;
+  }
+  const onRunway = l => !!l && Math.abs(l.v) < RWY_W / 2 + 1 && Math.abs(l.u) < RWY_LEN / 2;
+  // the whole flat meadow around a runway is fine to land on
+  const onAirfield = (x, z) => !!airfieldAt(x, z);
   // the seaplane can also land on (and take off from) any lake
   const onWater = (x, z) => !!plane.water && groundAt(x, z) < 0.3;
-  const restAt = (x, z) => { const g = groundAt(x, z); return (onHomeRunway(x, z) ? FREE_RWY : plane.water ? Math.max(g, 0) : g) + PLANE_SCALE; };
+  function restAt(x, z){
+    const l = airfieldAt(x, z);
+    if (onRunway(l)) return rwyTop(l.a) + PLANE_SCALE;
+    const g = groundAt(x, z);
+    return (plane.water ? Math.max(g, 0) : g) + PLANE_SCALE;
+  }
   const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
   // The plane's orientation is a quaternion so the nose can go all the way round a loop.
   // F.yaw / F.pitch / F.roll are read back from it for the HUD, camera and autopilots.
@@ -874,18 +957,44 @@ function boot(hot){
   function setLevel(yaw, pitch){ eTmp.set(pitch || 0, yaw, 0); Q.setFromEuler(eTmp); readAxes(); }
   const rotLocal = (axis, a) => { qTmp.setFromAxisAngle(axis, a); Q.multiply(qTmp); };
   const rotWorld = (axis, a) => { qTmp.setFromAxisAngle(axis, a); Q.premultiply(qTmp); };
-  // a tall light beside the runway, seen from far away (no fog on it)
-  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1600, 12, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffc23d, transparent: true, opacity: 0.35, depthWrite: false, fog: false, side: THREE.DoubleSide }));
-  beacon.position.set(-25, 800, 0); free.add(beacon);
+  // Each airport near the plane gets its runway mesh and a tall light beacon beside it that
+  // fog doesn't hide: yellow at Home Field, teal everywhere else.
+  const beaconGeo = new THREE.CylinderGeometry(1, 1, 1600, 12, 1, true);
+  const beaconOpts = { transparent: true, opacity: 0.35, depthWrite: false, fog: false, side: THREE.DoubleSide };
+  const beaconHome = new THREE.MeshBasicMaterial(Object.assign({ color: 0xffc23d }, beaconOpts));
+  const beaconMat = new THREE.MeshBasicMaterial(Object.assign({ color: 0x5fe0d0 }, beaconOpts));
+  const apVis = new Map();
+  let apCI = NaN, apCJ = NaN;
+  function updateAirports(){
+    const ci = cellOf(F.x), cj = cellOf(F.z);
+    if (ci !== apCI || cj !== apCJ){
+      apCI = ci; apCJ = cj;
+      const want = new Set();
+      for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++){
+        const a = airportOfCell(i, j); if (!a) continue;
+        want.add(a.key);
+        if (apVis.has(a.key)) continue;
+        const m = new THREE.Mesh(rwyGeo, rwyMat);
+        m.position.set(a.x - a.fx * RWY_LEN / 2, rwyTop(a) - RWY_TOP, a.z - a.fz * RWY_LEN / 2); m.rotation.y = a.hdg;
+        const b = new THREE.Mesh(beaconGeo, a.key === '0,0' ? beaconHome : beaconMat);
+        b.position.set(a.x - a.rx * 25, rwyTop(a) + 800, a.z - a.rz * 25);
+        free.add(m, b); apVis.set(a.key, { m, b });
+      }
+      for (const [k, vis] of apVis) if (!want.has(k)){ free.remove(vis.m, vis.b); apVis.delete(k); }
+    }
+    for (const vis of apVis.values()){
+      const k = Math.max(3, Math.hypot(vis.b.position.x - F.x, vis.b.position.z - F.z) * 0.004);
+      vis.b.scale.set(k, 1, k);
+    }
+    beaconHome.opacity = beaconMat.opacity = 0.25 + Math.sin(t * 3) * 0.1;
+  }
   function toggleAutoLand(){
     if (state !== 'play' || F.crashT > 0) return;
     if (F.ground){ toast('Already on the ground', 'info'); return; }
     F.auto = !F.auto; F.autoFinal = false; sfx.ap(F.auto);
-    toast(F.auto ? 'Auto-land: flying home' : 'Auto-land off', 'info');
+    if (F.auto) F.target = nearestAirport(F.x, F.z);
+    toast(F.auto ? 'Auto-land: flying to ' + F.target.name : 'Auto-land off', 'info');
   }
-  // Auto-land: fly to a point 1.6 km north of the runway, turn onto the runway heading,
-  // then follow a 6% glide path down to the threshold.
   // highest ground (or water) on the plane's path over the next 450 m
   function terrainAhead(){
     const ahead = d => groundAt(F.x - Math.sin(F.yaw) * d, F.z - Math.cos(F.yaw) * d);
@@ -896,19 +1005,24 @@ function boot(hot){
     const pitchT = clamp((altT - F.y) * 0.02, -0.3, 0.35);
     return clamp((pitchT - F.pitch) * 4, -1, 1);
   }
+  // Auto-land: fly to a point 1.6 km before the target airport's runway, turn onto the
+  // runway heading, then follow a 6% glide path down to the threshold.
   function autoLandInput(){
-    const gAhead = terrainAhead();
-    if (F.autoFinal && (Math.abs(F.x) > 220 || F.z < -200)) F.autoFinal = false;
-    if (!F.autoFinal && Math.abs(F.x) < 150 && F.z > 0 && F.z < 1900 && Math.abs(wrapA(F.yaw)) < 0.5) F.autoFinal = true;
+    const a = F.target, gAhead = terrainAhead(), l = apLocal(a, F.x, F.z);
+    const back = -l.u, touch = rwyTop(a) + PLANE_SCALE;   // back: how far short of the runway's middle
+    if (F.autoFinal && (Math.abs(l.v) > 220 || back < -200)) F.autoFinal = false;
+    if (!F.autoFinal && Math.abs(l.v) < 150 && back > 0 && back < 1900 && Math.abs(wrapA(F.yaw - a.hdg)) < 0.5) F.autoFinal = true;
     let yawT, altT;
+    F.apDist = 0;
     if (F.autoFinal){
-      yawT = clamp(F.x * 0.006, -0.35, 0.35);
-      altT = F.z > 40 ? restAt(0, 0) + (F.z - 40) * 0.06 : restAt(F.x, F.z) - 1;
-      if (F.z > 400) altT = Math.max(altT, gAhead + 40);
+      yawT = a.hdg + clamp(l.v * 0.006, -0.35, 0.35);
+      altT = back > 40 ? touch + (back - 40) * 0.06 : touch - 1;
+      if (back > 400) altT = Math.max(altT, gAhead + 40);
     } else {
-      const vx = 0 - F.x, vz = 1600 - F.z, dist = Math.hypot(vx, vz);
-      yawT = dist > 150 ? Math.atan2(-vx, -vz) : 0;
-      altT = Math.max(gAhead + 110, dist < 1500 ? 110 : 200);
+      const vx = a.x - a.fx * 1600 - F.x, vz = a.z - a.fz * 1600 - F.z, dist = Math.hypot(vx, vz);
+      yawT = dist > 150 ? Math.atan2(-vx, -vz) : a.hdg;
+      altT = Math.max(gAhead + 110, touch + (dist < 1500 ? 105 : 200));
+      F.apDist = dist;
     }
     const e = wrapA(yawT - F.yaw);
     return { ax: clamp(-e * 2.5, -1, 1), ay: vUp.y < 0.5 ? 0 : pitchToward(altT) };
@@ -916,7 +1030,6 @@ function boot(hot){
   // the world is always the open one: a big sky dome, the home runway at the origin
   sky.scale.setScalar(14); sun.scale.setScalar(15);
   camera.near = 1; camera.updateProjectionMatrix();
-  rwy.position.set(0, FREE_RWY - RWY_TOP, 130);
   // the start screen shows the plane cruising in big, gentle circles above the hills
   function demoInput(){ return { ax: 0.18, ay: vUp.y < 0.5 ? 0 : pitchToward(Math.max(groundAt(F.x, F.z), terrainAhead()) + 140) }; }
   function startFree(){
@@ -924,7 +1037,7 @@ function boot(hot){
     clearFreeItems();
     score = 0; coins = 0; chain = 0; mult = 1; lastCoinT = -9;
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0 });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0, apDist: 0, visited: new Set(['0,0']) });
     setLevel(0, 0); camUpS.set(0, 1, 0);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -968,8 +1081,7 @@ function boot(hot){
     }
     const live = state === 'play';
     if (!live){ const a = demoInput(); ax = a.ax; ay = a.ay; }
-    const homeFar = Math.hypot(F.x, F.z - 1600) > 2500;
-    const boosting = !!(keys.b || F.boostHeld) || boostT > 0 || (F.auto && !F.autoFinal && homeFar);
+    const boosting = !!(keys.b || F.boostHeld) || boostT > 0 || (F.auto && !F.autoFinal && F.apDist > 2500);
     boostT = Math.max(0, boostT - dt); shake = Math.max(0, shake - dt * 1.6);
 
     if (F.crashT > 0){
@@ -986,7 +1098,8 @@ function boot(hot){
       const g = groundAt(F.x, F.z);
       F.y = restAt(F.x, F.z);
       const leaving = !onAirfield(F.x, F.z) && !onWater(F.x, F.z);
-      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || F.z < -300)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
+      const fieldEnd = (l => l && Math.abs(l.u) > AP_HALF_L - 45)(airfieldAt(F.x, F.z));
+      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
       else if (g < 0.5 && !plane.water) crashFree(true);
     } else {
       // up/down pitches around the wings with no limit, so holding up flies a full loop
@@ -1017,7 +1130,13 @@ function boot(hot){
       if ((onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
         F.ground = true; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
         if (t - F.lastLand > 5){
-          score += 100; toast(water ? 'Splashdown! +100' : 'Nice landing! +100', ''); sfx.land();
+          const field = airfieldAt(F.x, F.z);
+          if (field && !F.visited.has(field.a.key)){
+            F.visited.add(field.a.key); score += 400; toast('Welcome to ' + field.a.name + '! +400', '');
+          } else {
+            score += 100; toast(field ? 'Landed at ' + field.a.name + '! +100' : 'Splashdown! +100', '');
+          }
+          sfx.land();
           burst(F.x, F.y - PLANE_SCALE + 0.2, F.z, water ? 0xe6f4ff : 0xf4f1ea, 10, 0.7);
         }
         F.lastLand = t;
@@ -1031,9 +1150,7 @@ function boot(hot){
     if (tx !== treeCX || tz !== treeCZ) buildTrees(tx, tz);
     fTrunks.visible = fLeaves.visible = F.y < 2500;
     fWater.position.set(F.x, 0, F.z);
-    const bd = Math.hypot(F.x + 25, F.z);
-    beacon.scale.set(Math.max(3, bd * 0.004), 1, Math.max(3, bd * 0.004));
-    beacon.material.opacity = 0.25 + Math.sin(t * 3) * 0.1;
+    updateAirports();
     for (const c of fClouds){
       const p = c.position;
       if (p.x - F.x > 3500) p.x -= 7000; else if (p.x - F.x < -3500) p.x += 7000;
@@ -1073,7 +1190,7 @@ function boot(hot){
     planeRoot.quaternion.copy(Q);
     for (const sp of spinners) sp.o.rotation[sp.axis] += dt * sp.rate;
     for (const fl of flames) fl.scale.y = (boosting && !F.ground ? 1.5 : fl.userData.idle) * (0.85 + Math.random() * 0.3);
-    const gTop = Math.max(onHomeRunway(F.x, F.z) ? FREE_RWY : groundAt(F.x, F.z), 0);
+    const field = airfieldAt(F.x, F.z), gTop = Math.max(onRunway(field) ? rwyTop(field.a) : groundAt(F.x, F.z), 0);
     planeShadow.position.set(F.x, gTop + 0.08, F.z);
     const alt = F.y - gTop; planeShadow.scale.setScalar(1 + alt * 0.05);
     M.shadow.opacity = planeRoot.visible ? clamp(0.32 - alt * 0.006, 0, 0.3) : 0;
@@ -1121,17 +1238,20 @@ function boot(hot){
     txt(H.spd, String(Math.round(F.speed * 1.944)));
     const hdg = ((-F.yaw * 180 / Math.PI) % 360 + 360) % 360;
     txt(H.hdg, String(Math.round(hdg) % 360).padStart(3, '0'));
-    txt(H.home, (Math.hypot(F.x, F.z) / 1000).toFixed(1));
-    H.homeArrow.style.transform = 'rotate(' + (Math.atan2(-F.x, F.z) + F.yaw).toFixed(3) + 'rad)';
+    // the nearest airport (or the one auto-land is heading for), with an arrow to it
+    const ap = F.auto && F.target ? F.target : nearestAirport(F.x, F.z);
+    txt(H.apName, ap.name);
+    txt(H.home, (Math.hypot(ap.x - F.x, ap.z - F.z) / 1000).toFixed(1));
+    H.homeArrow.style.transform = 'rotate(' + (Math.atan2(ap.x - F.x, F.z - ap.z) + F.yaw).toFixed(3) + 'rad)';
     let prompt = '';
     const up = invertY ? 'DOWN' : 'UP';
     if (F.crashT <= 0 && F.ground){
       if (F.autoBrake) prompt = F.speed > 1 ? 'Landed! Braking…' : 'Hold ' + up + ' to take off again';
       else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : 'Climb! Hold ' + up + ' or drag ' + up.toLowerCase();
     } else if (F.crashT <= 0 && F.auto){
-      prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying home';
-    } else if (F.crashT <= 0 && onAirfield(F.x, F.z) && F.y < 80){
-      prompt = 'Airfield below: go down gently to land';
+      prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying to ' + F.target.name;
+    } else if (F.crashT <= 0 && airfieldAt(F.x, F.z) && F.y < airfieldAt(F.x, F.z).a.elev + 80){
+      prompt = airfieldAt(F.x, F.z).a.name + ' below: go down gently to land';
     } else if (F.crashT <= 0 && onWater(F.x, F.z) && F.y < 50){
       prompt = 'Lake below: go down gently to land on it';
     }
