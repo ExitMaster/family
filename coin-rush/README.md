@@ -49,8 +49,8 @@ Pocket Hatch (free), Mini Kei, Dune Buggy (open roll cage, great off-road), Stre
 Dune Pickup (barely slows off-road), City Taxi (roof sign and checker stripes), Gravel Rally,
 Iron Muscle, Monster Truck (giant wheels — in a Race it crushes any rival it hits, +15 coins
 each; crushed cars pop back up after 5 s), Apex GT, Drift King (low grip, loves to slide),
-Jet Streak (3,000 coins, 576 km/h — twice as fast as anything else; its jet flame grows when
-you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
+Jet Streak (3,000 coins, tops out at 1,440 km/h — floor it down a straight and it breaks the
+sound barrier with a sonic boom at Mach 1, 1,235 km/h; its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
 
 Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo**
 (acceleration), **Tires** (grip and steering), **Nitro** (boost length).

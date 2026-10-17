@@ -326,7 +326,7 @@ const CARS = [
   {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. In a Race it crushes any rival it hits, +15 coins each.', price:2000, color:0xd7263d, top:47, accel:17, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
   {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:2400, color:0x1fae74, top:54, accel:20, grip:7.6, turn:2.4, shape:'gt'},
   {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:2900, color:0xf4f4f0, top:53, accel:20, grip:6.0, turn:2.8, shape:'drift'},
-  {id:'jet', name:'Jet Streak', cls:'Land speed', blurb:'A jet engine with seats and twice the speed of anything else. The flame grows when you floor it.', price:3000, color:0x2a6cff, top:160, accel:64, grip:10.5, turn:2.9, shape:'jet'},
+  {id:'jet', name:'Jet Streak', cls:'Supersonic', blurb:'A jet engine with seats. Floor it down a straight and it breaks the sound barrier (Mach 1 at 1,235 km/h) with a sonic boom.', price:3000, color:0x2a6cff, top:400, accel:250, grip:10.5, turn:2.9, shape:'jet'},
   {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:3400, color:0x22304f, top:57, accel:21, grip:8.0, turn:2.45, shape:'police'},
   {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:5000, color:0xffc21f, top:64, accel:25, grip:8.6, turn:2.6, shape:'hyper'},
   {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:8000, color:0x2fd1d6, top:70, accel:28, grip:10, turn:2.8, shape:'formula'},
@@ -1101,6 +1101,35 @@ const puffs = [];
 for (let i = 0; i < 40; i++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:smokeTex, transparent:true, depthWrite:false, opacity:0})); sp.visible = false; scene.add(sp); puffs.push({sp, life:0}); }
 let puffI = 0;
 function addPuff(x, z, strength){ const p = puffs[puffI]; puffI = (puffI + 1) % puffs.length; p.life = 1; p.max = 0.9; p.str = strength; p.sp.position.set(x + (Math.random()-.5)*.4, 0.4, z + (Math.random()-.5)*.4); p.sp.visible = true; }
+/* ---- sonic boom: crossing the speed of sound (343 m/s) ---- */
+const MACH = 343, shocks = [];
+function sonicBoom(){
+  const fx = Math.sin(car.h), fz = Math.cos(car.h);
+  for (let k = 0; k < 2; k++){
+    const m = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.2, 40), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.75, depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending}));
+    m.position.set(car.x - fx*(2 + k*3), 1.2, car.z - fz*(2 + k*3)); m.rotation.y = car.h;
+    scene.add(m); shocks.push({m, t:-k*0.12});
+  }
+  for (let k = 0; k < 10; k++) addPuff(car.x - fx*(3 + k), car.z - fz*(3 + k), 1);
+  car.bump = 1;
+  flash('SONIC BOOM! · MACH 1', 'pbc', 2.2);
+  if (actx && !save.muted){
+    const t = actx.currentTime, n = Math.floor(actx.sampleRate*1.6), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random()*2 - 1) * Math.pow(1 - i/n, 2);
+    const src = actx.createBufferSource(), lp = actx.createBiquadFilter(), g = actx.createGain(); src.buffer = buf;
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t); lp.frequency.exponentialRampToValueAtTime(80, t + 1.2);
+    g.gain.setValueAtTime(1.6, t); g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+    src.connect(lp); lp.connect(g); g.connect(snd.master); src.start(t); src.stop(t + 1.6);
+    beep(38, 0.6, 'sine', 0.5);
+  }
+}
+function updateShocks(dt){
+  for (let i = shocks.length - 1; i >= 0; i--){
+    const sk = shocks[i]; sk.t += dt; if (sk.t < 0) continue;
+    const k = sk.t / 0.9; sk.m.scale.setScalar(1 + k*14); sk.m.material.opacity = 0.75*(1 - k);
+    if (k >= 1){ scene.remove(sk.m); sk.m.geometry.dispose(); sk.m.material.dispose(); shocks.splice(i, 1); }
+  }
+}
 function updatePuffs(dt){ puffs.forEach(p => { if (p.life <= 0) return; p.life -= dt / p.max; const k = 1 - p.life; p.sp.scale.setScalar(1 + k*3.5); p.sp.position.y += dt*0.8; p.sp.material.opacity = Math.max(0, p.life) * 0.5 * p.str; if (p.life <= 0) p.sp.visible = false; }); }
 
 /* ================= Audio ================= */
@@ -1470,6 +1499,8 @@ function updatePit(dt){
 function updateRace(dt, inp){
   // the race clock (and the rivals) freeze while your crew works
   if (track.pit) updatePit(dt);
+  if (car.fwd >= MACH - 3 && !car.supersonic){ car.supersonic = true; sonicBoom(); }
+  else if (car.fwd < MACH*0.85) car.supersonic = false;
   if (!(car.pitT > 0)) race.time += dt;
   const n = track.N, i = car.idx;
   for (const cp of race.cps){ let d = Math.abs(i - cp); d = Math.min(d, n - d); if (d < 25) race.hit.add(cp); }
@@ -1803,6 +1834,7 @@ function frame(now){
     orbitCam(dt, (camera.aspect < 1 ? 11 : 7.8) + ce, 2.3 + ce*0.4);
   }
   updatePuffs(dt);
+  updateShocks(dt);
   updateParty(dt);
   if (track && track.anim) track.anim(dt);
   // keep the shadow box and headlight with the car
