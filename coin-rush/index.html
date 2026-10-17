@@ -317,14 +317,19 @@ const $ = s => document.querySelector(s);
 const CARS = [
   {id:'hatch', name:'Pocket Hatch', cls:'Starter', blurb:'Light, forgiving and cheap to tune. Everyone starts here.', price:0, color:0x3d9cf5, top:36, accel:13, grip:5.6, turn:2.25, shape:'hatch'},
   {id:'kei', name:'Mini Kei', cls:'Kei', blurb:'A tiny box on wheels. Slow on the straights, darts through hairpins.', price:200, color:0x7fd6c2, top:34, accel:15, grip:6.4, turn:2.6, shape:'kei'},
+  {id:'buggy', name:'Dune Buggy', cls:'Buggy', blurb:'An open roll cage on fat tires. The grass barely slows it down.', price:350, color:0xffb000, top:38, accel:14.5, grip:6.6, turn:2.6, rough:0.9, shape:'buggy'},
   {id:'coupe', name:'Street Coupe', cls:'Sport', blurb:'A rear-drive coupe with more power and a willing tail.', price:450, color:0xe0473c, top:42, accel:15.5, grip:6.0, turn:2.3, shape:'coupe'},
   {id:'pickup', name:'Dune Pickup', cls:'Off-road', blurb:'Tall tires and long travel. Barely slows down when it leaves the tarmac.', price:750, color:0xd9822b, top:41, accel:14, grip:7.0, turn:2.2, rough:0.82, shape:'pickup'},
+  {id:'taxi', name:'City Taxi', cls:'Taxi', blurb:'Checker stripes, a roof sign and a driver who knows every shortcut.', price:900, color:0xffd21f, top:44, accel:15, grip:6.6, turn:2.35, shape:'taxi'},
   {id:'rally', name:'Gravel Rally', cls:'Rally', blurb:'Stiff chassis, sticky tires, loves the tight stuff.', price:1100, color:0xf1f1ec, top:46, accel:18, grip:7.6, turn:2.5, shape:'rally'},
   {id:'muscle', name:'Iron Muscle', cls:'Muscle', blurb:'Big V8, twin stripes, and a rear end that wants to come round.', price:1600, color:0x6b3fc9, top:52, accel:19, grip:5.8, turn:2.15, shape:'muscle'},
+  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. Rolls over anything off the road.', price:2000, color:0xd7263d, top:47, accel:17, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
   {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:2400, color:0x1fae74, top:54, accel:20, grip:7.6, turn:2.4, shape:'gt'},
+  {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:2900, color:0xf4f4f0, top:53, accel:20, grip:6.0, turn:2.8, shape:'drift'},
   {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:3400, color:0x22304f, top:57, accel:21, grip:8.0, turn:2.45, shape:'police'},
   {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:5000, color:0xffc21f, top:64, accel:25, grip:8.6, turn:2.6, shape:'hyper'},
   {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:8000, color:0x2fd1d6, top:70, accel:28, grip:10, turn:2.8, shape:'formula'},
+  {id:'jet', name:'Jet Streak', cls:'Land speed', blurb:'A jet engine with seats. The flame grows when you floor it.', price:12000, color:0x2a6cff, top:80, accel:32, grip:10.5, turn:2.9, shape:'jet'},
 ];
 const UPGRADES = [
   {key:'engine', name:'Engine', desc:'+6% top speed per level'},
@@ -762,6 +767,11 @@ const SHAPES = {
   muscle:{L:4.7, W:1.96, H:0.6, cl:1.9, ch:0.5,  cz:-0.45, r:0.37, stripes:[-0.26, 0.26], stripeC:0xf4f4f0, hoodScoop:true},
   police:{L:4.6, W:1.9,  H:0.58, cl:2.0, ch:0.54, cz:-0.35, r:0.36, doors:0xeeeeea, lightbar:true},
   formula:{L:4.9, W:2.0, H:0.34, cl:0,   ch:0,    cz:0,     r:0.38, open:true},
+  buggy: {L:3.6, W:1.9,  H:0.42, cl:1.6, ch:0.75, cz:-0.2,  r:0.42, cage:true, tw:0.44},
+  taxi:  {L:4.6, W:1.9,  H:0.62, cl:2.3, ch:0.58, cz:-0.2,  r:0.35, taxi:true},
+  monster:{L:4.4, W:2.1, H:0.8,  cl:1.9, ch:0.7,  cz:-0.1,  r:0.85, lift:0.9, tw:0.62, wheelOut:0.35},
+  drift: {L:4.3, W:1.9,  H:0.52, cl:1.9, ch:0.5,  cz:-0.35, r:0.35, wing:1.0, stripes:[-0.45, 0.45], stripeC:0xe0473c},
+  jet:   {L:5.2, W:2.0,  H:0.4,  cl:1.5, ch:0.4,  cz:0.4,   r:0.36, fins:true, jet:true},
 };
 let carMesh = null;
 function glowCanvas(w, h, cx, cy, r, rgb, a0){
@@ -856,7 +866,7 @@ function makeCarMesh(def, paintId){
   const paint = paintMaterial(def, paintId || 'factory');
   const dark = new THREE.MeshStandardMaterial({color:0x1a1d22, metalness:0.2, roughness:0.7});
   const glass = new THREE.MeshStandardMaterial({color:0x1d2a38, metalness:0.6, roughness:0.15});
-  const baseY = sh.r*0.55;
+  const baseY = sh.r*0.55 + (sh.lift || 0);
   const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); body.add(o); return o; };
   const headM = new THREE.MeshBasicMaterial({color:0xfff6dd}), tailM = new THREE.MeshBasicMaterial({color:0xa01515});
   let head, tail, extra = {};
@@ -883,8 +893,25 @@ function makeCarMesh(def, paintId){
     const depth = sh.W*0.84;
     const cg = new THREE.ExtrudeGeometry(cs, {depth, bevelEnabled:false});
     cg.rotateY(-Math.PI/2); cg.translate(depth/2, 0, 0);
-    const cabin = new THREE.Mesh(cg, glass); cabin.position.set(0, baseY + sh.H, sh.cz); body.add(cabin);
-    const roof = box(depth*0.96, 0.06, l*0.44, paint, 0, baseY + sh.H + h + 0.02, sh.cz - l*0.09);
+    if (!sh.cage){ const cabin = new THREE.Mesh(cg, glass); cabin.position.set(0, baseY + sh.H, sh.cz); body.add(cabin); }
+    else cg.dispose();
+    const roof = box(depth*0.96, 0.06, l*0.44, sh.cage ? dark : paint, 0, baseY + sh.H + h + 0.02, sh.cz - l*0.09);
+    if (sh.cage){
+      // roll cage: four tubes up to the roof frame, a seat and a helmeted driver
+      const tube = new THREE.MeshStandardMaterial({color:0x2a2d33, metalness:0.6, roughness:0.4});
+      [-1, 1].forEach(sx => [-1, 1].forEach(sz => { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, h + 0.05, 8), tube); t.position.set(sx*depth*0.45, baseY + sh.H + h/2, roof.position.z + sz*l*0.2); body.add(t); }));
+      box(0.6, 0.5, 0.15, dark, 0, baseY + sh.H + 0.25, sh.cz - 0.35);
+      const hel = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.35})); hel.position.set(0, baseY + sh.H + 0.45, sh.cz - 0.1); body.add(hel);
+    }
+    if (sh.taxi){
+      const sign = canvasTex(128, 48, (c, w, h) => { c.fillStyle = '#ffe680'; c.fillRect(0, 0, w, h); c.fillStyle = '#111'; c.font = '700 34px Teko, Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('TAXI', w/2, h/2 + 2); });
+      sign.wrapS = sign.wrapT = THREE.ClampToEdgeWrapping;
+      box(0.8, 0.24, 0.32, new THREE.MeshBasicMaterial({map:sign}), 0, roof.position.y + 0.15, roof.position.z);
+      const chk = canvasTex(128, 16, (c, w, h) => { for (let x = 0; x < 16; x++) for (let y = 0; y < 2; y++){ c.fillStyle = (x + y) % 2 ? '#111' : '#f4f4f0'; c.fillRect(x*8, y*8, 8, 8); } });
+      chk.wrapS = chk.wrapT = THREE.ClampToEdgeWrapping;
+      const cm = new THREE.MeshStandardMaterial({map:chk, roughness:0.5});
+      [-1, 1].forEach(sd => box(0.02, 0.16, sh.L*0.8, cm, sd*(sh.W/2 + 0.011), baseY + sh.H*0.55, 0));
+    }
     const stripeM = new THREE.MeshStandardMaterial({color:sh.stripe || sh.stripeC || 0xffffff, roughness:.5});
     (sh.stripes || (sh.stripe ? [0] : [])).forEach(x => {
       const w = sh.stripes ? 0.2 : 0.42;
@@ -914,6 +941,15 @@ function makeCarMesh(def, paintId){
       [-1, 1].forEach(sd => box(0.06, 0.4*sh.wing, 0.22, dark, sd*sh.W*0.3, baseY + sh.H + 0.2*sh.wing, -sh.L/2 + 0.28));
     }
     if (sh.fins) [-1, 1].forEach(sd => box(0.05, 0.3, 1.2, dark, sd*0.45, baseY + sh.H + 0.12, -sh.L/2 + 0.9));
+    if (sh.jet){
+      // jet nozzle with a flame that grows with throttle (see syncCarMesh)
+      const ny = baseY + sh.H*0.6, nz = -sh.L/2 - 0.15;
+      const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.7, 16, 1, true), new THREE.MeshStandardMaterial({color:0x3a3f47, metalness:0.8, roughness:0.3, side:THREE.DoubleSide}));
+      noz.rotation.x = Math.PI/2; noz.position.set(0, ny, nz); body.add(noz);
+      const core = new THREE.Mesh(new THREE.CircleGeometry(0.28, 16), new THREE.MeshBasicMaterial({color:0xffb347})); core.position.set(0, ny, nz - 0.2); core.rotation.y = Math.PI; body.add(core);
+      const fl = new THREE.Sprite(new THREE.SpriteMaterial({map:glowCanvas(64, 64, .5, .5, .5, '120,180,255', 1), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+      fl.position.set(0, ny, nz - 0.9); fl.scale.set(1.3, 1.3, 1); body.add(fl); extra.flame = fl;
+    }
     head = {x:sh.W/2 - 0.32, y:baseY + sh.H*0.45, z:sh.L/2 + 0.3, w:0.42}; tail = {x:sh.W/2 - 0.32, y:baseY + sh.H*0.7, z:-sh.L/2 - 0.01};
   }
   [-1, 1].forEach(sd => { box(head.w, 0.13, 0.06, headM, sd*head.x, head.y, head.z); box(sh.open ? 0.14 : 0.42, 0.13, 0.06, tailM, sd*tail.x, tail.y, tail.z); });
@@ -937,12 +973,12 @@ function makeCarMesh(def, paintId){
   const tailSprites = night.children.filter(n => n.isSprite);
 
   // wheels
-  const tw = sh.open ? 0.5 : 0.34;
+  const tw = sh.open ? 0.5 : (sh.tw || 0.34);
   const tireG = new THREE.CylinderGeometry(sh.r, sh.r, tw, 18), rimG = new THREE.CylinderGeometry(sh.r*0.62, sh.r*0.62, tw + 0.02, 12), spokeG = new THREE.BoxGeometry(tw + 0.03, sh.r*1.15, 0.09);
   const tireM = new THREE.MeshStandardMaterial({color:0x121316, roughness:0.9}), rimM = new THREE.MeshStandardMaterial({color:0xb9c0c8, metalness:0.8, roughness:0.3});
   const wheels = [], pivots = [];
   [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz], i) => {
-    const pivot = new THREE.Group(); pivot.position.set(sx*(sh.W/2 - 0.08), sh.r, sz*(sh.L/2 - 0.78));
+    const pivot = new THREE.Group(); pivot.position.set(sx*(sh.W/2 - 0.08 + (sh.wheelOut || 0)), sh.r, sz*(sh.L/2 - 0.78));
     const spin = new THREE.Group(); pivot.add(spin);
     const tire = new THREE.Mesh(tireG, tireM); tire.rotation.z = Math.PI/2; tire.castShadow = true; spin.add(tire);
     const rim = new THREE.Mesh(rimG, rimM); rim.rotation.z = Math.PI/2; spin.add(rim);
@@ -965,7 +1001,7 @@ function makeCarMesh(def, paintId){
     const ug = new THREE.PlaneGeometry(sh.W + 2.4, sh.L + 2.4); ug.rotateX(-Math.PI/2);
     const glow = new THREE.Mesh(ug, addMat(glowCanvas(64, 64, .5, .5, .5, '255,40,220', 0.95), 0.9)); glow.position.y = 0.06; root.add(glow);
   }
-  return {root, body, wheels, pivots, r:sh.r, len:sh.L, w:sh.W, night, tailM, tailGlowM, tailSprites, bar:extra.bar};
+  return {root, body, wheels, pivots, r:sh.r, len:sh.L, w:sh.W, night, tailM, tailGlowM, tailSprites, bar:extra.bar, flame:extra.flame, camExtra:sh.lift ? 3 : 0};
 }
 
 /* ================= Effects: skid marks + smoke ================= */
@@ -1660,7 +1696,8 @@ function frame(now){
     updateAudio(mode === 'results' ? 0 : Math.min(1, (r % 1) * 0.85 + (inp.throttle ? 0.15 : 0)), gear, car.slip, mode !== 'results');
   } else if (mode === 'garage'){
     if (carMesh){ carMesh.wheels.forEach(w => w.rotation.x = 0); carLights(carMesh, false); }
-    orbitCam(dt, camera.aspect < 1 ? 11 : 7.8, 2.3);
+    const ce = carMesh ? carMesh.camExtra : 0;
+    orbitCam(dt, (camera.aspect < 1 ? 11 : 7.8) + ce, 2.3 + ce*0.4);
   }
   updatePuffs(dt);
   updateParty(dt);
@@ -1685,6 +1722,7 @@ function carLights(m, braking){
 }
 function syncCarMesh(dt, inp){
   const m = carMesh; m.root.position.set(car.x, 0, car.z); m.root.rotation.y = car.h;
+  if (m.flame){ const k = 0.7 + (inp.throttle ? 0.7 : 0) + (car.boost ? 0.9 : 0) + Math.random()*0.2; m.flame.scale.set(1.3*k, 1.3*k, 1); }
   carLights(m, inp.brake > 0 && car.fwd > 0.5 && mode === 'race');
   const spin = car.fwd * dt / m.r; m.wheels.forEach(w => w.rotation.x += spin);
   m.pivots.forEach(p => p.rotation.y = car.steer * 0.45);

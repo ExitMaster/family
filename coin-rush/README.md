@@ -43,11 +43,13 @@ them on new cars and upgrades.
 - Gold / silver / bronze medals add a bonus, and a new personal best adds +30.
 - Progress is saved in the browser (`localStorage`).
 
-## Cars (10)
+## Cars (15)
 
-Pocket Hatch (free), Mini Kei, Street Coupe, Dune Pickup (barely slows off-road),
-Gravel Rally, Iron Muscle, Apex GT, Interceptor (flashing lightbar), Volt Hyper,
-Formula Zero.
+Pocket Hatch (free), Mini Kei, Dune Buggy (open roll cage, great off-road), Street Coupe,
+Dune Pickup (barely slows off-road), City Taxi (roof sign and checker stripes), Gravel Rally,
+Iron Muscle, Monster Truck (giant wheels), Apex GT, Drift King (low grip, loves to slide),
+Interceptor (flashing lightbar), Volt Hyper, Formula Zero and Jet Streak (the fastest — its
+jet flame grows when you floor it).
 
 Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo**
 (acceleration), **Tires** (grip and steering), **Nitro** (boost length).
