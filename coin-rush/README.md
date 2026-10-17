@@ -49,8 +49,7 @@ Pocket Hatch (free), Mini Kei, Dune Buggy (open roll cage, great off-road), Stre
 Dune Pickup (barely slows off-road), City Taxi (roof sign and checker stripes), Gravel Rally,
 Iron Muscle, Monster Truck (giant wheels — in a Race it crushes any rival it hits, +15 coins
 each; crushed cars pop back up after 5 s), Apex GT, Drift King (low grip, loves to slide),
-Jet Streak (3,000 coins, tops out at 1,440 km/h — floor it down a straight and it breaks the
-sound barrier with a sonic boom at Mach 1, 1,235 km/h; its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
+Jet Streak (3,000 coins, 720 km/h, **Race mode only** — its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
 
 Every car except the Jet Streak got a +50% boost to top speed and acceleration (the Grand Prix
 rivals too).
