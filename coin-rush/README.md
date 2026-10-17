@@ -54,9 +54,11 @@ Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo
 
 ## Paint (free)
 
-Every car you own can wear any of five paint jobs, picked in the Workshop — no coins needed:
+Every car you own can wear any of eleven paint jobs, picked in the Workshop — no coins needed:
 **Factory**, **Neon** (glowing green with a pink underglow), **Camo**, **Nighthawk** (matte
-black with red stealth lines) and **Cat** (orange tabby stripes, cat ears and a tail).
+black with red stealth lines), **Cat** (orange tabby stripes, cat ears and a tail), **Gold**,
+**Chrome**, **Lava** (black rock with glowing cracks), **Galaxy** (purple space with stars),
+**Rainbow** and **Zebra**.
 
 ## Tracks (7)
 
