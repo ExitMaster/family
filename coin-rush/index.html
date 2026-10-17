@@ -323,13 +323,13 @@ const CARS = [
   {id:'taxi', name:'City Taxi', cls:'Taxi', blurb:'Checker stripes, a roof sign and a driver who knows every shortcut.', price:900, color:0xffd21f, top:44, accel:15, grip:6.6, turn:2.35, shape:'taxi'},
   {id:'rally', name:'Gravel Rally', cls:'Rally', blurb:'Stiff chassis, sticky tires, loves the tight stuff.', price:1100, color:0xf1f1ec, top:46, accel:18, grip:7.6, turn:2.5, shape:'rally'},
   {id:'muscle', name:'Iron Muscle', cls:'Muscle', blurb:'Big V8, twin stripes, and a rear end that wants to come round.', price:1600, color:0x6b3fc9, top:52, accel:19, grip:5.8, turn:2.15, shape:'muscle'},
-  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. Rolls over anything off the road.', price:2000, color:0xd7263d, top:47, accel:17, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
+  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. In a Race it crushes any rival it hits, +15 coins each.', price:2000, color:0xd7263d, top:47, accel:17, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
   {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:2400, color:0x1fae74, top:54, accel:20, grip:7.6, turn:2.4, shape:'gt'},
   {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:2900, color:0xf4f4f0, top:53, accel:20, grip:6.0, turn:2.8, shape:'drift'},
+  {id:'jet', name:'Jet Streak', cls:'Land speed', blurb:'A jet engine with seats and twice the speed of anything else. The flame grows when you floor it.', price:3000, color:0x2a6cff, top:160, accel:64, grip:10.5, turn:2.9, shape:'jet'},
   {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:3400, color:0x22304f, top:57, accel:21, grip:8.0, turn:2.45, shape:'police'},
   {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:5000, color:0xffc21f, top:64, accel:25, grip:8.6, turn:2.6, shape:'hyper'},
   {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:8000, color:0x2fd1d6, top:70, accel:28, grip:10, turn:2.8, shape:'formula'},
-  {id:'jet', name:'Jet Streak', cls:'Land speed', blurb:'A jet engine with seats. The flame grows when you floor it.', price:12000, color:0x2a6cff, top:80, accel:32, grip:10.5, turn:2.9, shape:'jet'},
 ];
 const UPGRADES = [
   {key:'engine', name:'Engine', desc:'+6% top speed per level'},
@@ -1221,7 +1221,7 @@ function spawnAis(){
   const grid = RIVAL_SLOTS;
   RIVALS.forEach((r, k) => {
     const def = Object.assign({}, carById('formula'), {color:r.color}), m = makeCarMesh(def);
-    m.root.add(nameTag(r.name, hex(def.color)));
+    const tag = nameTag(r.name, hex(def.color)); m.root.add(tag); m.tag = tag;
     const a = {name:r.name, def, m, k:prof.lapT / (bronzeLap * r.pace), d:grid[k][0], lat:grid[k][1], latT:grid[k][1], lane:r.lane, v:0, fin:null, x:0, z:0, h:0, box:r.box, pitLap:track.pit ? r.pitLap : 0, pitT:0, served:false};
     ais.push(a); poseAi(a, 0, 0);
   });
@@ -1231,6 +1231,7 @@ function poseAi(a, dt, latVel){
   const dh = Math.atan2(Math.sin(h - a.h), Math.cos(h - a.h));
   a.x = p.x + p.nx*a.lat; a.z = p.z + p.nz*a.lat; a.h = h;
   const m = a.m; m.root.position.set(a.x, 0, a.z); m.root.rotation.y = h;
+  if (m.tag) m.tag.visible = Math.hypot(camera.position.x - a.x, camera.position.z - a.z) > 8;
   if (dt > 0){ m.wheels.forEach(w => w.rotation.x += a.v*dt / m.r); const st = Math.max(-0.45, Math.min(0.45, dh / dt * 0.35)); m.pivots.forEach(pv => pv.rotation.y += (st - pv.rotation.y) * Math.min(1, dt*8)); }
 }
 function playerDist(){
@@ -1242,7 +1243,7 @@ function updateAis(dt){
   if (!ais.length) return;
   const L = track.length, N = track.N, prof = track.ai, go = mode === 'race' || mode === 'results';
   const pd = mode === 'results' ? race.finD : playerDist();
-  const others = [{d:pd, lat:car.lat, v:Math.max(0, car.fwd)}].concat(ais);
+  const others = [{d:pd, lat:car.lat, v:Math.max(0, car.fwd)}].concat(ais.filter(a => !(a.crushT > 0)));
   ais.forEach(a => {
     let target = 0, latT = a.latT;
     if (go){
@@ -1276,6 +1277,12 @@ function updateAis(dt){
         if (toBox < 0.3){ target = 0; a.v = 0; a.pitT += dt; if (a.pitT > PIT_TIME + 0.2) a.served = true; }
       }
     }
+    if (a.crushT > 0){
+      a.crushT -= dt; target = 0; a.v = 0;
+      if (a.crushT <= 0){ a.pop = 0.35; a.immune = 3; beep(660, 0.1, 'square', 0.05); }
+    }
+    if (a.immune > 0) a.immune -= dt;
+    if (a.pop > 0){ a.pop -= dt; const k = 1 - Math.max(0, a.pop) / 0.35; a.m.root.scale.set(1.2 - 0.2*k, 0.28 + 0.72*k + Math.sin(k*Math.PI)*0.25, 1.1 - 0.1*k); if (a.pop <= 0) a.m.root.scale.set(1, 1, 1); }
     a.latT = latT;
     const v0 = a.v;
     a.v = a.v < target ? Math.min(target, a.v + 14*dt) : Math.max(target, a.v - 20*dt);
@@ -1286,10 +1293,21 @@ function updateAis(dt){
     carLights(a.m, a.v < v0 - 6*dt && a.v > 1);
   });
 }
+const CRUSH_TIME = 5, CRUSH_COINS = 15;
+function crushAi(a){
+  a.crushT = CRUSH_TIME; a.v = 0; race.crushes = (race.crushes || 0) + 1;
+  a.m.root.scale.set(1.2, 0.28, 1.1);
+  for (let k = 0; k < 6; k++) addPuff(a.x + (Math.random() - 0.5)*2.5, a.z + (Math.random() - 0.5)*3, 0.9);
+  car.bump = Math.max(car.bump, 0.7); camShake = Math.max(camShake, 0.4);
+  flash(`CRUSHED ${a.name.toUpperCase()}! +${CRUSH_COINS}`, 'pbc', 1.6);
+  beep(55, 0.35, 'sawtooth', 0.22); beep(110, 0.18, 'square', 0.12, 0.03); beep(70, 0.25, 'triangle', 0.15, 0.12);
+}
 function collideAis(){
   ais.forEach(a => {
-    const dx = car.x - a.x, dz = car.z - a.z, d = Math.hypot(dx, dz), R = 2.4;
+    if (a.crushT > 0) return;   // flattened cars get driven over
+    const dx = car.x - a.x, dz = car.z - a.z, d = Math.hypot(dx, dz), R = car.crusher ? 3.0 : 2.4;
     if (d >= R || d < 1e-3) return;
+    if (car.crusher && mode === 'race' && !(a.immune > 0)){ crushAi(a); return; }
     const nx = dx/d, nz = dz/d, push = R - d, p = trackPoint(a.d);
     car.x += nx*push*0.6; car.z += nz*push*0.6;
     a.lat -= (nx*p.nx + nz*p.nz) * push*0.4;
@@ -1318,13 +1336,13 @@ function startRace(){
   if (!save.owned.includes(save.selected)) save.selected = 'hatch';
   const def = carById(save.selected);
   buildCar(def);
-  car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0; car.wear = 0; car.pitT = 0; car.inBox = false; car.boxWarn = false;
+  car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0; car.wear = 0; car.pitT = 0; car.inBox = false; car.boxWarn = false; car.crusher = def.shape === 'monster';
   const slot = raceMode() ? GRID[MY_SLOT] : [-14, 0];
   { const p = trackPoint(slot[0]); car.x = p.x + p.nx*slot[1]; car.z = p.z + p.nz*slot[1]; car.h = p.h; car.vx = car.vz = car.fwd = car.steer = car.slip = 0; car.idx = nearest(car.x, car.z, 0, true); }
   clearSkids();
   if (raceMode()) spawnAis(); else clearAis();
   $('#hPosWrap').hidden = !ais.length; $('#hTireWrap').hidden = !track.pit; $('#hPosN').textContent = ais.length + 1;
-  Object.assign(race, {time:0, lap:1, lapStart:0, lapTimes:[], hit:new Set(), prevIdx:car.idx, count:track.startLights ? 5.6 : 3.6, countStep:9, finished:false});
+  Object.assign(race, {time:0, lap:1, lapStart:0, lapTimes:[], hit:new Set(), crushes:0, prevIdx:car.idx, count:track.startLights ? 5.6 : 3.6, countStep:9, finished:false});
   (track.startLights || []).forEach(m => m.color.setHex(0x330606));
   race.cps = [0.25, 0.5, 0.75].map(f => Math.floor(track.N * f));
   mode = 'countdown';
@@ -1407,7 +1425,8 @@ function finishRace(){
   const timeCoins = Math.max(10, Math.round(track.pay * track.medals.bronze / T));
   const medalBonus = medal === 'gold' ? track.pay : medal === 'silver' ? Math.round(track.pay*0.5) : medal === 'bronze' ? Math.round(track.pay*0.25) : 0;
   const pbBonus = isPB && prev ? 30 : 0;
-  const total = timeCoins + medalBonus + pbBonus + placeBonus;
+  const crushBonus = (race.crushes || 0) * CRUSH_COINS;
+  const total = timeCoins + medalBonus + pbBonus + placeBonus + crushBonus;
   save.coins += total;
   if (isPB) save.best[id] = T;
   if (medal && (!save.medal[id] || MEDAL_RANK[medal] > MEDAL_RANK[save.medal[id]])) save.medal[id] = medal;
@@ -1424,6 +1443,7 @@ function finishRace(){
   $('#rLaps').innerHTML = race.lapTimes.map((t, i) => `<li class="${t === bestLap && race.lapTimes.length > 1 ? 'best' : ''}"><span>Lap ${i+1}</span><span>${fmt(t)}</span></li>`).join('');
   $('#rCoins').innerHTML = `<div><span>Time bonus (${fmt(track.medals.bronze)} pays ${track.pay})</span><span>+${timeCoins}</span></div>`
     + (placeBonus ? `<div><span>${ORD(place)} place</span><span>+${placeBonus}</span></div>` : '')
+    + (crushBonus ? `<div><span>Crushed ${race.crushes} car${race.crushes > 1 ? 's' : ''}</span><span>+${crushBonus}</span></div>` : '')
     + (medalBonus ? `<div><span>${MEDAL_NAME[medal]} medal</span><span>+${medalBonus}</span></div>` : '')
     + (pbBonus ? `<div><span>New personal best</span><span>+${pbBonus}</span></div>` : '')
     + `<div class="tot"><span>Earned</span><span id="rTot">+0</span></div>`;
@@ -1581,7 +1601,7 @@ function renderGarage(){
     ['Nitro', 2/6, st.nitro/6, st.nitro.toFixed(1) + ' s'],
   ].filter(b => !(isTouch && b[0] === 'Nitro'));
   let html = `<h2>Workshop</h2><div><div class="car-title">${c.name}</div><div class="car-blurb">${c.blurb}</div></div>`;
-  html += `<div class="stats">${bars.map(b => `<span class="lb">${b[0]}</span><span class="bar"><i style="width:${(b[1]*100).toFixed(1)}%"></i><i style="left:${(b[1]*100).toFixed(1)}%;width:${((b[2]-b[1])*100).toFixed(1)}%"></i></span><span class="val">${b[3]}</span>`).join('')}</div>`;
+  html += `<div class="stats">${bars.map(b => `<span class="lb">${b[0]}</span><span class="bar"><i style="width:${(Math.min(1, b[1])*100).toFixed(1)}%"></i><i style="left:${(Math.min(1, b[1])*100).toFixed(1)}%;width:${((Math.min(1, b[2]) - Math.min(1, b[1]))*100).toFixed(1)}%"></i></span><span class="val">${b[3]}</span>`).join('')}</div>`;
   if (owned){
     const cur = paintOf(c.id);
     html += `<div class="paints"><div class="un">Paint <span class="ud">free · ${PAINTS.find(q => q.id === cur).name}</span></div><div class="pswatch">${PAINTS.map(q => `<button type="button" class="pw pw-${q.id}" data-paint="${q.id}" aria-pressed="${q.id === cur}" ${q.id === 'factory' ? `style="background:${hex(c.color)}"` : ''}><span>${q.name}</span></button>`).join('')}</div></div>`;
@@ -1748,13 +1768,14 @@ function effects(dt, inp){
 function chaseCam(dt){
   const fx = Math.sin(car.h), fz = Math.cos(car.h), sp = Math.max(0, car.fwd);
   const narrow = camera.aspect < 1 ? 1.45 : 1;
-  const back = (8.4 + sp*0.035)*narrow, up = (3.2 + sp*0.012)*(narrow > 1 ? 1.3 : 1);
+  const ce = carMesh ? carMesh.camExtra : 0;
+  const back = (8.4 + ce + sp*0.035)*narrow, up = (3.2 + ce*0.7 + sp*0.012)*(narrow > 1 ? 1.3 : 1);
   const k = 1 - Math.exp(-dt*5.5);
   camera.position.x += (car.x - fx*back - camera.position.x) * k;
   camera.position.z += (car.z - fz*back - camera.position.z) * k;
   camera.position.y += (up - camera.position.y) * k;
   const shake = reduceMotion ? 0 : car.bump*0.35 + (car.boost ? 0.04 : 0);
-  camera.lookAt(car.x + fx*5 + (Math.random()-.5)*shake, 1.1 + (Math.random()-.5)*shake, car.z + fz*5);
+  camera.lookAt(car.x + fx*5 + (Math.random()-.5)*shake, 1.1 + ce*0.4 + (Math.random()-.5)*shake, car.z + fz*5);
   const fov = 62 + Math.min(14, sp*0.17) + (car.boost ? 6 : 0);
   if (Math.abs(camera.fov - fov) > 0.05){ camera.fov += (fov - camera.fov) * Math.min(1, dt*4); camera.updateProjectionMatrix(); }
 }
