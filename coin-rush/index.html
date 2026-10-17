@@ -120,6 +120,8 @@ kbd{font-family:var(--ui);font-size:10px;border:1px solid var(--line);padding:0 
 #party span{font-family:var(--display);font-size:min(9vw,48px);line-height:1;color:#fff;}
 #party small{margin-top:10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.75);}
 #confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;}
+.stand{gap:0;font-size:12px;}
+.stand li{padding:2px 0;}
 .stand li.me span{color:var(--coin);font-weight:700;}
 .stand .sw{display:inline-block;width:9px;height:9px;margin-right:8px;vertical-align:0;}
 .h-time{font-family:var(--display);font-size:52px;line-height:.85;font-variant-numeric:tabular-nums;}
@@ -164,7 +166,8 @@ body.touch .hud-br{bottom:auto;right:auto;left:max(16px,env(safe-area-inset-left
 body.touch .keys{display:none;}
 
 /* ---------- Results / pause ---------- */
-.center{display:flex;align-items:center;justify-content:center;overflow-y:auto;}
+.center{display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;}
+.center>.card{margin-block:auto;}
 .card{width:min(440px,100%);padding:22px 24px;display:flex;flex-direction:column;gap:14px;margin:auto;}
 .r-head{display:flex;justify-content:space-between;align-items:baseline;}
 .r-time{font-family:var(--display);font-size:72px;line-height:.8;font-variant-numeric:tabular-nums;}
@@ -230,7 +233,7 @@ body.touch .keys{display:none;}
       <section class="panel" id="shop" aria-label="Workshop"></section>
     </div>
     <footer class="g-bottom panel">
-      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 7 tracks</small></button><button type="button" data-mode="race">Race<small>vs 5 rivals</small></button></div>
+      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 7 tracks</small></button><button type="button" data-mode="race">Race<small>vs 9 rivals</small></button></div>
       <div class="tracks" id="trackList" role="group" aria-label="Choose a track"></div>
       <div class="race-col">
         <button class="race-btn" id="raceBtn" type="button">RACE</button>
@@ -1032,9 +1035,19 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 /* ================= AI rivals ================= */
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
 // scaled well past medal pace, but capped below your car's top speed and slowed when far ahead, so they stay beatable.
-const RIVALS = [{name:'Blaze', pace:0.57, lane:-5, color:0xe0473c, box:-46, pitLap:2}, {name:'Comet', pace:0.59, lane:5, color:0x2fd1d6, box:-22, pitLap:1}, {name:'Dash', pace:0.62, lane:0, color:0xffc21f, box:2, pitLap:2},
-                {name:'Nova', pace:0.65, lane:-2.5, color:0x3d6cf5, box:26, pitLap:1}, {name:'Rocket', pace:0.68, lane:2.5, color:0xff7a3d, box:50, pitLap:2}];
-const GRID = [[-6, -5.5], [-6, 5.5], [-14, -5.5], [-14, 5.5], [-22, -5.5], [-23, 5.5]];
+const RIVALS = [
+  {name:'Blaze',  pace:0.57, lane:-5,   color:0xe0473c, box:-50,  pitLap:2},
+  {name:'Comet',  pace:0.59, lane:5,    color:0x2fd1d6, box:-30,  pitLap:1},
+  {name:'Viper',  pace:0.60, lane:-2.5, color:0x1fae74, box:-10,  pitLap:2},
+  {name:'Dash',   pace:0.62, lane:2.5,  color:0xffc21f, box:10,   pitLap:1},
+  {name:'Storm',  pace:0.64, lane:-6,   color:0x9aa3ad, box:30,   pitLap:2},
+  {name:'Nova',   pace:0.65, lane:6,    color:0x3d6cf5, box:50,   pitLap:1},
+  {name:'Rocket', pace:0.68, lane:0,    color:0xff7a3d, box:70,   pitLap:2},
+  {name:'Bolt',   pace:0.70, lane:-4,   color:0xb46bff, box:-106, pitLap:1},
+  {name:'Flash',  pace:0.73, lane:4,    color:0xff5fa2, box:-126, pitLap:2},
+];
+// two-wide grid, 8 m between rows; the last slot is yours
+const GRID = Array.from({length:RIVALS.length + 1}, (_, i) => [-6 - Math.floor(i/2)*8 - (i === RIVALS.length ? 1 : 0), i % 2 ? 5.5 : -5.5]);
 let ais = [];
 function trackPoint(d){
   const L = track.length, N = track.N, u = (((d % L) + L) % L) / L * N, i = Math.floor(u) % N, f = u - Math.floor(u), a = track.s[i], b = track.s[(i + 1) % N];
@@ -1280,7 +1293,7 @@ function finishRace(){
     const tick = now => { const k = Math.min(1, (now - t0) / 900); shown = Math.round(total * (1 - Math.pow(1-k, 3))); const el = $('#rTot'); if (el) el.textContent = '+' + shown; if (k < 1) requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
     [0, 0.09, 0.18, 0.3].forEach((w, i) => beep([988, 1319, 1568, 2093][i], 0.16, 'square', 0.06, w + 0.1));
-    $('#againBtn').focus();
+    $('#againBtn').focus({preventScroll:true}); $('#results').scrollTop = 0;
   };
   if (place === 1) startParty(reveal); else reveal();
 }
@@ -1442,13 +1455,13 @@ function renderGarage(){
   document.querySelectorAll('#modeList [data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === save.mode)));
   if (raceMode()){
     const t = trackDef(), best = save.best[recKey(t)], md = save.medal[recKey(t)];
-    $('#trackList').innerHTML = `<div class="trk gp"><span class="tn">${t.name}</span><span class="ti">${t.laps} big laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · 5 rivals · pays ${trackPay(t)}+ and a podium bonus</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></div>`;
+    $('#trackList').innerHTML = `<div class="trk gp"><span class="tn">${t.name}</span><span class="ti">${t.laps} big laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · ${RIVALS.length} rivals · pays ${trackPay(t)}+ and a podium bonus</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></div>`;
   } else $('#trackList').innerHTML = TRACKS.filter(t => !t.race).map(t => {
     const best = save.best[recKey(t)], md = save.medal[recKey(t)];
     return `<button type="button" class="trk" data-track="${t.id}" aria-pressed="${save.track === t.id}"><span class="tn">${t.name}</span><span class="ti">${t.laps} laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · pays ${trackPay(t)}+</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></button>`;
   }).join('');
   const dc = carById(save.selected);
-  $('#raceSub').textContent = raceMode() ? `${dc.name} vs 5 rivals · ${trackDef().name}` : `Driving ${dc.name} on ${trackDef().name}`;
+  $('#raceSub').textContent = raceMode() ? `${dc.name} vs ${RIVALS.length} rivals · ${trackDef().name}` : `Driving ${dc.name} on ${trackDef().name}`;
 }
 const lenCache = {};
 function trackLen(t){
