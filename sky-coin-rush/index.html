@@ -151,7 +151,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="btn" id="btn-play">Take off</button>
       <hr class="perf">
       <div class="keys">
-        <span><kbd>←↑↓→</kbd> <kbd>WASD</kbd></span><span>Fly: left and right turn, up climbs, down dives. On touch, drag anywhere.</span>
+        <span><kbd>←↑↓→</kbd> <kbd>WASD</kbd></span><span>Fly: left and right turn, up climbs, down dives. Keep holding up to fly a loop! On touch, drag anywhere.</span>
         <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST)</span>
         <span><kbd>L</kbd> <kbd>Q</kbd></span><span>Auto-land: the plane flies home and lands (or tap LAND)</span>
         <span><kbd>Esc</kbd> <kbd>P</kbd></span><span>Pause</span>
@@ -674,12 +674,24 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false };
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0 };
   const onHomeRunway = (x, z) => Math.abs(x) < RWY_W / 2 + 1 && z < 130 && z > -130;
   // the whole flat meadow around the runway is fine to land on
   const onAirfield = (x, z) => Math.abs(x) < 115 && Math.abs(z) < 345;
   const restAt = (x, z) => (onHomeRunway(x, z) ? FREE_RWY : groundAt(x, z)) + PLANE_SCALE;
   const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+  // The plane's orientation is a quaternion so the nose can go all the way round a loop.
+  // F.yaw / F.pitch / F.roll are read back from it for the HUD, camera and autopilots.
+  const Q = new THREE.Quaternion(), qTmp = new THREE.Quaternion(), eTmp = new THREE.Euler(0, 0, 0, 'YXZ');
+  const vFwd = new THREE.Vector3(0, 0, -1), vUp = new THREE.Vector3(0, 1, 0), vRight = new THREE.Vector3(1, 0, 0);
+  const AX = new THREE.Vector3(1, 0, 0), AY = new THREE.Vector3(0, 1, 0), AZ = new THREE.Vector3(0, 0, 1);
+  function readAxes(){
+    vFwd.set(0, 0, -1).applyQuaternion(Q); vUp.set(0, 1, 0).applyQuaternion(Q); vRight.set(1, 0, 0).applyQuaternion(Q);
+    F.yaw = Math.atan2(-vFwd.x, -vFwd.z); F.pitch = Math.asin(clamp(vFwd.y, -1, 1)); F.roll = Math.atan2(vRight.y, vUp.y);
+  }
+  function setLevel(yaw, pitch){ eTmp.set(pitch || 0, yaw, 0); Q.setFromEuler(eTmp); readAxes(); }
+  const rotLocal = (axis, a) => { qTmp.setFromAxisAngle(axis, a); Q.multiply(qTmp); };
+  const rotWorld = (axis, a) => { qTmp.setFromAxisAngle(axis, a); Q.premultiply(qTmp); };
   // a tall light beside the runway, seen from far away (no fog on it)
   const beacon = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1600, 12, 1, true),
     new THREE.MeshBasicMaterial({ color: 0xffc23d, transparent: true, opacity: 0.35, depthWrite: false, fog: false, side: THREE.DoubleSide }));
@@ -717,20 +729,21 @@ function boot(hot){
       altT = Math.max(gAhead + 110, dist < 1500 ? 110 : 200);
     }
     const e = wrapA(yawT - F.yaw);
-    return { ax: clamp(-e * 2.5, -1, 1), ay: pitchToward(altT) };
+    return { ax: clamp(-e * 2.5, -1, 1), ay: vUp.y < 0.5 ? 0 : pitchToward(altT) };
   }
   // the world is always the open one: a big sky dome, the home runway at the origin
   sky.scale.setScalar(14); sun.scale.setScalar(15);
   camera.near = 1; camera.updateProjectionMatrix();
   rwy.position.set(0, FREE_RWY - RWY_TOP, 130);
   // the start screen shows the plane cruising in big, gentle circles above the hills
-  function demoInput(){ return { ax: 0.18, ay: pitchToward(Math.max(groundAt(F.x, F.z), terrainAhead()) + 140) }; }
+  function demoInput(){ return { ax: 0.18, ay: vUp.y < 0.5 ? 0 : pitchToward(Math.max(groundAt(F.x, F.z), terrainAhead()) + 140) }; }
   function startFree(){
     sfx.init(); sfx.resume();
     clearFreeItems();
     score = 0; coins = 0; chain = 0; mult = 1; lastCoinT = -9;
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0 });
+    setLevel(0, 0); camUpS.set(0, 1, 0);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
     for (let i = 0; i < 16; i++) spawnCluster();
@@ -743,6 +756,7 @@ function boot(hot){
     clearFreeItems(); $('prompt').hidden = true; sfx.engine(false, 0);
     Object.assign(F, { auto: false, autoFinal: false, crashT: 0, boostHeld: false, ground: false, pitch: 0, speed: 65 });
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 150);
+    setLevel(F.yaw, 0);
     boostT = 0; planeRoot.visible = true;
     state = 'attract'; show('start');
   }
@@ -755,7 +769,7 @@ function boot(hot){
   function respawnFree(){
     // put the plane back in the sky right above where it went down
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 220);
-    F.pitch = 0; F.roll = 0; F.speed = 65; F.ground = false; planeRoot.visible = true;
+    setLevel(F.yaw, 0); F.speed = 65; F.ground = false; planeRoot.visible = true;
     toast('Back in the air', 'info');
   }
 
@@ -785,36 +799,40 @@ function boot(hot){
       if (ay > 0.3) F.autoBrake = false;
       if (F.autoBrake || ay < -0.3) F.speed = Math.max(0, F.speed - 24 * dt);
       else F.speed = Math.min(F.speed + 13 * dt, 70);
-      F.yaw -= ax * 0.5 * dt * Math.min(1, F.speed / 15);
-      F.roll *= 0.8; F.pitch = F.speed >= VR && !F.autoBrake ? 0.08 : 0;
+      setLevel(F.yaw - ax * 0.5 * dt * Math.min(1, F.speed / 15), F.speed >= VR && !F.autoBrake ? 0.08 : 0);
       F.x += -Math.sin(F.yaw) * F.speed * dt; F.z += -Math.cos(F.yaw) * F.speed * dt;
       const g = groundAt(F.x, F.z);
       F.y = restAt(F.x, F.z);
       const leaving = !onAirfield(F.x, F.z);
-      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || F.z < -300)){ F.ground = false; F.pitch = 0.22; F.liftT = t; toast('Airborne!', ''); }
+      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || F.z < -300)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
       else if (g < 0.5) crashFree(true);
     } else {
-      // bank to turn, pitch to climb or dive
-      F.roll += (-ax * 1.0 - F.roll) * Math.min(1, dt * 3.5);
-      F.yaw += F.roll * 1.15 * dt;
-      F.pitch += ay * 1.1 * dt;
-      if (!ay) F.pitch -= F.pitch * Math.min(1, dt * 0.35);
-      if (F.y > CEIL - 400 && F.pitch > 0) F.pitch -= dt * 1.2 * (F.y - (CEIL - 400)) / 400;
-      F.pitch = clamp(F.pitch, -1.3, 1.3);
+      // up/down pitches around the wings with no limit, so holding up flies a full loop
+      const pulling = Math.abs(ay) > 0.2;
+      rotLocal(AX, ay * 1.5 * dt);
+      // left/right banks; let go (and stop pulling) and it rolls back level, which also
+      // turns the plane right way up after half a loop
+      if (ax || !pulling) rotLocal(AZ, clamp(wrapA(-ax * 1.0 - F.roll) * 3, -3, 3) * dt);
+      readAxes();
+      rotWorld(AY, vRight.y * 1.3 * dt);                      // a banked plane turns
+      if (!ay && vUp.y > 0.3) rotLocal(AX, -F.pitch * 0.35 * dt); // nose eases back to level
+      if (F.y > CEIL - 400 && vFwd.y > 0) rotLocal(AX, -(vUp.y < 0 ? -1 : 1) * dt * 1.2 * (F.y - (CEIL - 400)) / 400);
+      Q.normalize(); readAxes();
+      if (live && pulling){
+        F.loopAcc += ay * 1.5 * dt;
+        if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); }
+      } else F.loopAcc *= Math.max(0, 1 - dt * 2);
       const cruise = boosting ? 150 : 65;
-      F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8) - Math.sin(F.pitch) * 14 * dt;
+      F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8) - vFwd.y * 14 * dt;
       F.speed = clamp(F.speed, 30, 190);
-      const cp = Math.cos(F.pitch);
-      F.x += -Math.sin(F.yaw) * cp * F.speed * dt;
-      F.y += Math.sin(F.pitch) * F.speed * dt;
-      F.z += -Math.cos(F.yaw) * cp * F.speed * dt;
-      if (F.y >= CEIL){ F.y = CEIL; F.pitch = Math.min(F.pitch, 0); if (!F.ceilTold){ F.ceilTold = true; toast('Max altitude!', 'info'); } }
+      F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
+      if (F.y >= CEIL){ F.y = CEIL; if (!F.ceilTold){ F.ceilTold = true; toast('Max altitude!', 'info'); } }
       if (F.y < CEIL - 800) F.ceilTold = false;
       if (F.y > 3048 && !F.hiTold){ F.hiTold = true; toast('10,000 ft!', ''); }
       if (F.y < 2900) F.hiTold = false;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
-      if (onAirfield(F.x, F.z) && F.y <= restAt(F.x, F.z) + 0.8 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
-        F.ground = true; F.y = restAt(F.x, F.z); F.pitch = 0; F.roll = 0; F.auto = false; F.autoBrake = true;
+      if (onAirfield(F.x, F.z) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
+        F.ground = true; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
         if (t - F.lastLand > 5){ score += 100; toast('Nice landing! +100', ''); sfx.land(); burst(F.x, FREE_RWY + 0.2, F.z, 0xf4f1ea, 10, 0.7); }
         F.lastLand = t;
       } else if (F.y < top + 1.4) crashFree(g < 0.5);
@@ -866,23 +884,26 @@ function boot(hot){
 
     // the plane
     planeRoot.position.set(F.x, F.y, F.z);
-    planeRoot.rotation.order = 'YXZ';
-    planeRoot.rotation.set(F.pitch, F.yaw, F.roll);
+    planeRoot.quaternion.copy(Q);
     prop.rotation.z += dt * 42;
     const gTop = Math.max(onHomeRunway(F.x, F.z) ? FREE_RWY : groundAt(F.x, F.z), 0);
     planeShadow.position.set(F.x, gTop + 0.08, F.z);
     const alt = F.y - gTop; planeShadow.scale.setScalar(1 + alt * 0.05);
     M.shadow.opacity = planeRoot.visible ? clamp(0.32 - alt * 0.006, 0, 0.3) : 0;
 
-    // chase camera behind the flight path
-    const fx = -Math.sin(F.yaw), fz = -Math.cos(F.yaw), sp = Math.sin(F.pitch), cpp = Math.cos(F.pitch);
-    camT.set(F.x - fx * cpp * 13, F.y - sp * 13 + 4, F.z - fz * cpp * 13);
+    // chase camera behind the plane; it leans with the plane once it tips past steep
+    // banks, so it follows right round a loop instead of flipping over at the top
+    const lean = clamp((0.85 - vUp.y) / 0.85, 0, 1);
+    camUp.set(0, 1, 0).lerp(vUp, lean).normalize();
+    camUpS.lerp(camUp, 1 - Math.exp(-dt * 5)).normalize();
+    camT.set(F.x, F.y, F.z).addScaledVector(vFwd, -13).addScaledVector(camUpS, 4);
     camBase.lerp(camT, 1 - Math.exp(-dt * 6));
     const camFloor = Math.max(groundAt(camBase.x, camBase.z), 0) + 1.5;
     if (camBase.y < camFloor) camBase.y = camFloor;
     camera.position.copy(camBase);
     if (shake > 0){ const s = shake * shake; camera.position.x += (Math.random() - 0.5) * s * 1.6; camera.position.y += (Math.random() - 0.5) * s * 1.6; }
-    look.set(F.x + fx * cpp * 20, F.y + sp * 20 + 1.5, F.z + fz * cpp * 20);
+    look.set(F.x, F.y, F.z).addScaledVector(vFwd, 20).addScaledVector(camUpS, 1.5);
+    camera.up.copy(camUpS);
     camera.lookAt(look);
     const fov = baseFov + (boosting && !F.ground ? 10 : 0);
     if (Math.abs(camera.fov - fov) > 0.05){ camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
@@ -932,6 +953,7 @@ function boot(hot){
 
   /* ---------------- Main loop ---------------- */
   const camBase = new THREE.Vector3(0, 12, 14), camT = new THREE.Vector3(), look = new THREE.Vector3();
+  const camUp = new THREE.Vector3(0, 1, 0), camUpS = new THREE.Vector3(0, 1, 0);
   let last = performance.now(), audioTick = 0;
   function frame(now){
     requestAnimationFrame(frame);
