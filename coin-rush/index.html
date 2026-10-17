@@ -307,23 +307,23 @@ const MAX_LVL = 5;
 const TRACKS = [
   {id:'pine', name:'Pine Loop', laps:2, pay:1.0, theme:'pine', scale:1,
    pts:[[0,0],[120,-20],[200,40],[190,140],[100,180],[20,140],[-60,180],[-160,130],[-170,30],[-90,-30]]},
-  {id:'canyon', name:'Red Canyon', laps:2, pay:1.1, theme:'canyon', scale:1.35,
+  {id:'canyon', name:'Red Canyon', laps:2, pay:1.1, theme:'canyon', scale:1.6,
    pts:[[0,0],[80,-60],[160,-40],[180,40],[125,85],[150,140],[70,190],[-10,150],[-25,95],[-60,60],[-110,90],[-180,20],[-120,-60]]},
-  {id:'harbor', name:'Harbor Night', laps:3, pay:1.25, theme:'night', scale:1.45,
+  {id:'harbor', name:'Harbor Night', laps:2, pay:1.25, theme:'night', scale:2.05,
    pts:[[0,0],[150,0],[220,60],[170,115],[70,100],[0,135],[20,180],[40,225],[-60,235],[-170,170],[-150,60],[-210,-20],[-120,-70]]},
   {id:'beach', name:'Sunset Coast', laps:2, pay:1.1, theme:'beach', scale:1.1,
    pts:[[0,0],[160,-10],[260,40],[280,130],[200,170],[120,140],[40,190],[-80,170],[-160,100],[-130,20]]},
   {id:'oval', name:'Speed Bowl', laps:4, pay:1.0, theme:'oval', scale:1, pace:1.25,
    pts:[[0,0],[150,0],[210,30],[230,90],[210,150],[150,180],[0,180],[-150,180],[-210,150],[-230,90],[-210,30],[-150,0]]},
-  {id:'snow', name:'Frost Pass', laps:2, pay:1.3, theme:'snow', scale:1.2, pace:0.9, grip:0.78,
+  {id:'snow', name:'Frost Pass', laps:2, pay:1.3, theme:'snow', scale:1.45, pace:0.9, grip:0.78,
    pts:[[0,0],[110,-30],[180,20],[150,90],[200,160],[120,210],[40,170],[-40,220],[-130,180],[-110,100],[-190,40],[-140,-40]]},
   {id:'gp', name:'Grand Prix', laps:5, pay:1.2, theme:'f1', scale:1.3, pace:1.25, race:true,
    pts:[[0,0],[150,0],[210,30],[230,90],[210,150],[150,180],[0,180],[-150,180],[-210,150],[-230,90],[-210,30],[-150,0]]},
   {id:'city', name:'Neon City', laps:3, pay:1.3, theme:'city', scale:1.2, pace:0.95,
    pts:[[0,0],[140,0],[165,25],[165,115],[140,140],[70,140],[45,165],[45,215],[20,240],[-95,240],[-120,215],[-120,25],[-95,0]]},
 ];
-const HALF = 10;          // half road width, meters
-const WALL = HALF + 6;    // tire wall distance from center line
+const HALF = 15;          // half road width, meters
+const WALL = HALF + 4;    // tire wall distance from center line
 const carById = id => CARS.find(c => c.id === id) || CARS[0];
 
 /* ================= Save ================= */
@@ -987,9 +987,9 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 /* ================= AI rivals ================= */
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
 // scaled so a clean lap lands just slower than bronze pace. They ease off when far ahead (beatable on purpose).
-const RIVALS = [{name:'Blaze', pace:1.0, lane:-3.4, color:0xe0473c}, {name:'Comet', pace:1.05, lane:3.4, color:0x2fd1d6}, {name:'Dash', pace:1.1, lane:0, color:0xffc21f},
-                {name:'Nova', pace:1.16, lane:-1.7, color:0x3d6cf5}, {name:'Rocket', pace:1.23, lane:1.7, color:0xff7a3d}];
-const GRID = [[-6, -3.8], [-6, 3.8], [-14, -3.8], [-14, 3.8], [-22, -3.8], [-23, 3.8]];
+const RIVALS = [{name:'Blaze', pace:1.0, lane:-5, color:0xe0473c}, {name:'Comet', pace:1.05, lane:5, color:0x2fd1d6}, {name:'Dash', pace:1.1, lane:0, color:0xffc21f},
+                {name:'Nova', pace:1.16, lane:-2.5, color:0x3d6cf5}, {name:'Rocket', pace:1.23, lane:2.5, color:0xff7a3d}];
+const GRID = [[-6, -5.5], [-6, 5.5], [-14, -5.5], [-14, 5.5], [-22, -5.5], [-23, 5.5]];
 let ais = [];
 function trackPoint(d){
   const L = track.length, N = track.N, u = (((d % L) + L) % L) / L * N, i = Math.floor(u) % N, f = u - Math.floor(u), a = track.s[i], b = track.s[(i + 1) % N];
@@ -1004,7 +1004,7 @@ function aiProfile(){
     const a = s[(i - K + N) % N], b = s[(i + K) % N], dtx = b.tx - a.tx, dtz = b.tz - a.tz;
     const kap = Math.hypot(dtx, dtz) / (2*K*ds);
     v[i] = Math.min(60, Math.sqrt(LAT / Math.max(kap, 1e-4)));
-    ins[i] = Math.sign(dtx*s[i].nx + dtz*s[i].nz) * Math.min(1, kap*25) * 4.5;
+    ins[i] = Math.sign(dtx*s[i].nx + dtz*s[i].nz) * Math.min(1, kap*25) * 7;
   }
   for (let pass = 0; pass < 2; pass++) for (let j = N - 1; j >= 0; j--){ const n = (j + 1) % N; v[j] = Math.min(v[j], Math.sqrt(v[n]*v[n] + 2*LAT*ds)); }
   let T = 0; for (let i = 0; i < N; i++) T += ds / v[i];

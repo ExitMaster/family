@@ -48,7 +48,7 @@ Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo
 |---|---|---|
 | Pine Loop | 2 | forest, the easy one |
 | Red Canyon | 2 | desert rocks and mesas |
-| Harbor Night | 3 | night — headlights on |
+| Harbor Night | 2 | night — headlights on |
 | Sunset Coast | 2 | beach, palms, ocean |
 | Speed Bowl | 4 | oval with grandstands, flat-out |
 | Frost Pass | 2 | falling snow, slippery road |
