@@ -65,6 +65,12 @@ body{
 .ap.on small{background:var(--ink)}
 .ap:disabled{opacity:.45;cursor:default}
 .ap:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#hud:not(.free) .free-only,#hud.free .canyon-only{display:none!important}
+.arrow{display:inline-block;width:0;height:0;margin-left:6px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:11px solid var(--gold);vertical-align:-1px}
+.freebar{display:flex;gap:8px;align-items:stretch;width:100%}
+.freebar .hint{flex:1;min-width:0;background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.35;display:flex;align-items:center}
+.ap.boost{background:var(--coral)}
+.ap.boost.held{box-shadow:0 0 0 2px var(--gold)}
 .approach{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:12px;padding:8px 12px;font-size:13px;font-weight:700;letter-spacing:.06em;font-variant-numeric:tabular-nums}
 .approach b{font-size:16px}
 .papi{display:flex;gap:4px}
@@ -144,15 +150,17 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
   </div>
   <div class="tr">
     <div class="row">
-      <div class="hearts" id="hearts" aria-label="Lives"></div>
+      <div class="hearts canyon-only" id="hearts" aria-label="Lives"></div>
       <button class="iconbtn" id="btn-sound" aria-label="Toggle sound">♪</button>
       <button class="iconbtn" id="btn-pause" aria-label="Pause">II</button>
     </div>
     <div class="row">
       <span class="chip">ALT<b id="alt">0</b> ft</span>
       <span class="chip">IAS<b id="spd">0</b> kt</span>
-      <span class="chip hide-sm"><b id="dist">0</b> m</span>
-      <span class="chip" id="nextStripChip">STRIP<b id="nextStrip">0</b> km</span>
+      <span class="chip hide-sm canyon-only"><b id="dist">0</b> m</span>
+      <span class="chip free-only">HDG<b id="hdg">000</b></span>
+      <span class="chip free-only">HOME<b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
+      <span class="chip canyon-only" id="nextStripChip">STRIP<b id="nextStrip">0</b> km</span>
     </div>
     <div class="row" id="powers"></div>
   </div>
@@ -164,7 +172,11 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <span class="papi" id="papi" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       <span id="glideMsg">On glide path</span>
     </div>
-    <div class="dock">
+    <div class="freebar free-only">
+      <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
+      <span class="hint">Hold SPACE or BOOST to go fast. Follow the HOME arrow to land back on the runway.</span>
+    </div>
+    <div class="dock canyon-only">
       <button class="ap" id="btn-ap" aria-label="Autopilot">AP <small id="apCount">3</small></button>
       <div class="fuel" id="fuel"><span>FUEL</span><span>E</span><div class="fuel-track"><div id="fuelFill"></div></div><span>F</span></div>
     </div>
@@ -178,9 +190,12 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-head"><span>Flight SCR-01</span><span>Route: endless canyon</span></div>
     <div class="card-body">
       <h1>Sky Coin <em>Rush</em></h1>
-      <p class="lede">Take off from the river airstrip, fly the canyon grabbing coins, and land on the next strip to refuel before the needle hits E.</p>
-      <button class="btn" id="btn-play">Take off</button>
-      <div class="foot"><span>3 lives · 100% fuel</span><span>Best <b id="best-start">0</b></span></div>
+      <p class="lede">Two ways to fly. <b>Coin Rush</b>: race down the river canyon grabbing coins and land on airstrips to refuel. <b>Free flight</b>: go anywhere you like, over mountains and lakes, up to 19,700 ft above the clouds.</p>
+      <div class="btns">
+        <button class="btn" id="btn-play">Coin Rush</button>
+        <button class="btn secondary" id="btn-free">Free flight</button>
+      </div>
+      <div class="foot"><span>Coin Rush: 3 lives · 100% fuel</span><span>Best <b id="best-start">0</b></span></div>
       <hr class="perf">
       <div>
         <p class="label">Collect</p>
@@ -208,7 +223,8 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       </div>
       <div class="keys">
         <span><kbd>←↑↓→</kbd> <kbd>WASD</kbd></span><span>Steer. On touch, drag anywhere.</span>
-        <span><kbd>Q</kbd></span><span>Autopilot</span>
+        <span><kbd>Q</kbd></span><span>Autopilot (Coin Rush)</span>
+        <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (Free flight)</span>
         <span><kbd>Esc</kbd> <kbd>P</kbd></span><span>Pause</span>
       </div>
       <label class="toggle"><input type="checkbox" id="invert-start"> Pilot-style controls: push down to climb</label>
@@ -224,6 +240,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <div class="btns">
         <button class="btn" id="btn-resume">Resume</button>
         <button class="btn secondary" id="btn-restart">Restart flight</button>
+        <button class="btn secondary" id="btn-menu">End flight</button>
       </div>
     </div>
   </section>
@@ -262,9 +279,11 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const pick = arr => arr[(Math.random() * arr.length) | 0];
 
 const LIM = { x: 13.5, yMin: 2.2, yMax: 18 };
-const SPAWN_Z = -360, KILL_Z = 30, PLANE_R = 1.25, WATER_Y = -1.2, TL = 320, NT = 3;
+// PLANE_SCALE sizes the plane model; its wheels sit PLANE_SCALE below its centre.
+const PLANE_SCALE = 1.3;
+const SPAWN_Z = -360, KILL_Z = 30, PLANE_R = 1.45, WATER_Y = -1.2, TL = 320, NT = 3;
 // Airstrip: the runway sits on a sandbar in the river. REST_Y is the plane's height with its wheels on it.
-const RWY_LEN = 260, RWY_W = 10, RWY_TOP = WATER_Y + 0.3, REST_Y = RWY_TOP + 0.85;
+const RWY_LEN = 260, RWY_W = 10, RWY_TOP = WATER_Y + 0.3, REST_Y = RWY_TOP + PLANE_SCALE;
 const VR = 30, GLIDE = 0.05, STRIP_EVERY = 2000, AP_TIME = 8;
 
 /* ---------------- Sound ---------------- */
@@ -343,7 +362,7 @@ function boot(hot){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xd6ecf5, 150, 500);
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1600);
+  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 16000);
   let baseFov = 62;
   function resize(){
     const w = window.innerWidth, h = window.innerHeight;
@@ -516,11 +535,11 @@ function boot(hot){
     const blade2 = blade.clone(); blade2.rotation.z = Math.PI / 2; prop.add(blade, blade2);
     const blur = new THREE.Mesh(new THREE.CircleGeometry(1.55, 24), new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
     prop.position.set(0, 0, -2.72); planeBody.add(prop, blur); blur.position.set(0, 0, -2.74);
-    planeBody.scale.setScalar(0.85);
+    planeBody.scale.setScalar(PLANE_SCALE);
   })();
-  const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2, 20), M.shadow);
+  const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
-  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(3.4, 1), new THREE.MeshBasicMaterial({ color: 0x5fe0d0, transparent: true, opacity: 0.18, wireframe: true, depthWrite: false }));
+  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(3.4 * PLANE_SCALE / 0.85, 1), new THREE.MeshBasicMaterial({ color: 0x5fe0d0, transparent: true, opacity: 0.18, wireframe: true, depthWrite: false }));
   shield.visible = false; planeRoot.add(shield);
 
   /* ---------------- Airstrip ---------------- */
@@ -672,7 +691,7 @@ function boot(hot){
   let phase = 'cruise', rwyActive = false, approach = false, nextStrip = STRIP_EVERY, stopT = 0;
   let apT = 0, apCharges = 3, landings = 0, topSpeed = 0, rollDecel = 18;
   const toThreshold = () => -rwy.position.z;
-  function placeRunway(z){ rwyActive = true; rwy.visible = true; rwy.position.z = z; }
+  function placeRunway(z){ rwyActive = true; rwy.visible = true; rwy.position.set(0, 0, z); }
   function hideRunway(){ rwyActive = false; approach = false; rwy.visible = false; }
   // What a beat spawned at z0 may contain while an airstrip is near: nothing over the
   // approach and runway, coins only for the climb-out, everything after that.
@@ -788,7 +807,7 @@ function boot(hot){
     sfx.land(); burst(px, RWY_TOP + 0.2, 0, 0xf4f1ea, 10, 0.7);
   }
   function engageAP(){
-    if (state !== 'play' || apT > 0 || apCharges <= 0) return;
+    if (state !== 'play' || mode !== 'canyon' || apT > 0 || apCharges <= 0) return;
     apCharges--; apT = AP_TIME; sfx.ap(true); toast('Autopilot on', 'info');
   }
   // Where the autopilot wants to be: on the glide path when landing, otherwise the next
@@ -815,6 +834,7 @@ function boot(hot){
   }
   function startRun(){
     sfx.init(); sfx.resume();
+    clearFreeItems(); setWorld('canyon');
     resetRun(); lineUpForTakeoff(); state = 'play'; prefill(); show(null);
     toast('Cleared for takeoff', 'info');
   }
@@ -878,7 +898,7 @@ function boot(hot){
 
   /* ---------------- Input ---------------- */
   const keys = {};
-  const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd' };
+  const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', Space: 'b', ShiftLeft: 'b', ShiftRight: 'b' };
   window.addEventListener('keydown', e => {
     if (e.target && e.target.tagName === 'INPUT') return;
     const k = KEYMAP[e.code];
@@ -933,7 +953,13 @@ function boot(hot){
   $('btn-play').addEventListener('click', startRun);
   $('btn-again').addEventListener('click', startRun);
   $('btn-resume').addEventListener('click', resume);
-  $('btn-restart').addEventListener('click', startRun);
+  $('btn-restart').addEventListener('click', () => mode === 'free' ? startFree() : startRun());
+  $('btn-free').addEventListener('click', startFree);
+  $('btn-menu').addEventListener('click', goMenu);
+  const boostBtn = $('btn-boost');
+  const holdBoost = on => e => { F.boostHeld = on; boostBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
+  boostBtn.addEventListener('pointerdown', holdBoost(true));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => boostBtn.addEventListener(n, holdBoost(false)));
   $('best-start').textContent = $('best-over').textContent = best.toLocaleString();
   syncToggles();
 
@@ -951,7 +977,7 @@ function boot(hot){
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
   const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), dist: $('dist'), fuel: $('fuel'), fill: $('fuelFill'), powers: $('powers'),
     approach: $('approach'), nextChip: $('nextStripChip'), nextStrip: $('nextStrip'), stripDist: $('stripDist'), glideMsg: $('glideMsg'),
-    papi: Array.from(document.querySelectorAll('#papi i')), prompt: $('prompt'), apCount: $('apCount'), ap: $('btn-ap') };
+    papi: Array.from(document.querySelectorAll('#papi i')), hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), prompt: $('prompt'), apCount: $('apCount'), ap: $('btn-ap') };
   let powKey = '';
   function updatePowers(force){
     const parts = [];
@@ -1007,6 +1033,363 @@ function boot(hot){
     H.ap.classList.toggle('on', apT > 0);
   }
 
+  /* ---------------- Free flight ---------------- */
+  // An open world built around the plane. The terrain is one grid mesh that follows the
+  // plane and is re-sampled every couple of cells. Its middle is a regular 30 m lattice
+  // aligned to world coordinates, so nearby hills never shift; cells grow wider towards
+  // the edge, where the fog hides them.
+  let mode = 'canyon';
+  const CEIL = 6000, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
+  const SPACE_C = new THREE.Color(0x0b1238);
+  function hash2(i, j){
+    let h = Math.imul(i | 0, 374761393) ^ Math.imul(j | 0, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function vnoise(x, z){
+    const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+    const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+    const a = hash2(xi, zi), b = hash2(xi + 1, zi), c = hash2(xi, zi + 1), d = hash2(xi + 1, zi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+  function freeH(x, z){
+    let n = 0, amp = 1, f = 1 / 900, sum = 0;
+    for (let o = 0; o < 5; o++){ n += amp * vnoise(x * f + o * 17.3, z * f - o * 9.1); sum += amp; amp *= 0.5; f *= 2.03; }
+    n /= sum;
+    const cont = vnoise(x / 4200 + 50, z / 4200 - 30);              // where the mountain ranges are
+    const r = 1 - Math.abs(vnoise(x / 650 + 11, z / 650 + 7) * 2 - 1); // ridged peaks
+    const h = (n - 0.42) * 240 + Math.max(0, cont - 0.42) * 2 * r * r * 1100;
+    // the home airfield is a flat meadow around the runway
+    const dx = Math.max(0, Math.abs(x) - 120), dz = Math.max(0, Math.abs(z) - 350);
+    const w = Math.min(1, Math.hypot(dx, dz) / 260), sm = w * w * (3 - 2 * w);
+    return 5.5 + (h - 5.5) * sm;
+  }
+  // height of the rendered surface (same triangles as the mesh's inner lattice)
+  function groundAt(x, z){
+    const gx = Math.floor(x / FS), gz = Math.floor(z / FS), fx = x / FS - gx, fz = z / FS - gz;
+    const hb = freeH((gx + 1) * FS, gz * FS), hc = freeH(gx * FS, (gz + 1) * FS);
+    if (fx + fz < 1){ const ha = freeH(gx * FS, gz * FS); return ha + (hb - ha) * fx + (hc - ha) * fz; }
+    const hd = freeH((gx + 1) * FS, (gz + 1) * FS);
+    return hd + (hc - hd) * (1 - fx) + (hb - hd) * (1 - fz);
+  }
+  const free = new THREE.Group(); free.visible = false; scene.add(free);
+  const FV = FN + 1, offs = new Float32Array(FV);
+  for (let i = 0; i < FV; i++){
+    const k = i - FN / 2, a = Math.abs(k);
+    let d = Math.min(a, FIN) * FS;
+    if (a > FIN) d += FS * FG * (Math.pow(FG, a - FIN) - 1) / (FG - 1);
+    offs[i] = Math.sign(k) * d;
+  }
+  const fPos = new Float32Array(FV * FV * 3), fCol = new Float32Array(FV * FV * 3), fHt = new Float32Array(FV * FV);
+  const fIdx = new Uint16Array(FN * FN * 6);
+  for (let j = 0, n = 0; j < FN; j++) for (let i = 0; i < FN; i++){
+    const a = j * FV + i, b = a + 1, c = a + FV, d = c + 1;
+    fIdx[n++] = a; fIdx[n++] = c; fIdx[n++] = b; fIdx[n++] = b; fIdx[n++] = c; fIdx[n++] = d;
+  }
+  const fGeo = new THREE.BufferGeometry();
+  fGeo.setAttribute('position', new THREE.BufferAttribute(fPos, 3));
+  fGeo.setAttribute('color', new THREE.BufferAttribute(fCol, 3));
+  fGeo.setIndex(new THREE.BufferAttribute(fIdx, 1));
+  const fTerrain = new THREE.Mesh(fGeo, new THREE.MeshPhongMaterial({ vertexColors: true, flatShading: true, shininess: 0, specular: 0x000000 }));
+  fTerrain.frustumCulled = false; free.add(fTerrain);
+  const fWater = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000), M.water);
+  fWater.rotation.x = -Math.PI / 2; free.add(fWater);
+  let fCX = NaN, fCZ = NaN;
+  const tc = new THREE.Color();
+  function buildTerrain(cx, cz){
+    fCX = cx; fCZ = cz;
+    for (let j = 0; j < FV; j++){
+      const z = cz + offs[j];
+      for (let i = 0; i < FV; i++){
+        const x = cx + offs[i], k = j * FV + i, h = freeH(x, z);
+        fHt[k] = h; fPos[k * 3] = x; fPos[k * 3 + 1] = h; fPos[k * 3 + 2] = z;
+      }
+    }
+    for (let j = 0; j < FV; j++) for (let i = 0; i < FV; i++){
+      const k = j * FV + i, h = fHt[k];
+      const i0 = Math.max(0, i - 1), i1 = Math.min(FN, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(FN, j + 1);
+      const sl = Math.max(Math.abs(fHt[j * FV + i1] - fHt[j * FV + i0]) / (offs[i1] - offs[i0]), Math.abs(fHt[j1 * FV + i] - fHt[j0 * FV + i]) / (offs[j1] - offs[j0]));
+      let hex;
+      if (h < 2.5) hex = 0xdcc791;
+      else if (h > 560) hex = 0xf5f2ea;
+      else if (sl > 0.75) hex = h > 300 ? 0xb7a998 : 0x8f7a68;
+      else if (h > 330) hex = 0x8a8a6a;
+      else if (h < 70) hex = 0x86b85a;
+      else hex = 0x5f9a48;
+      tc.setHex(hex);
+      const jit = (hash2(Math.round(fPos[k * 3] / FS), Math.round(fPos[k * 3 + 2] / FS)) - 0.5) * 0.06;
+      fCol[k * 3] = clamp(tc.r + jit, 0, 1); fCol[k * 3 + 1] = clamp(tc.g + jit, 0, 1); fCol[k * 3 + 2] = clamp(tc.b + jit, 0, 1);
+    }
+    fGeo.attributes.position.needsUpdate = true; fGeo.attributes.color.needsUpdate = true;
+  }
+  // forests: up to two trees per 90 m cell in a ring of cells around the plane
+  const FT = 1300, TC = 90, TR = 12;
+  const fTrunks = new THREE.InstancedMesh(trunkGeo, M.trunk, FT), fLeaves = new THREE.InstancedMesh(leafGeo, M.leaf, FT);
+  fLeaves.setColorAt(0, new THREE.Color(0x3f7d3a));
+  fTrunks.frustumCulled = fLeaves.frustumCulled = false; free.add(fTrunks, fLeaves);
+  let treeCX = NaN, treeCZ = NaN;
+  function buildTrees(cx, cz){
+    treeCX = cx; treeCZ = cz;
+    const d = new THREE.Object3D(), c = new THREE.Color(); let n = 0;
+    for (let gz = cz - TR; gz <= cz + TR; gz++) for (let gx = cx - TR; gx <= cx + TR; gx++) for (let s = 0; s < 2 && n < FT; s++){
+      if (hash2(gx * 7 + s, gz * 13 - s) < 0.4) continue;
+      const x = (gx + hash2(gx + 101 * s, gz + 3)) * TC, z = (gz + hash2(gx - 7, gz + 59 + s)) * TC;
+      if (Math.abs(x) < 60 && Math.abs(z) < 420) continue;
+      const h = groundAt(x, z); if (h < 3 || h > 360) continue;
+      const k = 2.6 + hash2(gx, gz * 3 + s) * 2;
+      d.position.set(x, h - 0.6, z); d.rotation.y = hash2(gx, gz) * 6; d.scale.set(k, k * (0.9 + hash2(gz, gx) * 0.5), k); d.updateMatrix();
+      fTrunks.setMatrixAt(n, d.matrix); fLeaves.setMatrixAt(n, d.matrix);
+      c.setHex(TREE_COLS[(hash2(gx + s, gz) * TREE_COLS.length) | 0]); fLeaves.setColorAt(n, c); n++;
+    }
+    fTrunks.count = fLeaves.count = n;
+    fTrunks.instanceMatrix.needsUpdate = fLeaves.instanceMatrix.needsUpdate = true;
+    if (fLeaves.instanceColor) fLeaves.instanceColor.needsUpdate = true;
+  }
+  const fClouds = [];
+  for (let i = 0; i < 34; i++){
+    const c = new THREE.Group(), puffs = 4 + (Math.random() * 3 | 0);
+    for (let j = 0; j < puffs; j++){
+      const m = new THREE.Mesh(cloudGeo, M.cloud);
+      m.position.set((j - puffs / 2) * 1.3 + rnd(-0.3, 0.3), rnd(-0.3, 0.4), rnd(-0.6, 0.6));
+      m.scale.setScalar(rnd(0.9, 1.6)); m.rotation.set(rnd(0, 3), rnd(0, 3), 0); c.add(m);
+    }
+    const k = rnd(22, 55); c.scale.set(k, k * 0.55, k); c.userData.y = rnd(380, 1300);
+    fClouds.push(c); free.add(c);
+  }
+
+  // coins and boost rings float in clusters around the plane
+  const fItems = [], fPool = { coin: [], ring: [] };
+  let clusterId = 0, itemTick = 0;
+  function fAdd(kind, x, y, z, cid, rotY){
+    let m = fPool[kind].pop();
+    if (!m){ m = BUILD[kind](); m.scale.setScalar(kind === 'coin' ? 3.2 : 3); free.add(m); }
+    m.visible = true; m.position.set(x, y, z); m.rotation.set(0, rotY || 0, 0);
+    fItems.push({ kind, mesh: m, cid });
+  }
+  function fRemove(i){ const it = fItems[i]; it.mesh.visible = false; fPool[it.kind].push(it.mesh); fItems.splice(i, 1); }
+  function clearFreeItems(){ for (let i = fItems.length - 1; i >= 0; i--) fRemove(i); }
+  function spawnCluster(){
+    const cid = ++clusterId, ang = F.yaw + rnd(-1.1, 1.1), dist = rnd(350, 1700);
+    const cx = F.x - Math.sin(ang) * dist, cz = F.z - Math.cos(ang) * dist, g = Math.max(0, freeH(cx, cz));
+    // most clusters near your height, some high up in the sky to chase
+    let cy = Math.random() < 0.18 ? rnd(1500, CEIL - 300) : clamp(F.y + rnd(-200, 250), g + 45, CEIL - 300);
+    cy = Math.max(cy, g + 45);
+    const dir = rnd(0, Math.PI * 2), dx = -Math.sin(dir), dz = -Math.cos(dir), pat = pick(['line', 'climb', 'wave', 'ring']);
+    for (let i = 0; i < 10; i++){
+      let x = cx + dx * i * 22, y = cy, z = cz + dz * i * 22;
+      if (pat === 'climb') y += i * 9;
+      else if (pat === 'wave'){ x += dz * Math.sin(i * 0.7) * 20; z -= dx * Math.sin(i * 0.7) * 20; }
+      else if (pat === 'ring'){ const a = i / 10 * Math.PI * 2; x = cx + dz * Math.cos(a) * 40; z = cz - dx * Math.cos(a) * 40; y = cy + Math.sin(a) * 40; }
+      fAdd('coin', x, Math.max(y, Math.max(0, freeH(x, z)) + 25), z, cid, dir);
+    }
+    if (pat === 'ring') fAdd('ring', cx, cy, cz, cid, dir);
+    else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
+  }
+
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, hiTold: false, ceilTold: false };
+  const onHomeRunway = (x, z) => Math.abs(x) < RWY_W / 2 + 1 && z < 130 && z > -130;
+  function setWorld(m){
+    mode = m;
+    const c = m === 'canyon';
+    tiles.forEach(o => o.visible = c); water.visible = c;
+    glints.forEach(o => o.visible = c); clouds.forEach(o => o.visible = c);
+    lines.forEach(l => l.visible = false);
+    free.visible = !c;
+    planeRoot.rotation.set(0, 0, 0); planeBody.rotation.set(0, 0, 0);
+    sky.scale.setScalar(c ? 1 : 14); sun.scale.setScalar(c ? 1 : 15);
+    camera.near = c ? 0.5 : 1; camera.updateProjectionMatrix();
+    if (c){ scene.fog.near = 150; scene.fog.far = 500; camBase.set(0, 9.5, 12.5); }
+    $('hud').classList.toggle('free', !c);
+  }
+  function startFree(){
+    sfx.init(); sfx.resume();
+    clearEnts(); hideRunway(); clearFreeItems();
+    setWorld('free');
+    score = 0; coins = 0; chain = 0; mult = 1; lastCoinT = -9;
+    boostT = magnetT = apT = invT = shake = 0; skyDist = 0; skyPhase = -1;
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, hiTold: false, ceilTold: false });
+    rwy.visible = true; rwy.position.set(0, FREE_RWY - RWY_TOP, 130);
+    fCX = fCZ = treeCX = treeCZ = NaN;
+    fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
+    for (let i = 0; i < 16; i++) spawnCluster();
+    planeRoot.visible = true; shield.visible = false; planeShadow.visible = true;
+    camBase.set(0, FREE_REST + 5, F.z + 16);
+    updatePowers(true);
+    state = 'play'; show(null); toast('Free flight', 'info');
+  }
+  function goMenu(){
+    clearFreeItems(); setWorld('canyon'); clearEnts(); hideRunway();
+    $('prompt').hidden = true; sfx.engine(false, 0);
+    state = 'attract'; phase = 'cruise'; px = 0; py = 8; vx = vy = 0; speed = 36;
+    boostT = apT = 0; planeRoot.visible = true; shield.visible = false; beat = 0;
+    prefill(); show('start');
+  }
+  function crashFree(inWater){
+    F.crashT = 1.6; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
+    if (inWater){ sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); }
+    else { sfx.hit(); burst(F.x, F.y, F.z, 0xb7a998, 18, 1.4); }
+    toast(inWater ? 'Splash!' : 'Crash!', 'warn');
+  }
+  function respawnFree(){
+    // put the plane back in the sky right above where it went down
+    F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 220);
+    F.pitch = 0; F.roll = 0; F.speed = 65; F.ground = false; planeRoot.visible = true;
+    toast('Back in the air', 'info');
+  }
+
+  function updateFree(dt){
+    t += dt;
+    let ax = clamp((keys.r ? 1 : 0) - (keys.l ? 1 : 0) + stick.x, -1, 1);
+    let ay = clamp((keys.u ? 1 : 0) - (keys.d ? 1 : 0) + stick.y, -1, 1);
+    if (invertY) ay = -ay;
+    if (Math.abs(ax) < 0.05) ax = 0;
+    if (Math.abs(ay) < 0.05) ay = 0;
+    const boosting = !!(keys.b || F.boostHeld) || boostT > 0;
+    boostT = Math.max(0, boostT - dt); shake = Math.max(0, shake - dt * 1.6);
+
+    if (F.crashT > 0){
+      F.crashT -= dt;
+      if (F.crashT <= 0) respawnFree();
+    } else if (F.ground){
+      // rolling on the home runway: speeds up by itself, pull up to lift off, push down to brake
+      if (ay < -0.3) F.speed = Math.max(0, F.speed - 25 * dt);
+      else F.speed = Math.min(F.speed + 13 * dt, 70);
+      F.yaw -= ax * 0.5 * dt * Math.min(1, F.speed / 15);
+      F.roll *= 0.8; F.pitch = F.speed >= VR ? 0.08 : 0;
+      F.x += -Math.sin(F.yaw) * F.speed * dt; F.z += -Math.cos(F.yaw) * F.speed * dt; F.y = FREE_REST;
+      const g = groundAt(F.x, F.z);
+      if (F.speed >= VR && (ay > 0.3 || F.z < -100)){ F.ground = false; F.pitch = 0.22; F.liftT = t; toast('Airborne!', ''); }
+      else if (g > F.y - 0.6) crashFree(false);
+      else if (g < FREE_RWY - 1.5){ F.ground = false; F.liftT = t; }   // rolled off the edge of the meadow
+    } else {
+      // bank to turn, pitch to climb or dive
+      F.roll += (-ax * 1.0 - F.roll) * Math.min(1, dt * 3.5);
+      F.yaw += F.roll * 1.15 * dt;
+      F.pitch += ay * 1.1 * dt;
+      if (!ay) F.pitch -= F.pitch * Math.min(1, dt * 0.35);
+      if (F.y > CEIL - 400 && F.pitch > 0) F.pitch -= dt * 1.2 * (F.y - (CEIL - 400)) / 400;
+      F.pitch = clamp(F.pitch, -1.3, 1.3);
+      const cruise = boosting ? 150 : 65;
+      F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8) - Math.sin(F.pitch) * 14 * dt;
+      F.speed = clamp(F.speed, 30, 190);
+      const cp = Math.cos(F.pitch);
+      F.x += -Math.sin(F.yaw) * cp * F.speed * dt;
+      F.y += Math.sin(F.pitch) * F.speed * dt;
+      F.z += -Math.cos(F.yaw) * cp * F.speed * dt;
+      if (F.y >= CEIL){ F.y = CEIL; F.pitch = Math.min(F.pitch, 0); if (!F.ceilTold){ F.ceilTold = true; toast('Max altitude!', 'info'); } }
+      if (F.y < CEIL - 800) F.ceilTold = false;
+      if (F.y > 3048 && !F.hiTold){ F.hiTold = true; toast('10,000 ft!', ''); }
+      if (F.y < 2900) F.hiTold = false;
+      const g = groundAt(F.x, F.z), top = Math.max(g, 0);
+      if (onHomeRunway(F.x, F.z) && F.y <= FREE_REST + 0.6 && F.pitch > -0.6 && F.pitch < 0.05 && t - F.liftT > 1){
+        F.ground = true; F.y = FREE_REST; F.pitch = 0; F.roll = 0;
+        if (t - F.lastLand > 5){ score += 100; toast('Nice landing! +100', ''); sfx.land(); burst(F.x, FREE_RWY + 0.2, F.z, 0xf4f1ea, 10, 0.7); }
+        F.lastLand = t;
+      } else if (F.y < top + 1.4) crashFree(g < 0.5);
+    }
+
+    // keep the world built around the plane
+    const sx = Math.round(F.x / (FS * 2)) * FS * 2, sz = Math.round(F.z / (FS * 2)) * FS * 2;
+    if (sx !== fCX || sz !== fCZ) buildTerrain(sx, sz);
+    const tx = Math.floor(F.x / TC), tz = Math.floor(F.z / TC);
+    if (tx !== treeCX || tz !== treeCZ) buildTrees(tx, tz);
+    fTrunks.visible = fLeaves.visible = F.y < 2500;
+    fWater.position.set(F.x, 0, F.z);
+    for (const c of fClouds){
+      const p = c.position;
+      if (p.x - F.x > 3500) p.x -= 7000; else if (p.x - F.x < -3500) p.x += 7000;
+      if (p.z - F.z > 3500) p.z -= 7000; else if (p.z - F.z < -3500) p.z += 7000;
+    }
+
+    // coins and rings
+    for (let i = fItems.length - 1; i >= 0; i--){
+      const it = fItems[i], p = it.mesh.position;
+      if (it.kind === 'coin') it.mesh.rotation.y = t * 3;
+      if (planeRoot.visible){
+        const dx = p.x - F.x, dy = p.y - F.y, dz = p.z - F.z, d2 = dx * dx + dy * dy + dz * dz;
+        if (it.kind === 'coin' && d2 < 64){ collectCoin(it); fRemove(i); continue; }
+        if (it.kind === 'ring' && d2 < 121){ boostT = 3; score += 50; sfx.ring(); toast('Boost!', ''); burst(p.x, p.y, p.z, 0xff8a3d, 12, 1.3); fRemove(i); continue; }
+      }
+    }
+    itemTick -= dt;
+    if (itemTick <= 0){
+      itemTick = 0.5;
+      const live = new Set();
+      for (let i = fItems.length - 1; i >= 0; i--){
+        const p = fItems[i].mesh.position;
+        if (Math.hypot(p.x - F.x, p.z - F.z) > 2800) fRemove(i); else live.add(fItems[i].cid);
+      }
+      for (let n = live.size; n < 16; n++) spawnCluster();
+    }
+    for (const p of parts){
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      if (p.life <= 0){ p.m.visible = false; continue; }
+      p.v.y -= 14 * dt; p.m.position.addScaledVector(p.v, dt * 2);
+      p.m.rotation.x += dt * 8; p.m.rotation.y += dt * 6; p.m.scale.setScalar(p.life / p.max * 3);
+    }
+
+    // the plane
+    planeRoot.position.set(F.x, F.y, F.z);
+    planeRoot.rotation.order = 'YXZ';
+    planeRoot.rotation.set(F.pitch, F.yaw, F.roll);
+    prop.rotation.z += dt * 42;
+    const gTop = Math.max(groundAt(F.x, F.z), F.ground || onHomeRunway(F.x, F.z) ? FREE_RWY : 0);
+    planeShadow.position.set(F.x, gTop + 0.08, F.z);
+    const alt = F.y - gTop; planeShadow.scale.setScalar(1 + alt * 0.05);
+    M.shadow.opacity = planeRoot.visible ? clamp(0.32 - alt * 0.006, 0, 0.3) : 0;
+
+    // chase camera behind the flight path
+    const fx = -Math.sin(F.yaw), fz = -Math.cos(F.yaw), sp = Math.sin(F.pitch), cpp = Math.cos(F.pitch);
+    camT.set(F.x - fx * cpp * 13, F.y - sp * 13 + 4, F.z - fz * cpp * 13);
+    camBase.lerp(camT, 1 - Math.exp(-dt * 6));
+    const camFloor = Math.max(groundAt(camBase.x, camBase.z), 0) + 1.5;
+    if (camBase.y < camFloor) camBase.y = camFloor;
+    camera.position.copy(camBase);
+    if (shake > 0){ const s = shake * shake; camera.position.x += (Math.random() - 0.5) * s * 1.6; camera.position.y += (Math.random() - 0.5) * s * 1.6; }
+    look.set(F.x + fx * cpp * 20, F.y + sp * 20 + 1.5, F.z + fz * cpp * 20);
+    camera.lookAt(look);
+    const fov = baseFov + (boosting && !F.ground ? 10 : 0);
+    if (Math.abs(camera.fov - fov) > 0.05){ camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
+
+    // sky darkens and the haze thins out as you climb
+    skyDist += F.speed * dt; applySky(skyDist);
+    const hk = clamp((F.y - 1200) / 4800, 0, 1);
+    skyMat.uniforms.top.value.lerp(SPACE_C, hk * 0.85);
+    skyMat.uniforms.low.value.copy(skyMat.uniforms.mid.value);
+    scene.fog.far = Math.min(3000 + F.y * 2.5, 12500);
+    scene.fog.near = Math.min(300 + F.y * 0.6, scene.fog.far * 0.45);
+    sky.position.copy(camera.position);
+    sunDir.set(-0.45, skyEl, -1).normalize();
+    sun.position.copy(camera.position).addScaledVector(sunDir, 12000); sun.lookAt(camera.position);
+    sunLight.position.set(F.x + sunDir.x * 100, F.y + Math.max(0.2, sunDir.y) * 100 + 30, F.z + sunDir.z * 100);
+    sunLight.target.position.set(F.x, F.y, F.z);
+
+    audioTick -= dt;
+    if (audioTick <= 0){ audioTick = 0.1; sfx.engine(true, F.speed); }
+    updateFreeHud();
+  }
+  function updateFreeHud(){
+    txt(H.score, Math.floor(score).toLocaleString());
+    txt(H.coins, coins.toLocaleString());
+    txt(H.mult, 'x' + mult); H.mult.classList.toggle('off', mult < 2);
+    if (t - lastCoinT > 1.15 && chain){ chain = 0; mult = 1; }
+    txt(H.alt, Math.round(Math.max(0, F.y) * 3.28).toLocaleString());
+    txt(H.spd, String(Math.round(F.speed * 1.944)));
+    const hdg = ((-F.yaw * 180 / Math.PI) % 360 + 360) % 360;
+    txt(H.hdg, String(Math.round(hdg) % 360).padStart(3, '0'));
+    txt(H.home, (Math.hypot(F.x, F.z) / 1000).toFixed(1));
+    H.homeArrow.style.transform = 'rotate(' + (Math.atan2(-F.x, F.z) + F.yaw).toFixed(3) + 'rad)';
+    let prompt = '';
+    if (F.crashT <= 0 && F.ground){
+      if (t - F.lastLand < 8 && F.speed > 1) prompt = 'Landed! Hold DOWN to brake';
+      else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : (invertY ? 'Climb! Hold DOWN or drag down' : 'Climb! Hold UP or drag up');
+    }
+    H.prompt.hidden = !prompt; txt(H.prompt, prompt);
+    H.prompt.classList.toggle('go', F.ground && F.speed >= VR);
+    updatePowers(false);
+  }
+
   /* ---------------- Main loop ---------------- */
   const camBase = new THREE.Vector3(0, 12, 14), camT = new THREE.Vector3(), look = new THREE.Vector3();
   let last = performance.now(), audioTick = 0;
@@ -1018,6 +1401,7 @@ function boot(hot){
     renderer.render(scene, camera);
   }
   function update(dt){
+    if (mode === 'free'){ updateFree(dt); return; }
     t += dt;
     const live = state === 'play';
     let target = baseSpeed();
@@ -1132,7 +1516,7 @@ function boot(hot){
       switch (e.type){
         case 'coin': {
           const dy = py - p.y;
-          if (canTouch && dx * dx + dy * dy + dz * dz < 1.9 * 1.9){ collectCoin(e); freeEnt(i); continue; }
+          if (canTouch && dx * dx + dy * dy + dz * dz < 2.4 * 2.4){ collectCoin(e); freeEnt(i); continue; }
           break;
         }
         case 'fuel': case 'magnet': case 'heart': {
