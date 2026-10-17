@@ -279,9 +279,11 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const pick = arr => arr[(Math.random() * arr.length) | 0];
 
 const LIM = { x: 13.5, yMin: 2.2, yMax: 18 };
-const SPAWN_Z = -360, KILL_Z = 30, PLANE_R = 1.25, WATER_Y = -1.2, TL = 320, NT = 3;
+// PLANE_SCALE sizes the plane model; its wheels sit PLANE_SCALE below its centre.
+const PLANE_SCALE = 1.3;
+const SPAWN_Z = -360, KILL_Z = 30, PLANE_R = 1.45, WATER_Y = -1.2, TL = 320, NT = 3;
 // Airstrip: the runway sits on a sandbar in the river. REST_Y is the plane's height with its wheels on it.
-const RWY_LEN = 260, RWY_W = 10, RWY_TOP = WATER_Y + 0.3, REST_Y = RWY_TOP + 0.85;
+const RWY_LEN = 260, RWY_W = 10, RWY_TOP = WATER_Y + 0.3, REST_Y = RWY_TOP + PLANE_SCALE;
 const VR = 30, GLIDE = 0.05, STRIP_EVERY = 2000, AP_TIME = 8;
 
 /* ---------------- Sound ---------------- */
@@ -533,11 +535,11 @@ function boot(hot){
     const blade2 = blade.clone(); blade2.rotation.z = Math.PI / 2; prop.add(blade, blade2);
     const blur = new THREE.Mesh(new THREE.CircleGeometry(1.55, 24), new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false }));
     prop.position.set(0, 0, -2.72); planeBody.add(prop, blur); blur.position.set(0, 0, -2.74);
-    planeBody.scale.setScalar(0.85);
+    planeBody.scale.setScalar(PLANE_SCALE);
   })();
-  const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2, 20), M.shadow);
+  const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
-  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(3.4, 1), new THREE.MeshBasicMaterial({ color: 0x5fe0d0, transparent: true, opacity: 0.18, wireframe: true, depthWrite: false }));
+  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(3.4 * PLANE_SCALE / 0.85, 1), new THREE.MeshBasicMaterial({ color: 0x5fe0d0, transparent: true, opacity: 0.18, wireframe: true, depthWrite: false }));
   shield.visible = false; planeRoot.add(shield);
 
   /* ---------------- Airstrip ---------------- */
@@ -1037,7 +1039,7 @@ function boot(hot){
   // aligned to world coordinates, so nearby hills never shift; cells grow wider towards
   // the edge, where the fog hides them.
   let mode = 'canyon';
-  const CEIL = 6000, FREE_RWY = 6, FREE_REST = FREE_RWY + 0.85, FS = 30, FN = 144, FIN = 32, FG = 1.08;
+  const CEIL = 6000, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
   const SPACE_C = new THREE.Color(0x0b1238);
   function hash2(i, j){
     let h = Math.imul(i | 0, 374761393) ^ Math.imul(j | 0, 668265263);
@@ -1305,7 +1307,7 @@ function boot(hot){
       if (it.kind === 'coin') it.mesh.rotation.y = t * 3;
       if (planeRoot.visible){
         const dx = p.x - F.x, dy = p.y - F.y, dz = p.z - F.z, d2 = dx * dx + dy * dy + dz * dz;
-        if (it.kind === 'coin' && d2 < 49){ collectCoin(it); fRemove(i); continue; }
+        if (it.kind === 'coin' && d2 < 64){ collectCoin(it); fRemove(i); continue; }
         if (it.kind === 'ring' && d2 < 121){ boostT = 3; score += 50; sfx.ring(); toast('Boost!', ''); burst(p.x, p.y, p.z, 0xff8a3d, 12, 1.3); fRemove(i); continue; }
       }
     }
@@ -1339,7 +1341,7 @@ function boot(hot){
 
     // chase camera behind the flight path
     const fx = -Math.sin(F.yaw), fz = -Math.cos(F.yaw), sp = Math.sin(F.pitch), cpp = Math.cos(F.pitch);
-    camT.set(F.x - fx * cpp * 16, F.y - sp * 16 + 4.5, F.z - fz * cpp * 16);
+    camT.set(F.x - fx * cpp * 13, F.y - sp * 13 + 4, F.z - fz * cpp * 13);
     camBase.lerp(camT, 1 - Math.exp(-dt * 6));
     const camFloor = Math.max(groundAt(camBase.x, camBase.z), 0) + 1.5;
     if (camBase.y < camFloor) camBase.y = camFloor;
@@ -1514,7 +1516,7 @@ function boot(hot){
       switch (e.type){
         case 'coin': {
           const dy = py - p.y;
-          if (canTouch && dx * dx + dy * dy + dz * dz < 1.9 * 1.9){ collectCoin(e); freeEnt(i); continue; }
+          if (canTouch && dx * dx + dy * dy + dz * dz < 2.4 * 2.4){ collectCoin(e); freeEnt(i); continue; }
           break;
         }
         case 'fuel': case 'magnet': case 'heart': {
