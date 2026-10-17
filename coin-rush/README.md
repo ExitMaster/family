@@ -16,11 +16,20 @@ them on new cars and upgrades.
 | Nitro | `SHIFT` |
 | Back on track | `R` |
 | Pause | `ESC` |
-| Phone / tablet | on-screen buttons |
+| Phone / tablet | one thumb: hold anywhere to drive, slide left/right to steer, pull down to brake or reverse (no nitro on phones) |
+
+## Modes
+
+- **Time Trial** — solo, pick any of the 7 tracks below and chase medal times.
+- **Race** — the Grand Prix: 5 big laps of an F1-style oval (grandstands, pit garages,
+  five red start lights) against 5 rival formula cars — Blaze, Comet, Dash, Nova and Rocket.
+  Rivals only appear here. They're tuned to be beatable: a clean run at bronze-medal pace
+  wins, and they ease off if they get far ahead. Your position shows next to the lap counter.
 
 ## Coins
 
 - Every finish pays coins: beating the bronze time pays the track's full rate, slower times pay less.
+- In Race mode, finishing 1st / 2nd / 3rd adds a place bonus.
 - Gold / silver / bronze medals add a bonus, and a new personal best adds +30.
 - Progress is saved in the browser (`localStorage`).
 
