@@ -10,10 +10,10 @@ them on new cars and upgrades.
 
 | | |
 |---|---|
-| Gas / brake & reverse | `W` `S` or `↑` `↓` |
+| Accelerate / brake & reverse | `W` `S` or `↑` `↓` |
 | Steer | `A` `D` or `←` `→` |
 | Handbrake drift | `SPACE` |
-| Nitro | `SHIFT` |
+| Boost | `SHIFT` |
 | Back on track | `R` |
 | Pause | `ESC` |
 | Phone / tablet | one thumb: hold anywhere to drive, slide left/right to steer, pull down to brake or reverse (no nitro on phones) |
@@ -30,11 +30,11 @@ them on new cars and upgrades.
 - **Champagne party:** win the Grand Prix and you get a 50-second celebration — two bottles
   spraying from your car, confetti over the screen, a cork pop and fizz. Tap (or press a key)
   to bring up the results while the party keeps going.
-- **Pit stops (Grand Prix):** tires wear fast as you drive (worn out early in lap 2) (faster when you slide), costing grip
+- **Pit stops (Grand Prix):** tires wear as you drive (worn out around the end of lap 2) (faster when you slide), costing grip
   and a little top speed — watch the TIRES bar. The pit lane is on the right of the main
   straight: the inner wall swings out to let you in, there's a 72 km/h limiter, and you stop
   in the yellow PIT box in front of your garage for a 2.5 s stop that fits fresh tires and
-  refills nitro. The race clock and the rivals freeze while your crew works. Each rival makes one stop too.
+  refills boost and charges the battery. The race clock and the rivals freeze while your crew works. Each rival makes one stop too.
 
 ## Coins
 
@@ -43,17 +43,32 @@ them on new cars and upgrades.
 - Gold / silver / bronze medals add a bonus, and a new personal best adds +30.
 - Progress is saved in the browser (`localStorage`).
 
+## Electric cars and charging
+
+Every car is electric: a smooth motor whine instead of gear changes (the HUD shows D / N / R),
+blue sparks instead of exhaust smoke when boosting, and a **battery** (⚡ BATT bar) that drains
+as you drive — three times faster while boosting. Below 20% the car loses power.
+
+- **Time Trial tracks** each have a **charging station** just after the start line: a glowing
+  green pad on the right of the road with chargers and a ⚡ CHARGE sign. Drive over it to top
+  up, or stop on it to charge fast.
+- **Grand Prix:** your pit box has a charger — a pit stop fits fresh tires *and* fully charges.
+
+Upgrades are Motor (top speed), Power (acceleration), Tires and Boost cell.
+
 ## Cars (15)
 
 Pocket Hatch (free), Mini Kei, Dune Buggy (open roll cage, great off-road), Street Coupe,
 Dune Pickup (barely slows off-road), City Taxi (roof sign and checker stripes), Gravel Rally,
 Iron Muscle, Monster Truck (giant wheels — in a Race it crushes any rival it hits, +15 coins
 each; crushed cars pop back up after 5 s), Apex GT, Drift King (low grip, loves to slide),
-Jet Streak (3,000 coins, 576 km/h — twice as fast as anything else; its jet flame grows when
-you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
+Jet Streak (3,000 coins, 720 km/h, **Race mode only** — its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
 
-Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo**
-(acceleration), **Tires** (grip and steering), **Nitro** (boost length).
+Every car except the Jet Streak got a +50% boost to top speed and acceleration (the Grand Prix
+rivals too).
+
+Each owned car has four upgrades, 5 levels each: **Motor** (top speed), **Power**
+(acceleration), **Tires** (grip and steering), **Boost cell** (boost length).
 
 ## Paint (free)
 
