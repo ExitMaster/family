@@ -72,13 +72,19 @@ h2{font-family:var(--display);font-weight:500;font-size:22px;letter-spacing:.12e
 .bar i+i{background:repeating-linear-gradient(-45deg,var(--coin) 0 4px,#c99418 4px 8px);}
 .upgs{display:flex;flex-direction:column;gap:6px;}
 .paints{background:var(--panel-2);padding:9px 10px;display:flex;flex-direction:column;gap:8px;}
-.pswatch{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.pswatch{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
 .pw{position:relative;height:42px;border:2px solid transparent;padding:0;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;}
-.pw span{font-size:8px;font-weight:700;letter-spacing:0;text-transform:uppercase;background:rgba(10,12,16,.72);width:100%;padding:2px 0;}
+.pw span{font-size:7px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;text-transform:uppercase;background:rgba(10,12,16,.72);width:100%;padding:2px 0;}
 .pw[aria-pressed="true"]{border-color:var(--coin);}
 .pw-neon{background:#39ff14;box-shadow:inset 0 -10px 16px #ff28dc;}
 .pw-camo{background:radial-gradient(circle at 25% 30%,#3e4a26 0 22%,transparent 23%),radial-gradient(circle at 70% 60%,#7a7148 0 20%,transparent 21%),radial-gradient(circle at 45% 80%,#2b2f1e 0 18%,transparent 19%),#5d6b3a;}
 .pw-nighthawk{background:linear-gradient(170deg,transparent 52%,#d4202a 53% 58%,transparent 59%),#15171c;}
+.pw-gold{background:linear-gradient(135deg,#ffe58a,#f2b62c 45%,#a8740a 60%,#ffd75a);}
+.pw-chrome{background:linear-gradient(135deg,#ffffff,#b8c2cc 40%,#6d7884 55%,#eef2f6);}
+.pw-lava{background:linear-gradient(120deg,transparent 40%,#ff6a10 42% 46%,transparent 48%),linear-gradient(40deg,transparent 55%,#ffb020 56% 58%,transparent 60%),#1d1412;}
+.pw-galaxy{background:radial-gradient(circle at 30% 30%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 55%,#fff 0 1px,transparent 2px),radial-gradient(circle at 50% 20%,rgba(255,80,200,.5),transparent 50%),linear-gradient(135deg,#120a2e,#2a0f52,#0a1640);}
+.pw-rainbow{background:linear-gradient(120deg,#ff3b3b,#ff9a1f,#ffe11f,#34d058,#2f8bff,#8a4dff);}
+.pw-zebra{background:repeating-linear-gradient(80deg,#f4f4f0 0 6px,#121212 6px 10px);}
 .pw-cat{background:repeating-linear-gradient(90deg,#f39a32 0 9px,#8f420c 9px 14px);}
 .upg{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;background:var(--panel-2);padding:9px 10px;}
 .upg .un{font-weight:600;font-size:13px;}
@@ -770,6 +776,12 @@ const PAINTS = [
   {id:'camo', name:'Camo'},
   {id:'nighthawk', name:'Nighthawk'},
   {id:'cat', name:'Cat'},
+  {id:'gold', name:'Gold'},
+  {id:'chrome', name:'Chrome'},
+  {id:'lava', name:'Lava'},
+  {id:'galaxy', name:'Galaxy'},
+  {id:'rainbow', name:'Rainbow'},
+  {id:'zebra', name:'Zebra'},
 ];
 const paintOf = id => (save.paint && save.paint[id]) || 'factory';
 function paintTex(id){
@@ -782,6 +794,31 @@ function paintTex(id){
       c.fillStyle = '#15171c'; c.fillRect(0, 0, w, h);
       c.strokeStyle = '#25282f'; c.lineWidth = 2; for (let k = 0; k < 7; k++){ c.beginPath(); c.moveTo(rnd()*w, 0); c.lineTo(rnd()*w, h); c.stroke(); }
       c.strokeStyle = '#d4202a'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, h*0.62); c.lineTo(w*0.45, h*0.62); c.lineTo(w*0.55, h*0.5); c.lineTo(w, h*0.5); c.stroke();
+    } else if (id === 'lava' || id === 'lavaGlow'){
+      // the glow texture is the same cracks on black, used as an emissive map
+      const r2 = mulberry(77);
+      c.fillStyle = id === 'lava' ? '#1d1412' : '#000'; c.fillRect(0, 0, w, h);
+      if (id === 'lava'){ for (let k = 0; k < 40; k++){ c.fillStyle = r2() < 0.5 ? '#2b1f1b' : '#140d0b'; c.beginPath(); c.arc(r2()*w, r2()*h, 4 + r2()*10, 0, Math.PI*2); c.fill(); } }
+      c.strokeStyle = '#ff6a10'; c.lineCap = 'round';
+      for (let k = 0; k < 9; k++){ let x = r2()*w, y = r2()*h; c.lineWidth = 2 + r2()*3; c.beginPath(); c.moveTo(x, y); for (let j = 0; j < 6; j++){ x += (r2() - 0.5)*36; y += (r2() - 0.5)*36; c.lineTo(x, y); } c.stroke(); }
+      c.strokeStyle = '#ffd040'; c.lineWidth = 1; for (let k = 0; k < 6; k++){ let x = r2()*w, y = r2()*h; c.beginPath(); c.moveTo(x, y); for (let j = 0; j < 4; j++){ x += (r2() - 0.5)*30; y += (r2() - 0.5)*30; c.lineTo(x, y); } c.stroke(); }
+    } else if (id === 'galaxy'){
+      const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#120a2e'); g.addColorStop(0.5, '#2a0f52'); g.addColorStop(1, '#0a1640'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      [['rgba(255,80,200,.35)', 30], ['rgba(80,160,255,.35)', 26], ['rgba(160,90,255,.3)', 34]].forEach(([col, r]) => { const x = rnd()*w, y = rnd()*h, rg = c.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col); rg.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = rg; c.fillRect(0, 0, w, h); });
+      for (let k = 0; k < 90; k++){ c.fillStyle = rnd() < 0.8 ? '#ffffff' : '#ffe08a'; const r = rnd() < 0.9 ? 0.8 : 1.8; c.beginPath(); c.arc(rnd()*w, rnd()*h, r, 0, Math.PI*2); c.fill(); }
+    } else if (id === 'rainbow'){
+      const cols = ['#ff3b3b', '#ff9a1f', '#ffe11f', '#34d058', '#2f8bff', '#8a4dff'];
+      for (let k = 0; k < 12; k++){ c.fillStyle = cols[k % 6]; c.beginPath(); const x = k*w/6 - w; c.moveTo(x, h); c.lineTo(x + w/6, h); c.lineTo(x + w/6 + w, 0); c.lineTo(x + w, 0); c.closePath(); c.fill(); }
+    } else if (id === 'zebra'){
+      c.fillStyle = '#f4f4f0'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#121212';
+      for (let k = 0; k < 6; k++){
+        const x = (k + 0.5) * w/6 + (rnd() - 0.5)*6, bw = 6 + rnd()*6;
+        c.beginPath(); c.moveTo(x - bw/2, 0);
+        for (let y = 0; y <= h; y += 12) c.lineTo(x - bw/2 + Math.sin(y*0.12 + k*2)*6, y);
+        for (let y = h; y >= 0; y -= 12) c.lineTo(x + bw/2 + Math.sin(y*0.12 + k*2)*6 + Math.cos(y*0.05 + k)*2, y);
+        c.closePath(); c.fill();
+      }
     } else if (id === 'cat'){
       // bold wavy tabby stripes running top to bottom
       c.fillStyle = '#f39a32'; c.fillRect(0, 0, w, h);
@@ -802,6 +839,12 @@ function paintMaterial(def, id){
   if (id === 'camo') return new THREE.MeshStandardMaterial({map:paintTex('camo'), metalness:0.05, roughness:0.85});
   if (id === 'nighthawk') return new THREE.MeshStandardMaterial({map:paintTex('nighthawk'), metalness:0.15, roughness:0.9});
   if (id === 'cat') return new THREE.MeshStandardMaterial({map:paintTex('cat'), metalness:0.1, roughness:0.6});
+  if (id === 'gold') return new THREE.MeshStandardMaterial({color:0xf2b62c, emissive:0x3a2600, metalness:0.65, roughness:0.22});
+  if (id === 'chrome') return new THREE.MeshStandardMaterial({color:0xe9eef4, emissive:0x1a1d22, metalness:0.6, roughness:0.12});
+  if (id === 'lava') return new THREE.MeshStandardMaterial({map:paintTex('lava'), emissive:0xffffff, emissiveMap:paintTex('lavaGlow'), emissiveIntensity:0.9, metalness:0.1, roughness:0.8});
+  if (id === 'galaxy') return new THREE.MeshStandardMaterial({map:paintTex('galaxy'), emissive:0xffffff, emissiveMap:paintTex('galaxy'), emissiveIntensity:0.25, metalness:0.3, roughness:0.35});
+  if (id === 'rainbow') return new THREE.MeshStandardMaterial({map:paintTex('rainbow'), metalness:0.2, roughness:0.35});
+  if (id === 'zebra') return new THREE.MeshStandardMaterial({map:paintTex('zebra'), metalness:0.05, roughness:0.6});
   return new THREE.MeshStandardMaterial({color:def.color, metalness:0.35, roughness:0.38});
 }
 function buildCar(def){
