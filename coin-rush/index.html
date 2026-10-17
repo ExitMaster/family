@@ -305,19 +305,19 @@ const UPGRADES = [
 ];
 const MAX_LVL = 5;
 const TRACKS = [
-  {id:'pine', name:'Pine Loop', laps:2, pay:1.0, theme:'pine', scale:1,
+  {id:'pine', name:'Pine Loop', laps:3, pay:1.0, theme:'pine', scale:1,
    pts:[[0,0],[120,-20],[200,40],[190,140],[100,180],[20,140],[-60,180],[-160,130],[-170,30],[-90,-30]]},
-  {id:'canyon', name:'Red Canyon', laps:2, pay:1.1, theme:'canyon', scale:1.6,
+  {id:'canyon', name:'Red Canyon', laps:3, pay:1.1, theme:'canyon', scale:1.6,
    pts:[[0,0],[80,-60],[160,-40],[180,40],[125,85],[150,140],[70,190],[-10,150],[-25,95],[-60,60],[-110,90],[-180,20],[-120,-60]]},
-  {id:'harbor', name:'Harbor Night', laps:2, pay:1.25, theme:'night', scale:2.05,
+  {id:'harbor', name:'Harbor Night', laps:3, pay:1.25, theme:'night', scale:2.05,
    pts:[[0,0],[150,0],[220,60],[170,115],[70,100],[0,135],[20,180],[40,225],[-60,235],[-170,170],[-150,60],[-210,-20],[-120,-70]]},
-  {id:'beach', name:'Sunset Coast', laps:2, pay:1.1, theme:'beach', scale:1.1,
+  {id:'beach', name:'Sunset Coast', laps:3, pay:1.1, theme:'beach', scale:1.1,
    pts:[[0,0],[160,-10],[260,40],[280,130],[200,170],[120,140],[40,190],[-80,170],[-160,100],[-130,20]]},
-  {id:'oval', name:'Speed Bowl', laps:4, pay:1.0, theme:'oval', scale:1, pace:1.25,
+  {id:'oval', name:'Speed Bowl', laps:3, pay:1.0, theme:'oval', scale:1, pace:1.25,
    pts:[[0,0],[150,0],[210,30],[230,90],[210,150],[150,180],[0,180],[-150,180],[-210,150],[-230,90],[-210,30],[-150,0]]},
-  {id:'snow', name:'Frost Pass', laps:2, pay:1.3, theme:'snow', scale:1.45, pace:0.9, grip:0.78,
+  {id:'snow', name:'Frost Pass', laps:3, pay:1.3, theme:'snow', scale:1.45, pace:0.9, grip:0.78,
    pts:[[0,0],[110,-30],[180,20],[150,90],[200,160],[120,210],[40,170],[-40,220],[-130,180],[-110,100],[-190,40],[-140,-40]]},
-  {id:'gp', name:'Grand Prix', laps:5, pay:1.2, theme:'f1', scale:1.3, pace:1.25, race:true,
+  {id:'gp', name:'Grand Prix', laps:3, pay:1.2, theme:'f1', scale:1.3, pace:1.25, race:true,
    pts:[[0,0],[150,0],[210,30],[230,90],[210,150],[150,180],[0,180],[-150,180],[-210,150],[-230,90],[-210,30],[-150,0]]},
   {id:'city', name:'Neon City', laps:3, pay:1.3, theme:'city', scale:1.2, pace:0.95,
    pts:[[0,0],[140,0],[165,25],[165,115],[140,140],[70,140],[45,165],[45,215],[20,240],[-95,240],[-120,215],[-120,25],[-95,0]]},
@@ -325,6 +325,8 @@ const TRACKS = [
 const HALF = 15;          // half road width, meters
 const WALL = HALF + 4;    // tire wall distance from center line
 const carById = id => CARS.find(c => c.id === id) || CARS[0];
+// records are per lap count, so changing a track's laps starts it fresh
+const recKey = t => t.id + '@' + t.laps;
 
 /* ================= Save ================= */
 const SAVE_KEY = 'coinrush_save_v1';
@@ -1119,7 +1121,7 @@ function startRace(){
   $('#garage').hidden = true; $('#results').hidden = true; $('#pause').hidden = true;
   $('#hud').hidden = false; $('#touch').hidden = !isTouch; steerReset();
   $('#hLaps').textContent = track.laps; $('#hCar').textContent = def.name.toUpperCase();
-  const pb = save.best[track.def.id]; $('#hBest').textContent = pb ? fmt(pb) : '--:--.---';
+  const pb = save.best[recKey(track.def)]; $('#hBest').textContent = pb ? fmt(pb) : '--:--.---';
   $('#hMsg').textContent = '';
   snapCam();
 }
@@ -1171,7 +1173,7 @@ const MEDAL_RANK = {gold:3, silver:2, bronze:1};
 function finishRace(){
   race.finD = track.laps * track.length;
   mode = 'results';
-  const T = race.time, id = track.def.id, prev = save.best[id], medal = medalFor(T);
+  const T = race.time, id = recKey(track.def), prev = save.best[id], medal = medalFor(T);
   // final order: rivals still running get an estimate from their remaining distance at race pace
   const field = [{name:'You', me:true, t:T, color:carMesh ? hex(carById(save.selected).color) : '#fff'}].concat(ais.map(a => ({name:a.name, t:a.fin !== null ? a.fin : T + Math.max(0, track.laps*track.length - a.d) / (track.length / (track.ai.lapT / a.k)), color:hex(a.def.color)})));
   field.sort((p, q) => p.t - q.t);
@@ -1260,10 +1262,10 @@ function renderGarage(){
   $('#shop').innerHTML = html;
   document.querySelectorAll('#modeList [data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === save.mode)));
   if (raceMode()){
-    const t = trackDef(), best = save.best[t.id], md = save.medal[t.id];
+    const t = trackDef(), best = save.best[recKey(t)], md = save.medal[recKey(t)];
     $('#trackList').innerHTML = `<div class="trk gp"><span class="tn">${t.name}</span><span class="ti">${t.laps} big laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · 5 rivals · pays ${trackPay(t)}+ and a podium bonus</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></div>`;
   } else $('#trackList').innerHTML = TRACKS.filter(t => !t.race).map(t => {
-    const best = save.best[t.id], md = save.medal[t.id];
+    const best = save.best[recKey(t)], md = save.medal[recKey(t)];
     return `<button type="button" class="trk" data-track="${t.id}" aria-pressed="${save.track === t.id}"><span class="tn">${t.name}</span><span class="ti">${t.laps} laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · pays ${trackPay(t)}+</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></button>`;
   }).join('');
   const dc = carById(save.selected);
