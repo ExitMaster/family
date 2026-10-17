@@ -52,6 +52,12 @@ Formula Zero.
 Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo**
 (acceleration), **Tires** (grip and steering), **Nitro** (boost length).
 
+## Paint (free)
+
+Every car you own can wear any of five paint jobs, picked in the Workshop — no coins needed:
+**Factory**, **Neon** (glowing green with a pink underglow), **Camo**, **Nighthawk** (matte
+black with red stealth lines) and **Cat** (orange tabby stripes, cat ears and a tail).
+
 ## Tracks (7)
 
 Time Trial races are 2 laps; the Race-mode Grand Prix is 3 laps.
