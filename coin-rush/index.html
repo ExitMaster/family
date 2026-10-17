@@ -1042,8 +1042,9 @@ const RIVALS = [
   {name:'Nova',   pace:0.93, lane:6,    color:0x3d6cf5, box:50,   pitLap:1},
   {name:'Rocket', pace:1.00, lane:0,    color:0xff7a3d, box:70,   pitLap:2},
 ];
-// two-wide grid, 8 m between rows; the last slot is yours
-const GRID = Array.from({length:RIVALS.length + 1}, (_, i) => [-6 - Math.floor(i/2)*8 - (i === RIVALS.length ? 1 : 0), i % 2 ? 5.5 : -5.5]);
+// two-wide staggered grid, 8 m between rows; you start 3rd, rivals fill the other slots in order
+const GRID = Array.from({length:RIVALS.length + 1}, (_, i) => [-6 - Math.floor(i/2)*8 - (i % 2), i % 2 ? 5.5 : -5.5]);
+const MY_SLOT = 2, RIVAL_SLOTS = GRID.filter((g, i) => i !== MY_SLOT);
 let ais = [];
 function trackPoint(d){
   const L = track.length, N = track.N, u = (((d % L) + L) % L) / L * N, i = Math.floor(u) % N, f = u - Math.floor(u), a = track.s[i], b = track.s[(i + 1) % N];
@@ -1073,7 +1074,7 @@ function clearAis(){ ais.forEach(a => { scene.remove(a.m.root); disposeTree(a.m.
 function spawnAis(){
   clearAis();
   const prof = aiProfile(), bronzeLap = track.medals.bronze / track.laps;
-  const grid = GRID;
+  const grid = RIVAL_SLOTS;
   RIVALS.forEach((r, k) => {
     const def = Object.assign({}, carById('formula'), {color:r.color}), m = makeCarMesh(def);
     m.root.add(nameTag(r.name, hex(def.color)));
@@ -1174,7 +1175,7 @@ function startRace(){
   const def = carById(save.selected);
   buildCar(def);
   car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0; car.wear = 0; car.pitT = 0; car.inBox = false; car.boxWarn = false;
-  const slot = raceMode() ? GRID[RIVALS.length] : [-14, 0];
+  const slot = raceMode() ? GRID[MY_SLOT] : [-14, 0];
   { const p = trackPoint(slot[0]); car.x = p.x + p.nx*slot[1]; car.z = p.z + p.nz*slot[1]; car.h = p.h; car.vx = car.vz = car.fwd = car.steer = car.slip = 0; car.idx = nearest(car.x, car.z, 0, true); }
   clearSkids();
   if (raceMode()) spawnAis(); else clearAis();
@@ -1213,7 +1214,7 @@ function updatePit(dt){
   const sp = track.s[car.idx], x = lineX(sp.dist + (car.x - sp.x)*sp.tx + (car.z - sp.z)*sp.tz), inBox = Math.abs(x - PIT_BOX) < 5.5 && Math.abs(car.lat - PIT_LAT) < 4.5;
   if (car.pitT > 0){
     car.pitT -= dt; car.vx = car.vz = 0;
-    flash(`PIT STOP ${Math.max(0, car.pitT).toFixed(1)}`, 'warn', 0.2);
+    flash(`PIT STOP ${Math.max(0, car.pitT).toFixed(1)} · clock stopped`, 'warn', 0.2);
     if (car.pitT <= 0){ car.wear = 0; car.nitro = car.stats.nitro; car.boxWarn = false; flash('FRESH TIRES · GO GO GO', 'pbc', 1.6); beep(880, 0.12); beep(1320, 0.2, 'square', 0.08, 0.12); }
   } else if (inBox && !car.inBox && Math.abs(car.fwd) < 4){
     car.pitT = PIT_TIME; car.inBox = true; car.vx = car.vz = 0; beep(330, 0.15);
@@ -1222,8 +1223,9 @@ function updatePit(dt){
   if (car.wear > 0.6 && !car.boxWarn){ car.boxWarn = true; flash('BOX BOX · tires worn, pit on the main straight', 'warn', 3); }
 }
 function updateRace(dt, inp){
-  race.time += dt;
+  // the race clock (and the rivals) freeze while your crew works
   if (track.pit) updatePit(dt);
+  if (!(car.pitT > 0)) race.time += dt;
   const n = track.N, i = car.idx;
   for (const cp of race.cps){ let d = Math.abs(i - cp); d = Math.min(d, n - d); if (d < 25) race.hit.add(cp); }
   if (race.prevIdx > n*0.85 && i < n*0.15 && race.hit.size === race.cps.length){
@@ -1535,7 +1537,7 @@ function frame(now){
     if (mode === 'countdown') updateCountdown(dt);
     const sub = 3, h = dt / sub;
     for (let k = 0; k < sub; k++) stepCar(h, mode === 'countdown' ? NO_INPUT : inp);
-    updateAis(dt); collideAis();
+    updateAis(car.pitT > 0 ? 0 : dt); collideAis();
     if (mode === 'race') updateRace(dt, inp);
     syncCarMesh(dt, inp);
     effects(dt, inp);

@@ -23,7 +23,7 @@ them on new cars and upgrades.
 - **Time Trial** — solo, pick any of the 7 tracks below and chase medal times.
 - **Race** — the Grand Prix: 3 big laps of an F1-style oval (grandstands, pit garages,
   five red start lights) against 5 rival formula cars — Blaze, Comet, Dash, Nova and Rocket — from a
-  6-car grid (you start last).
+  6-car grid — you start 3rd.
   Rivals only appear here. They're fast — well past medal pace — but never faster than 95% of
   your car's top speed, and they ease off when far ahead, so they stay beatable. Your position
   shows next to the lap counter.
@@ -34,7 +34,7 @@ them on new cars and upgrades.
   and a little top speed — watch the TIRES bar. The pit lane is on the right of the main
   straight: the inner wall swings out to let you in, there's a 72 km/h limiter, and you stop
   in the yellow PIT box in front of your garage for a 2.5 s stop that fits fresh tires and
-  refills nitro. Each rival makes one stop too.
+  refills nitro. The race clock and the rivals freeze while your crew works. Each rival makes one stop too.
 
 ## Coins
 
