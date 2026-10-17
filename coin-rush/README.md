@@ -27,6 +27,11 @@ them on new cars and upgrades.
   Rivals only appear here. The quickest laps around silver-medal pace, the slowest near
   bronze, and none go faster than 90% of your car's top speed, and they ease off when far ahead, so they stay beatable. Your position
   shows next to the lap counter.
+- **Off Road** — dirt tracks: **Mud Valley** (green hills, logs) and **Dust Bowl** (desert,
+  cacti, mesas). Dirt roads with ruts, dirt berms and hay-bale walls, three **ramps** per lap
+  that launch you into the air (no steering mid-air, a bump on landing, "BIG AIR!" for the big
+  ones) and **mud puddles** that drag you down. Off-road cars (Dune Buggy, Monster Truck, Dune
+  Pickup) keep nearly all their pace on dirt; road cars lose up to about 20%.
 - **Champagne party:** win the Grand Prix and you get a 50-second celebration — two bottles
   spraying from your car, confetti over the screen, a cork pop and fizz. Tap (or press a key)
   to bring up the results while the party keeps going.
