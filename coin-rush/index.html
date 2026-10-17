@@ -71,6 +71,15 @@ h2{font-family:var(--display);font-weight:500;font-size:22px;letter-spacing:.12e
 .bar i{position:absolute;inset:0 auto 0 0;background:var(--fg);}
 .bar i+i{background:repeating-linear-gradient(-45deg,var(--coin) 0 4px,#c99418 4px 8px);}
 .upgs{display:flex;flex-direction:column;gap:6px;}
+.paints{background:var(--panel-2);padding:9px 10px;display:flex;flex-direction:column;gap:8px;}
+.pswatch{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.pw{position:relative;height:42px;border:2px solid transparent;padding:0;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;}
+.pw span{font-size:8px;font-weight:700;letter-spacing:0;text-transform:uppercase;background:rgba(10,12,16,.72);width:100%;padding:2px 0;}
+.pw[aria-pressed="true"]{border-color:var(--coin);}
+.pw-neon{background:#39ff14;box-shadow:inset 0 -10px 16px #ff28dc;}
+.pw-camo{background:radial-gradient(circle at 25% 30%,#3e4a26 0 22%,transparent 23%),radial-gradient(circle at 70% 60%,#7a7148 0 20%,transparent 21%),radial-gradient(circle at 45% 80%,#2b2f1e 0 18%,transparent 19%),#5d6b3a;}
+.pw-nighthawk{background:linear-gradient(170deg,transparent 52%,#d4202a 53% 58%,transparent 59%),#15171c;}
+.pw-cat{background:repeating-linear-gradient(90deg,#f39a32 0 9px,#8f420c 9px 14px);}
 .upg{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;background:var(--panel-2);padding:9px 10px;}
 .upg .un{font-weight:600;font-size:13px;}
 .upg .ud{font-size:11px;color:var(--mute);}
@@ -348,7 +357,7 @@ const recKey = t => t.id + '@' + t.laps;
 
 /* ================= Save ================= */
 const SAVE_KEY = 'coinrush_save_v1';
-const freshSave = () => ({coins:150, owned:['hatch'], selected:'hatch', track:'pine', mode:'trial', upg:{}, best:{}, medal:{}, muted:false});
+const freshSave = () => ({coins:150, owned:['hatch'], selected:'hatch', track:'pine', mode:'trial', upg:{}, best:{}, medal:{}, paint:{}, muted:false});
 let save = (() => {
   try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && typeof s.coins === 'number') return Object.assign(freshSave(), s); } catch (e) {}
   return freshSave();
@@ -754,13 +763,54 @@ function glowCanvas(w, h, cx, cy, r, rgb, a0){
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
 }
 const addMat = (map, opacity) => new THREE.MeshBasicMaterial({map, transparent:true, opacity, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4});
+/* ---- free paint jobs ---- */
+const PAINTS = [
+  {id:'factory', name:'Factory'},
+  {id:'neon', name:'Neon'},
+  {id:'camo', name:'Camo'},
+  {id:'nighthawk', name:'Nighthawk'},
+  {id:'cat', name:'Cat'},
+];
+const paintOf = id => (save.paint && save.paint[id]) || 'factory';
+function paintTex(id){
+  const rnd = mulberry(id.length * 131 + 7);
+  const t = canvasTex(128, 128, (c, w, h) => {
+    if (id === 'camo'){
+      c.fillStyle = '#5d6b3a'; c.fillRect(0, 0, w, h);
+      ['#3e4a26', '#7a7148', '#2b2f1e', '#4f5d30'].forEach(col => { c.fillStyle = col; for (let k = 0; k < 9; k++){ const x = rnd()*w, y = rnd()*h, r = 8 + rnd()*16; c.beginPath(); for (let a = 0; a < 7; a++){ const ang = a/7*Math.PI*2, rr = r*(0.6 + rnd()*0.6); c.lineTo(x + Math.cos(ang)*rr*1.4, y + Math.sin(ang)*rr); } c.closePath(); c.fill(); } });
+    } else if (id === 'nighthawk'){
+      c.fillStyle = '#15171c'; c.fillRect(0, 0, w, h);
+      c.strokeStyle = '#25282f'; c.lineWidth = 2; for (let k = 0; k < 7; k++){ c.beginPath(); c.moveTo(rnd()*w, 0); c.lineTo(rnd()*w, h); c.stroke(); }
+      c.strokeStyle = '#d4202a'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, h*0.62); c.lineTo(w*0.45, h*0.62); c.lineTo(w*0.55, h*0.5); c.lineTo(w, h*0.5); c.stroke();
+    } else if (id === 'cat'){
+      // bold wavy tabby stripes running top to bottom
+      c.fillStyle = '#f39a32'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#8f420c';
+      for (let k = 0; k < 4; k++){
+        const x = (k + 0.5) * w/4 + (rnd() - 0.5)*8, bw = 9 + rnd()*5;
+        c.beginPath(); c.moveTo(x - bw/2, 0);
+        for (let y = 0; y <= h; y += 16) c.lineTo(x - bw/2 + Math.sin(y*0.09 + k)*5, y);
+        for (let y = h; y >= 0; y -= 16) c.lineTo(x + bw/2 + Math.sin(y*0.09 + k)*5 - (y > h*0.7 ? (y - h*0.7)*0.25 : 0), y);
+        c.closePath(); c.fill();
+      }
+    }
+  });
+  return t;
+}
+function paintMaterial(def, id){
+  if (id === 'neon') return new THREE.MeshStandardMaterial({color:0x39ff14, emissive:0x1fa30a, emissiveIntensity:0.55, metalness:0.2, roughness:0.3});
+  if (id === 'camo') return new THREE.MeshStandardMaterial({map:paintTex('camo'), metalness:0.05, roughness:0.85});
+  if (id === 'nighthawk') return new THREE.MeshStandardMaterial({map:paintTex('nighthawk'), metalness:0.15, roughness:0.9});
+  if (id === 'cat') return new THREE.MeshStandardMaterial({map:paintTex('cat'), metalness:0.1, roughness:0.6});
+  return new THREE.MeshStandardMaterial({color:def.color, metalness:0.35, roughness:0.38});
+}
 function buildCar(def){
   if (carMesh){ scene.remove(carMesh.root); disposeTree(carMesh.root); }
-  return (carMesh = makeCarMesh(def));
+  return (carMesh = makeCarMesh(def, paintOf(def.id)));
 }
-function makeCarMesh(def){
+function makeCarMesh(def, paintId){
   const sh = SHAPES[def.shape], root = new THREE.Group(), body = new THREE.Group(); root.add(body);
-  const paint = new THREE.MeshStandardMaterial({color:def.color, metalness:0.35, roughness:0.38});
+  const paint = paintMaterial(def, paintId || 'factory');
   const dark = new THREE.MeshStandardMaterial({color:0x1a1d22, metalness:0.2, roughness:0.7});
   const glass = new THREE.MeshStandardMaterial({color:0x1d2a38, metalness:0.6, roughness:0.15});
   const baseY = sh.r*0.55;
@@ -857,6 +907,21 @@ function makeCarMesh(def){
     root.add(pivot); wheels.push(spin); if (i < 2) pivots.push(pivot);
   });
   scene.add(root);
+  if (paintId === 'cat'){
+    const fur = new THREE.MeshStandardMaterial({color:0xf08a24, roughness:0.7}), pink = new THREE.MeshStandardMaterial({color:0xff9fb5, roughness:0.7});
+    const earY = sh.open ? baseY + 0.62 : baseY + sh.H + sh.ch + 0.2, earZ = sh.open ? 0.3 : sh.cz - sh.cl*0.02, earX = sh.open ? 0.11 : sh.W*0.22, k = sh.open ? 0.55 : 1;
+    [-1, 1].forEach(sd => {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.2*k, 0.42*k, 4), fur); ear.position.set(sd*earX, earY, earZ); ear.rotation.y = Math.PI/4; ear.castShadow = true; body.add(ear);
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.11*k, 0.26*k, 4), pink); inner.position.set(sd*earX, earY - 0.04*k, earZ + 0.08*k); inner.rotation.y = Math.PI/4; body.add(inner);
+    });
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.0, 8), fur); tail.geometry.translate(0, 0.5, 0);
+    tail.position.set(0, baseY + (sh.open ? 0.5 : sh.H*0.85), -sh.L/2 + (sh.open ? 0.3 : 0.05)); tail.rotation.x = -0.55; tail.castShadow = true; body.add(tail);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshStandardMaterial({color:0xfff0de})); tip.position.y = 1.0; tail.add(tip);
+  }
+  if (paintId === 'neon'){
+    const ug = new THREE.PlaneGeometry(sh.W + 2.4, sh.L + 2.4); ug.rotateX(-Math.PI/2);
+    const glow = new THREE.Mesh(ug, addMat(glowCanvas(64, 64, .5, .5, .5, '255,40,220', 0.95), 0.9)); glow.position.y = 0.06; root.add(glow);
+  }
   return {root, body, wheels, pivots, r:sh.r, len:sh.L, w:sh.W, night, tailM, tailGlowM, tailSprites, bar:extra.bar};
 }
 
@@ -1439,6 +1504,8 @@ function renderGarage(){
   let html = `<h2>Workshop</h2><div><div class="car-title">${c.name}</div><div class="car-blurb">${c.blurb}</div></div>`;
   html += `<div class="stats">${bars.map(b => `<span class="lb">${b[0]}</span><span class="bar"><i style="width:${(b[1]*100).toFixed(1)}%"></i><i style="left:${(b[1]*100).toFixed(1)}%;width:${((b[2]-b[1])*100).toFixed(1)}%"></i></span><span class="val">${b[3]}</span>`).join('')}</div>`;
   if (owned){
+    const cur = paintOf(c.id);
+    html += `<div class="paints"><div class="un">Paint <span class="ud">free · ${PAINTS.find(q => q.id === cur).name}</span></div><div class="pswatch">${PAINTS.map(q => `<button type="button" class="pw pw-${q.id}" data-paint="${q.id}" aria-pressed="${q.id === cur}" ${q.id === 'factory' ? `style="background:${hex(c.color)}"` : ''}><span>${q.name}</span></button>`).join('')}</div></div>`;
     html += `<div class="upgs">${UPGRADES.filter(g => !(isTouch && g.key === 'nitro')).map(g => {
       const lv = u[g.key], maxed = lv >= MAX_LVL, cost = upgCost(c.id, lv);
       return `<div class="upg"><div><span class="un">${g.name}</span> <span class="ud">Lv ${lv}/${MAX_LVL} · ${g.desc}</span></div><div class="pips">${Array.from({length:MAX_LVL}, (_, i) => `<span class="${i < lv ? 'on' : ''}"></span>`).join('')}</div>`
@@ -1498,6 +1565,9 @@ $('#shop').addEventListener('click', e => {
     if (u[key] >= MAX_LVL || save.coins < cost) return;
     save.coins -= cost; u[key]++; persist();
     toast(`${UPGRADES.find(g => g.key === key).name} upgraded to level ${u[key]}`); bumpWallet(); beep(660, .1, 'square', .05); beep(990, .14, 'square', .05, .08);
+  } else if (b.dataset.paint){
+    save.paint = save.paint || {}; save.paint[viewCar] = b.dataset.paint; persist();
+    showPreview(); beep(880, .08, 'square', .04);
   } else if (b.dataset.drive){
     save.selected = b.dataset.drive; persist(); toast(`Now driving ${carById(save.selected).name}`);
   }
