@@ -44,14 +44,14 @@ Each owned car has four upgrades, 5 levels each: **Engine** (top speed), **Turbo
 
 ## Tracks (7)
 
-Every race is 3 laps.
+Time Trial races are 2 laps; the Race-mode Grand Prix is 3 laps.
 
 | Track | Laps | Notes |
 |---|---|---|
-| Pine Loop | 3 | forest, the easy one |
-| Red Canyon | 3 | desert rocks and mesas |
-| Harbor Night | 3 | night — headlights on |
-| Sunset Coast | 3 | beach, palms, ocean |
-| Speed Bowl | 3 | oval with grandstands, flat-out |
-| Frost Pass | 3 | falling snow, slippery road |
-| Neon City | 3 | night city — headlights on |
+| Pine Loop | 2 | forest, the easy one |
+| Red Canyon | 2 | desert rocks and mesas |
+| Harbor Night | 2 | night — headlights on |
+| Sunset Coast | 2 | beach, palms, ocean |
+| Speed Bowl | 2 | oval with grandstands, flat-out |
+| Frost Pass | 2 | falling snow, slippery road |
+| Neon City | 2 | night city — headlights on |
