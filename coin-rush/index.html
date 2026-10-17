@@ -120,6 +120,10 @@ kbd{font-family:var(--ui);font-size:10px;border:1px solid var(--line);padding:0 
 .h-time{font-family:var(--display);font-size:52px;line-height:.85;font-variant-numeric:tabular-nums;}
 .h-sub{font-size:13px;font-variant-numeric:tabular-nums;color:var(--mute);display:flex;gap:6px;align-items:center;}
 .pb{background:var(--pb);color:#fff;font-weight:700;font-size:10px;padding:1px 5px;letter-spacing:.08em;}
+.h-tire{display:flex;gap:6px;align-items:center;font-size:11px;letter-spacing:.12em;color:var(--mute);margin-top:3px;font-variant-numeric:tabular-nums;}
+.h-tire i{flex:1;height:6px;background:#0b0f14;position:relative;min-width:70px;}
+.h-tire b{position:absolute;inset:0 auto 0 0;background:#1fae74;}
+.h-tire.low b{background:#ff4b3e;} .h-tire.low #hTire{color:#ff6b5f;}
 .h-target{font-size:12px;font-variant-numeric:tabular-nums;display:flex;gap:6px;align-items:center;color:var(--mute);}
 #mini{position:absolute;top:max(14px,env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));width:150px;height:150px;}
 .hud-br{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:auto auto;gap:0 12px;align-items:end;padding:10px 16px 10px 18px;min-width:210px;}
@@ -237,6 +241,7 @@ body.touch .keys{display:none;}
       <div class="h-time" id="hTime">0:00.000</div>
       <div class="h-sub"><span class="pb">PB</span><span id="hBest">--:--.---</span></div>
       <div class="h-target"><span class="medal" id="hTargetDot"></span><span id="hTarget"></span></div>
+      <div class="h-tire" id="hTireWrap" hidden><span>TIRES</span><i><b id="hTireBar"></b></i><span id="hTire">100%</span></div>
     </div>
     <canvas id="mini" width="300" height="300" aria-hidden="true"></canvas>
     <button class="hud-pause" id="pauseBtn" type="button" aria-label="Pause">II</button>
@@ -324,6 +329,10 @@ const TRACKS = [
 ];
 const HALF = 15;          // half road width, meters
 const WALL = HALF + 4;    // tire wall distance from center line
+// Grand Prix pit lane: right of the main straight, x is metres from the start line along it
+const PIT_IN = -190, PIT_OUT = 150, PIT_RAMP = 60, PIT_OPEN = 16, PIT_LAT = 26, PIT_SPEED = 20, PIT_BOX = -70, PIT_TIME = 2.5;
+const pitTaper = x => Math.max(0, Math.min(1, (x - PIT_IN) / PIT_RAMP)) * Math.max(0, Math.min(1, (PIT_OUT - x) / PIT_RAMP));
+const lineX = d => { const L = track.length, m = ((d % L) + L) % L; return m > L/2 ? m - L : m; };
 const carById = id => CARS.find(c => c.id === id) || CARS[0];
 // records are per lap count, so changing a track's laps starts it fresh
 const recKey = t => t.id + '@' + t.laps;
@@ -404,16 +413,17 @@ function disposeTree(o){
   });
 }
 
-function ribbon(s, total, off0, off1, y, vScale, y1){
+function ribbon(s, total, off0, off1, y, vScale, y1, keep){
+  const f0 = typeof off0 === 'function' ? off0 : () => off0, f1 = typeof off1 === 'function' ? off1 : () => off1;
   const N = s.length, pos = new Float32Array((N+1)*6), uv = new Float32Array((N+1)*4), nor = new Float32Array((N+1)*6), idx = [];
   const vertical = y1 !== undefined;
   for (let i = 0; i <= N; i++){
-    const p = s[i % N], d = i === N ? total : p.dist, k = i*6;
-    pos[k] = p.x + p.nx*off0; pos[k+1] = y; pos[k+2] = p.z + p.nz*off0;
-    pos[k+3] = p.x + p.nx*off1; pos[k+4] = vertical ? y1 : y; pos[k+5] = p.z + p.nz*off1;
-    for (let j = 0; j < 2; j++){ nor[k+j*3] = vertical ? -p.nx*Math.sign(off0) : 0; nor[k+j*3+1] = vertical ? 0 : 1; nor[k+j*3+2] = vertical ? -p.nz*Math.sign(off0) : 0; }
+    const p = s[i % N], d = i === N ? total : p.dist, k = i*6, o0 = f0(i % N), o1 = f1(i % N);
+    pos[k] = p.x + p.nx*o0; pos[k+1] = y; pos[k+2] = p.z + p.nz*o0;
+    pos[k+3] = p.x + p.nx*o1; pos[k+4] = vertical ? y1 : y; pos[k+5] = p.z + p.nz*o1;
+    for (let j = 0; j < 2; j++){ nor[k+j*3] = vertical ? -p.nx*Math.sign(o0) : 0; nor[k+j*3+1] = vertical ? 0 : 1; nor[k+j*3+2] = vertical ? -p.nz*Math.sign(o0) : 0; }
     uv[i*4] = 0; uv[i*4+1] = d / vScale; uv[i*4+2] = 1; uv[i*4+3] = d / vScale;
-    if (i < N){ const a = i*2; idx.push(a, a+1, a+2, a+1, a+3, a+2); }
+    if (i < N && (!keep || keep(i))){ const a = i*2; idx.push(a, a+1, a+2, a+1, a+3, a+2); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -473,7 +483,17 @@ function buildTrack(def){
   // tire walls
   const wTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#1b1d20'; c.fillRect(0,0,w,h); c.fillStyle = th.wall || (th.night ? '#2c78d8' : '#e8e8e2'); c.fillRect(0,h*0.38,w,h*0.24); noise(c,w,h,300,.3,true); });
   const wallMat = new THREE.MeshLambertMaterial({map:wTex, side:THREE.DoubleSide});
-  [WALL, -WALL].forEach(o => { const m = new THREE.Mesh(ribbon(s, total, o, o, 0, 4, 1.0), wallMat); m.castShadow = true; m.receiveShadow = true; world.add(m); });
+  // on the Grand Prix the inner wall swings out around the pit lane and stops in front of the garages
+  const tp = def.theme === 'f1' ? (i => pitTaper(s[i].dist > total/2 ? s[i].dist - total : s[i].dist)) : (() => 0);
+  t.pit = def.theme === 'f1' ? (dist => pitTaper(dist > total/2 ? dist - total : dist)) : null;
+  [WALL, -WALL].forEach(o => {
+    const off = o > 0 ? (i => o + PIT_OPEN*tp(i)) : o, keep = o > 0 ? (i => !(tp(i) >= 1 && tp((i + 1) % N) >= 1)) : undefined;
+    const m = new THREE.Mesh(ribbon(s, total, off, off, 0, 4, 1.0, keep), wallMat); m.castShadow = true; m.receiveShadow = true; world.add(m);
+  });
+  if (t.pit){
+    const lane = new THREE.Mesh(ribbon(s, total, HALF + 1.3, i => WALL + PIT_OPEN*tp(i), 0.025, 10, undefined, i => tp(i) > 0 || tp((i + 1) % N) > 0), new THREE.MeshLambertMaterial({color:0x3d4148, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1}));
+    lane.receiveShadow = true; world.add(lane);
+  }
 
   // start line + gantry
   const s0 = s[0], heading0 = Math.atan2(s0.tx, s0.tz);
@@ -601,8 +621,19 @@ function buildTrack(def){
       const doors = []; for (let x = -plen/2 + 8; x < plen/2 - 4; x += 12) doors.push(x);
       const dm = placeInst(new THREE.BoxGeometry(9, 4.6, 0.2), new THREE.MeshLambertMaterial({color:0xffffff}), doors, (d,x) => { d.position.set(x, 2.3, pitZ - 0.05); d.scale.set(1,1,1); d.rotation.set(0,0,0); }, false);
       const teams = [0xe0473c, 0x2fd1d6, 0xffc21f, 0x3d6cf5, 0x1fae74, 0xff7a3d, 0x6b3fc9, 0xf1f1ec]; doors.forEach((x, i) => dm.setColorAt(i, new THREE.Color(teams[i % teams.length])));
-      const pw = new THREE.Mesh(new THREE.BoxGeometry(plen + 40, 1.3, 0.6), new THREE.MeshLambertMaterial({color:0xf2f2f2})); pw.position.set(0, 0.65, WALL + 3.2); world.add(pw);
-      const pitRoad = new THREE.Mesh(new THREE.PlaneGeometry(plen + 40, 10), new THREE.MeshLambertMaterial({color:0x3d4148})); pitRoad.rotation.x = -Math.PI/2; pitRoad.position.set(0, 0.03, WALL + 9); pitRoad.receiveShadow = true; world.add(pitRoad);
+      // pit boxes painted on the lane: yours in yellow, the rivals' in their team colours, each with a crew
+      const boxes = [{x:PIT_BOX, c:'#ffc93c', me:true}].concat(RIVALS.map(r => ({x:r.box, c:hex(r.color)})));
+      const crew = [];
+      boxes.forEach(b => {
+        const tex = canvasTex(128, 96, (c, w, h) => { c.strokeStyle = b.c; c.lineWidth = 8; c.strokeRect(4, 4, w - 8, h - 8); if (b.me){ c.fillStyle = b.c; c.font = '600 54px Teko, Impact, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('PIT', w/2, h/2 + 4); } });
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+        const p = trackPoint(b.x), x = p.x + p.nx*PIT_LAT, z = p.z + p.nz*PIT_LAT;
+        const dec = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-6, polygonOffsetUnits:-6}));
+        dec.rotation.order = 'YXZ'; dec.rotation.set(-Math.PI/2, p.h + Math.PI/2, 0); dec.position.set(x, 0.05, z); world.add(dec);
+        [[-3.6, -2.2], [3.6, -2.2], [-3.6, 2.2], [3.6, 2.2]].forEach(([u, v]) => crew.push({x:x + Math.sin(p.h)*u + p.nx*(v + Math.sign(v)*1.3), z:z + Math.cos(p.h)*u + p.nz*(v + Math.sign(v)*1.3), c:b.me ? 0xffc93c : parseInt(b.c.slice(1), 16)}));
+      });
+      const cm = placeInst(new THREE.BoxGeometry(0.55, 1.7, 0.4), new THREE.MeshLambertMaterial({color:0xffffff}), crew, (d,c) => { d.position.set(c.x, 0.85, c.z); d.scale.set(1,1,1); d.rotation.set(0,0,0); });
+      crew.forEach((c, i) => cm.setColorAt(i, new THREE.Color(c.c)));
       // five start lights hanging under the gantry banner
       const pod = new THREE.MeshLambertMaterial({color:0x14171c});
       t.startLights = [];
@@ -949,11 +980,15 @@ function stepCar(dt, inp){
   car.idx = nearest(car.x, car.z, car.idx);
   const s = track.s[car.idx];
   const lat = (car.x - s.x)*s.nx + (car.z - s.z)*s.nz; car.lat = lat;
-  const off = Math.abs(lat) > HALF + 0.9; car.off = off;
+  const pt = track.pit && lat > 0 ? track.pit(s.dist) : 0;
+  car.pitLane = pt > 0 && lat > WALL - 3;
+  const off = Math.abs(lat) > HALF + 0.9 && !(pt > 0.05); car.off = off;
   const boosting = inp.nitro && car.nitro > 0 && fwd > 2 && inp.throttle > 0;
   car.nitro = boosting ? Math.max(0, car.nitro - dt) : Math.min(S.nitro, car.nitro + dt*0.11);
   car.boost = boosting;
-  const top = S.top * (off ? S.rough : 1) * (boosting ? 1.2 : 1);
+  const wear = car.wear || 0;
+  let top = S.top * (off ? S.rough : 1) * (boosting ? 1.2 : 1) * (1 - 0.08*wear);
+  if (car.pitLane) top = Math.min(top, PIT_SPEED);
   const acc = S.accel * (boosting ? 1.55 : 1);
   if (inp.throttle > 0 && fwd > -0.5){ const r = Math.max(0, fwd) / top; fwd += acc * inp.throttle * dt * Math.max(0, 1 - r*r*r); }
   if (inp.brake > 0){
@@ -969,15 +1004,17 @@ function stepCar(dt, inp){
   const sp = Math.abs(fwd);
   const sf = Math.min(1, sp/5) * (1 - 0.42*Math.min(1, sp/(S.top*1.15)));
   car.h += S.turn * car.steer * sf * (inp.hand ? 1.5 : 1) * (fwd < 0 ? -1 : 1) * dt;
-  const grip = S.grip * (inp.hand ? 0.17 : 1) * (off ? 0.6 : 1) * (track.def.grip || 1);
+  const grip = S.grip * (inp.hand ? 0.17 : 1) * (off ? 0.6 : 1) * (track.def.grip || 1) * (1 - 0.45*Math.pow(wear, 1.5));
+  if (track.pit && mode === 'race') car.wear = Math.min(1, wear + Math.abs(fwd)*dt/4200 + (car.slip > 3 ? car.slip*dt*0.002 : 0));
   const dec = Math.exp(-grip*dt); lx *= dec; lz *= dec;
   car.slip = Math.hypot(lx, lz);
   car.vx = fx*fwd + lx; car.vz = fz*fwd + lz; car.fwd = fwd;
   car.x += car.vx*dt; car.z += car.vz*dt;
   // tire wall
   const lat2 = (car.x - s.x)*s.nx + (car.z - s.z)*s.nz;
-  if (Math.abs(lat2) > WALL - 1.1){
-    const sg = Math.sign(lat2), push = lat2 - sg*(WALL - 1.1);
+  const wl = WALL - 1.1 + (lat2 > 0 && track.pit ? PIT_OPEN*track.pit(s.dist) : 0);
+  if (Math.abs(lat2) > wl){
+    const sg = Math.sign(lat2), push = lat2 - sg*wl;
     car.x -= s.nx*push; car.z -= s.nz*push;
     const vn = car.vx*s.nx + car.vz*s.nz;
     if (vn*sg > 0){ car.vx -= s.nx*vn*1.35; car.vz -= s.nz*vn*1.35; car.bump = Math.min(1, Math.max(car.bump, Math.abs(vn)/14)); if (Math.abs(vn) > 4) beep(70, 0.15, 'triangle', 0.12); }
@@ -988,9 +1025,9 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 
 /* ================= AI rivals ================= */
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
-// scaled so a clean lap lands just slower than bronze pace. They ease off when far ahead (beatable on purpose).
-const RIVALS = [{name:'Blaze', pace:1.0, lane:-5, color:0xe0473c}, {name:'Comet', pace:1.05, lane:5, color:0x2fd1d6}, {name:'Dash', pace:1.1, lane:0, color:0xffc21f},
-                {name:'Nova', pace:1.16, lane:-2.5, color:0x3d6cf5}, {name:'Rocket', pace:1.23, lane:2.5, color:0xff7a3d}];
+// scaled so the leader laps close to silver pace and the back marker near bronze. They ease off a little when far ahead.
+const RIVALS = [{name:'Blaze', pace:0.85, lane:-5, color:0xe0473c, box:-46, pitLap:2}, {name:'Comet', pace:0.89, lane:5, color:0x2fd1d6, box:-22, pitLap:1}, {name:'Dash', pace:0.93, lane:0, color:0xffc21f, box:2, pitLap:2},
+                {name:'Nova', pace:0.97, lane:-2.5, color:0x3d6cf5, box:26, pitLap:1}, {name:'Rocket', pace:1.02, lane:2.5, color:0xff7a3d, box:50, pitLap:2}];
 const GRID = [[-6, -5.5], [-6, 5.5], [-14, -5.5], [-14, 5.5], [-22, -5.5], [-23, 5.5]];
 let ais = [];
 function trackPoint(d){
@@ -1025,7 +1062,7 @@ function spawnAis(){
   RIVALS.forEach((r, k) => {
     const def = Object.assign({}, carById('formula'), {color:r.color}), m = makeCarMesh(def);
     m.root.add(nameTag(r.name, hex(def.color)));
-    const a = {name:r.name, def, m, k:prof.lapT / (bronzeLap * r.pace), d:grid[k][0], lat:grid[k][1], latT:grid[k][1], lane:r.lane, v:0, fin:null, x:0, z:0, h:0};
+    const a = {name:r.name, def, m, k:prof.lapT / (bronzeLap * r.pace), d:grid[k][0], lat:grid[k][1], latT:grid[k][1], lane:r.lane, v:0, fin:null, x:0, z:0, h:0, box:r.box, pitLap:track.pit ? r.pitLap : 0, pitT:0, served:false};
     ais.push(a); poseAi(a, 0, 0);
   });
 }
@@ -1052,7 +1089,7 @@ function updateAis(dt){
       const i = Math.floor((((a.d % L) + L) % L) / L * N) % N, lim = HALF - 1.4;
       target = prof.v[i] * a.k;
       const lead = a.d - pd;
-      if (mode === 'race' && lead > 40) target *= Math.max(0.78, 1 - (lead - 40) / 300);
+      if (mode === 'race' && lead > 80) target *= Math.max(0.9, 1 - (lead - 80) / 400);
       else if (mode === 'race' && lead < -90) target *= 1.05;
       latT = Math.max(-lim, Math.min(lim, a.lane*0.5 + prof.ins[(i + 14) % N]));
       others.forEach(o => {
@@ -1066,11 +1103,22 @@ function updateAis(dt){
         }
       });
     }
+    // one pit stop each: follow the lane in, brake into the box, wait, rejoin
+    const rel = a.d - a.pitLap*L, inPit = go && a.pitLap && rel > PIT_IN && rel < PIT_OUT;
+    if (inPit){
+      latT = PIT_LAT * pitTaper(rel);
+      if (a.lat > WALL - 3) target = Math.min(target, PIT_SPEED);
+      if (!a.served){
+        const toBox = a.box - rel;
+        target = Math.min(target, Math.max(1.5, Math.sqrt(16*Math.max(0, toBox))));
+        if (toBox < 0.3){ target = 0; a.v = 0; a.pitT += dt; if (a.pitT > PIT_TIME + 0.2) a.served = true; }
+      }
+    }
     a.latT = latT;
     const v0 = a.v;
-    a.v = a.v < target ? Math.min(target, a.v + 11*dt) : Math.max(target, a.v - 20*dt);
+    a.v = a.v < target ? Math.min(target, a.v + 14*dt) : Math.max(target, a.v - 20*dt);
     a.d += a.v*dt;
-    const dl = Math.max(-2.4*dt, Math.min(2.4*dt, a.latT - a.lat)); a.lat += dl;
+    const lr = inPit ? 12 : 2.4, dl = Math.max(-lr*dt, Math.min(lr*dt, a.latT - a.lat)); a.lat += dl;
     if (a.fin === null && a.d >= track.laps*L && mode !== 'countdown') a.fin = race.time;
     poseAi(a, dt, dt > 0 ? dl / dt : 0);
     carLights(a.m, a.v < v0 - 6*dt && a.v > 1);
@@ -1108,12 +1156,12 @@ function startRace(){
   if (!save.owned.includes(save.selected)) save.selected = 'hatch';
   const def = carById(save.selected);
   buildCar(def);
-  car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0;
+  car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0; car.wear = 0; car.pitT = 0; car.inBox = false; car.boxWarn = false;
   const slot = raceMode() ? GRID[RIVALS.length] : [-14, 0];
   { const p = trackPoint(slot[0]); car.x = p.x + p.nx*slot[1]; car.z = p.z + p.nz*slot[1]; car.h = p.h; car.vx = car.vz = car.fwd = car.steer = car.slip = 0; car.idx = nearest(car.x, car.z, 0, true); }
   clearSkids();
   if (raceMode()) spawnAis(); else clearAis();
-  $('#hPosWrap').hidden = !ais.length; $('#hPosN').textContent = ais.length + 1;
+  $('#hPosWrap').hidden = !ais.length; $('#hTireWrap').hidden = !track.pit; $('#hPosN').textContent = ais.length + 1;
   Object.assign(race, {time:0, lap:1, lapStart:0, lapTimes:[], hit:new Set(), prevIdx:car.idx, count:track.startLights ? 5.6 : 3.6, countStep:9, finished:false});
   (track.startLights || []).forEach(m => m.color.setHex(0x330606));
   race.cps = [0.25, 0.5, 0.75].map(f => Math.floor(track.N * f));
@@ -1144,8 +1192,21 @@ function updateCountdown(dt){
   }
 }
 
+function updatePit(dt){
+  const sp = track.s[car.idx], x = lineX(sp.dist + (car.x - sp.x)*sp.tx + (car.z - sp.z)*sp.tz), inBox = Math.abs(x - PIT_BOX) < 5.5 && Math.abs(car.lat - PIT_LAT) < 4.5;
+  if (car.pitT > 0){
+    car.pitT -= dt; car.vx = car.vz = 0;
+    flash(`PIT STOP ${Math.max(0, car.pitT).toFixed(1)}`, 'warn', 0.2);
+    if (car.pitT <= 0){ car.wear = 0; car.nitro = car.stats.nitro; car.boxWarn = false; flash('FRESH TIRES · GO GO GO', 'pbc', 1.6); beep(880, 0.12); beep(1320, 0.2, 'square', 0.08, 0.12); }
+  } else if (inBox && !car.inBox && Math.abs(car.fwd) < 4){
+    car.pitT = PIT_TIME; car.inBox = true; car.vx = car.vz = 0; beep(330, 0.15);
+  } else if (car.pitLane && msgT < 0.25) flash('PIT LANE · 72 km/h', '', 0.2);
+  if (!inBox) car.inBox = false;
+  if (car.wear > 0.6 && !car.boxWarn){ car.boxWarn = true; flash('BOX BOX · tires worn, pit on the main straight', 'warn', 3); }
+}
 function updateRace(dt, inp){
   race.time += dt;
+  if (track.pit) updatePit(dt);
   const n = track.N, i = car.idx;
   for (const cp of race.cps){ let d = Math.abs(i - cp); d = Math.min(d, n - d); if (d < 25) race.hit.add(cp); }
   if (race.prevIdx > n*0.85 && i < n*0.15 && race.hit.size === race.cps.length){
@@ -1343,7 +1404,7 @@ function frame(now){
   if (mode === 'paused'){ renderer.render(scene, camera); return; }
   const driving = mode === 'race' || mode === 'countdown' || mode === 'results';
   if (driving){
-    const inp = mode === 'race' ? readInput() : NO_INPUT;
+    const inp = mode === 'race' && !(car.pitT > 0) ? readInput() : NO_INPUT;
     if (mode === 'countdown') updateCountdown(dt);
     const sub = 3, h = dt / sub;
     for (let k = 0; k < sub; k++) stepCar(h, mode === 'countdown' ? NO_INPUT : inp);
@@ -1429,6 +1490,7 @@ function updateHud(dt){
   setText('hTime', fmt(race.time));
   setText('hLap', String(race.lap));
   setText('hPos', String(racePosition()));
+  if (track.pit){ const left = 1 - (car.wear || 0); $('#hTireBar').style.width = (left*100).toFixed(1) + '%'; setText('hTire', Math.round(left*100) + '%'); $('#hTireWrap').classList.toggle('low', left < 0.4); }
   const sp = Math.abs(car.fwd);
   setText('hSpd', String(kmh(sp)));
   const r = Math.max(0, car.fwd) / car.stats.top * 6;
