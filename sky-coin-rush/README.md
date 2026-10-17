@@ -67,13 +67,23 @@ turns):
 - Pause and press **End flight** to go back to the start card, where the plane keeps
   cruising over the hills.
 
+## Fuel
+
+A full tank lasts **5 minutes** in the air (it doesn't drain on the ground). The FUEL chip
+shows the time left; under a minute it turns red and says "Low fuel: land soon!". Landing
+at any airport refuels you while you're on the ground (lakes have no fuel). If the tank
+runs dry the engine stops and the plane glides, slowly sinking: glide to an airport or
+tap LAND. If you crash (or end up stuck on a lake) with an empty tank, the plane is towed
+to the nearest airport with a full tank.
+
 ## Airports
 
 The world has airports everywhere: one in most 5 km squares of an endless grid, each with
 its own name (Pine Valley, Otter Bay, Snowcap…) and its runway pointing its own way. You
 start at **Home Field**. The ground around each one is flattened into a meadow: an airport
 on a lake becomes an island strip, and one on a mountain sits on a high plateau (up to
-about 3,000 ft). Every airport has a tall light **beacon** beside its runway that the haze
+about 3,000 ft or more). An airport is only placed where its approach and climb-out are
+clear of hills (it tries up to six runway directions). Every airport has a tall light **beacon** beside its runway that the haze
 doesn't hide: yellow at Home Field, teal everywhere else.
 
 ## Landing
