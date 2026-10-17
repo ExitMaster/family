@@ -115,6 +115,11 @@ kbd{font-family:var(--ui);font-size:10px;border:1px solid var(--line);padding:0 
 .h-lap b{color:var(--fg);font-size:15px;}
 .h-pos{margin-left:16px;}
 .h-pos b{color:var(--coin);font-size:20px;}
+#party{position:absolute;left:0;right:0;top:max(9%,60px);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none;text-shadow:0 4px 24px rgba(0,0,0,.55);}
+#party b{font-family:var(--display);font-weight:600;font-size:min(22vw,150px);line-height:.85;color:var(--coin);letter-spacing:.02em;animation:pop .9s ease-out both;}
+#party span{font-family:var(--display);font-size:min(9vw,48px);line-height:1;color:#fff;}
+#party small{margin-top:10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.75);}
+#confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;}
 .stand li.me span{color:var(--coin);font-weight:700;}
 .stand .sw{display:inline-block;width:9px;height:9px;margin-right:8px;vertical-align:0;}
 .h-time{font-family:var(--display);font-size:52px;line-height:.85;font-variant-numeric:tabular-nums;}
@@ -259,6 +264,7 @@ body.touch .keys{display:none;}
     <div class="t-steer" id="steerPad" aria-label="Hold to drive, slide to steer, pull down to brake"><div class="t-hint">Hold to drive · slide ◀ ▶ to steer · pull ▼ to brake</div><div class="t-ring" id="steerRing"><i id="steerKnob"></i></div></div>
   </div>
 
+  <div id="party" hidden><b>1ST PLACE</b><span>Champagne party!</span><small>Tap for results</small></div>
   <div id="results" class="screen center" hidden>
     <div class="card panel">
       <div class="r-head"><h2 id="rPlace">Finish</h2><span class="r-flag" id="rFlag"></span></div>
@@ -1005,7 +1011,7 @@ function stepCar(dt, inp){
   const sf = Math.min(1, sp/5) * (1 - 0.42*Math.min(1, sp/(S.top*1.15)));
   car.h += S.turn * car.steer * sf * (inp.hand ? 1.5 : 1) * (fwd < 0 ? -1 : 1) * dt;
   const grip = S.grip * (inp.hand ? 0.17 : 1) * (off ? 0.6 : 1) * (track.def.grip || 1) * (1 - 0.45*Math.pow(wear, 1.5));
-  if (track.pit && mode === 'race') car.wear = Math.min(1, wear + Math.abs(fwd)*dt/4200 + (car.slip > 3 ? car.slip*dt*0.002 : 0));
+  if (track.pit && mode === 'race') car.wear = Math.min(1, wear + Math.abs(fwd)*dt/2000 + (car.slip > 3 ? car.slip*dt*0.004 : 0));
   const dec = Math.exp(-grip*dt); lx *= dec; lz *= dec;
   car.slip = Math.hypot(lx, lz);
   car.vx = fx*fwd + lx; car.vz = fz*fwd + lz; car.fwd = fwd;
@@ -1025,9 +1031,9 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 
 /* ================= AI rivals ================= */
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
-// scaled so the leader laps close to silver pace and the back marker near bronze. They ease off a little when far ahead.
-const RIVALS = [{name:'Blaze', pace:0.85, lane:-5, color:0xe0473c, box:-46, pitLap:2}, {name:'Comet', pace:0.89, lane:5, color:0x2fd1d6, box:-22, pitLap:1}, {name:'Dash', pace:0.93, lane:0, color:0xffc21f, box:2, pitLap:2},
-                {name:'Nova', pace:0.97, lane:-2.5, color:0x3d6cf5, box:26, pitLap:1}, {name:'Rocket', pace:1.02, lane:2.5, color:0xff7a3d, box:50, pitLap:2}];
+// scaled well past medal pace, but capped below your car's top speed and slowed when far ahead, so they stay beatable.
+const RIVALS = [{name:'Blaze', pace:0.57, lane:-5, color:0xe0473c, box:-46, pitLap:2}, {name:'Comet', pace:0.59, lane:5, color:0x2fd1d6, box:-22, pitLap:1}, {name:'Dash', pace:0.62, lane:0, color:0xffc21f, box:2, pitLap:2},
+                {name:'Nova', pace:0.65, lane:-2.5, color:0x3d6cf5, box:26, pitLap:1}, {name:'Rocket', pace:0.68, lane:2.5, color:0xff7a3d, box:50, pitLap:2}];
 const GRID = [[-6, -5.5], [-6, 5.5], [-14, -5.5], [-14, 5.5], [-22, -5.5], [-23, 5.5]];
 let ais = [];
 function trackPoint(d){
@@ -1089,8 +1095,10 @@ function updateAis(dt){
       const i = Math.floor((((a.d % L) + L) % L) / L * N) % N, lim = HALF - 1.4;
       target = prof.v[i] * a.k;
       const lead = a.d - pd;
-      if (mode === 'race' && lead > 80) target *= Math.max(0.9, 1 - (lead - 80) / 400);
+      if (mode === 'race' && lead > 50) target *= Math.max(0.72, 1 - (lead - 50) / 250);
       else if (mode === 'race' && lead < -90) target *= 1.05;
+      // never faster than 95% of your car's top speed, so you can always reel them in on a straight
+      target = Math.min(target, car.stats.top * 0.95);
       latT = Math.max(-lim, Math.min(lim, a.lane*0.5 + prof.ins[(i + 14) % N]));
       others.forEach(o => {
         if (o === a) return;
@@ -1152,7 +1160,7 @@ let orbitA = 0.6, camShake = 0;
 const raceMode = () => save.mode === 'race';
 const trackDef = () => raceMode() ? TRACKS.find(t => t.race) : TRACKS.find(t => t.id === save.track);
 function startRace(){
-  initAudio();
+  initAudio(); stopParty();
   if (!save.owned.includes(save.selected)) save.selected = 'hatch';
   const def = carById(save.selected);
   buildCar(def);
@@ -1264,19 +1272,129 @@ function finishRace(){
     + (medalBonus ? `<div><span>${MEDAL_NAME[medal]} medal</span><span>+${medalBonus}</span></div>` : '')
     + (pbBonus ? `<div><span>New personal best</span><span>+${pbBonus}</span></div>` : '')
     + `<div class="tot"><span>Earned</span><span id="rTot">+0</span></div>`;
-  $('#results').hidden = false;
-  let shown = 0; const t0 = performance.now();
-  const tick = now => { const k = Math.min(1, (now - t0) / 900); shown = Math.round(total * (1 - Math.pow(1-k, 3))); const el = $('#rTot'); if (el) el.textContent = '+' + shown; if (k < 1) requestAnimationFrame(tick); };
-  requestAnimationFrame(tick);
-  [0, 0.09, 0.18, 0.3].forEach((w, i) => beep([988, 1319, 1568, 2093][i], 0.16, 'square', 0.06, w + 0.1));
   orbitA = car.h + Math.PI*0.75;
-  $('#againBtn').focus();
+  const reveal = () => {
+    if (mode !== 'results' || !$('#results').hidden) return;
+    $('#party').hidden = true; $('#results').hidden = false;
+    let shown = 0; const t0 = performance.now();
+    const tick = now => { const k = Math.min(1, (now - t0) / 900); shown = Math.round(total * (1 - Math.pow(1-k, 3))); const el = $('#rTot'); if (el) el.textContent = '+' + shown; if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    [0, 0.09, 0.18, 0.3].forEach((w, i) => beep([988, 1319, 1568, 2093][i], 0.16, 'square', 0.06, w + 0.1));
+    $('#againBtn').focus();
+  };
+  if (place === 1) startParty(reveal); else reveal();
 }
+
+/* ================= Victory: 50 s champagne party ================= */
+const PARTY_LEN = 50;
+let party = null;
+const confettiCv = document.createElement('canvas'); confettiCv.id = 'confetti'; confettiCv.hidden = true; $('#results').after(confettiCv);
+const cctx = confettiCv.getContext('2d');
+function startParty(reveal){
+  stopParty();
+  const g = new THREE.Group(), necks = [];
+  const glass = new THREE.MeshStandardMaterial({color:0x17502a, metalness:0.3, roughness:0.2}), foil = new THREE.MeshStandardMaterial({color:0xe8c04a, metalness:0.8, roughness:0.3});
+  [-1, 1].forEach(sd => {
+    const b = new THREE.Group();
+    b.add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.66, 14), glass));
+    const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.17, 0.24, 14), glass); sh.position.y = 0.45; b.add(sh);
+    const nk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.24, 10), foil); nk.position.y = 0.66; b.add(nk);
+    const lb = new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.175, 0.22, 14), foil); lb.position.y = -0.02; b.add(lb);
+    b.position.set(sd*0.75, 1.75, 0.3); b.rotation.set(0.35, 0, -sd*0.7); b.userData.sd = sd;
+    g.add(b); necks.push(b);
+  });
+  carMesh.root.add(g);
+  const N = 900, pos = new Float32Array(N*3).fill(-999), vel = new Float32Array(N*3), life = new Float32Array(N);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({map:smokeTex, color:0xfff2c8, size:0.4, transparent:true, opacity:0.95, depthWrite:false}));
+  pts.frustumCulled = false; scene.add(pts);
+  const pieces = reduceMotion ? [] : Array.from({length:170}, () => newPiece(true));
+  party = {g, necks, pts, pos, vel, life, N, head:0, t:0, emit:0, pieces, reveal};
+  $('#party').hidden = false; confettiCv.hidden = !pieces.length;
+  partySound();
+}
+function newPiece(anywhere){
+  const cols = ['#ffc93c', '#e0473c', '#2fd1d6', '#3d6cf5', '#1fae74', '#ff7a3d', '#ffffff', '#b46bff'];
+  return {x:Math.random(), y:anywhere ? Math.random()*-1 : -0.05 - Math.random()*0.2, vx:(Math.random() - 0.5)*0.05, vy:0.12 + Math.random()*0.12, r:Math.random()*6, vr:(Math.random() - 0.5)*8, w:6 + Math.random()*7, h:9 + Math.random()*9, c:cols[Math.floor(Math.random()*cols.length)], ph:Math.random()*6};
+}
+function stopParty(){
+  if (!party) return;
+  party.g.parent && party.g.parent.remove(party.g); disposeTree(party.g);
+  scene.remove(party.pts); party.pts.geometry.dispose(); party.pts.material.dispose();
+  party = null; $('#party').hidden = true; confettiCv.hidden = true;
+}
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+function updateParty(dt){
+  if (!party) return;
+  const P = party; P.t += dt;
+  if (P.t >= PARTY_LEN){ P.reveal(); stopParty(); return; }
+  // bring the car to a stop for the celebration
+  const k = Math.max(0, 1 - 1.4*dt); car.vx *= k; car.vz *= k;
+  // bottles wave and spray in bursts
+  const spraying = (P.t % 6) < 4.2;
+  P.necks.forEach(b => { b.rotation.z = -b.userData.sd*(0.7 + 0.2*Math.sin(P.t*5 + b.userData.sd)); b.rotation.x = 0.35 + 0.15*Math.sin(P.t*3.3); });
+  P.g.updateMatrixWorld(true);
+  if (spraying){
+    P.emit += dt * 420;
+    while (P.emit >= 1){
+      P.emit -= 1;
+      const b = P.necks[P.head % 2], i = P.head % P.N; P.head++;
+      b.localToWorld(tmpA.set(0, 0.8, 0)); b.localToWorld(tmpB.set(0, 1.8, 0)).sub(tmpA).normalize();
+      const sp = 5 + Math.random()*4;
+      P.pos[i*3] = tmpA.x; P.pos[i*3+1] = tmpA.y; P.pos[i*3+2] = tmpA.z;
+      P.vel[i*3] = tmpB.x*sp + (Math.random() - 0.5)*2.2; P.vel[i*3+1] = tmpB.y*sp + (Math.random() - 0.5)*2.2; P.vel[i*3+2] = tmpB.z*sp + (Math.random() - 0.5)*2.2;
+      P.life[i] = 1.2 + Math.random()*0.6;
+    }
+  }
+  for (let i = 0; i < P.N; i++){
+    if (P.life[i] <= 0) continue;
+    P.life[i] -= dt;
+    if (P.life[i] <= 0 || P.pos[i*3+1] < 0.05){ P.life[i] = 0; P.pos[i*3+1] = -999; continue; }
+    P.vel[i*3+1] -= 9.8*dt;
+    P.pos[i*3] += P.vel[i*3]*dt; P.pos[i*3+1] += P.vel[i*3+1]*dt; P.pos[i*3+2] += P.vel[i*3+2]*dt;
+  }
+  P.pts.geometry.attributes.position.needsUpdate = true;
+  if (Math.random() < dt*0.6) partySound(true);
+  // confetti over the whole screen
+  if (P.pieces.length){
+    const W = confettiCv.clientWidth, H = confettiCv.clientHeight, dpr = Math.min(2, devicePixelRatio || 1);
+    if (confettiCv.width !== Math.round(W*dpr)){ confettiCv.width = Math.round(W*dpr); confettiCv.height = Math.round(H*dpr); }
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0); cctx.clearRect(0, 0, W, H);
+    const fade = Math.min(1, (PARTY_LEN - P.t) / 3);
+    cctx.globalAlpha = fade;
+    P.pieces.forEach((c, n) => {
+      c.ph += dt*3; c.x += (c.vx + Math.sin(c.ph)*0.03)*dt; c.y += c.vy*dt; c.r += c.vr*dt;
+      if (c.y > 1.05) P.pieces[n] = newPiece(false);
+      cctx.save(); cctx.translate(c.x*W, c.y*H); cctx.rotate(c.r); cctx.scale(1, Math.cos(c.ph*1.7)); cctx.fillStyle = c.c; cctx.fillRect(-c.w/2, -c.h/2, c.w, c.h); cctx.restore();
+    });
+    cctx.globalAlpha = 1;
+  }
+}
+// cork pop + fizz (fizz only on later bursts)
+function partySound(fizzOnly){
+  if (!actx || save.muted) return;
+  const t = actx.currentTime, n = Math.floor(actx.sampleRate*2.5), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random()*2 - 1;
+  if (!fizzOnly){
+    const pop = actx.createBufferSource(), bp = actx.createBiquadFilter(), g1 = actx.createGain(); pop.buffer = buf;
+    bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+    g1.gain.setValueAtTime(1.2, t); g1.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    pop.connect(bp); bp.connect(g1); g1.connect(snd.master); pop.start(t); pop.stop(t + 0.12);
+    beep(140, 0.12, 'sine', 0.3);
+  }
+  const fz = actx.createBufferSource(), hp = actx.createBiquadFilter(), g2 = actx.createGain(); fz.buffer = buf;
+  hp.type = 'highpass'; hp.frequency.value = 3800;
+  g2.gain.setValueAtTime(0.0001, t + 0.05); g2.gain.linearRampToValueAtTime(fizzOnly ? 0.08 : 0.16, t + 0.18); g2.gain.exponentialRampToValueAtTime(0.001, t + 2.3);
+  fz.connect(hp); hp.connect(g2); g2.connect(snd.master); fz.start(t + 0.05); fz.stop(t + 2.45);
+}
+addEventListener('pointerdown', e => { if (party && $('#results').hidden && !e.target.closest('button')) party.reveal(); });
+addEventListener('keydown', e => { if (party && $('#results').hidden && e.code !== 'Escape') party.reveal(); });
 
 function pauseGame(){ if (mode !== 'race' && mode !== 'countdown') return; race.pausedFrom = mode; mode = 'paused'; $('#pause').hidden = false; updateAudio(0, 0, 0, false); $('#resumeBtn').focus(); }
 function resumeGame(){ if (mode !== 'paused') return; mode = race.pausedFrom; $('#pause').hidden = true; for (const k in keys) keys[k] = false; }
 function toGarage(){
   mode = 'garage'; viewCar = save.selected;
+  stopParty();
   ['#hud', '#touch', '#results', '#pause', '#countdown'].forEach(s => $(s).hidden = true);
   clearAis();
   $('#garage').hidden = false;
@@ -1421,6 +1539,7 @@ function frame(now){
     orbitCam(dt, camera.aspect < 1 ? 11 : 7.8, 2.3);
   }
   updatePuffs(dt);
+  updateParty(dt);
   if (track && track.anim) track.anim(dt);
   // keep the shadow box and headlight with the car
   const fx = Math.sin(car.h), fz = Math.cos(car.h);
