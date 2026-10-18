@@ -16,10 +16,23 @@ build on it, fly over it. The world saves in the browser.
 | Break | left click (hold to keep digging); also hits animals and lights TNT |
 | Place | right click |
 | Copy block | middle click puts the targeted block in your hand |
+| Backpack & crafting | `E` (touch: Bag button) |
+| Eat | right click while holding food (Survival) |
 | Pick block | `1`–`9` or mouse wheel |
 | Mute | `M` (or the Sound button in the pause menu) |
 | Pause | `ESC` |
 | Phone / tablet | left stick moves, drag on the right to look, tap to break or place (switch with the Break / Place button), Jump and Fly buttons |
+
+## Game modes
+
+- **Creative**: fly, every block and item, break blocks instantly.
+- **Survival** (pick it in the pause menu): 10 hearts and 10 food. Falling, drowning, zombies
+  and TNT hurt you; food slowly drains and full food heals you. Blocks take time to dig and
+  go into your backpack; stone needs a pickaxe, iron ore a stone pickaxe. Zombies come out at
+  night and in dark caves and burn in daylight. If you die you respawn with your backpack.
+- **Crafting** in the backpack: planks, sticks, torches, wooden/stone/iron pickaxes and swords,
+  iron ingots (raw iron + coal), cooked porkchops, glass, stone, stone bricks, bricks and TNT.
+- **Torches** light up caves and the night with a warm glow.
 
 ## World
 
@@ -38,5 +51,5 @@ build on it, fly over it. The world saves in the browser.
 ## Saving
 
 Everything is kept in `localStorage` under `blockwood.save.v1`: the seed, every block you
-changed, your position, fly mode, time of day, hotbar, view distance and sound setting. It saves every few
+changed, your position, fly mode, time of day, game mode, both inventories, health, food, spawn point, view distance and sound setting. It saves every few
 seconds while you build and whenever you pause or leave the page.

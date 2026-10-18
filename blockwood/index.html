@@ -138,6 +138,45 @@ select{
 #confirm p{margin:0;line-height:1.5}
 #err{margin:0;color:#ffb39e;line-height:1.5}
 .divider{height:1px;background:rgba(255,255,255,.12)}
+#stats{
+  position:fixed;left:50%;transform:translateX(-50%);width:min(380px,84vw);image-rendering:pixelated;pointer-events:none;
+  bottom:calc(12px + env(safe-area-inset-bottom,0px) + clamp(32px,9.4vw,48px) + 16px);
+}
+#hurt{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(200,0,0,0) 40%,rgba(200,0,0,.55));opacity:0;transition:opacity .35s}
+#hurt.on{opacity:1;transition:none}
+.slot .cnt{left:auto;top:auto;right:3px;bottom:1px;font-size:11px;font-weight:600;color:var(--ink);text-shadow:0 1px 0 #000}
+#invUI{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,12,8,.6);overflow-y:auto;touch-action:pan-y;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+}
+.invcard{
+  width:100%;max-width:820px;margin:auto;background:var(--earth);border-top:8px solid var(--stone);border-radius:4px;
+  padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:0 18px 50px rgba(0,0,0,.55);
+}
+.invhead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.invcard h2,.invcard h3{margin:0;font-family:var(--display);font-weight:600}
+.invcard h2{font-size:26px}
+.invcard h3{font-size:18px;margin-bottom:8px}
+.invcols{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.grid{display:grid;grid-template-columns:repeat(9,auto);gap:3px;justify-content:start}
+.grid .slot{--s:clamp(28px,8.4vw,44px)}
+#invHot{margin-top:10px}
+#craft{flex:1 1 240px;min-width:0}
+#recipes{display:flex;flex-direction:column;gap:4px;max-height:min(52vh,420px);overflow-y:auto}
+.rec{
+  display:flex;align-items:center;gap:10px;text-align:left;font-family:var(--mono);font-size:12px;color:var(--ink);
+  background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.14);border-radius:4px;padding:4px 8px;cursor:pointer;
+}
+.rec img{width:28px;height:28px;image-rendering:pixelated;flex:none}
+.rec b{font-weight:600;display:block}
+.rec small{color:var(--muted)}
+.rec[disabled]{opacity:.42;cursor:default}
+.rec:not([disabled]):hover{border-color:var(--gold)}
+#handIcon{position:fixed;width:36px;height:36px;pointer-events:none;transform:translate(-50%,-50%);z-index:5}
+#handIcon img{width:100%;height:100%;image-rendering:pixelated}
+#handIcon span{position:absolute;right:-2px;bottom:-4px;font-weight:600;text-shadow:0 1px 0 #000}
+#dead{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(120,0,0,.45);text-align:center}
+#dead h1{margin:0;font-family:var(--display);font-size:clamp(40px,10vw,64px);text-shadow:0 4px 0 #000}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}}
 </style>
 </head>
@@ -149,16 +188,36 @@ select{
 <div id="cross" aria-hidden="true"></div>
 <div id="toast" role="status"></div>
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
+<canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
+<div id="hurt"></div>
 
 <div id="touch" hidden>
   <div id="joy" aria-label="Move stick"><div id="knob"></div></div>
   <div id="tbtns">
+    <button class="tb" id="bBag" type="button">Bag</button>
     <button class="tb" id="bMode" type="button">Break</button>
     <button class="tb" id="bFly" type="button">Fly</button>
     <button class="tb" id="bDown" type="button" hidden>Down</button>
     <button class="tb" id="bJump" type="button">Jump</button>
   </div>
   <button class="tb" id="bPause" type="button" aria-label="Pause">II</button>
+</div>
+
+<div id="invUI" hidden>
+  <div class="invcard">
+    <div class="invhead"><h2 id="invTitle">Backpack</h2><button id="invClose" class="btn small" type="button">Done</button></div>
+    <div class="invcols">
+      <div><div id="invGrid" class="grid"></div><div id="invHot" class="grid" aria-label="Hotbar"></div></div>
+      <div id="craft"><h3>Crafting</h3><div id="recipes"></div></div>
+    </div>
+    <p class="meta" id="invHint" style="margin:0;line-height:1.5"></p>
+  </div>
+</div>
+<div id="handIcon" hidden><img alt=""><span></span></div>
+<div id="dead" hidden>
+  <h1>You died!</h1>
+  <p class="lede">Your backpack is safe. You'll start again at your spawn point.</p>
+  <button id="respawn" class="btn primary" type="button">Respawn</button>
 </div>
 
 <div id="overlay">
@@ -175,6 +234,8 @@ select{
       <dt>Place</dt><dd>Right click</dd>
       <dt>Copy block</dt><dd>Middle click puts the targeted block in your hand</dd>
       <dt>Pick block</dt><dd><kbd>1</kbd>–<kbd>9</kbd> or mouse wheel</dd>
+      <dt>Backpack</dt><dd><kbd>E</kbd> opens your inventory and crafting</dd>
+      <dt>Eat</dt><dd>Right click while holding food (Survival)</dd>
       <dt>Sound</dt><dd><kbd>M</kbd> mutes</dd>
       <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
     </dl>
@@ -184,10 +245,18 @@ select{
       <dt>Dig / build</dt><dd>Tap the screen to break or place the block under the crosshair. Switch with the Break / Place button.</dd>
       <dt>Jump, Fly</dt><dd>Buttons on the right</dd>
       <dt>Pick block</dt><dd>Tap a hotbar slot</dd>
+      <dt>Bag</dt><dd>Backpack and crafting. In Survival, hold on a block to dig it.</dd>
     </dl>
     <p class="lede">Dig all the way through the bedrock at the bottom and you fall out of the sky on the other side of the world.</p>
 
     <div class="divider"></div>
+    <div class="row">
+      <label for="gm">Game mode</label>
+      <select id="gm">
+        <option value="c">Creative: fly, endless blocks</option>
+        <option value="s">Survival: health, hunger, crafting</option>
+      </select>
+    </div>
     <div class="row">
       <label for="rd">View distance</label>
       <select id="rd">
@@ -225,9 +294,9 @@ let TOUCH = matchMedia('(pointer: coarse)').matches;
 
 /* ---------- blocks ---------- */
 const CS = 16, H = 64, PH = H + 2, PX = CS + 2, WATER = 26;
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19;
 const T = {GRASS_TOP:0, GRASS_SIDE:1, DIRT:2, STONE:3, SAND:4, WATER:5, LOG_SIDE:6, LOG_TOP:7, LEAVES:8, PLANKS:9, COBBLE:10, GLASS:11, BRICK:12, BEDROCK:13, COAL:14,
-  IRON:15, SNOW:16, SNOW_SIDE:17, TNT_SIDE:18, TNT_TOP:19, TNT_BOTTOM:20, SBRICK:21, WOOL:22};
+  IRON:15, SNOW:16, SNOW_SIDE:17, TNT_SIDE:18, TNT_TOP:19, TNT_BOTTOM:20, SBRICK:21, WOOL:22, TORCH:23};
 const BLOCKS = [];
 const def = (id, n, top, bottom = top, side = top) => BLOCKS[id] = {n, t: [top, bottom, side]};
 def(GRASS, 'Grass', T.GRASS_TOP, T.DIRT, T.GRASS_SIDE);
@@ -248,11 +317,13 @@ def(SNOW, 'Snow', T.SNOW, T.DIRT, T.SNOW_SIDE);
 def(TNT, 'TNT', T.TNT_TOP, T.TNT_BOTTOM, T.TNT_SIDE);
 def(SBRICK, 'Stone bricks', T.SBRICK);
 def(WOOL, 'Wool', T.WOOL);
+def(TORCH, 'Torch', T.TORCH);
 
 const NB = 32, SOLID = new Uint8Array(NB), TRANSP = new Uint8Array(NB), AOS = new Uint8Array(NB);
 for (let i = 1; i < NB; i++) { SOLID[i] = i !== WATERB ? 1 : 0; AOS[i] = (i !== WATERB && i !== GLASS) ? 1 : 0; }
-TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = 1;
-const DEFAULT_HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, GLASS, SBRICK, TNT];
+TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = TRANSP[TORCH] = 1;
+SOLID[TORCH] = AOS[TORCH] = 0;
+const DEFAULT_HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, GLASS, TORCH, TNT];
 
 /* ---------- textures (procedural 16px tiles in an 8x8 atlas) ---------- */
 const ATL = 8, atlas = document.createElement('canvas');
@@ -341,6 +412,11 @@ tile(T.TNT_SIDE, () => (x, y, r) => {
 tile(T.TNT_TOP, () => (x, y, r) => (x > 5 && x < 10 && y > 5 && y < 10) ? J([46, 46, 46], r, 8) : J([196, 64, 46], r, 16));
 tile(T.TNT_BOTTOM, () => (x, y, r) => J([176, 50, 38], r, 16));
 tile(T.SBRICK, () => (x, y, r) => (y % 8 === 7 || x === ((y >> 3) % 2 ? 7 : 15)) ? J([86, 86, 88], r, 8) : J([134, 134, 136], r, 14));
+tile(T.TORCH, () => (x, y, r) => {
+  if (x < 7 || x > 8 || y < 6) return [0, 0, 0, 0];
+  if (y < 8) return y === 6 ? [255, 238, 150] : [255, 184, 60];
+  return J([120, 88, 50], r, 14);
+});
 tile(T.WOOL, () => (x, y, r) => (x + y * 3) % 5 === 0 ? J([214, 214, 210], r, 8) : J([236, 236, 232], r, 12));
 
 // average colour per tile (for break particles)
@@ -479,7 +555,7 @@ function genData(cx, cz) {
 function getChunk(cx, cz) {
   const k = ck(cx, cz);
   let c = chunks.get(k);
-  if (!c) { c = {cx, cz, data: genData(cx, cz), mesh: null, water: null, built: false, dirty: false}; chunks.set(k, c); }
+  if (!c) { c = {cx, cz, data: genData(cx, cz), torches: torchSet(cx, cz), mesh: null, water: null, built: false, dirty: false}; chunks.set(k, c); }
   return c;
 }
 function getBlock(x, y, z) {
@@ -494,9 +570,13 @@ let saveDirty = false;
 function setBlock(x, y, z, b) {
   if (y < 0 || y >= H) return false;
   const cx = Math.floor(x / CS), cz = Math.floor(z / CS), lx = x - cx * CS, lz = z - cz * CS;
-  const c = getChunk(cx, cz), i = idxOf(lx, y, lz);
-  if (c.data[i] === b) return false;
+  const c = getChunk(cx, cz), i = idxOf(lx, y, lz), old = c.data[i];
+  if (old === b) return false;
   c.data[i] = b;
+  if (old === TORCH || b === TORCH) {
+    if (b === TORCH) c.torches.add(i); else c.torches.delete(i);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) markDirty(cx + dx, cz + dz);
+  }
   const k = ck(cx, cz);
   if (!edits.has(k)) edits.set(k, new Map());
   edits.get(k).set(i, b);
@@ -555,13 +635,14 @@ function drawFace(b, nb) {
 }
 function buildChunk(c) {
   fillPad(c.cx, c.cz);
-  const o = {p: [], u: [], c: [], i: []}, w = {p: [], u: [], c: [], i: []};
-  const ox = c.cx * CS, oz = c.cz * CS, ao = [0, 0, 0, 0];
+  const o = {p: [], u: [], c: [], i: [], l: []}, w = {p: [], u: [], c: [], i: []};
+  const ox = c.cx * CS, oz = c.cz * CS, ao = [0, 0, 0, 0], near = nearTorches(c);
   for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
     const col = PH * ((x + 1) + PX * (z + 1)) + 1;
     for (let y = 0; y < H; y++) {
       const pi = col + y, b = pad[pi];
       if (!b) continue;
+      if (b === TORCH) { emitTorch(o, ox + x, y, oz + z); continue; }
       const isW = b === WATERB, g = isW ? w : o, tiles = BLOCKS[b].t;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f];
@@ -579,8 +660,9 @@ function buildChunk(c) {
             sl = (litAt(ni) + litAt(ni + A[0]) + litAt(ni + A[1]) + litAt(ni + A[2])) / 4;
           }
           ao[k] = a;
-          const l = F.shade * AOL[a] * (.2 + .8 * sl);
+          const l = F.shade * AOL[a];
           g.c.push(l, l, l);
+          if (!isW) g.l.push(sl, near.length ? torchLight(near, ox + x + cv[0], yy, oz + z + cv[2], F.n) : 0);
           g.u.push(k === 0 || k === 3 ? uv[0] : uv[1], k < 2 ? uv[2] : uv[3]);
         }
         if (ao[0] + ao[2] >= ao[1] + ao[3]) g.i.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
@@ -600,6 +682,7 @@ function makeMesh(g, mat) {
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(g.p), 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.u), 2));
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(g.c), 3));
+  if (g.l) geo.setAttribute('lt', new THREE.BufferAttribute(new Float32Array(g.l), 2));
   geo.setIndex(new THREE.BufferAttribute(new Uint32Array(g.i), 1));
   const m = new THREE.Mesh(geo, mat);
   m.matrixAutoUpdate = false;
@@ -630,6 +713,14 @@ scene.fog = new THREE.Fog(0x87b9f0, 40, 90);
 const tex = new THREE.CanvasTexture(atlas);
 tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
 const matOpaque = new THREE.MeshBasicMaterial({map: tex, vertexColors: true, alphaTest: .5});
+// light = brighter of sky light (dimmed by time of day) and warm torch light, baked per vertex
+const dayU = {value: 1};
+matOpaque.onBeforeCompile = sh => {
+  sh.uniforms.uDay = dayU;
+  sh.vertexShader = 'attribute vec2 lt;\nvarying vec2 vLt;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vLt = lt;');
+  sh.fragmentShader = 'uniform float uDay;\nvarying vec2 vLt;\n' + sh.fragmentShader.replace('#include <color_fragment>',
+    '#include <color_fragment>\n  diffuseColor.rgb *= max(max(vec3(vLt.x * uDay), vLt.y * vec3(1., .88, .66)), vec3(.1));');
+};
 const matWater = new THREE.MeshBasicMaterial({map: tex, vertexColors: true, transparent: true, opacity: .72, depthWrite: false, side: THREE.DoubleSide});
 const highlight = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
   new THREE.LineBasicMaterial({color: 0x000000, transparent: true, opacity: .55}));
@@ -663,7 +754,10 @@ function burst(x, y, z, b, col) {
 /* ---------- player ---------- */
 const HW = .3, PHGT = 1.8, EYE = 1.62, DAY = 600;
 const P = {x: 0, y: 40, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: -.15, onGround: false, fly: false};
-let tod = .08, hotbar = DEFAULT_HOTBAR.slice(), sel = 0, RD = TOUCH ? 4 : 6;
+let tod = .08, sel = 0, RD = TOUCH ? 4 : 6, mode = 'c'; // mode: 'c' creative, 's' survival
+let invs = {c: creativeInv(), s: Array(36).fill(null)}, inv = invs.c, hand = null, invOpen = false, dead = false, spawnPt = null;
+const st = {hp: 20, food: 20, air: 10, ex: 0, regen: 0, starve: 0, drown: 0, inv: 0, fallY: null, noFall: false};
+const mine = {on: false, x: 0, y: 0, z: 0, p: 0, snd: 0};
 const keys = {};
 const joy = {x: 0, y: 0};
 let hitWall = false, wasWater = false, stepAcc = 0, shake = 0, trips = 0;
@@ -673,6 +767,7 @@ const FAR = 12000;
 function otherSide() {
   P.x += P.x > FAR / 2 ? -FAR : FAR; P.z = -P.z;
   P.y = H + 30; P.vx = P.vz = 0; P.vy = -4; trips++;
+  st.noFall = true; st.fallY = null;
   noise(1.6, 'bandpass', 250, 1.2, 1.2, null, 2600);
   toast('You came out the other side of the world!', 3500);
   saveDirty = true;
@@ -706,7 +801,7 @@ function physics(dt) {
   const len = Math.hypot(ix, iz); if (len > 1) { ix /= len; iz /= len; }
   const s = Math.sin(P.yaw), c = Math.cos(P.yaw);
   const wx = ix * c - iz * s, wz = -ix * s - iz * c;
-  const sprint = !P.fly && (keys.ShiftLeft || keys.ShiftRight);
+  const sprint = !P.fly && (keys.ShiftLeft || keys.ShiftRight) && !(mode === 's' && st.food <= 6);
   const jump = keys.Space || keys.touchJump, down = keys.ShiftLeft || keys.ShiftRight || keys.touchDown;
   const speed = P.fly ? 11 : inWater ? 3 : sprint ? 5.8 : 4.3;
   const acc = P.fly ? 8 : P.onGround ? 14 : inWater ? 6 : 5;
@@ -721,8 +816,8 @@ function physics(dt) {
     P.vy = Math.max(-3.5, Math.min(3.5, P.vy));
   } else {
     P.vy -= 30 * dt;
-    if (jump && P.onGround) P.vy = 8.6;
-    P.vy = Math.max(P.vy, -55);
+    if (jump && P.onGround) { P.vy = 8.6; exhaust(sprint ? .2 : .05); }
+    P.vy = Math.max(P.vy, st.noFall ? -16 : -55);
   }
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(P.vx), Math.abs(P.vy), Math.abs(P.vz)) * dt / .3));
   const h = dt / steps;
@@ -730,6 +825,8 @@ function physics(dt) {
   P.onGround = false; hitWall = false;
   for (let i = 0; i < steps; i++) { moveAxis('x', P.vx * h); moveAxis('z', P.vz * h); moveAxis('y', P.vy * h); }
   if (P.y < -4) otherSide();
+  if (mode === 's') survivalMove(dt, inWater, sprint);
+  if (P.onGround || inWater || P.fly) st.noFall = false;
   if (inWater && !wasWater && P.vy < -3) noise(.5, 'lowpass', 1400, .7, .7, null, 300);
   wasWater = inWater;
   if (P.onGround && !P.fly && !inWater) {
@@ -768,28 +865,31 @@ function updateTarget() {
   if (target) highlight.position.set(target.x + .5, target.y + .5, target.z + .5);
 }
 function act(button) {
+  if (dead) return;
+  const s = inv[sel];
   if (button === 0) {
     const reach = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) - .4 : 4;
     const m = mobHit(Math.min(4, reach));
-    if (m) { hurtMob(m); return; }
+    if (m) { hurtMob(m, mode === 'c' ? 5 : damageOf(), true); exhaust(.1); return; }
   }
+  if (button === 2 && s && ITEMS[s.id] && ITEMS[s.id].food) { eat(s); return; }
   if (!target) return;
   if (button === 0) {
     const {x, y, z, b} = target;
     if (b === TNT) { setBlock(x, y, z, AIR); igniteTNT(x, y, z, 3); toast('Run!'); return; }
-    if (setBlock(x, y, z, AIR)) {
-      burst(x, y, z, b); blockSfx('break', b, x, y, z);
-      if (y === 0) toast('A hole in the bottom of the world… jump in!', 3000);
-    }
+    if (mode === 'c') breakBlock(x, y, z);
   } else if (button === 2) {
-    const {px, py, pz} = target, b = hotbar[sel];
+    if (!s || s.id >= 64) return;
+    const {px, py, pz} = target, b = s.id;
     if (py < 0 || py >= H) return;
     if (SOLID[b] && px + 1 > P.x - HW && px < P.x + HW && pz + 1 > P.z - HW && pz < P.z + HW && py + 1 > P.y && py < P.y + PHGT) return;
-    if (setBlock(px, py, pz, b)) blockSfx('place', b, px, py, pz);
+    if (b === TORCH && !SOLID[getBlock(px, py - 1, pz)]) { toast('Torches need a block under them'); return; }
+    if (setBlock(px, py, pz, b)) { blockSfx('place', b, px, py, pz); if (mode === 's') use1(sel); }
   } else if (button === 1) {
     if (target.b === BEDROCK) return;
-    const at = hotbar.indexOf(target.b);
-    if (at >= 0) selectSlot(at); else { hotbar[sel] = target.b; renderHotbar(); selectSlot(sel); saveDirty = true; }
+    const at = inv.slice(0, 9).findIndex(t => t && t.id === target.b);
+    if (at >= 0) selectSlot(at);
+    else if (mode === 'c') { inv[sel] = {id: target.b, n: 1}; renderHotbar(); selectSlot(sel); saveDirty = true; }
   }
 }
 
@@ -828,12 +928,12 @@ function resetWorld() {
 const SKY_DAY = new THREE.Color(0x8cc0f2), SKY_NIGHT = new THREE.Color(0x0b1028), SKY_DUSK = new THREE.Color(0xf0935c), WATER_FOG = new THREE.Color(0x1d3f8a);
 const sky = new THREE.Color(), sunDir = new THREE.Vector3();
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-let headInWater = false;
+let headInWater = false, skyLight = 1, dayAmt = 1;
 function updateSky() {
   const a = tod * Math.PI * 2, sh = Math.sin(a);
   const day = smooth(-.15, .25, sh), light = .3 + .7 * day;
   sky.copy(SKY_NIGHT).lerp(SKY_DAY, day).lerp(SKY_DUSK, Math.max(0, 1 - Math.abs(sh) / .3) * .45);
-  matOpaque.color.setScalar(light); matWater.color.setScalar(light);
+  dayU.value = light; skyLight = light; dayAmt = day; matWater.color.setScalar(light);
   lightA.intensity = .5 * light; lightD.intensity = .55 * light;
   if (headInWater) {
     scene.fog.color.copy(WATER_FOG).multiplyScalar(light); scene.background = scene.fog.color;
@@ -856,21 +956,24 @@ function toast(msg, ms = 1300) {
 }
 function renderHotbar() {
   hotbarEl.textContent = '';
-  hotbar.forEach((b, i) => {
-    const s = document.createElement('button');
-    s.type = 'button'; s.className = 'slot' + (i === sel ? ' sel' : ''); s.id = 'slot' + i;
-    s.setAttribute('aria-label', `Slot ${i + 1}: ${BLOCKS[b].n}`);
-    const img = document.createElement('img'); img.src = blockIcon(b); img.alt = '';
-    const n = document.createElement('span'); n.textContent = i + 1;
-    s.append(img, n);
-    s.addEventListener('pointerdown', e => { e.stopPropagation(); selectSlot(i); });
-    hotbarEl.append(s);
-  });
+  for (let i = 0; i < 9; i++) {
+    const it = inv[i], sl = document.createElement('button');
+    sl.type = 'button'; sl.className = 'slot' + (i === sel ? ' sel' : ''); sl.id = 'slot' + i;
+    sl.setAttribute('aria-label', `Slot ${i + 1}: ${it ? nameOf(it.id) + (mode === 's' ? ' ×' + it.n : '') : 'empty'}`);
+    if (it) {
+      const img = document.createElement('img'); img.src = iconURL(it.id); img.alt = ''; sl.append(img);
+      if (mode === 's' && it.n > 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = it.n; sl.append(c); }
+    }
+    const n = document.createElement('span'); n.textContent = i + 1; sl.append(n);
+    sl.addEventListener('pointerdown', e => { e.stopPropagation(); selectSlot(i); });
+    hotbarEl.append(sl);
+  }
 }
 function selectSlot(i) {
   sel = (i + 9) % 9;
-  [...hotbarEl.children].forEach((s, j) => s.classList.toggle('sel', j === sel));
-  toast(BLOCKS[hotbar[sel]].n);
+  [...hotbarEl.children].forEach((sl, j) => sl.classList.toggle('sel', j === sel));
+  const it = inv[sel];
+  toast(it ? nameOf(it.id) : 'Empty hand');
 }
 function clock() {
   const t = (6 + tod * 24) % 24, h = Math.floor(t), m = Math.floor((t - h) * 60);
@@ -878,7 +981,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${clock()}${P.fly ? '  · flying' : ''}${Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
 }
 
 /* ---------- save / load ---------- */
@@ -887,7 +990,8 @@ let lastSave = 0;
 function serialize() {
   const e = {};
   for (const [k, m] of edits) e[k] = [...m];
-  return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, hotbar, sel, rd: RD, snd: S.on};
+  return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
+    mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -904,6 +1008,7 @@ function spawn() {
     if (h <= WATER + 1) continue;
     if (getBlock(x, h + 1, z) !== AIR || getBlock(x, h + 2, z) !== AIR) continue;
     P.x = x + .5; P.z = z + .5; P.y = h + 1; P.vx = P.vy = P.vz = 0;
+    spawnPt = [P.x, P.y, P.z];
     return;
   }
   P.x = 8.5; P.z = 8.5; P.y = H - 4; P.fly = true;
@@ -913,7 +1018,13 @@ function applySave(s) {
   if (s && typeof s.seed === 'number') {
     SEED = s.seed;
     for (const k in s.edits || {}) edits.set(Number(k), new Map(s.edits[k]));
-    if (Array.isArray(s.hotbar) && s.hotbar.length === 9 && s.hotbar.every(b => BLOCKS[b])) hotbar = s.hotbar.slice();
+    invs = {c: creativeInv(), s: Array(36).fill(null)};
+    if (s.invs) { invs.c = unpackInv(s.invs.c) || invs.c; invs.s = unpackInv(s.invs.s) || invs.s; }
+    else if (Array.isArray(s.hotbar)) s.hotbar.forEach((b, i) => { if (i < 9 && BLOCKS[b]) invs.c[i] = {id: b, n: 1}; });
+    mode = s.mode === 's' ? 's' : 'c'; inv = invs[mode];
+    if (typeof s.hp === 'number') st.hp = Math.max(1, Math.min(20, s.hp | 0));
+    if (typeof s.food === 'number') st.food = Math.max(0, Math.min(20, s.food | 0));
+    if (Array.isArray(s.spawn) && s.spawn.length === 3) spawnPt = s.spawn;
     sel = (s.sel | 0) % 9;
     if ([3, 4, 6, 8].includes(s.rd)) RD = s.rd;
     if (typeof s.tod === 'number') tod = s.tod;
@@ -928,7 +1039,9 @@ function applySave(s) {
 function newWorld() {
   resetWorld(); edits.clear(); clearMobs();
   SEED = Math.floor(Math.random() * 1e6);
-  tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; hotbar = DEFAULT_HOTBAR.slice(); sel = 0;
+  tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
+  invs = {c: creativeInv(), s: Array(36).fill(null)}; inv = invs[mode];
+  Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false});
   spawn(); renderHotbar(); refreshMeta(); persist();
 }
 function refreshMeta() {
@@ -936,6 +1049,7 @@ function refreshMeta() {
   $('#rd').value = String(RD);
   $('#bFly').classList.toggle('on', P.fly); $('#bDown').hidden = !P.fly;
   $('#snd').textContent = S.on ? 'Sound on' : 'Sound off';
+  $('#gm').value = mode; $('#stats').hidden = mode !== 's'; statsKey = '';
 }
 function toggleSound() {
   S.on = !S.on; if (S.on) audio();
@@ -972,7 +1086,7 @@ $('#play').addEventListener('click', () => {
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   if (locked) startPlaying(false);
-  else if (playing && !dragMode) pause();
+  else if (playing && !dragMode && !invOpen && !dead) pause();
 });
 document.addEventListener('pointerlockerror', () => startPlaying(true));
 
@@ -990,12 +1104,13 @@ document.addEventListener('mousemove', e => {
 });
 let mdrag = null;
 canvas.addEventListener('mousedown', e => {
-  if (!playing) return;
-  if (locked) { act(e.button); held = {b: e.button, t: .3}; }
-  else if (dragMode) mdrag = {b: e.button, dist: 0};
+  if (!playing || invOpen || dead) return;
+  if (locked) { act(e.button); if (e.button === 0 && mode === 's') mine.on = true; else held = {b: e.button, t: .3}; }
+  else if (dragMode) { mdrag = {b: e.button, dist: 0}; if (e.button === 0 && mode === 's') mine.on = true; }
+  else requestLock();
 });
 addEventListener('mouseup', e => {
-  held = null;
+  held = null; mine.on = false;
   if (mdrag) { if (mdrag.dist < 6) act(mdrag.b); mdrag = null; }
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -1008,6 +1123,8 @@ canvas.addEventListener('wheel', e => {
 let lastSpace = 0;
 addEventListener('keydown', e => {
   if (!playing) return;
+  if (invOpen) { if (!e.repeat && (e.code === 'KeyE' || e.code === 'Escape')) closeInv(e.code === 'KeyE'); return; }
+  if (dead) return;
   if (e.code === 'Space') {
     e.preventDefault();
     if (!e.repeat) {
@@ -1020,19 +1137,21 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.code === 'KeyF') toggleFly();
   if (e.code === 'KeyM') toggleSound();
+  if (e.code === 'KeyE') openInv();
   if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code[5] - 1);
   if (e.code === 'Escape' && !locked) pause();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; held = null; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; held = null; mine.on = false; });
 function toggleFly() {
+  if (mode === 's') { toast('Flying is for Creative mode'); return; }
   P.fly = !P.fly; if (!P.fly) P.vy = 0;
   toast(P.fly ? 'Flying' : 'Walking');
   $('#bFly').classList.toggle('on', P.fly); $('#bDown').hidden = !P.fly;
 }
 
 // touch
-let mode = 0; // 0 = break, 2 = place
+let tmode = 0; // 0 = break, 2 = place
 const touchLook = new Map();
 function enableTouch() {
   TOUCH = true;
@@ -1041,8 +1160,10 @@ function enableTouch() {
 canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'mouse') return;
   if (!TOUCH) enableTouch();
-  if (!playing) return;
-  touchLook.set(e.pointerId, {x: e.clientX, y: e.clientY, t: performance.now(), dist: 0});
+  if (!playing || invOpen || dead) return;
+  const t = {x: e.clientX, y: e.clientY, t: performance.now(), dist: 0, mining: false, timer: 0};
+  if (mode === 's' && tmode === 0) t.timer = setTimeout(() => { if (t.dist < 10 && touchLook.get(e.pointerId) === t) { t.mining = true; mine.on = true; } }, 220);
+  touchLook.set(e.pointerId, t);
 });
 canvas.addEventListener('pointermove', e => {
   const t = touchLook.get(e.pointerId);
@@ -1054,11 +1175,12 @@ canvas.addEventListener('pointermove', e => {
 const endTouch = e => {
   const t = touchLook.get(e.pointerId);
   if (!t) return;
-  touchLook.delete(e.pointerId);
-  if (playing && t.dist < 10 && performance.now() - t.t < 350) act(mode);
+  touchLook.delete(e.pointerId); clearTimeout(t.timer);
+  if (t.mining) mine.on = false;
+  else if (playing && t.dist < 10 && performance.now() - t.t < 350) act(tmode);
 };
 canvas.addEventListener('pointerup', endTouch);
-canvas.addEventListener('pointercancel', e => touchLook.delete(e.pointerId));
+canvas.addEventListener('pointercancel', e => { touchLook.delete(e.pointerId); mine.on = false; });
 
 const joyEl = $('#joy'), knob = $('#knob');
 let joyId = null;
@@ -1083,10 +1205,10 @@ holdBtn($('#bJump'), 'touchJump');
 holdBtn($('#bDown'), 'touchDown');
 $('#bFly').addEventListener('click', toggleFly);
 $('#bMode').addEventListener('click', () => {
-  mode = mode === 0 ? 2 : 0;
-  $('#bMode').textContent = mode === 0 ? 'Break' : 'Place';
-  $('#bMode').classList.toggle('on', mode === 2);
-  toast(mode === 0 ? 'Tap to break' : 'Tap to place');
+  tmode = tmode === 0 ? 2 : 0;
+  $('#bMode').textContent = tmode === 0 ? 'Break' : 'Place';
+  $('#bMode').classList.toggle('on', tmode === 2);
+  toast(tmode === 2 ? 'Tap to place or eat' : mode === 's' ? 'Hold to dig' : 'Tap to break');
 });
 $('#bPause').addEventListener('click', pause);
 
@@ -1174,13 +1296,13 @@ function part(g, c, w, h, d, x, y, z) { const m = new THREE.Mesh(boxG, mmat(c));
 function leg(g, c, w, h, x, z) { const p = new THREE.Group(); p.position.set(x, h, z); part(p, c, w, h, w, 0, -h / 2, 0); g.add(p); return p; }
 function eyes(g, y, z, dx) { part(g, 0x141414, .07, .07, .02, -dx, y, z); part(g, 0x141414, .07, .07, .02, dx, y, z); }
 const KINDS = {
-  pig: {hw: .42, h: .9, speed: 1.4, hp: 4, col: 0xf0a3a0, build(g) {
+  pig: {hw: .42, h: .9, speed: 1.4, hp: 10, hurtF: 620, col: 0xf0a3a0, build(g) {
     const c = this.col;
     part(g, c, .62, .5, 1, 0, .57, 0); part(g, c, .5, .48, .46, 0, .7, -.66);
     part(g, 0xe48686, .26, .16, .08, 0, .63, -.92); eyes(g, .8, -.9, .14);
     return [leg(g, c, .2, .32, -.18, -.3), leg(g, c, .2, .32, .18, .3), leg(g, c, .2, .32, .18, -.3), leg(g, c, .2, .32, -.18, .3)];
   }, say(at) { tone(330, 210, .16, .22, 'sawtooth', at); tone(300, 200, .14, .18, 'sawtooth', at, .2); }},
-  sheep: {hw: .42, h: 1.25, speed: 1.2, hp: 4, col: 0xeeeeea, build(g) {
+  sheep: {hw: .42, h: 1.25, speed: 1.2, hp: 8, hurtF: 700, col: 0xeeeeea, build(g) {
     const c = this.col, sk = 0xd8b597;
     part(g, c, .74, .62, 1.06, 0, .9, 0); part(g, sk, .38, .4, .4, 0, 1.06, -.66);
     part(g, c, .46, .2, .34, 0, 1.28, -.6); eyes(g, 1.12, -.87, .1);
@@ -1227,14 +1349,23 @@ function moveMob(m, K, a, d) {
   return true;
 }
 function updateMobs(dt) {
-  if (mobs.length < 10 && (spawnT -= dt) <= 0) { spawnT = 1.5; trySpawn(); }
+  if ((spawnT -= dt) <= 0) {
+    spawnT = 1.5;
+    let pass = 0, host = 0;
+    for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
+    if (pass < 8) trySpawn();
+    if (mode === 's' && host < 5 && !dead) trySpawnZombie();
+  }
   const fl = Math.floor;
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i], K = KINDS[m.kind], dx = m.x - P.x, dz = m.z - P.z;
     if (dx * dx + dz * dz > 90 * 90 || m.y < -10) { removeMob(i); continue; }
     m.t -= dt; m.flee -= dt;
-    if (m.flee > 0) {
-      if (m.t <= 0) { m.yaw = Math.atan2(-dx, -dz) + Math.PI + (Math.random() - .5) * 1.4; m.t = .7; }
+    if (K.hostile) {
+      if (mode !== 's') { removeMob(i); continue; }
+      zombieThink(m, dt);
+    } else if (m.flee > 0) {
+      if (m.t <= 0) { m.yaw = Math.atan2(-dx, -dz) + (Math.random() - .5) * 1.4; m.t = .7; }
       m.walk = true;
     } else if (m.t <= 0) {
       m.walk = Math.random() < .55; m.yaw = Math.random() * 6.283; m.t = 2 + Math.random() * 4;
@@ -1253,7 +1384,7 @@ function updateMobs(dt) {
     const v = Math.hypot(m.vx, m.vz);
     m.ph += dt * v * 5;
     const sw = Math.sin(m.ph) * Math.min(.7, v * .5);
-    m.legs.forEach((l, j) => { l.rotation.x = j < 2 ? sw : -sw; });
+    m.legs.forEach((l, j) => { l.rotation.x = (K.biped ? j % 2 === 0 : j < 2) ? sw : -sw; });
     m.g.position.set(m.x, m.y, m.z); m.g.rotation.y = m.ry;
   }
 }
@@ -1278,11 +1409,14 @@ function killMob(m) {
   burst(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), 0, new THREE.Color(KINDS[m.kind].col));
   noise(.25, 'lowpass', 700, .7, .6, [m.x, m.y, m.z]);
   removeMob(i);
+  if (mode === 's' && KINDS[m.kind].drop) KINDS[m.kind].drop();
 }
-function hurtMob(m) {
-  m.hp--; m.flee = 5; m.t = 0;
-  m.vx += dirV.x * 6; m.vz += dirV.z * 6; m.vy = 5;
-  tone(m.kind === 'pig' ? 620 : 700, 300, .18, .25, 'square', [m.x, m.y + 1, m.z]);
+function hurtMob(m, dmg = 1, byPlayer = false) {
+  const K = KINDS[m.kind];
+  m.hp -= dmg;
+  if (!K.hostile) { m.flee = 5; m.t = 0; }
+  if (byPlayer) { m.vx += dirV.x * 6; m.vz += dirV.z * 6; m.vy = 5; }
+  tone(K.hurtF, K.hurtF / 2, .18, .25, 'square', [m.x, m.y + 1, m.z]);
   if (m.hp <= 0) killMob(m);
 }
 
@@ -1305,7 +1439,7 @@ function updateTNT(dt) {
     if (SOLID[getBlock(Math.floor(e.x), Math.floor(ny), Math.floor(e.z))]) { e.y = Math.max(e.y, Math.floor(ny) + 1); e.vy = 0; } else e.y = ny;
     const flash = Math.floor(e.t * 5) % 2 === 0, s = e.t < .5 ? 1 + (.5 - e.t) * .35 : 1;
     e.m.position.set(e.x, e.y + .5, e.z); e.m.scale.setScalar(s);
-    for (const mm of e.m.material) mm.color.setScalar(flash ? 2 : matOpaque.color.r);
+    for (const mm of e.m.material) mm.color.setScalar(flash ? 2 : skyLight);
     if (e.t <= 0 || e.y < -20) {
       scene.remove(e.m); e.m.material.forEach(mm => mm.dispose()); tnts.splice(i, 1);
       if (e.y > -20) explode(e.x, e.y + .5, e.z);
@@ -1327,12 +1461,449 @@ function explode(cx, cy, cz) {
   noise(1.4, 'lowpass', 1000, .7, 1.8, [cx, cy, cz], 90);
   tone(80, 28, 1, .8, 'sine', [cx, cy, cz]);
   const px = P.x - cx, py = P.y + .9 - cy, pz = P.z - cz, pd = Math.hypot(px, py, pz);
+  if (pd < 6) hurtPlayer(Math.round((6 - pd) * 3));
   if (pd < 7) {
     const f = (7 - pd) * 2.2 / Math.max(pd, .5);
     P.vx += px * f; P.vz += pz * f; P.vy = Math.min(14, Math.max(P.vy, 0) + py * f + 4); P.onGround = false;
   }
   shake = Math.max(shake, 1 - pd / 24);
   for (const m of mobs.slice()) if (Math.hypot(m.x - cx, m.y - cy, m.z - cz) < 5) killMob(m);
+}
+
+/* ---------- items ---------- */
+const STICK = 64, COALI = 65, RAWIRON = 66, IRONI = 67, APPLE = 68, PORK = 69, CPORK = 70,
+  WPICK = 71, SPICK = 72, IPICK = 73, WSWORD = 74, SSWORD = 75, ISWORD = 76;
+const ITEMS = {};
+const item = (id, n, draw, o = {}) => ITEMS[id] = Object.assign({n, draw}, o);
+function rects(g, c, list) { g.fillStyle = c; for (const [x, y, w = 1, h = 1] of list) g.fillRect(x, y, w, h); }
+function diag(g, c, x, y, n, dx, dy, w = 2) { g.fillStyle = c; for (let i = 0; i < n; i++) g.fillRect(x + i * dx, y + i * dy, w, w); }
+const lump = (c, hi, lo) => g => { rects(g, c, [[4, 5, 8, 7], [5, 4, 6, 9], [3, 6, 10, 5]]); rects(g, hi, [[6, 6, 2, 1], [9, 8, 1, 1], [5, 8, 1, 1]]); rects(g, lo, [[5, 11, 6, 1], [11, 7, 1, 3]]); };
+const chop = (c, fat) => g => { rects(g, c, [[4, 5, 8, 6], [3, 6, 10, 4]]); rects(g, fat, [[4, 9, 8, 1], [3, 7, 1, 2]]); rects(g, '#f4f0e0', [[11, 4, 3, 2], [13, 3, 1, 1]]); };
+const pick = (c, lo) => g => { diag(g, '#7a5a32', 2, 12, 8, 1, -1); diag(g, c, 5, 2, 9, 1, 1); diag(g, lo, 6, 4, 7, 1, 1, 1); };
+const sword = (c, lo) => g => { diag(g, c, 6, 8, 8, 1, -1); diag(g, lo, 7, 9, 7, 1, -1, 1); diag(g, '#5a3a1a', 3, 7, 4, 1, 1); diag(g, '#7a5a32', 2, 12, 3, 1, -1); };
+item(STICK, 'Stick', g => { diag(g, '#6e4f2a', 3, 11, 9, 1, -1); diag(g, '#a07a45', 4, 11, 8, 1, -1, 1); });
+item(COALI, 'Coal', lump('#262628', '#5a5a60', '#141414'));
+item(RAWIRON, 'Raw iron', lump('#c49c80', '#ead0b8', '#8e6a52'));
+item(IRONI, 'Iron ingot', g => { rects(g, '#e8e8e8', [[4, 6, 8, 1]]); rects(g, '#c4c4c4', [[3, 7, 10, 3]]); rects(g, '#8e8e8e', [[3, 10, 10, 1]]); rects(g, '#ffffff', [[5, 7, 3, 1]]); });
+item(APPLE, 'Apple', g => { rects(g, '#d8352a', [[5, 5, 6, 1], [4, 6, 8, 5], [5, 11, 6, 1]]); rects(g, '#ff9080', [[6, 7, 2, 2]]); rects(g, '#5a3a1a', [[7, 3, 1, 2]]); rects(g, '#4caf3a', [[8, 3, 2, 1]]); }, {food: 4});
+item(PORK, 'Raw porkchop', chop('#f19a9a', '#fbd3d3'), {food: 3});
+item(CPORK, 'Cooked porkchop', chop('#a65a2c', '#d89a62'), {food: 8});
+item(WPICK, 'Wooden pickaxe', pick('#b08a52', '#7a5a32'), {pick: 1, dmg: 2, max: 1});
+item(SPICK, 'Stone pickaxe', pick('#9a9a9a', '#5e5e5e'), {pick: 2, dmg: 3, max: 1});
+item(IPICK, 'Iron pickaxe', pick('#eeeeee', '#a8a8a8'), {pick: 3, dmg: 4, max: 1});
+item(WSWORD, 'Wooden sword', sword('#b08a52', '#7a5a32'), {dmg: 4, max: 1});
+item(SSWORD, 'Stone sword', sword('#9a9a9a', '#5e5e5e'), {dmg: 5, max: 1});
+item(ISWORD, 'Iron sword', sword('#eeeeee', '#a8a8a8'), {dmg: 7, max: 1});
+const nameOf = id => id < 64 ? BLOCKS[id].n : ITEMS[id].n;
+const maxOf = id => id < 64 ? 64 : ITEMS[id].max || 64;
+const validId = id => (id > 0 && id < 64 && BLOCKS[id]) || ITEMS[id];
+const PALETTE = [...BLOCKS.keys()].filter(i => BLOCKS[i]).concat(Object.keys(ITEMS).map(Number));
+function outline(c) {
+  const g = c.getContext('2d'), im = g.getImageData(0, 0, 16, 16), d = im.data, a = i => d[i * 4 + 3];
+  const add = [];
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    if (a(y * 16 + x)) continue;
+    if ((x > 0 && a(y * 16 + x - 1)) || (x < 15 && a(y * 16 + x + 1)) || (y > 0 && a(y * 16 + x - 16)) || (y < 15 && a(y * 16 + x + 16))) add.push(y * 16 + x);
+  }
+  for (const i of add) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 16; d[i * 4 + 3] = 200; }
+  g.putImageData(im, 0, 0);
+}
+const iconCache = {};
+function iconURL(id) {
+  if (iconCache[id]) return iconCache[id];
+  let url;
+  if (id === TORCH) { const c = tileCanvas(T.TORCH); outline(c); url = c.toDataURL(); }
+  else if (id < 64) url = blockIcon(id);
+  else { const c = document.createElement('canvas'); c.width = c.height = 16; ITEMS[id].draw(c.getContext('2d')); outline(c); url = c.toDataURL(); }
+  return iconCache[id] = url;
+}
+const HARD = new Float32Array(NB).fill(1), NEED = new Uint8Array(NB), DROP = [];
+[[GRASS, .6], [DIRT, .5], [STONE, 1.5], [SAND, .5], [LOG, 1.4], [LEAVES, .2], [PLANKS, 1.4], [COBBLE, 1.8], [GLASS, .3], [BRICK, 2],
+  [BEDROCK, 10], [COAL, 2], [IRON, 2.4], [SNOW, .3], [TNT, 0], [SBRICK, 1.5], [WOOL, .6], [TORCH, 0]].forEach(([b, h]) => HARD[b] = h);
+for (const b of [STONE, COBBLE, BRICK, COAL, SBRICK]) NEED[b] = 1;
+NEED[IRON] = 2;
+DROP[GRASS] = DIRT; DROP[STONE] = COBBLE; DROP[COAL] = COALI; DROP[IRON] = RAWIRON; DROP[GLASS] = DROP[BEDROCK] = DROP[WATERB] = 0;
+const dropOf = b => b === LEAVES ? (Math.random() < .1 ? APPLE : 0) : DROP[b] !== undefined ? DROP[b] : b;
+const RECIPES = [
+  [PLANKS, 4, [[LOG, 1]]],
+  [STICK, 4, [[PLANKS, 2]]],
+  [WPICK, 1, [[PLANKS, 3], [STICK, 2]]],
+  [WSWORD, 1, [[PLANKS, 2], [STICK, 1]]],
+  [TORCH, 4, [[STICK, 1], [COALI, 1]]],
+  [SPICK, 1, [[COBBLE, 3], [STICK, 2]]],
+  [SSWORD, 1, [[COBBLE, 2], [STICK, 1]]],
+  [IRONI, 1, [[RAWIRON, 1], [COALI, 1]]],
+  [IPICK, 1, [[IRONI, 3], [STICK, 2]]],
+  [ISWORD, 1, [[IRONI, 2], [STICK, 1]]],
+  [CPORK, 2, [[PORK, 2], [COALI, 1]]],
+  [GLASS, 4, [[SAND, 4], [COALI, 1]]],
+  [STONE, 4, [[COBBLE, 4], [COALI, 1]]],
+  [SBRICK, 4, [[STONE, 4]]],
+  [BRICK, 4, [[DIRT, 2], [SAND, 2], [COALI, 1]]],
+  [TNT, 1, [[SAND, 4], [COALI, 2]]],
+];
+
+/* ---------- inventory ---------- */
+function creativeInv() { const a = Array(36).fill(null); DEFAULT_HOTBAR.forEach((b, i) => a[i] = {id: b, n: 1}); return a; }
+const packInv = a => a.map(s => s ? [s.id, s.n] : 0);
+function unpackInv(a) {
+  if (!Array.isArray(a) || a.length !== 36) return null;
+  return a.map(s => Array.isArray(s) && validId(s[0]) ? {id: s[0], n: Math.max(1, Math.min(maxOf(s[0]), s[1] | 0))} : null);
+}
+const countOf = id => inv.reduce((t, s) => t + (s && s.id === id ? s.n : 0), 0);
+function take(id, n) {
+  for (let i = 35; i >= 0 && n > 0; i--) {
+    const s = inv[i];
+    if (!s || s.id !== id) continue;
+    const k = Math.min(n, s.n); s.n -= k; n -= k;
+    if (!s.n) inv[i] = null;
+  }
+}
+function addRange(id, n, a, b) {
+  for (let i = a; i < b && n > 0; i++) { const s = inv[i]; if (s && s.id === id && s.n < maxOf(id)) { const k = Math.min(n, maxOf(id) - s.n); s.n += k; n -= k; } }
+  for (let i = a; i < b && n > 0; i++) if (!inv[i]) { const k = Math.min(n, maxOf(id)); inv[i] = {id, n: k}; n -= k; }
+  return n;
+}
+const addItem = (id, n) => addRange(id, n, 0, 36);
+function give(id, n) {
+  if (addItem(id, n)) toast('Backpack full');
+  tone(800 + Math.random() * 300, 1300, .07, .12, 'sine');
+  renderHotbar(); if (invOpen) renderInv(); saveDirty = true;
+}
+function use1(i) { const s = inv[i]; if (!s) return; if (--s.n <= 0) inv[i] = null; renderHotbar(); saveDirty = true; }
+const toolOf = () => { const s = inv[sel]; return s && ITEMS[s.id] ? ITEMS[s.id] : null; };
+const damageOf = () => { const t = toolOf(); return t && t.dmg ? t.dmg : 1; };
+function eat(s) {
+  if (mode !== 's') { toast('No need to eat in Creative'); return; }
+  if (st.food >= 20) { toast("You're full"); return; }
+  st.food = Math.min(20, st.food + ITEMS[s.id].food); st.ex = 0;
+  noise(.3, 'bandpass', 700, 1.5, .7); tone(160, 120, .1, .1, 'triangle');
+  toast('Ate ' + nameOf(s.id).toLowerCase());
+  use1(sel);
+}
+
+const invUI = $('#invUI'), handEl = $('#handIcon');
+function mkBtn(id, n) {
+  const s = document.createElement('button');
+  s.type = 'button'; s.className = 'slot';
+  if (id) {
+    const img = document.createElement('img'); img.src = iconURL(id); img.alt = ''; s.append(img);
+    s.title = nameOf(id); s.setAttribute('aria-label', nameOf(id) + (n > 1 ? ' ×' + n : ''));
+  } else s.setAttribute('aria-label', 'Empty');
+  if (n > 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = n; s.append(c); }
+  return s;
+}
+function mkSlot(i) {
+  const it = inv[i], s = mkBtn(it && it.id, mode === 's' && it ? it.n : 0);
+  if (i === sel) s.classList.add('sel');
+  s.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (mode === 's') slotClick(i, e);
+    else if (i < 9) { sel = i; renderInv(); renderHotbar(); }
+  });
+  return s;
+}
+function slotClick(i, e) {
+  const s = inv[i];
+  if (e.shiftKey && s && !hand) {
+    inv[i] = null;
+    const left = i < 9 ? addRange(s.id, s.n, 9, 36) : addRange(s.id, s.n, 0, 9);
+    if (left) inv[i] = {id: s.id, n: left};
+  } else if (e.button === 2) {
+    if (!hand && s) { const k = Math.ceil(s.n / 2); hand = {id: s.id, n: k}; s.n -= k; if (!s.n) inv[i] = null; }
+    else if (hand && (!s || (s.id === hand.id && s.n < maxOf(s.id)))) {
+      if (s) s.n++; else inv[i] = {id: hand.id, n: 1};
+      if (!--hand.n) hand = null;
+    }
+  } else if (!hand) { hand = s; inv[i] = null; }
+  else if (!s) { inv[i] = hand; hand = null; }
+  else if (s.id === hand.id) { const k = Math.min(hand.n, maxOf(s.id) - s.n); s.n += k; hand.n -= k; if (!hand.n) hand = null; }
+  else { inv[i] = hand; hand = s; }
+  tone(600, 700, .04, .06, 'sine');
+  renderInv(); renderHotbar(); saveDirty = true;
+}
+function craft(out, n, ing) {
+  if (!ing.every(([id, k]) => countOf(id) >= k)) return;
+  for (const [id, k] of ing) take(id, k);
+  give(out, n);
+  noise(.15, 'bandpass', 500, 2, .5);
+  renderInv();
+}
+function renderInv() {
+  const grid = $('#invGrid'), hot = $('#invHot'), rec = $('#recipes'), surv = mode === 's';
+  grid.textContent = ''; hot.textContent = ''; rec.textContent = '';
+  $('#invTitle').textContent = surv ? 'Backpack' : 'All blocks and items';
+  $('#craft').hidden = !surv;
+  $('#invHint').textContent = surv
+    ? 'Click to pick up and put down · right-click takes half · shift-click moves between hotbar and backpack. Start by punching a tree for logs.'
+    : 'Click anything to put it in the selected hotbar slot. Click a hotbar slot below to choose it.';
+  if (surv) for (let i = 9; i < 36; i++) grid.append(mkSlot(i));
+  else for (const id of PALETTE) {
+    const b = mkBtn(id, 0);
+    b.addEventListener('click', () => { inv[sel] = {id, n: 1}; renderInv(); renderHotbar(); toast(nameOf(id)); saveDirty = true; });
+    grid.append(b);
+  }
+  for (let i = 0; i < 9; i++) hot.append(mkSlot(i));
+  if (surv) {
+    const list = RECIPES.map(r => [r, r[2].every(([id, k]) => countOf(id) >= k)]).sort((a, b) => b[1] - a[1]);
+    for (const [[out, n, ing], ok] of list) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'rec'; b.disabled = !ok;
+      const img = document.createElement('img'); img.src = iconURL(out); img.alt = '';
+      const t = document.createElement('span'), nm = document.createElement('b'), sm = document.createElement('small');
+      nm.textContent = (n > 1 ? n + ' × ' : '') + nameOf(out);
+      sm.textContent = ing.map(([id, k]) => `${k} ${nameOf(id).toLowerCase()}`).join(' + ');
+      t.append(nm, sm); b.append(img, t);
+      b.addEventListener('click', () => craft(out, n, ing));
+      rec.append(b);
+    }
+  }
+  handEl.hidden = !hand;
+  if (hand) { handEl.querySelector('img').src = iconURL(hand.id); handEl.querySelector('span').textContent = hand.n > 1 ? hand.n : ''; }
+}
+function openInv() {
+  if (!playing || dead || invOpen) return;
+  invOpen = true; mine.on = false; held = null;
+  for (const k in keys) keys[k] = false;
+  renderInv(); invUI.hidden = false;
+  if (locked) document.exitPointerLock();
+}
+function closeInv(relock) {
+  if (!invOpen) return;
+  invOpen = false; invUI.hidden = true;
+  if (hand) { addItem(hand.id, hand.n); hand = null; }
+  handEl.hidden = true; renderHotbar();
+  if (!TOUCH && !dragMode) { if (relock) requestLock(); else toast('Click to look around', 2500); }
+}
+document.addEventListener('pointermove', e => { if (invOpen && hand) { handEl.style.left = e.clientX + 'px'; handEl.style.top = e.clientY + 'px'; } });
+invUI.addEventListener('contextmenu', e => e.preventDefault());
+$('#invClose').addEventListener('click', () => closeInv(true));
+$('#bBag').addEventListener('click', () => invOpen ? closeInv(false) : openInv());
+
+/* ---------- survival ---------- */
+const statsEl = $('#stats'), sctx = statsEl.getContext('2d'), hurtEl = $('#hurt'), deadEl = $('#dead');
+const HEART = ['0110110', '1111111', '1111111', '0111110', '0011100', '0001000'];
+const MEAT = ['0000022', '0000122', '0011110', '0111110', '1111100', '1111000', '0110000'];
+const BUB = ['0011100', '0100010', '1000001', '1000001', '1000001', '0100010', '0011100'];
+function drawIcon(map, ox, oy, col) {
+  for (let y = 0; y < map.length; y++) for (let x = 0; x < 7; x++) {
+    const v = map[y][x];
+    if (v === '0') continue;
+    const c = col(x, v);
+    if (c) { sctx.fillStyle = c; sctx.fillRect(ox + x, oy + y, 1, 1); }
+  }
+}
+let statsKey = '';
+function drawStats() {
+  if (mode !== 's') return;
+  const air = Math.ceil(st.air), key = st.hp + ',' + st.food + ',' + air + headInWater;
+  if (key === statsKey) return;
+  statsKey = key;
+  sctx.clearRect(0, 0, 190, 18);
+  for (let i = 0; i < 10; i++) {
+    const full = st.hp >= i * 2 + 2, half = st.hp === i * 2 + 1;
+    drawIcon(HEART, i * 9 + 1, 11, x => full || (half && x < 4) ? (x === 1 ? '#ff9c90' : '#e8322a') : '#3c1414');
+    const ff = st.food >= i * 2 + 2, fh = st.food === i * 2 + 1;
+    drawIcon(MEAT, 182 - i * 9, 10, (x, v) => ff || (fh && x > 3) ? (v === '2' ? '#f4f0e0' : '#c0773a') : '#3a2614');
+    if (headInWater && air > i) drawIcon(BUB, 182 - i * 9, 1, () => '#a6dcff');
+  }
+}
+function exhaust(x) { if (mode === 's') st.ex += x; }
+function hurtPlayer(dmg, fx, fz) {
+  if (mode !== 's' || dead || st.inv > 0) return;
+  st.hp = Math.max(0, st.hp - dmg); st.inv = .5;
+  hurtEl.classList.add('on'); setTimeout(() => hurtEl.classList.remove('on'), 120);
+  tone(240, 120, .22, .35, 'square');
+  if (fx !== undefined) {
+    const dx = P.x - fx, dz = P.z - fz, d = Math.hypot(dx, dz) || 1;
+    P.vx += dx / d * 7; P.vz += dz / d * 7; P.vy = Math.max(P.vy, 5); P.onGround = false;
+  }
+  if (st.hp <= 0) die();
+}
+function die() {
+  dead = true; mine.on = false; held = null;
+  for (const k in keys) keys[k] = false;
+  deadEl.hidden = false;
+  if (locked) document.exitPointerLock();
+  tone(320, 60, 1.1, .4, 'sawtooth');
+  $('#respawn').focus({preventScroll: true});
+}
+function respawn() {
+  dead = false; deadEl.hidden = true;
+  Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false, inv: 1});
+  if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+  P.vx = P.vy = P.vz = 0;
+  if (!TOUCH && !dragMode) requestLock();
+  saveDirty = true;
+}
+$('#respawn').addEventListener('click', respawn);
+function survivalMove(dt, inWater, sprint) {
+  if (P.onGround) exhaust(Math.hypot(P.vx, P.vz) * dt * (sprint ? .1 : .01));
+  if (P.onGround || inWater) {
+    if (st.fallY !== null && !st.noFall && !inWater) {
+      const f = st.fallY - P.y;
+      if (f > 3.5) hurtPlayer(Math.round(f - 3));
+    }
+    st.fallY = null;
+  } else st.fallY = st.fallY === null ? P.y : Math.max(st.fallY, P.y);
+}
+function updateSurvival(dt) {
+  if (mode !== 's' || dead) return;
+  st.inv -= dt;
+  exhaust(dt * .02);
+  while (st.ex >= 4) { st.ex -= 4; st.food = Math.max(0, st.food - 1); }
+  if (st.food >= 16 && st.hp < 20) { if ((st.regen += dt) >= 3) { st.regen = 0; st.hp++; exhaust(1.5); } } else st.regen = 0;
+  if (st.food <= 0) { if ((st.starve += dt) >= 4) { st.starve = 0; if (st.hp > 2) hurtPlayer(1); } } else st.starve = 0;
+  if (headInWater) {
+    st.air = Math.max(0, st.air - dt);
+    if (st.air <= 0 && (st.drown += dt) >= 1) { st.drown = 0; hurtPlayer(2); }
+  } else { st.air = Math.min(10, st.air + dt * 4); st.drown = 0; }
+}
+function setMode(m) {
+  if (m === mode) return;
+  if (hand) { addItem(hand.id, hand.n); hand = null; }
+  mode = m; inv = invs[m];
+  if (m === 's') { P.fly = false; st.fallY = null; }
+  statsKey = '';
+  refreshMeta(); renderHotbar(); persist();
+  toast(m === 's' ? 'Survival mode' : 'Creative mode');
+}
+$('#gm').addEventListener('change', e => setMode(e.target.value));
+
+/* ---------- mining (survival) ---------- */
+const crackTex = [];
+for (let s = 0; s < 6; s++) {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const g = c.getContext('2d'), r = rng(77);
+  g.fillStyle = 'rgba(0,0,0,.7)';
+  for (let k = 0; k < (s + 1) * 6; k++) {
+    let x = r() * 16 | 0, y = r() * 16 | 0;
+    for (let j = 0; j < 5; j++) { g.fillRect(x, y, 1, 1); x += r() < .5 ? 1 : -1; y += r() < .6 ? 1 : 0; }
+  }
+  const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+  crackTex.push(t);
+}
+const crack = new THREE.Mesh(new THREE.BoxGeometry(1.006, 1.006, 1.006),
+  new THREE.MeshBasicMaterial({map: crackTex[0], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1}));
+crack.visible = false; scene.add(crack);
+function breakTime(b) {
+  const t = toolOf(), rock = MAT[b] === 'rock', tier = rock && t && t.pick ? t.pick : 0;
+  return HARD[b] * ((tier || 0) >= NEED[b] ? 1.5 : 5) / [1, 2, 4, 6][tier];
+}
+function breakBlock(x, y, z) {
+  const b = getBlock(x, y, z);
+  if (!setBlock(x, y, z, AIR)) return;
+  burst(x, y, z, b); blockSfx('break', b, x, y, z);
+  if (mode === 's') {
+    exhaust(.005);
+    const t = toolOf(), tier = t && t.pick ? t.pick : 0;
+    if (tier >= NEED[b]) { const d = dropOf(b); if (d) give(d, 1); }
+    else toast('You need a better pickaxe for ' + nameOf(b).toLowerCase());
+  }
+  if (y === 0) toast('A hole in the bottom of the world… jump in!', 3000);
+  if (getBlock(x, y + 1, z) === TORCH) breakBlock(x, y + 1, z);
+}
+function updateMining(dt) {
+  if (!mine.on || mode !== 's' || dead || !target || target.b === TNT) { crack.visible = false; mine.p = 0; return; }
+  const {x, y, z, b} = target;
+  if (x !== mine.x || y !== mine.y || z !== mine.z) { mine.x = x; mine.y = y; mine.z = z; mine.p = 0; }
+  mine.p += dt / Math.max(.05, breakTime(b));
+  if ((mine.snd -= dt) <= 0) { mine.snd = .24; blockSfx('step', b, x, y, z); }
+  if (mine.p >= 1) { mine.p = 0; crack.visible = false; breakBlock(x, y, z); return; }
+  crack.visible = true; crack.position.set(x + .5, y + .5, z + .5);
+  crack.material.map = crackTex[Math.min(5, Math.floor(mine.p * 6))];
+}
+
+/* ---------- torches & darkness ---------- */
+function torchSet(cx, cz) {
+  const s = new Set(), e = edits.get(ck(cx, cz));
+  if (e) for (const [i, b] of e) if (b === TORCH) s.add(i);
+  return s;
+}
+function torchesAround(cx, cz, fn) {
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const c = chunks.get(ck(cx + dx, cz + dz));
+    if (!c) continue;
+    for (const i of c.torches) fn((cx + dx) * CS + ((i / H | 0) % CS), i % H, (cz + dz) * CS + (i / (H * CS) | 0));
+  }
+}
+function nearTorches(c) {
+  const out = [];
+  torchesAround(c.cx, c.cz, (x, y, z) => {
+    if (x > c.cx * CS - 11 && x < c.cx * CS + CS + 10 && z > c.cz * CS - 11 && z < c.cz * CS + CS + 10) out.push([x + .5, y + .5, z + .5]);
+  });
+  return out;
+}
+function torchLight(near, px, py, pz, n) {
+  let best = 0;
+  for (const t of near) {
+    const dx = t[0] - px, dy = t[1] - py, dz = t[2] - pz;
+    if (dx * n[0] + dy * n[1] + dz * n[2] < -.05) continue;
+    const L = 1 - (Math.abs(dx) + Math.abs(dy) + Math.abs(dz)) / 11;
+    if (L > best) best = L;
+  }
+  return best;
+}
+function torchNear(x, y, z, r) {
+  let hit = false;
+  torchesAround(Math.floor(x / CS), Math.floor(z / CS), (tx, ty, tz) => { if (Math.abs(tx - x) + Math.abs(ty - y) + Math.abs(tz - z) < r) hit = true; });
+  return hit;
+}
+function colTop(x, z) {
+  for (let y = H - 1; y >= 0; y--) { const b = getBlock(x, y, z); if (SOLID[b] && !TRANSP[b]) return y; }
+  return -1;
+}
+function emitTorch(g, x, y, z) {
+  const uv = TUV[T.TORCH], du = uv[1] - uv[0], dv = uv[3] - uv[2];
+  const side = [uv[0] + du * 7 / 16, uv[0] + du * 9 / 16, uv[2], uv[2] + dv * 10 / 16];
+  const top = [side[0], side[1], uv[2] + dv * 8 / 16, side[3]];
+  const a = 7 / 16, b = 9 / 16, h = 10 / 16;
+  for (let f = 0; f < 6; f++) {
+    if (f === 3) continue;
+    const F = FACES[f], U = f === 2 ? top : side, vi = g.p.length / 3;
+    for (let k = 0; k < 4; k++) {
+      const cv = F.c[k];
+      g.p.push(x + (cv[0] ? b : a), y + (cv[1] ? h : 0), z + (cv[2] ? b : a));
+      g.c.push(1, 1, 1); g.l.push(1, 1);
+      g.u.push(k === 0 || k === 3 ? U[0] : U[1], k < 2 ? U[2] : U[3]);
+    }
+    g.i.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+  }
+}
+
+/* ---------- zombies ---------- */
+KINDS.zombie = {hw: .3, h: 1.95, speed: 2.4, hp: 20, col: 0x5f9a48, hostile: true, biped: true, hurtF: 260, build(g) {
+  const skin = this.col, shirt = 0x2f8f9c, pants = 0x3b3f8f;
+  part(g, shirt, .5, .7, .28, 0, 1.1, 0); part(g, skin, .46, .46, .46, 0, 1.68, 0); eyes(g, 1.72, -.235, .1);
+  for (const sx of [-.36, .36]) { const arm = new THREE.Group(); arm.position.set(sx, 1.38, 0); part(arm, skin, .2, .2, .66, 0, 0, -.3); g.add(arm); }
+  return [leg(g, pants, .22, .75, -.12, 0), leg(g, pants, .22, .75, .12, 0)];
+}, say(at) { tone(150, 95, .55, .22, 'sawtooth', at); }, drop() { if (Math.random() < .15) give(IRONI, 1); }};
+KINDS.pig.drop = () => give(PORK, 1 + (Math.random() < .5 ? 1 : 0));
+KINDS.sheep.drop = () => give(WOOL, 1);
+function zombieThink(m, dt) {
+  const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
+  m.atk = (m.atk || 0) - dt;
+  if (!dead && d < 20 && Math.abs(P.y - m.y) < 8) {
+    m.yaw = Math.atan2(-dx, -dz); m.walk = d > .9;
+    if (d < 1.5 && Math.abs(P.y - m.y) < 1.6 && m.atk <= 0) { m.atk = 1; hurtPlayer(3, m.x, m.z); }
+    if (Math.random() < dt * .15) KINDS.zombie.say([m.x, m.y + 1.6, m.z]);
+  } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
+  if (dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
+    m.burnT = 1;
+    if (m.y + 1 >= colTop(Math.floor(m.x), Math.floor(m.z))) { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xff8a20)); hurtMob(m, 3); }
+  }
+}
+function trySpawnZombie() {
+  const ang = Math.random() * 6.283, r = 16 + Math.random() * 22;
+  const x = Math.floor(P.x + Math.cos(ang) * r), z = Math.floor(P.z + Math.sin(ang) * r);
+  if (!chunks.has(ck(Math.floor(x / CS), Math.floor(z / CS)))) return;
+  const spots = [];
+  for (let y = 2; y < H - 2; y++) if (SOLID[getBlock(x, y - 1, z)] && getBlock(x, y, z) === AIR && getBlock(x, y + 1, z) === AIR) spots.push(y);
+  if (!spots.length) return;
+  const y = spots[Math.floor(Math.random() * spots.length)];
+  if (y > colTop(x, z) && dayAmt > .3) return;
+  if (torchNear(x, y, z, 10)) return;
+  addMob('zombie', x + .5, y, z + .5);
 }
 
 /* ---------- main loop ---------- */
@@ -1342,7 +1913,8 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(.05, (now - last) / 1000); last = now; frame++;
   if (playing) {
-    physics(dt);
+    if (!dead) physics(dt);
+    updateSurvival(dt); updateMining(dt);
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updateTNT(dt);
@@ -1369,9 +1941,10 @@ function loop(now) {
     if (u.life <= 0) { m.visible = false; continue; }
     u.v.y -= 20 * dt; m.position.addScaledVector(u.v, dt);
     m.scale.setScalar(Math.min(1, u.life / .4));
-    m.material.color.copy(u.base).multiplyScalar(matOpaque.color.r);
+    m.material.color.copy(u.base).multiplyScalar(skyLight);
   }
   if (frame % 6 === 0) updateInfo();
+  drawStats();
   if (saveDirty && now - lastSave > 4000) persist();
   renderer.render(scene, cam);
 }
