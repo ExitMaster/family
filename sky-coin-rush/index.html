@@ -1077,9 +1077,9 @@ function boot(hot){
   }
   /* ---------------- Missiles ---------------- */
   // S fires a missile from under a wing. It chases the other plane nearest the middle of
-  // your view (marked with a red ring) and blows it up: the pilot floats down on a
-  // parachute and a new plane turns up somewhere else.
-  const MSL_LIFE = 6, LOCK_RANGE = 2600, LOCK_COS = Math.cos(0.4), HIT_R = 11;
+  // your view, or else the closest one (marked with a red ring), and blows it up: the pilot
+  // floats down on a parachute and a new plane turns up somewhere else.
+  const MSL_LIFE = 9, LOCK_RANGE = 3600, LOCK_COS = Math.cos(0.4), HIT_R = 11;
   const NEG_Z = new THREE.Vector3(0, 0, -1), mslAim = new THREE.Vector3();
   const missiles = [], booms = [], chutes = [];
   let fireT = 0, shots = 0, lockOn = null;
@@ -1144,16 +1144,18 @@ function boot(hot){
     if (live){ score += 150; toast('Hit! ' + a.def.name + ' +150 (the pilot is safe)', ''); }
     aiSpawn(a, false);
   }
-  function lockTarget(){
-    let best = null, bc = LOCK_COS;
+  // the plane nearest the middle of your view, or else the closest one to (x, y, z)
+  function lockTarget(x, y, z, dir){
+    let best = null, bc = LOCK_COS, near = null, nd = LOCK_RANGE;
     for (const a of aiPlanes){
       if (!a.def) continue;
-      const dx = a.x - F.x, dy = a.y - F.y, dz = a.z - F.z, d = Math.hypot(dx, dy, dz);
+      const dx = a.x - x, dy = a.y - y, dz = a.z - z, d = Math.hypot(dx, dy, dz);
       if (d > LOCK_RANGE || d < 25) continue;
-      const c = (dx * vFwd.x + dy * vFwd.y + dz * vFwd.z) / d;
+      if (d < nd){ nd = d; near = a; }
+      const c = (dx * dir.x + dy * dir.y + dz * dir.z) / d;
       if (c > bc){ bc = c; best = a; }
     }
-    return best;
+    return best || near;
   }
   function fireMissile(){
     if (fireT > 0 || !planeRoot.visible || F.ground || F.crashT > 0) return;
@@ -1178,7 +1180,7 @@ function boot(hot){
 
   function updateMissiles(dt, live){
     fireT = Math.max(0, fireT - dt);
-    lockOn = live && planeRoot.visible && !F.ground ? lockTarget() : null;
+    lockOn = live && planeRoot.visible && !F.ground ? lockTarget(F.x, F.y, F.z, vFwd) : null;
     if (live && keys.f) fireMissile();
     lockRing.visible = !!lockOn;
     if (lockOn){
@@ -1188,12 +1190,14 @@ function boot(hot){
     for (const m of missiles){
       if (m.life <= 0) continue;
       m.life -= dt; m.speed = Math.min(m.cap, m.speed + 160 * dt);
+      // if its plane was already shot down, it picks another one
+      if (!m.target || m.target.gen !== m.gen){ m.target = lockTarget(m.pos.x, m.pos.y, m.pos.z, m.dir); m.gen = m.target ? m.target.gen : 0; }
       const a = m.target;
-      if (a && a.gen === m.gen){
+      if (a){
         // aim where the target will be when the missile gets there
         const lead = Math.hypot(a.x - m.pos.x, a.y - m.pos.y, a.z - m.pos.z) / m.speed, cp = Math.cos(a.pitch) * a.speed * lead;
         mslAim.set(a.x - Math.sin(a.yaw) * cp - m.pos.x, a.y + Math.sin(a.pitch) * a.speed * lead - m.pos.y, a.z - Math.cos(a.yaw) * cp - m.pos.z).normalize();
-        m.dir.lerp(mslAim, Math.min(1, dt * 4)).normalize();
+        m.dir.lerp(mslAim, Math.min(1, dt * 5)).normalize();
       }
       m.prev.copy(m.pos); m.pos.addScaledVector(m.dir, m.speed * dt);
       let gone = false;
