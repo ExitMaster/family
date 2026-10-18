@@ -1,8 +1,8 @@
 # Sky Coin Rush
 
 A 3D flying game in **one HTML file** (three.js from a CDN, no build step). Take off from
-the home airfield and fly anywhere you like over an endless open world, as high as
-19,700 ft above the clouds, grabbing coins that float in the sky.
+the home airfield and fly anywhere you like over an endless open world, as high as you
+like (all the way up into space), grabbing coins that float in the sky.
 
 > <https://exitmaster.github.io/family/sky-coin-rush/>
 
@@ -64,8 +64,9 @@ turns):
   Auto-land puts the gear down for you. The Puffin's floats don't fold up.
 - **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
   every direction, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
-  haze clears as you climb. The top is 19,700 ft (6,000 m); there's a call-out when you
-  pass 10,000 ft. The sky also moves from morning to noon to golden hour to dusk as you
+  haze clears as you climb. **There's no altitude limit**: above about 20,000 ft the sky
+  keeps darkening to black and the stars come out, and there are call-outs at 10,000 ft,
+  30,000 ft (as high as a jumbo jet), 100,000 ft and 328,000 ft (space!). The sky also moves from morning to noon to golden hour to dusk as you
   fly.
 - **HUD:** fuel (time left), altitude (ft), airspeed (kt), compass heading (HDG, 000 =
   north) and an airport chip: its name, distance and an arrow pointing to it (your chosen

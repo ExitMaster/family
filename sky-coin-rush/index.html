@@ -177,7 +177,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-head"><span>Flight SCR-01</span><span>Route: anywhere</span></div>
     <div class="card-body">
       <h1>Sky Coin <em>Rush</em></h1>
-      <p class="lede">Take off from the home airfield and fly anywhere you like: over hills, lakes and snowy mountains, through the clouds and up to 19,700 ft. Grab the coins floating in the sky, then land back home.</p>
+      <p class="lede">Take off from the home airfield and fly anywhere you like: over hills, lakes and snowy mountains, through the clouds and as high as you like, all the way up to space. Grab the coins floating in the sky, then land back home.</p>
       <div>
         <p class="label">Choose your plane</p>
         <div class="planes" id="planes" role="group" aria-label="Choose your plane"></div>
@@ -319,7 +319,7 @@ function boot(hot){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xd6ecf5, 150, 500);
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 16000);
+  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 40000);
   let baseFov = 62;
   function resize(){
     const w = window.innerWidth, h = window.innerHeight;
@@ -795,8 +795,21 @@ function boot(hot){
   // Fuel at airports costs coins: 1 coin buys FUEL_PER_COIN %, so a full tank is 50 coins.
   // Below EMERGENCY_FUEL % it's free, so you can always fly off and collect more coins.
   const FUEL_PER_COIN = 2, EMERGENCY_FUEL = 25;
-  const CEIL = 6000, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
-  const SPACE_C = new THREE.Color(0x0b1238);
+  const COIN_TOP = 5700, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
+  const SPACE_C = new THREE.Color(0x0b1238), BLACK = new THREE.Color(0x02030a), SPACE_HAZE = new THREE.Color(0x101528);
+  // altitude call-outs (metres, message); there's no ceiling, so they go all the way to space
+  const MILESTONES = [[3048, '10,000 ft!'], [9144, '30,000 ft! As high as a jumbo jet'], [30480, '100,000 ft! The sky is turning black'], [100000, 'SPACE! 328,000 ft']];
+  // stars, faded in as you climb towards space
+  const stars = (() => {
+    const n = 1500, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++){
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      pos[i * 3] = r * Math.cos(a) * 13000; pos[i * 3 + 1] = u * 13000; pos[i * 3 + 2] = r * Math.sin(a) * 13000;
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+    pts.renderOrder = -1; pts.frustumCulled = false; scene.add(pts); return pts;
+  })();
   function hash2(i, j){
     let h = Math.imul(i | 0, 374761393) ^ Math.imul(j | 0, 668265263);
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -990,7 +1003,7 @@ function boot(hot){
     const cid = ++clusterId, ang = F.yaw + rnd(-1.1, 1.1), dist = rnd(350, 1700);
     const cx = F.x - Math.sin(ang) * dist, cz = F.z - Math.cos(ang) * dist, g = Math.max(0, freeH(cx, cz));
     // most clusters near your height, some high up in the sky to chase
-    let cy = Math.random() < 0.18 ? rnd(1500, CEIL - 300) : clamp(F.y + rnd(-200, 250), g + 45, CEIL - 300);
+    let cy = Math.random() < 0.18 ? rnd(1500, Math.max(COIN_TOP, F.y + 600)) : F.y + rnd(-200, 250);
     cy = Math.max(cy, g + 45);
     const dir = rnd(0, Math.PI * 2), dx = -Math.sin(dir), dz = -Math.cos(dir), pat = pick(['line', 'climb', 'wave', 'ring']);
     for (let i = 0; i < 10; i++){
@@ -1004,7 +1017,7 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false };
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false };
   // Progress is never reset: coins, score, fuel and the airports you've visited carry over
   // from flight to flight and are saved in the browser.
   (function loadProgress(){
@@ -1168,7 +1181,7 @@ function boot(hot){
     clearFreeItems();
     chain = 0; mult = 1; lastCoinT = -9;   // coins, score, fuel and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0, apDist: 0, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false });
     setLevel(0, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -1288,7 +1301,6 @@ function boot(hot){
       rotWorld(AY, vRight.y * plane.turn * dt);               // a banked plane turns
       if (!ay && vUp.y * flip > 0.3) rotLocal(AX, -flip * F.pitch * 0.35 * dt); // nose eases back to level
       if (live && vUp.y < -0.8) score += 5 * dt;              // upside-down bonus
-      if (F.y > CEIL - 400 && vFwd.y > 0) rotLocal(AX, -(vUp.y < 0 ? -1 : 1) * dt * 1.2 * (F.y - (CEIL - 400)) / 400);
       Q.normalize(); readAxes();
       if (live && pulling){
         F.loopAcc += ay * plane.pitch * dt;
@@ -1301,10 +1313,10 @@ function boot(hot){
       F.speed = clamp(F.speed, 30, plane.boost + 40);
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
       if (!engineOn) F.y -= 5 * dt;                              // and slowly sinking
-      if (F.y >= CEIL){ F.y = CEIL; if (!F.ceilTold){ F.ceilTold = true; toast('Max altitude!', 'info'); } }
-      if (F.y < CEIL - 800) F.ceilTold = false;
-      if (F.y > 3048 && !F.hiTold){ F.hiTold = true; toast('10,000 ft!', ''); }
-      if (F.y < 2900) F.hiTold = false;
+      // no altitude limit: call-outs on the way up (each again after dropping well below it)
+      const ms = MILESTONES[F.milestone];
+      if (ms && F.y > ms[0]){ F.milestone++; if (live) toast(ms[1], ''); }
+      if (F.milestone > 0 && F.y < MILESTONES[F.milestone - 1][0] * 0.9) F.milestone--;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
       const water = onWater(F.x, F.z);
       const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
@@ -1405,6 +1417,14 @@ function boot(hot){
     skyDist += F.speed * dt; applySky(skyDist);
     const hk = clamp((F.y - 1200) / 4800, 0, 1);
     skyMat.uniforms.top.value.lerp(SPACE_C, hk * 0.85);
+    // above about 20,000 ft the sky goes on darkening to black and the stars come out
+    const sk = clamp((F.y - 6000) / 24000, 0, 1);
+    skyMat.uniforms.top.value.lerp(BLACK, sk);
+    skyMat.uniforms.mid.value.lerp(SPACE_HAZE, sk * 0.9);
+    scene.fog.color.copy(skyMat.uniforms.mid.value);
+    stars.material.opacity = clamp((F.y - 5000) / 15000, 0, 1);
+    stars.visible = stars.material.opacity > 0.01;
+    stars.position.copy(camera.position);
     skyMat.uniforms.low.value.copy(skyMat.uniforms.mid.value);
     scene.fog.far = Math.min(3000 + F.y * 2.5, 12500);
     scene.fog.near = Math.min(300 + F.y * 0.6, scene.fog.far * 0.45);
