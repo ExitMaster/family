@@ -236,8 +236,8 @@ const pick = arr => arr[(Math.random() * arr.length) | 0];
 
 // PLANE_SCALE sizes the plane model; its wheels sit PLANE_SCALE below its centre.
 const PLANE_SCALE = 1.3;
-// Home runway: RWY_LEN long, RWY_W wide; the plane can lift off from VR (m/s).
-const RWY_LEN = 260, RWY_W = 10, RWY_TOP = 0, VR = 30;
+// Runways: RWY_LEN long, RWY_W wide; the plane can lift off from VR (m/s).
+const RWY_LEN = 260, RWY_W = 30, RWY_TOP = 0, VR = 30;
 
 /* ---------------- Sound ---------------- */
 const sfx = (() => {
@@ -831,27 +831,29 @@ function boot(hot){
       g.applyMatrix4(new THREE.Matrix4().makeRotationX(rx || 0).setPosition(x, y, z));
       parts.push([g, new THREE.Color(color)]);
     };
-    add(new THREE.BoxGeometry(18, 1.0, RWY_LEN + 50), 0xdcc791, 0, RWY_TOP - 0.55, -RWY_LEN / 2);
+    add(new THREE.BoxGeometry(RWY_W + 8, 1.0, RWY_LEN + 50), 0xdcc791, 0, RWY_TOP - 0.55, -RWY_LEN / 2);
     add(new THREE.BoxGeometry(RWY_W, 0.2, RWY_LEN), 0x4a4f5c, 0, RWY_TOP - 0.1, -RWY_LEN / 2);
     const paint = 0xf4f1ea, y = RWY_TOP + 0.01;
-    const dash = new THREE.BoxGeometry(0.35, 0.02, 6);
+    const dash = new THREE.BoxGeometry(0.9, 0.02, 8);
     for (let z = -22; z > -RWY_LEN + 20; z -= 14) add(dash, paint, 0, y, z);
-    const bar = new THREE.BoxGeometry(0.55, 0.02, 9);
-    [-4, -3, -2, -1, 1, 2, 3, 4].forEach(i => { add(bar, paint, i * 0.95, y, -6); add(bar, paint, i * 0.95, y, -RWY_LEN + 6); });
-    const tdz = new THREE.BoxGeometry(1.3, 0.02, 9);
-    [-40, -70].forEach(z => { add(tdz, paint, 2.4, y, z); add(tdz, paint, -2.4, y, z); });
+    // threshold "piano keys" across both ends, and touchdown-zone marks either side of the centreline
+    const bar = new THREE.BoxGeometry(1.2, 0.02, 12);
+    for (let k = 0; k < 6; k++) for (const sd of [-1, 1]){ add(bar, paint, sd * (1.6 + k * 2.2), y, -8); add(bar, paint, sd * (1.6 + k * 2.2), y, -RWY_LEN + 8); }
+    const tdz = new THREE.BoxGeometry(3, 0.02, 12);
+    [-40, -70].forEach(z => { add(tdz, paint, RWY_W / 4, y, z); add(tdz, paint, -RWY_W / 4, y, z); });
     const lightGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
     const edge = 0xfff1c0, green = 0x4dff88, red = 0xff4a3a;
     for (let z = 0; z >= -RWY_LEN; z -= 20){ add(lightGeo, edge, RWY_W / 2 + 0.5, RWY_TOP + 0.15, z); add(lightGeo, edge, -RWY_W / 2 - 0.5, RWY_TOP + 0.15, z); }
-    for (let x = -4.5; x <= 4.5; x += 1.5){ add(lightGeo, green, x, RWY_TOP + 0.15, 1); add(lightGeo, red, x, RWY_TOP + 0.15, -RWY_LEN - 1); }
+    for (let x = -RWY_W / 2 + 0.5; x <= RWY_W / 2; x += 2){ add(lightGeo, green, x, RWY_TOP + 0.15, 1); add(lightGeo, red, x, RWY_TOP + 0.15, -RWY_LEN - 1); }
     // PAPI lights beside the touchdown zone: two white over two red is "on the glide path"
     [0, 1, 2, 3].forEach(i => add(new THREE.BoxGeometry(0.5, 0.4, 0.4), i < 2 ? edge : red, -RWY_W / 2 - 1.5 - i * 0.8, RWY_TOP + 0.2, -40));
     // control tower and windsock
-    add(new THREE.BoxGeometry(1.6, 6, 1.6), 0xfff1d6, 7.6, RWY_TOP + 3, -90);
-    add(new THREE.BoxGeometry(2.4, 1.3, 2.4), 0x7fd3e8, 7.6, RWY_TOP + 6.6, -90);
-    add(new THREE.BoxGeometry(2.8, 0.3, 2.8), 0xe8432e, 7.6, RWY_TOP + 7.4, -90);
-    add(new THREE.CylinderGeometry(0.08, 0.08, 4, 5), 0x2a2f45, 7.4, RWY_TOP + 2, -25);
-    add(new THREE.ConeGeometry(0.45, 2, 8), 0xff8a3d, 7.4, RWY_TOP + 3.7, -24, -Math.PI / 2.3);
+    const side = RWY_W / 2 + 2.6;   // on the sand beside the runway
+    add(new THREE.BoxGeometry(1.6, 6, 1.6), 0xfff1d6, side, RWY_TOP + 3, -90);
+    add(new THREE.BoxGeometry(2.4, 1.3, 2.4), 0x7fd3e8, side, RWY_TOP + 6.6, -90);
+    add(new THREE.BoxGeometry(2.8, 0.3, 2.8), 0xe8432e, side, RWY_TOP + 7.4, -90);
+    add(new THREE.CylinderGeometry(0.08, 0.08, 4, 5), 0x2a2f45, side - 0.2, RWY_TOP + 2, -25);
+    add(new THREE.ConeGeometry(0.45, 2, 8), 0xff8a3d, side - 0.2, RWY_TOP + 3.7, -24, -Math.PI / 2.3);
     let n = 0; parts.forEach(([g]) => n += g.attributes.position.count);
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
     let o = 0;
