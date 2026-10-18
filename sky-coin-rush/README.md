@@ -24,7 +24,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **32 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **40 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -63,12 +63,20 @@ turns):
 | **Mega** | giant six-engine cargo jet | 156 / 350 kt | slowest to turn |
 | **Triple** | red triplane with three wings | 107 / 233 kt | very loopy |
 | **Swan** | graceful white swan: **lands on lakes** | 107 / 233 kt | medium |
+| **Unicorn** | flying unicorn with a golden horn and a rainbow tail | 126 / 311 kt | quick |
+| **Balloon** | hot-air balloon; the burner flame roars when boosting | 58 / 126 kt | slowest |
+| **Owl** | big-eyed owl, almost silent | 87 / 214 kt | very quick |
+| **Butterfly** | blue and orange butterfly | 68 / 165 kt | very quick |
+| **Coast Guard** | red rescue helicopter on floats: **lands on lakes** | 107 / 233 kt | quick |
+| **Racer** | gold air racer | 233 / 544 kt | very quick |
+| **Ptero** | pterodactyl with a head crest and huge wings | 117 / 292 kt | quick |
+| **Bus** | yellow school bus with wings and two propellers | 117 / 272 kt | slow to turn |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan) can land on and take off from any
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard) can land on and take off from any
 lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
-white vapour cone round the plane. Bubbles, Origami, Retro and the floats/hulls of the lake planes don't fold up.
+white vapour cone round the plane. Bubbles, Origami, Retro, Balloon and the floats/hulls of the lake planes don't fold up.
 
 ## Flying
 
@@ -101,6 +109,9 @@ white vapour cone round the plane. Bubbles, Origami, Retro and the floats/hulls 
   sky. Coins are 10 points each; grab them less than about a second apart to build a
   chain (every 5 in a row adds one to the multiplier, up to x5). Rings give a 3-second
   boost and +50.
+- **Other planes:** 59 computer-flown planes from the plane list cruise around you, flying
+  between airports and over the hills at a safe height. Fly within about 45 m of one for a
+  **close fly-by** (+25). They can't crash into you.
 - **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps
@@ -111,7 +122,7 @@ white vapour cone round the plane. Bubbles, Origami, Retro and the floats/hulls 
 
 ## Airports
 
-The world has airports everywhere: one in most 5 km squares of an endless grid, each with
+The world has airports everywhere: one in most 3 km squares of an endless grid (so there's nearly always one within a couple of km), each with
 its own name (Pine Valley, Otter Bay, Snowcap…) and its runway pointing its own way. You
 start at **Home Field**. The ground around each one is flattened into a meadow: an airport
 on a lake becomes an island strip, and one on a mountain sits on a high plateau (up to
