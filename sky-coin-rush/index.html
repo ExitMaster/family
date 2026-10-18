@@ -418,7 +418,15 @@ function boot(hot){
     { id: 'penguin', name: 'Penguin', note: 'Jetpack penguin, lands on lakes', color: '#1b2340', cruise: 60, boost: 150, pitch: 2.0, turn: 1.9, water: true, sound: { mul: 2.4, vol: 0.035 } },
     { id: 'mega', name: 'Mega', note: 'Giant six-engine cargo jet', color: '#8a9bb0', cruise: 80, boost: 180, pitch: 0.7, turn: 0.6, cam: 1.9, sound: { mul: 1.6, vol: 0.05 } },
     { id: 'triple', name: 'Triple', note: 'Red triplane, super loopy', color: '#c0392b', cruise: 55, boost: 120, pitch: 2.3, turn: 1.9 },
-    { id: 'swan', name: 'Swan', note: 'Graceful swan, lands on lakes', color: '#fbfaf6', cruise: 55, boost: 120, pitch: 1.6, turn: 1.5, cam: 1.15, water: true, fixedGear: true, sound: { mul: 2.6, vol: 0.015 } }
+    { id: 'swan', name: 'Swan', note: 'Graceful swan, lands on lakes', color: '#fbfaf6', cruise: 55, boost: 120, pitch: 1.6, turn: 1.5, cam: 1.15, water: true, fixedGear: true, sound: { mul: 2.6, vol: 0.015 } },
+    { id: 'unicorn', name: 'Unicorn', note: 'Flying unicorn with a rainbow tail', color: '#ff8fb8', cruise: 65, boost: 160, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.015 } },
+    { id: 'balloon', name: 'Balloon', note: 'Hot-air balloon, slow and gentle', color: '#e8432e', cruise: 30, boost: 65, pitch: 0.8, turn: 0.7, cam: 1.8, fixedGear: true, sound: { mul: 0.4, vol: 0.02 } },
+    { id: 'owl', name: 'Owl', note: 'Big-eyed owl, almost silent', color: '#8a5a32', cruise: 45, boost: 110, pitch: 1.8, turn: 1.9, sound: { mul: 2.5, vol: 0.008 } },
+    { id: 'butterfly', name: 'Butterfly', note: 'Flutters about', color: '#3fa9f5', cruise: 35, boost: 85, pitch: 2.0, turn: 2.0, sound: { mul: 3, vol: 0.005 } },
+    { id: 'coastguard', name: 'Coast Guard', note: 'Rescue helicopter, lands on lakes', color: '#e8432e', cruise: 55, boost: 120, pitch: 1.5, turn: 1.6, cam: 1.2, water: true, fixedGear: true, sound: { mul: 0.6, vol: 0.05 } },
+    { id: 'racer', name: 'Racer', note: 'Gold air racer, very nimble', color: '#ffc23d', cruise: 120, boost: 280, pitch: 2.1, turn: 2.0, sound: { mul: 1.3, vol: 0.045 } },
+    { id: 'ptero', name: 'Ptero', note: 'Pterodactyl dinosaur', color: '#c77a3a', cruise: 60, boost: 150, pitch: 1.7, turn: 1.7, cam: 1.2, sound: { mul: 0.45, vol: 0.03 } },
+    { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, sound: { mul: 0.9, vol: 0.05 } }
   ];
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
   planeRoot.add(planeBody); scene.add(planeRoot);
@@ -617,9 +625,10 @@ function boot(hot){
         both((x) => gearBox(0.4, 0.3, 0.6, x, -0.85, 0.2, O), 0.4);
         break;
       }
-      case 'whirly': {   // helicopter: big rotor on top, little one on the tail
-        const B = 0x3fa9f5;
+      case 'whirly': case 'coastguard': {   // helicopters: big rotor on top, little one on the tail
+        const cg = def.id === 'coastguard', B = cg ? RED : 0x3fa9f5;
         ball(1.3, B, 0, 0.15, -0.3, 1, 0.9, 1.3); ball(0.95, glassMat, 0, 0.3, -1.05);
+        if (cg) ball(1.31, WHITE, 0, 0.1, 0.1, 1, 0.25, 1.1);   // white stripe round the cabin
         box(0.35, 0.35, 3.6, B, 0, 0.35, 2.2); box(0.1, 1.0, 0.6, B, 0, 0.8, 3.9);
         const tr = new THREE.Group(), tb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.2, 0.12), mat(DARK)), tb2 = tb.clone();
         tb2.rotation.x = Math.PI / 2; tr.add(tb, tb2); tr.position.set(0.12, 0.8, 3.95); planeBody.add(tr); spinners.push({ o: tr, axis: 'x', rate: 50 });
@@ -628,7 +637,90 @@ function boot(hot){
         rb2.rotation.y = Math.PI / 2;
         const disc = new THREE.Mesh(new THREE.CircleGeometry(3.5, 24), blurMat); disc.rotation.x = -Math.PI / 2;
         rotor.add(rb, rb2, disc); rotor.position.set(0, 1.62, -0.3); planeBody.add(rotor); spinners.push({ o: rotor, axis: 'y', rate: 25 });
-        both((x) => { gearBox(0.14, 0.14, 2.8, x, -0.93, -0.3); gearBox(0.08, 0.5, 0.08, x, -0.62, -1.0); gearBox(0.08, 0.5, 0.08, x, -0.62, 0.4); }, 0.9);
+        if (cg) both((x) => { box(0.42, 0.36, 2.9, WHITE, x, -0.82, -0.3); box(0.08, 0.5, 0.08, DARK, x, -0.45, -1.0); box(0.08, 0.5, 0.08, DARK, x, -0.45, 0.4); }, 1.0);   // floats
+        else both((x) => { gearBox(0.14, 0.14, 2.8, x, -0.93, -0.3); gearBox(0.08, 0.5, 0.08, x, -0.62, -1.0); gearBox(0.08, 0.5, 0.08, x, -0.62, 0.4); }, 0.9);
+        break;
+      }
+      case 'unicorn': {
+        const W = 0xfbfaf6, P = 0xff8fb8, G = 0xffc23d;
+        ball(1.0, W, 0, 0.2, 0, 0.85, 0.8, 1.6); box(0.5, 1.0, 0.5, W, 0, 0.9, -1.2, -0.5);
+        ball(0.45, W, 0, 1.45, -1.65, 0.8, 0.8, 1.3); box(0.4, 0.35, 0.5, W, 0, 1.3, -2.15);
+        const horn = add(new THREE.ConeGeometry(0.1, 0.75, 8), G, 0, 1.95, -1.85); horn.rotation.x = -0.5;
+        both((x) => box(0.1, 0.12, 0.08, 0x111111, x, 1.55, -2.0), 0.22);
+        box(0.16, 0.45, 1.0, P, 0, 1.35, -1.1, -0.5);
+        [0xe8432e, 0xffc23d, 0x4dbb5f, 0x3fa9f5, 0x7a5ad8].forEach((c, k) => box(0.14, 0.14, 1.6, c, (k - 2) * 0.12, 0.35 + Math.abs(k - 2) * 0.03, 2.1, 0.35));
+        tris([[-0.7, 0.6, -0.6], [-3.4, 1.5, 0.1], [-0.7, 0.6, 0.8], [-3.4, 1.5, 0.1], [-2.5, 1.0, 1.1], [-0.7, 0.6, 0.8],
+              [0.7, 0.6, -0.6], [3.4, 1.5, 0.1], [0.7, 0.6, 0.8], [3.4, 1.5, 0.1], [2.5, 1.0, 1.1], [0.7, 0.6, 0.8]], 0xf3eef8);
+        both((x) => { gearBox(0.22, 0.8, 0.22, x, -0.6, -0.8, W); gearBox(0.22, 0.8, 0.22, x, -0.6, 0.8, W); }, 0.45);
+        break;
+      }
+      case 'balloon': {   // hot-air balloon: the burner flame points up and roars when boosting
+        const R2 = 0xe8432e, Y = 0xffc23d;
+        ball(2.4, R2, 0, 2.6, 0, 1, 1.15, 1);
+        add(new THREE.CylinderGeometry(2.43, 2.43, 0.4, 28, 1, true), Y, 0, 2.6, 0);
+        add(new THREE.CylinderGeometry(2.25, 2.25, 0.35, 28, 1, true), Y, 0, 3.6, 0);
+        add(new THREE.CylinderGeometry(2.25, 2.25, 0.35, 28, 1, true), Y, 0, 1.6, 0);
+        box(1.1, 0.8, 1.1, 0x8a5a32, 0, -0.6, 0);
+        both((x) => { box(0.04, 1.3, 0.04, DARK, x, 0.4, 0.45); box(0.04, 1.3, 0.04, DARK, x, 0.4, -0.45); }, 0.45);
+        const fg = new THREE.ConeGeometry(0.25, 1.2, 10); fg.translate(0, 0.6, 0);
+        const fire = new THREE.Mesh(fg, flameMat); fire.position.set(0, -0.15, 0); fire.userData.idle = 0.35;
+        planeBody.add(fire); flames.push(fire);
+        break;
+      }
+      case 'owl': {
+        const Br = 0x8a5a32, C = 0xe9d8a6, O = 0xffb000;
+        ball(1.0, Br, 0, 0.1, 0, 1, 1, 1.3); ball(0.85, C, 0, -0.05, -0.25, 0.85, 0.85, 1.05);
+        ball(0.8, Br, 0, 0.9, -0.8); ball(0.62, C, 0, 0.9, -1.35, 1, 1, 0.4);
+        both((x) => { ball(0.22, 0xffd23d, x, 1.0, -1.52); ball(0.1, 0x111111, x, 1.0, -1.7); const ear = add(new THREE.ConeGeometry(0.14, 0.45, 6), Br, x * 1.8, 1.6, -0.75); ear.rotation.z = -0.3 * Math.sign(x); }, 0.25);
+        const beak = add(new THREE.ConeGeometry(0.1, 0.3, 6), O, 0, 0.75, -1.58); beak.rotation.x = Math.PI;
+        tris([[-0.8, 0.4, -0.6], [-3.4, 0.8, 0.2], [-0.8, 0.3, 1.0], [-3.4, 0.8, 0.2], [-2.6, 0.5, 1.2], [-0.8, 0.3, 1.0],
+              [0.8, 0.4, -0.6], [3.4, 0.8, 0.2], [0.8, 0.3, 1.0], [3.4, 0.8, 0.2], [2.6, 0.5, 1.2], [0.8, 0.3, 1.0]], Br);
+        tris([[0, 0.2, 1.1], [-0.6, 0.1, 2.2], [0.6, 0.1, 2.2]], Br);
+        both((x) => gearBox(0.25, 0.3, 0.35, x, -0.85, 0, O), 0.35);
+        break;
+      }
+      case 'butterfly': {
+        const Bl = 0x3fa9f5, Or = 0xff8a3d, Yl = 0xffd23d;
+        tube(0.15, 0.2, 2.6, DARK, 0, 0, 0.2); ball(0.25, DARK, 0, 0.05, -1.2);
+        both((x, sd) => { box(0.04, 0.9, 0.04, DARK, x, 0.45, -1.5, -0.6, 0, -0.35 * sd); ball(0.08, DARK, x * 2.4, 0.85, -1.85); }, 0.12);
+        tris([[0, 0, -0.6], [-2.8, 0.6, -1.7], [-2.6, 0.5, 0.2], [0, 0, -0.6], [2.8, 0.6, -1.7], [2.6, 0.5, 0.2]], Bl);
+        tris([[0, 0, 0.2], [-2.2, 0.3, 0.6], [-1.2, 0.2, 1.8], [0, 0, 0.2], [2.2, 0.3, 0.6], [1.2, 0.2, 1.8]], Or);
+        both((x) => ball(0.3, Yl, x, 0.45, -0.8, 1, 0.2, 1), 1.9);
+        both((x) => { gearBox(0.06, 0.8, 0.06, x, -0.6, -0.3); gearBox(0.06, 0.8, 0.06, x, -0.6, 0.4); }, 0.2);
+        break;
+      }
+      case 'racer': {   // gold air racer
+        const Gd = 0xffc23d, K = 0x1b1b1b;
+        tube(0.5, 0.6, 5.2, Gd, 0, 0, 0.2); nose(0.3, 0.6, RED, -2.7); propeller(0, 0, -2.55, 2.6);
+        box(5.6, 0.14, 1.2, Gd, 0, -0.25, -0.3);
+        for (let k = 0; k < 4; k++) both((x) => box(0.3, 0.15, 0.3, K, x, -0.25, -0.75 + (k % 2) * 0.3 + Math.floor(k / 2) * 0.6), 2.25 + (k % 2) * 0.3);
+        ball(0.4, glassMat, 0, 0.45, 0.8, 1, 0.9, 1.6);
+        box(2.2, 0.1, 0.7, Gd, 0, 0.1, 2.5); box(0.1, 0.9, 0.8, RED, 0, 0.55, 2.5);
+        wheel(0.8, -0.7); wheel(-0.8, -0.7);
+        break;
+      }
+      case 'ptero': {   // pterodactyl
+        const Pt = 0xc77a3a, Mb = 0xa85a3a;
+        ball(0.7, Pt, 0, 0, 0, 0.9, 0.8, 1.6); ball(0.4, Pt, 0, 0.3, -1.3, 1, 1, 1.3);
+        nose(0.2, 1.6, 0xe9c9a0, -2.45, 0.25);
+        tris([[0, 0.5, -1.4], [0, 0.6, -0.1], [0, 1.3, 0.3]], Mb);
+        both((x) => ball(0.07, 0x111111, x, 0.45, -1.6), 0.2);
+        tris([[-0.5, 0.2, -0.6], [-5.0, 1.0, 0.4], [-0.5, 0.1, 0.8], [-5.0, 1.0, 0.4], [-3.4, 0.4, 1.4], [-0.5, 0.1, 0.8],
+              [0.5, 0.2, -0.6], [5.0, 1.0, 0.4], [0.5, 0.1, 0.8], [5.0, 1.0, 0.4], [3.4, 0.4, 1.4], [0.5, 0.1, 0.8]], Mb);
+        tube(0.04, 0.2, 1.4, Pt, 0, 0, 1.6);
+        both((x) => gearBox(0.15, 0.5, 0.3, x, -0.75, 0.3, Pt), 0.3);
+        break;
+      }
+      case 'bus': {   // school bus with wings
+        const Y = 0xffb000, K = 0x1b1b1b;
+        box(2.0, 1.8, 5.6, Y, 0, 0.1, 0); box(2.03, 0.12, 5.62, K, 0, -0.3, 0); box(2.03, 0.12, 5.62, K, 0, 0.95, 0);
+        box(2.02, 0.5, 4.4, darkGlass, 0, 0.5, 0.2); box(1.8, 0.6, 0.05, glassMat, 0, 0.5, -2.83);
+        box(0.05, 0.4, 0.4, RED, -1.05, 0.2, -1.6);
+        both((x) => box(0.35, 0.2, 0.05, 0xfff1c0, x, -0.45, -2.83), 0.7);
+        box(9, 0.15, 1.4, WHITE, 0, 0.3, -0.2);
+        both((x) => { tube(0.32, 0.36, 1.4, GRAY, x, 0.3, -1.1); propeller(x, 0.3, -1.85, 2.2); }, 3.0);
+        box(0.14, 1.3, 1.0, Y, 0, 1.6, 2.4); box(3.0, 0.12, 0.8, WHITE, 0, 1.2, 2.5);
+        [[0.95, 1.8], [-0.95, 1.8], [0.95, -1.8], [-0.95, -1.8]].forEach(([x, z]) => gearBox(0.3, 0.6, 0.6, x, -0.7, z));
         break;
       }
       case 'blimp': {
