@@ -86,7 +86,7 @@ white vapour cone round the plane. Bubbles and Origami have no landing gear to f
   keeps darkening to black and the stars come out, and there are call-outs at 10,000 ft,
   30,000 ft (as high as a jumbo jet), 100,000 ft and 328,000 ft (space!). The sky also moves from morning to noon to golden hour to dusk as you
   fly.
-- **HUD:** fuel (time left), altitude (ft), airspeed (kt), compass heading (HDG, 000 =
+- **HUD:** altitude (ft), airspeed (kt), a MACH readout near the speed of sound, compass heading (HDG, 000 =
   north) and an airport chip: its name, distance and an arrow pointing to it (your chosen
   destination, or else the nearest airport).
 - **Coins and orange rings** float in clusters all around you, some of them high in the
@@ -97,23 +97,9 @@ white vapour cone round the plane. Bubbles and Origami have no landing gear to f
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps
   cruising over the hills.
-- **Nothing resets:** your coins, score, fuel and the airports you've visited carry over
+- **No fuel limit:** fly and boost as long as you like.
+- **Nothing resets:** your coins, score and the airports you've visited carry over
   from flight to flight and stay saved in the browser.
-
-## Fuel
-
-A full tank lasts **5 minutes** in the air (it doesn't drain on the ground). **Boosting
-burns fuel 3 times faster** (boosts from orange rings are free). The FUEL chip shows the
-time left; under a minute it turns red and says "Low fuel: land soon!".
-
-**Fuel costs coins.** On the ground at any airport you buy fuel with the coins you've
-collected: 1 coin for every 2%, so a full tank is 50 coins (lakes have no fuel). Below
-25% it's free, so with no coins you still get enough emergency fuel to fly off and grab
-more coins.
-
-If the tank runs dry the engine stops and the plane glides, slowly sinking: glide to an
-airport or tap LAND. If you crash (or end up stuck on a lake) with an empty tank, the plane
-is towed to the nearest airport with free emergency fuel.
 
 ## Airports
 
@@ -148,4 +134,4 @@ doesn't hide: yellow at Home Field, teal everywhere else.
 
 ## Saved in the browser
 
-Your coins, score, fuel, visited airports, plane, the pilot-style control setting and sound on/off are kept in `localStorage`.
+Your coins, score, visited airports, plane, the pilot-style control setting and sound on/off are kept in `localStorage`.

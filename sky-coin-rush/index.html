@@ -71,11 +71,6 @@ body{
 #prompt{position:absolute;left:0;right:0;top:40%;text-align:center;font:400 clamp(20px,5vw,28px)/1.2 var(--display);color:var(--hud-fg);-webkit-text-stroke:1px var(--ink);text-shadow:0 3px 0 var(--ink)}
 #prompt.go{color:var(--gold);animation:pulse .7s ease-in-out infinite alternate}
 @keyframes pulse{to{transform:scale(1.08)}}
-.fbar{display:inline-block;width:46px;height:8px;margin-left:6px;border-radius:4px;background:rgba(255,250,240,.2);overflow:hidden;vertical-align:middle}
-.fbar i{display:block;height:100%;width:100%;background:var(--mint);border-radius:4px}
-.fuelchip.low{background:var(--coral);animation:blink .6s steps(2) infinite}
-.fuelchip.low .fbar i{background:var(--hud-fg)}
-@keyframes blink{50%{opacity:.55}}
 #toast{position:absolute;left:0;right:0;top:26%;text-align:center;font:400 clamp(24px,6vw,34px)/1.1 var(--display);color:var(--gold);-webkit-text-stroke:1.2px var(--ink);text-shadow:0 3px 0 var(--ink);opacity:0}
 #toast.show{animation:pop 1.1s ease-out forwards}
 #toast.warn{color:var(--coral)}
@@ -130,7 +125,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
   .chip b{font-size:12px}
   .hide-sm{display:none}
 }
-@media (prefers-reduced-motion:reduce){.fuelchip.low{animation:none}#toast.show{animation-duration:1.4s}#prompt.go{animation:none}}
+@media (prefers-reduced-motion:reduce){#toast.show{animation-duration:1.4s}#prompt.go{animation:none}}
 </style>
 </head>
 <body>
@@ -148,7 +143,6 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="iconbtn" id="btn-pause" aria-label="Pause">II</button>
     </div>
     <div class="row">
-      <span class="chip fuelchip" id="fuelChip">FUEL<b id="fuel">5:00</b><span class="fbar"><i id="fuelFill"></i></span></span>
       <span class="chip">ALT<b id="alt">0</b> ft</span>
       <span class="chip">IAS<b id="spd">0</b> kt</span>
       <span class="chip" id="machChip" hidden>MACH<b id="mach">0.00</b></span>
@@ -187,8 +181,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <hr class="perf">
       <div class="keys">
         <span><kbd>←↑↓→</kbd> <kbd>WASD</kbd></span><span>Fly: left and right turn, up climbs, down dives. Keep holding up to fly a loop! On touch, drag anywhere.</span>
-        <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST). Boosting burns fuel 3 times faster!</span>
-        <span><kbd>Fuel</kbd></span><span>5 minutes per tank. Buy more at any airport with coins: 1 coin = 2%.</span>
+        <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST)</span>
         <span><kbd>G</kbd></span><span>Landing gear up or down (or tap GEAR)</span>
         <span><kbd>F</kbd></span><span>Flip and fly upside down (or tap FLIP)</span>
         <span><kbd>M</kbd></span><span>Map: choose an airport to fly to (or tap MAP)</span>
@@ -917,7 +910,7 @@ function boot(hot){
   }
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
   const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), mach: $('mach'), machChip: $('machChip'), powers: $('powers'),
-    hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), fuel: $('fuel'), fuelChip: $('fuelChip'), fuelFill: $('fuelFill'), land: $('btn-land'), gearBtn: $('btn-gear'), flipBtn: $('btn-flip'), prompt: $('prompt'),
+    hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), land: $('btn-land'), gearBtn: $('btn-gear'), flipBtn: $('btn-flip'), prompt: $('prompt'),
     apChip: $('apChip'), guide: $('guide'), guideArrow: $('guideArrow'), guideText: $('guideText') };
   let powKey = '';
   function updatePowers(force){
@@ -934,10 +927,6 @@ function boot(hot){
   // plane and is re-sampled every couple of cells. Its middle is a regular 30 m lattice
   // aligned to world coordinates, so nearby hills never shift; cells grow wider towards
   // the edge, where the fog hides them.
-  const FUEL_TIME = 300, BOOST_BURN = 3;   // seconds of flying on a full tank; boosting burns fuel 3x faster
-  // Fuel at airports costs coins: 1 coin buys FUEL_PER_COIN %, so a full tank is 50 coins.
-  // Below EMERGENCY_FUEL % it's free, so you can always fly off and collect more coins.
-  const FUEL_PER_COIN = 2, EMERGENCY_FUEL = 25;
   const COIN_TOP = 5700, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
   const SPACE_C = new THREE.Color(0x0b1238), BLACK = new THREE.Color(0x02030a), SPACE_HAZE = new THREE.Color(0x101528);
   // altitude call-outs (metres, message); there's no ceiling, so they go all the way to space
@@ -1160,18 +1149,17 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false, supersonic: false, vaporT: 0 };
-  // Progress is never reset: coins, score, fuel and the airports you've visited carry over
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0 };
+  // Progress is never reset: coins, score and the airports you've visited carry over
   // from flight to flight and are saved in the browser.
   (function loadProgress(){
     const saved = store.get('scr.progress', null);
     if (!saved) return;
     coins = Math.max(0, saved.coins | 0); score = Math.max(0, +saved.score || 0);
-    F.fuel = clamp(typeof saved.fuel === 'number' ? saved.fuel : 100, 0, 100);
     F.visited = new Set(['0,0'].concat(Array.isArray(saved.visited) ? saved.visited : []));
   })();
   function saveProgress(){
-    store.set('scr.progress', { coins, score: Math.floor(score), fuel: Math.round(F.fuel * 10) / 10, visited: Array.from(F.visited) });
+    store.set('scr.progress', { coins, score: Math.floor(score), visited: Array.from(F.visited) });
   }
   window.addEventListener('pagehide', saveProgress);
   // the airport whose meadow the point is on (null if none), in its own coordinates
@@ -1323,9 +1311,9 @@ function boot(hot){
   function startFree(){
     sfx.init(); sfx.resume();
     clearFreeItems();
-    chain = 0; mult = 1; lastCoinT = -9;   // coins, score, fuel and visited airports carry over
+    chain = 0; mult = 1; lastCoinT = -9;   // coins, score and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false, supersonic: false, vaporT: 0 });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0 });
     setLevel(0, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -1351,18 +1339,7 @@ function boot(hot){
     else { sfx.hit(); burst(F.x, F.y, F.z, 0xb7a998, 18, 1.4); }
     toast(msg || (inWater ? 'Splash!' : 'Crash!'), 'warn');
   }
-  // Out of fuel and down (or stuck on a lake): the plane is towed to the nearest airport,
-  // lined up at the start of its runway with free emergency fuel (more costs coins there).
-  function towToAirport(){
-    const a = nearestAirport(F.x, F.z);
-    F.x = a.x - a.fx * (RWY_LEN / 2 - 20); F.z = a.z - a.fz * (RWY_LEN / 2 - 20); F.y = rwyTop(a) + PLANE_SCALE;
-    setLevel(a.hdg, 0); F.speed = 0; F.ground = true; F.autoBrake = true; F.auto = false;
-    F.fuel = Math.max(F.fuel, EMERGENCY_FUEL); F.broke = false; F.lowTold = false; F.stuckT = 0; F.lastLand = t; F.gear = true; F.gearT = 1; F.flipped = false; showGear(1); planeRoot.visible = true;
-    camBase.set(F.x, F.y + 5, F.z).addScaledVector(vFwd, -13 * (plane.cam || 1));
-    toast('Towed to ' + a.name + ' with free emergency fuel', 'info');
-  }
   function respawnFree(){
-    if (F.fuel <= 0){ towToAirport(); return; }
     // put the plane back in the sky right above where it went down
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 220);
     setLevel(F.yaw, 0); F.speed = 65; F.ground = false; F.gear = true; F.gearT = 1; showGear(1); planeRoot.visible = true;
@@ -1382,18 +1359,9 @@ function boot(hot){
     }
     const live = state === 'play';
     if (!live){ const a = demoInput(); ax = a.ax; ay = a.ay; }
-    const engineOn = F.fuel > 0;
     // auto-land boosts on long trips, but not towards high ground
     const autoBoost = F.auto && !F.autoFinal && F.apDist > 2500 && terrainAhead() < F.y - 150;
-    const burning = engineOn && (!!(keys.b || F.boostHeld) || autoBoost);   // boost you chose (ring boosts are free)
-    const boosting = burning || (engineOn && boostT > 0);
-    // a full tank lasts FUEL_TIME seconds in the air, BOOST_BURN times faster while boosting;
-    // landing at an airport fills it again
-    if (live && !F.ground && F.crashT <= 0 && F.fuel > 0){
-      F.fuel = Math.max(0, F.fuel - 100 / FUEL_TIME * dt * (burning ? BOOST_BURN : 1));
-      if (F.fuel < 20 && !F.lowTold){ F.lowTold = true; toast('Low fuel: land soon!', 'warn'); }
-      if (F.fuel <= 0) toast('Out of fuel! Glide to an airport', 'warn');
-    }
+    const boosting = !!(keys.b || F.boostHeld) || boostT > 0 || autoBoost;
     boostT = Math.max(0, boostT - dt); shake = Math.max(0, shake - dt * 1.6);
     // breaking the sound barrier: a boom, a shake and a flash of vapour round the plane
     if (live && !F.supersonic && F.speed >= MACH1 && !F.ground){
@@ -1409,32 +1377,15 @@ function boot(hot){
       // on the airfield. After a landing the brakes stop the plane by themselves; hold up to
       // roll again and lift off. On the first takeoff it speeds up on its own.
       if (ay > 0.3) F.autoBrake = false;
-      if (F.autoBrake || ay < -0.3 || !engineOn) F.speed = Math.max(0, F.speed - 24 * dt);
+      if (F.autoBrake || ay < -0.3) F.speed = Math.max(0, F.speed - 24 * dt);
       else F.speed = Math.min(F.speed + 13 * dt, 70);
-      if (live && onAirfield(F.x, F.z) && F.fuel < 100 && !F.broke){
-        let add = Math.min(35 * dt, 100 - F.fuel);
-        if (F.fuel < EMERGENCY_FUEL) add = Math.min(add, EMERGENCY_FUEL - F.fuel);   // free emergency fuel
-        else {
-          // pay as you pump: fuelCredit is fuel already paid for but not yet pumped
-          add = Math.min(add, F.fuelCredit + coins * FUEL_PER_COIN);
-          F.fuelCredit -= add;
-          while (F.fuelCredit < 0 && coins > 0){ coins--; F.fuelCredit += FUEL_PER_COIN; }
-          F.fuelCredit = Math.max(0, F.fuelCredit);
-          if (add <= 1e-6){ F.broke = true; toast('Out of coins! Grab coins in the sky for more fuel', 'warn'); }
-        }
-        F.fuel = Math.min(100, F.fuel + add);
-        if (F.fuel >= 100){ F.lowTold = false; toast('Tank full!', ''); }
-      }
-      // empty tank somewhere with no fuel (a lake): get a tow after a moment
-      F.stuckT = live && !engineOn && F.speed < 1 && !onAirfield(F.x, F.z) ? F.stuckT + dt : 0;
-      if (F.stuckT > 2.5) towToAirport();
       setLevel(F.yaw - ax * 0.5 * dt * Math.min(1, F.speed / 15), F.speed >= VR && !F.autoBrake ? 0.08 : 0);
       F.x += -Math.sin(F.yaw) * F.speed * dt; F.z += -Math.cos(F.yaw) * F.speed * dt;
       const g = groundAt(F.x, F.z);
       F.y = restAt(F.x, F.z);
       const leaving = !onAirfield(F.x, F.z) && !onWater(F.x, F.z);
       const fieldEnd = (l => l && Math.abs(l.u) > AP_HALF_L - 45)(airfieldAt(F.x, F.z));
-      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; F.broke = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
+      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
       else if (g < 0.5 && !plane.water) crashFree(true);
     } else {
       // up/down pitches around the wings with no limit, so holding up flies a full loop
@@ -1457,12 +1408,10 @@ function boot(hot){
         if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); }
       } else F.loopAcc *= Math.max(0, 1 - dt * 2);
       const cruise = (boosting ? plane.boost : plane.cruise) * (1 - 0.08 * F.gearT);   // the gear down slows you a little
-      if (engineOn) F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8);
-      else F.speed -= 2 * dt;                                    // engine off: just gliding
+      F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8);
       F.speed -= vFwd.y * 14 * dt;
       F.speed = clamp(F.speed, 30, plane.boost + 40);
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
-      if (!engineOn) F.y -= 5 * dt;                              // and slowly sinking
       // no altitude limit: call-outs on the way up (each again after dropping well below it)
       const ms = MILESTONES[F.milestone];
       if (ms && F.y > ms[0]){ F.milestone++; if (live) toast(ms[1], ''); }
@@ -1537,10 +1486,10 @@ function boot(hot){
     planeRoot.quaternion.copy(Q);
     const gearTo = F.gear || !hasGear() ? 1 : 0;
     if (F.gearT !== gearTo){ F.gearT = gearTo > F.gearT ? Math.min(1, F.gearT + dt * 1.2) : Math.max(0, F.gearT - dt * 1.2); showGear(F.gearT); }
-    for (const sp of spinners) sp.o.rotation[sp.axis] += dt * sp.rate * (engineOn ? 1 : 0.15);
+    for (const sp of spinners) sp.o.rotation[sp.axis] += dt * sp.rate;
     F.vaporT = Math.max(0, F.vaporT - dt * 1.2);
     vapor.visible = F.vaporT > 0; vapor.material.opacity = F.vaporT * 0.55; vapor.scale.setScalar(1 + (1 - F.vaporT) * 0.6);
-    for (const fl of flames) fl.scale.y = engineOn ? (boosting && !F.ground ? 1.5 : fl.userData.idle) * (0.85 + Math.random() * 0.3) : 0.001;
+    for (const fl of flames) fl.scale.y = (boosting && !F.ground ? 1.5 : fl.userData.idle) * (0.85 + Math.random() * 0.3);
     const field = airfieldAt(F.x, F.z), gTop = Math.max(onRunway(field) ? rwyTop(field.a) : groundAt(F.x, F.z), 0);
     planeShadow.position.set(F.x, gTop + 0.08, F.z);
     const alt = F.y - gTop; planeShadow.scale.setScalar(1 + alt * 0.05);
@@ -1589,7 +1538,7 @@ function boot(hot){
 
     if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
     audioTick -= dt;
-    if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live && engineOn, Math.min(F.speed, 190), snd.mul, snd.vol); }
+    if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live, Math.min(F.speed, 190), snd.mul, snd.vol); }
     if (live) updateFreeHud();
   }
   function updateFreeHud(){
@@ -1618,21 +1567,12 @@ function boot(hot){
       H.guideArrow.style.transform = 'rotate(' + turn + 'rad)';
       txt(H.guideText, F.dest.name + ' · ' + (apDist / 1000).toFixed(1) + ' km');
     }
-    const left = Math.ceil(F.fuel / 100 * FUEL_TIME);
-    txt(H.fuel, Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
-    H.fuelFill.style.width = F.fuel.toFixed(1) + '%';
-    H.fuelChip.classList.toggle('low', F.fuel < 20);
     let prompt = '';
     const up = invertY ? 'DOWN' : 'UP';
     if (F.crashT <= 0 && F.ground){
       if (F.autoBrake && F.speed > 1) prompt = 'Landed! Braking…';
-      else if (F.fuel < 100 && onAirfield(F.x, F.z) && !F.broke) prompt = F.fuel < EMERGENCY_FUEL ? 'Free emergency fuel… ' + Math.floor(F.fuel) + '%' : 'Buying fuel (1 coin = 2%)… ' + Math.floor(F.fuel) + '%';
-      else if (F.broke && F.speed < 1) prompt = 'No coins left for fuel. Hold ' + up + ' to take off';
-      else if (F.fuel <= 0) prompt = 'Out of fuel: calling a tow…';
       else if (F.autoBrake) prompt = 'Hold ' + up + ' to take off again';
       else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : 'Climb! Hold ' + up + ' or drag ' + up.toLowerCase();
-    } else if (F.crashT <= 0 && F.fuel <= 0 && !F.auto){
-      prompt = 'Out of fuel: glide to an airport (or tap LAND)';
     } else if (F.crashT <= 0 && F.auto){
       prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying to ' + F.target.name;
     } else if (F.crashT <= 0 && airfieldAt(F.x, F.z) && F.y < airfieldAt(F.x, F.z).a.elev + 80){
