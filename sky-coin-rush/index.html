@@ -55,7 +55,7 @@ body{
 .chip.power.boost{background:var(--coral)}
 .iconbtn{pointer-events:auto;width:38px;height:38px;border-radius:10px;border:0;background:var(--glass);color:var(--hud-fg);font:700 14px/1 var(--hud);cursor:pointer;display:grid;place-items:center}
 .iconbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(420px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
+.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(520px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
 .ap{pointer-events:auto;border:0;border-radius:12px;background:var(--glass);color:var(--hud-fg);font:700 15px/1 var(--hud);letter-spacing:.08em;padding:0 14px;cursor:pointer;display:flex;align-items:center;gap:6px;min-height:44px}
 .ap.on{background:var(--teal);box-shadow:0 0 0 2px var(--mint)}
 .ap:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
@@ -161,6 +161,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="ap" id="btn-gear" aria-label="Landing gear up or down (G)">GEAR</button>
       <button class="ap" id="btn-flip" aria-label="Fly upside down (F)">FLIP</button>
       <button class="ap" id="btn-map" aria-label="Choose an airport to fly to (M)">MAP</button>
+      <button class="ap" id="btn-view" aria-label="Look at the front of the plane (C)">VIEW</button>
       <span class="hint">Airports are everywhere: follow the arrow and the light beacons, or tap LAND (L) to fly to the nearest one and land.</span>
     </div>
   </div>
@@ -1072,6 +1073,7 @@ function boot(hot){
     if ((e.code === 'KeyL' || e.code === 'KeyQ') && state === 'play'){ e.preventDefault(); toggleAutoLand(); }
     if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
     if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
+    if ((e.code === 'KeyC' || e.code === 'KeyV') && state === 'play'){ e.preventDefault(); toggleView(); }
     if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
     if (e.code === 'Escape' || e.code === 'KeyP'){ state === 'play' ? pause() : state === 'paused' && resume(); }
     if ((e.code === 'Enter' || e.code === 'Space') && state === 'attract' && !(e.target && e.target.tagName === 'BUTTON')){ e.preventDefault(); startFree(); }
@@ -1129,6 +1131,7 @@ function boot(hot){
   $('btn-land').addEventListener('click', e => { toggleAutoLand(); e.currentTarget.blur(); });
   $('btn-gear').addEventListener('click', e => { toggleGear(); e.currentTarget.blur(); });
   $('btn-flip').addEventListener('click', e => { toggleFlip(); e.currentTarget.blur(); });
+  $('btn-view').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
   $('btn-map').addEventListener('click', e => { e.currentTarget.blur(); openAirports(); });
   $('aplist').addEventListener('click', e => {
     const b = e.target.closest('.apbtn'); if (!b) return;
@@ -1751,13 +1754,23 @@ function boot(hot){
     camUp.set(0, 1, 0).lerp(camFlip.copy(vUp).multiplyScalar(fl), lean).normalize();
     camUpS.lerp(camUp, 1 - Math.exp(-dt * 5)).normalize();
     const camK = plane.cam || 1;
-    camT.set(F.x, F.y, F.z).addScaledVector(vFwd, -13 * camK).addScaledVector(camUpS, 4 * camK);
-    camBase.lerp(camT, 1 - Math.exp(-dt * 6));
+    if (camView){
+      // front view: held at a set spot ahead of the nose (relative to the plane, so it
+      // doesn't fall behind at speed)
+      camT.copy(vFwd).multiplyScalar(15 * camK).addScaledVector(camUpS, 3 * camK);
+      if (camSnap) camOff.copy(camT); else camOff.lerp(camT, 1 - Math.exp(-dt * 6));
+      camBase.set(F.x, F.y, F.z).add(camOff);
+    } else {
+      camT.set(F.x, F.y, F.z).addScaledVector(vFwd, -13 * camK).addScaledVector(camUpS, 4 * camK);
+      if (camSnap) camBase.copy(camT); else camBase.lerp(camT, 1 - Math.exp(-dt * 6));
+    }
+    camSnap = false;
     const camFloor = Math.max(groundAt(camBase.x, camBase.z), 0) + 1.5;
     if (camBase.y < camFloor) camBase.y = camFloor;
     camera.position.copy(camBase);
     if (shake > 0){ const s = shake * shake; camera.position.x += (Math.random() - 0.5) * s * 1.6; camera.position.y += (Math.random() - 0.5) * s * 1.6; }
-    look.set(F.x, F.y, F.z).addScaledVector(vFwd, 20).addScaledVector(camUpS, 1.5);
+    if (camView) look.set(F.x, F.y, F.z).addScaledVector(camUpS, 0.8 * camK);
+    else look.set(F.x, F.y, F.z).addScaledVector(vFwd, 20).addScaledVector(camUpS, 1.5);
     camera.up.copy(camUpS);
     camera.lookAt(look);
     const fov = baseFov + (boosting && !F.ground ? 10 : 0);
@@ -1844,6 +1857,10 @@ function boot(hot){
   /* ---------------- Main loop ---------------- */
   const camBase = new THREE.Vector3(0, 12, 14), camT = new THREE.Vector3(), look = new THREE.Vector3();
   const camUp = new THREE.Vector3(0, 1, 0), camUpS = new THREE.Vector3(0, 1, 0), camFlip = new THREE.Vector3();
+  // camera view: 0 = chase (behind the plane), 1 = front (out ahead, looking back at the plane)
+  let camView = 0, camSnap = false;
+  const camOff = new THREE.Vector3();
+  function toggleView(){ camView = 1 - camView; camSnap = true; toast(camView ? 'Front view' : 'Chase view', ''); }
   let last = performance.now(), audioTick = 0, saveTick = 2;
   function frame(now){
     requestAnimationFrame(frame);
