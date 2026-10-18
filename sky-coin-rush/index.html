@@ -60,10 +60,14 @@ body{
 .ap.on{background:var(--teal);box-shadow:0 0 0 2px var(--mint)}
 .ap:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .arrow{display:inline-block;width:0;height:0;margin-left:6px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:11px solid var(--gold);vertical-align:-1px}
-.freebar{display:flex;gap:8px;align-items:stretch;width:100%}
+.freebar{display:flex;gap:8px;align-items:stretch;width:100%;flex-wrap:wrap;justify-content:center}
 .freebar .hint{flex:1;min-width:0;background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.35;display:flex;align-items:center}
 .ap.boost{background:var(--coral)}
 .ap.boost.held{box-shadow:0 0 0 2px var(--gold)}
+#guide{display:grid;justify-items:center;gap:4px;pointer-events:none}
+#guide i{width:0;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-bottom:32px solid var(--coral);filter:drop-shadow(0 2px 0 var(--ink))}
+#guide span{font:700 12px/1.2 var(--hud);letter-spacing:.06em;background:var(--glass);padding:3px 8px;border-radius:8px;white-space:nowrap}
+.chip.dest{background:var(--coral)}
 #prompt{position:absolute;left:0;right:0;top:40%;text-align:center;font:400 clamp(20px,5vw,28px)/1.2 var(--display);color:var(--hud-fg);-webkit-text-stroke:1px var(--ink);text-shadow:0 3px 0 var(--ink)}
 #prompt.go{color:var(--gold);animation:pulse .7s ease-in-out infinite alternate}
 @keyframes pulse{to{transform:scale(1.08)}}
@@ -101,6 +105,12 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 .btn:focus-visible,.toggle input:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 .btn.secondary{background:transparent;box-shadow:inset 0 0 0 2px var(--ink);font-size:17px;padding:13px 18px}
 .btns{display:grid;gap:10px}
+.aplist{display:grid;gap:6px;max-height:min(52vh,420px);overflow-y:auto}
+.apbtn{appearance:none;border:2px solid transparent;background:var(--paper-2);border-radius:10px;padding:8px 12px;text-align:left;cursor:pointer;display:grid;gap:2px;font:inherit;color:var(--ink)}
+.apbtn b{font:400 16px/1.15 var(--display)}
+.apbtn small{font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
+.apbtn[aria-pressed="true"]{border-color:var(--ink);background:var(--gold)}
+.apbtn:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
 .planes{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:8px}
 .pl{appearance:none;border:2px solid transparent;background:var(--paper-2);border-radius:10px;padding:8px 10px;text-align:left;cursor:pointer;display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;font:inherit;color:var(--ink);min-width:0}
 .pl .sw{grid-row:span 2;width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(27,35,64,.35)}
@@ -113,7 +123,9 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 .foot{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;font-variant-numeric:tabular-nums}
 .foot b{font-family:var(--display);font-weight:400;font-size:18px}
 #nogl{position:fixed;inset:0;display:grid;place-items:center;text-align:center;padding:24px;z-index:30;background:var(--ink);color:var(--paper);font-size:16px}
+@media (max-width:700px){.freebar .hint{display:none}}
 @media (max-width:520px){
+  .ap{padding:0 9px;font-size:13px;min-height:40px}
   .chip{font-size:10px;padding:4px 6px}
   .chip b{font-size:12px}
   .hide-sm{display:none}
@@ -140,16 +152,20 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <span class="chip">ALT<b id="alt">0</b> ft</span>
       <span class="chip">IAS<b id="spd">0</b> kt</span>
       <span class="chip">HDG<b id="hdg">000</b></span>
-      <span class="chip"><span class="apname" id="apName">Home Field</span><b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
+      <span class="chip" id="apChip"><span class="apname" id="apName">Home Field</span><b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
     </div>
     <div class="row" id="powers"></div>
   </div>
   <div id="toast"></div>
   <div id="prompt" hidden></div>
   <div class="bottom">
+    <div id="guide" hidden><i id="guideArrow"></i><span id="guideText"></span></div>
     <div class="freebar">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
       <button class="ap" id="btn-land" aria-label="Auto-land at the nearest airport">LAND</button>
+      <button class="ap" id="btn-gear" aria-label="Landing gear up or down (G)">GEAR</button>
+      <button class="ap" id="btn-flip" aria-label="Fly upside down (F)">FLIP</button>
+      <button class="ap" id="btn-map" aria-label="Choose an airport to fly to (M)">MAP</button>
       <span class="hint">Airports are everywhere: follow the arrow and the light beacons, or tap LAND (L) to fly to the nearest one and land.</span>
     </div>
   </div>
@@ -161,7 +177,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-head"><span>Flight SCR-01</span><span>Route: anywhere</span></div>
     <div class="card-body">
       <h1>Sky Coin <em>Rush</em></h1>
-      <p class="lede">Take off from the home airfield and fly anywhere you like: over hills, lakes and snowy mountains, through the clouds and up to 19,700 ft. Grab the coins floating in the sky, then land back home.</p>
+      <p class="lede">Take off from the home airfield and fly anywhere you like: over hills, lakes and snowy mountains, through the clouds and as high as you like, all the way up to space. Grab the coins floating in the sky, then land back home.</p>
       <div>
         <p class="label">Choose your plane</p>
         <div class="planes" id="planes" role="group" aria-label="Choose your plane"></div>
@@ -170,11 +186,27 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <hr class="perf">
       <div class="keys">
         <span><kbd>←↑↓→</kbd> <kbd>WASD</kbd></span><span>Fly: left and right turn, up climbs, down dives. Keep holding up to fly a loop! On touch, drag anywhere.</span>
-        <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST)</span>
+        <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST). Boosting burns fuel 3 times faster!</span>
+        <span><kbd>Fuel</kbd></span><span>5 minutes per tank. Buy more at any airport with coins: 1 coin = 2%.</span>
+        <span><kbd>G</kbd></span><span>Landing gear up or down (or tap GEAR)</span>
+        <span><kbd>F</kbd></span><span>Flip and fly upside down (or tap FLIP)</span>
+        <span><kbd>M</kbd></span><span>Map: choose an airport to fly to (or tap MAP)</span>
         <span><kbd>L</kbd> <kbd>Q</kbd></span><span>Auto-land: the plane flies home and lands (or tap LAND)</span>
         <span><kbd>Esc</kbd> <kbd>P</kbd></span><span>Pause</span>
       </div>
       <label class="toggle"><input type="checkbox" id="invert-start"> Pilot-style controls: push down to climb</label>
+    </div>
+  </section>
+
+  <section class="card" id="card-airports" hidden>
+    <div class="card-head"><span>Flight plan</span><span>Choose a destination</span></div>
+    <div class="card-body">
+      <h2>Where <em>to?</em></h2>
+      <div class="aplist" id="aplist"></div>
+      <div class="btns">
+        <button class="btn secondary" id="btn-ap-nearest">Nearest airport</button>
+        <button class="btn" id="btn-ap-back">Back to flying</button>
+      </div>
     </div>
   </section>
 
@@ -259,6 +291,7 @@ const sfx = (() => {
     hit(){ noise(0.4, 0.55, 1800, 150); tone(120, 0.45, 'sawtooth', 0.18, 0, 40); },
     splash(){ noise(0.9, 0.5, 2500, 200); },
     land(){ noise(0.25, 0.35, 3000, 900, 'bandpass'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, 0.15 + i * 0.09)); },
+    gear(){ noise(0.5, 0.18, 700, 200, 'bandpass'); tone(170, 0.45, 'square', 0.035, 0, 110); },
     ap(on){ tone(on ? 660 : 880, 0.12, 'sine', 0.08); tone(on ? 880 : 660, 0.14, 'sine', 0.08, 0.1); },
     engine(on, speed, mul, vol){
       if (!engine) return;
@@ -286,7 +319,7 @@ function boot(hot){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0xd6ecf5, 150, 500);
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 16000);
+  const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 40000);
   let baseFov = 62;
   function resize(){
     const w = window.innerWidth, h = window.innerHeight;
@@ -361,7 +394,7 @@ function boot(hot){
   const PLANES = [
     { id: 'cub', name: 'Red Cub', note: 'The all-rounder', color: '#e8432e', cruise: 65, boost: 150, pitch: 1.5, turn: 1.3 },
     { id: 'biplane', name: 'Barnstormer', note: 'Slow and super loopy', color: '#ffc23d', cruise: 55, boost: 120, pitch: 2.1, turn: 1.6 },
-    { id: 'seaplane', name: 'Puffin', note: 'Lands on lakes too', color: '#2f6fbf', cruise: 60, boost: 130, pitch: 1.4, turn: 1.2, water: true },
+    { id: 'seaplane', name: 'Puffin', note: 'Lands on lakes too', color: '#2f6fbf', cruise: 60, boost: 130, pitch: 1.4, turn: 1.2, water: true, fixedGear: true },
     { id: 'zippy', name: 'Zippy', note: 'Stunt plane, spins fast', color: '#ff4f9a', cruise: 70, boost: 160, pitch: 2.5, turn: 2.0 },
     { id: 'glider', name: 'Feather', note: 'Long wings, very quiet', color: '#e9e4d8', cruise: 45, boost: 95, pitch: 1.3, turn: 1.2, cam: 1.3, sound: { mul: 2.4, vol: 0.012 } },
     { id: 'hauler', name: 'Hauler', note: 'Big cargo, two props', color: '#6b7a3a', cruise: 60, boost: 125, pitch: 1.0, turn: 0.9, cam: 1.25, sound: { mul: 0.8, vol: 0.05 } },
@@ -381,11 +414,11 @@ function boot(hot){
   const silverMat = new THREE.MeshPhongMaterial({ color: 0xc9d2dc, specular: 0xffffff, shininess: 90 });
   const blurMat = new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
   const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
-  let spinners = [], flames = [];
+  let spinners = [], flames = [], gearParts = [], gearShown = 1;
   const RED = 0xe8432e, CREAM = 0xfff1d6, DARK = 0x2a2f45, WHITE = 0xf4f1ea, GRAY = 0xc9d2dc;
   function buildPlane(def){
     planeBody.traverse(o => { if (o.geometry) o.geometry.dispose(); });
-    planeBody.clear(); spinners = []; flames = [];
+    planeBody.clear(); spinners = []; flames = []; gearParts = [];
     const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); planeBody.add(o); return o; };
     const box = (w, h, d, m, x, y, z, rx, ry, rz) => { const o = add(new THREE.BoxGeometry(w, h, d), m, x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); return o; };
     const both = (fn, x, ...rest) => { fn(x, 1, ...rest); fn(-x, -1, ...rest); };   // build a part on each side
@@ -393,7 +426,9 @@ function boot(hot){
     const tube = (r1, r2, len, m, x, y, z) => { const o = add(new THREE.CylinderGeometry(r1, r2, len, 14), m, x, y, z); o.rotation.x = Math.PI / 2; return o; };
     const nose = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = -Math.PI / 2; return o; };
     const tail = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = Math.PI / 2; return o; };
-    const wheel = (x, z) => box(0.28, 0.5, 0.28, DARK, x, -0.75, z);
+    // landing gear folds up into the plane: these parts shrink upwards when it's raised
+    const gearBox = (w, h, d, x, y, z) => { const o = box(w, h, d, DARK, x, y, z); o.userData.gy = y; o.userData.gh = h; gearParts.push(o); return o; };
+    const wheel = (x, z) => gearBox(0.28, 0.5, 0.28, x, -0.75, z);
     const propeller = (x, y, z, size) => {
       const g = new THREE.Group(), b = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, 0.06), mat(DARK)), b2 = b.clone();
       b2.rotation.z = Math.PI / 2;
@@ -451,7 +486,7 @@ function boot(hot){
         box(0.5, 0.4, 1.2, glassMat, 0, 0.42, -1.2);
         box(11.5, 0.1, 0.85, WHITE, 0, 0.2, -0.4); both((x) => box(0.9, 0.12, 0.87, RED, x, 0.2, -0.4), 5.4);
         box(0.1, 1.3, 0.8, WHITE, 0, 0.9, 2.2); box(2.4, 0.08, 0.6, RED, 0, 1.55, 2.3);
-        box(0.25, 0.65, 0.4, DARK, 0, -0.68, -0.2);
+        gearBox(0.25, 0.65, 0.4, 0, -0.68, -0.2);
         break;
       case 'hauler': {
         const O = 0x6b7a3a, O2 = 0x5a6830;
@@ -471,7 +506,7 @@ function boot(hot){
         box(0.12, 1.4, 1.3, B, 0, 0.85, 2.3, 0.4);
         both((x, sd) => box(1.6, 0.1, 0.8, GRAY, x, 0.1, 2.5, 0, -0.4 * sd), 0.9);
         tube(0.4, 0.45, 0.6, DARK, 0, 0, 2.9); flame(0, 0, 3.2, 0.35);
-        box(0.2, 0.6, 0.2, DARK, 0, -0.7, -1.8); wheel(0.6, 0.6); wheel(-0.6, 0.6);
+        gearBox(0.2, 0.6, 0.2, 0, -0.7, -1.8); wheel(0.6, 0.6); wheel(-0.6, 0.6);
         break;
       }
       case 'thunder': {
@@ -483,7 +518,7 @@ function boot(hot){
         both((x, sd) => { box(0.12, 1.3, 1.2, D, x, 0.85, 2.4, 0.45, 0, -0.25 * sd); box(0.13, 0.3, 0.9, RED, x + 0.1 * sd, 1.35, 2.7, 0.45, 0, -0.25 * sd); }, 0.55);
         both((x, sd) => box(1.8, 0.1, 0.9, D, x, 0, 2.8, 0, -0.35 * sd), 1.2);
         both((x) => { tube(0.32, 0.36, 0.6, DARK, x, 0, 3.2); flame(x, 0, 3.5, 0.3); }, 0.35);
-        box(0.2, 0.65, 0.2, DARK, 0, -0.68, -1.8); wheel(0.8, 1.0); wheel(-0.8, 1.0);
+        gearBox(0.2, 0.65, 0.2, 0, -0.68, -1.8); wheel(0.8, 1.0); wheel(-0.8, 1.0);
         break;
       }
       case 'stealth': {
@@ -492,7 +527,7 @@ function boot(hot){
         both((x, sd) => box(5.2, 0.22, 2.0, K, x, -0.05, 0.9, 0, -0.75 * sd), 2.6);
         box(0.8, 0.25, 1.0, darkGlass, 0, 0.35, -0.6);
         both((x) => flame(x, 0, 1.9, 0.22, 0.3), 0.5);
-        box(0.2, 0.6, 0.2, DARK, 0, -0.7, -1.2); wheel(0.9, 0.4); wheel(-0.9, 0.4);
+        gearBox(0.2, 0.6, 0.2, 0, -0.7, -1.2); wheel(0.9, 0.4); wheel(-0.9, 0.4);
         break;
       }
       case 'jumbo': {
@@ -504,7 +539,7 @@ function boot(hot){
         both((x) => { tube(0.32, 0.38, 1.4, GRAY, x, -0.6, 0.1); tube(0.3, 0.36, 1.3, GRAY, x * 1.9, -0.55, 0.9); }, 1.9);
         box(0.14, 2.2, 1.6, B, 0, 1.6, 4.7, 0.35);
         both((x, sd) => box(2.6, 0.12, 1.0, WHITE, x, 0.3, 4.9, 0, -0.4 * sd), 1.4);
-        box(0.25, 0.5, 0.25, DARK, 0, -0.75, -3.0); wheel(0.9, 0.8); wheel(-0.9, 0.8);
+        gearBox(0.25, 0.5, 0.25, 0, -0.75, -3.0); wheel(0.9, 0.8); wheel(-0.9, 0.8);
         break;
       }
       case 'rocket': {
@@ -514,7 +549,7 @@ function boot(hot){
         both((x, sd) => box(3.2, 0.18, 3.0, WHITE, x, -0.4, 1.4, 0, -0.55 * sd), 1.7);
         box(0.16, 1.8, 1.6, WHITE, 0, 1.4, 2.6, 0.4);
         [[0, 0.25], [0.45, -0.2], [-0.45, -0.2]].forEach(([x, y]) => { tube(0.3, 0.38, 0.6, DARK, x, y, 3.3); flame(x, y, 3.6, 0.3, 0.8); });
-        box(0.25, 0.5, 0.25, DARK, 0, -0.75, -2.0); wheel(0.7, 1.0); wheel(-0.7, 1.0);
+        gearBox(0.25, 0.5, 0.25, 0, -0.75, -2.0); wheel(0.7, 1.0); wheel(-0.7, 1.0);
         break;
       }
       case 'saucer': {
@@ -530,11 +565,19 @@ function boot(hot){
           l.position.set(Math.cos(a) * 3.15, 0, Math.sin(a) * 3.15); ring.add(l);
         }
         planeBody.add(ring); spinners.push({ o: ring, axis: 'y', rate: 2.5 });
-        for (let i = 0; i < 3; i++){ const a = i / 3 * Math.PI * 2; box(0.12, 0.5, 0.12, DARK, Math.cos(a) * 1.4, -0.75, Math.sin(a) * 1.4); }
+        for (let i = 0; i < 3; i++){ const a = i / 3 * Math.PI * 2; gearBox(0.12, 0.5, 0.12, Math.cos(a) * 1.4, -0.75, Math.sin(a) * 1.4); }
         break;
       }
     }
     planeBody.scale.setScalar(PLANE_SCALE);
+    showGear(gearShown);
+  }
+  function showGear(k){
+    gearShown = k;
+    for (const o of gearParts){
+      o.visible = k > 0.04; o.scale.y = Math.max(0.02, k);
+      o.position.y = o.userData.gy + o.userData.gh / 2 * (1 - k);
+    }
   }
   let plane = PLANES.find(pl => pl.id === store.get('scr.plane', 'cub')) || PLANES[0];
   buildPlane(plane);
@@ -623,7 +666,7 @@ function boot(hot){
   let state = 'attract', t = 0, skyDist = 0;
   let score = 0, coins = 0, boostT = 0, shake = 0;
   let chain = 0, mult = 1, lastCoinT = -9;
-  function pause(){ if (state !== 'play') return; state = 'paused'; sfx.engine(false, 0); show('pause'); }
+  function pause(){ if (state !== 'play') return; state = 'paused'; sfx.engine(false, 0); saveProgress(); show('pause'); }
   function resume(){ if (state !== 'paused') return; state = 'play'; sfx.resume(); show(null); }
 
   /* ---------------- Pickups & hits ---------------- */
@@ -645,6 +688,9 @@ function boot(hot){
     const k = KEYMAP[e.code];
     if (k){ keys[k] = true; if (state === 'play') e.preventDefault(); }
     if ((e.code === 'KeyL' || e.code === 'KeyQ') && state === 'play'){ e.preventDefault(); toggleAutoLand(); }
+    if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
+    if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
+    if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
     if (e.code === 'Escape' || e.code === 'KeyP'){ state === 'play' ? pause() : state === 'paused' && resume(); }
     if ((e.code === 'Enter' || e.code === 'Space') && state === 'attract' && !(e.target && e.target.tagName === 'BUTTON')){ e.preventDefault(); startFree(); }
   });
@@ -673,7 +719,7 @@ function boot(hot){
 
   /* ---------------- UI wiring ---------------- */
   function show(panel){
-    ['start', 'pause'].forEach(id => $('card-' + id).hidden = id !== panel);
+    ['start', 'pause', 'airports'].forEach(id => $('card-' + id).hidden = id !== panel);
     $('overlay').hidden = !panel;
     $('hud').hidden = !(state === 'play' || state === 'paused');
     if (panel){ stick.id = null; stickEl.hidden = true; const b = $('card-' + panel).querySelector('.btn'); if (b) try { b.focus({ preventScroll: true }); } catch(e){} }
@@ -699,6 +745,15 @@ function boot(hot){
   boostBtn.addEventListener('pointerdown', holdBoost(true));
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => boostBtn.addEventListener(n, holdBoost(false)));
   $('btn-land').addEventListener('click', e => { toggleAutoLand(); e.currentTarget.blur(); });
+  $('btn-gear').addEventListener('click', e => { toggleGear(); e.currentTarget.blur(); });
+  $('btn-flip').addEventListener('click', e => { toggleFlip(); e.currentTarget.blur(); });
+  $('btn-map').addEventListener('click', e => { e.currentTarget.blur(); openAirports(); });
+  $('aplist').addEventListener('click', e => {
+    const b = e.target.closest('.apbtn'); if (!b) return;
+    F.dest = airports.get(b.dataset.key); resume(); toast('Fly to ' + F.dest.name + '!', '');
+  });
+  $('btn-ap-nearest').addEventListener('click', () => { F.dest = null; resume(); toast('Arrow shows the nearest airport', 'info'); });
+  $('btn-ap-back').addEventListener('click', resume);
   syncToggles();
   const pickerEl = $('planes');
   pickerEl.innerHTML = PLANES.map(pl => '<button type="button" class="pl" data-id="' + pl.id + '" aria-pressed="false"><span class="sw" style="background:' + pl.color + '"></span><b>' + pl.name + '</b><small>' + pl.note + '</small></button>').join('');
@@ -719,11 +774,14 @@ function boot(hot){
   }
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
   const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), powers: $('powers'),
-    hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), fuel: $('fuel'), fuelChip: $('fuelChip'), fuelFill: $('fuelFill'), land: $('btn-land'), prompt: $('prompt') };
+    hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), fuel: $('fuel'), fuelChip: $('fuelChip'), fuelFill: $('fuelFill'), land: $('btn-land'), gearBtn: $('btn-gear'), flipBtn: $('btn-flip'), prompt: $('prompt'),
+    apChip: $('apChip'), guide: $('guide'), guideArrow: $('guideArrow'), guideText: $('guideText') };
   let powKey = '';
   function updatePowers(force){
     const parts = [];
     if (boostT > 0) parts.push('<span class="chip power boost">BOOST<b>' + Math.ceil(boostT) + 's</b></span>');
+    if (state === 'play' && !F.gear) parts.push('<span class="chip power">GEAR UP</span>');
+    if (state === 'play' && F.flipped) parts.push('<span class="chip power boost">UPSIDE DOWN</span>');
     const k = parts.join('');
     if (force || k !== powKey){ powKey = k; H.powers.innerHTML = k; }
   }
@@ -733,9 +791,25 @@ function boot(hot){
   // plane and is re-sampled every couple of cells. Its middle is a regular 30 m lattice
   // aligned to world coordinates, so nearby hills never shift; cells grow wider towards
   // the edge, where the fog hides them.
-  const FUEL_TIME = 300;   // seconds of flying on a full tank
-  const CEIL = 6000, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
-  const SPACE_C = new THREE.Color(0x0b1238);
+  const FUEL_TIME = 300, BOOST_BURN = 3;   // seconds of flying on a full tank; boosting burns fuel 3x faster
+  // Fuel at airports costs coins: 1 coin buys FUEL_PER_COIN %, so a full tank is 50 coins.
+  // Below EMERGENCY_FUEL % it's free, so you can always fly off and collect more coins.
+  const FUEL_PER_COIN = 2, EMERGENCY_FUEL = 25;
+  const COIN_TOP = 5700, FREE_RWY = 6, FREE_REST = FREE_RWY + PLANE_SCALE, FS = 30, FN = 144, FIN = 32, FG = 1.08;
+  const SPACE_C = new THREE.Color(0x0b1238), BLACK = new THREE.Color(0x02030a), SPACE_HAZE = new THREE.Color(0x101528);
+  // altitude call-outs (metres, message); there's no ceiling, so they go all the way to space
+  const MILESTONES = [[3048, '10,000 ft!'], [9144, '30,000 ft! As high as a jumbo jet'], [30480, '100,000 ft! The sky is turning black'], [100000, 'SPACE! 328,000 ft']];
+  // stars, faded in as you climb towards space
+  const stars = (() => {
+    const n = 1500, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++){
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      pos[i * 3] = r * Math.cos(a) * 13000; pos[i * 3 + 1] = u * 13000; pos[i * 3 + 2] = r * Math.sin(a) * 13000;
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+    pts.renderOrder = -1; pts.frustumCulled = false; scene.add(pts); return pts;
+  })();
   function hash2(i, j){
     let h = Math.imul(i | 0, 374761393) ^ Math.imul(j | 0, 668265263);
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -929,7 +1003,7 @@ function boot(hot){
     const cid = ++clusterId, ang = F.yaw + rnd(-1.1, 1.1), dist = rnd(350, 1700);
     const cx = F.x - Math.sin(ang) * dist, cz = F.z - Math.cos(ang) * dist, g = Math.max(0, freeH(cx, cz));
     // most clusters near your height, some high up in the sky to chase
-    let cy = Math.random() < 0.18 ? rnd(1500, CEIL - 300) : clamp(F.y + rnd(-200, 250), g + 45, CEIL - 300);
+    let cy = Math.random() < 0.18 ? rnd(1500, Math.max(COIN_TOP, F.y + 600)) : F.y + rnd(-200, 250);
     cy = Math.max(cy, g + 45);
     const dir = rnd(0, Math.PI * 2), dx = -Math.sin(dir), dz = -Math.cos(dir), pat = pick(['line', 'climb', 'wave', 'ring']);
     for (let i = 0; i < 10; i++){
@@ -943,7 +1017,20 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0 };
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false };
+  // Progress is never reset: coins, score, fuel and the airports you've visited carry over
+  // from flight to flight and are saved in the browser.
+  (function loadProgress(){
+    const saved = store.get('scr.progress', null);
+    if (!saved) return;
+    coins = Math.max(0, saved.coins | 0); score = Math.max(0, +saved.score || 0);
+    F.fuel = clamp(typeof saved.fuel === 'number' ? saved.fuel : 100, 0, 100);
+    F.visited = new Set(['0,0'].concat(Array.isArray(saved.visited) ? saved.visited : []));
+  })();
+  function saveProgress(){
+    store.set('scr.progress', { coins, score: Math.floor(score), fuel: Math.round(F.fuel * 10) / 10, visited: Array.from(F.visited) });
+  }
+  window.addEventListener('pagehide', saveProgress);
   // the airport whose meadow the point is on (null if none), in its own coordinates
   function airfieldAt(x, z){
     const a = airportNear(x, z); if (!a) return null;
@@ -980,6 +1067,7 @@ function boot(hot){
   const beaconOpts = { transparent: true, opacity: 0.35, depthWrite: false, fog: false, side: THREE.DoubleSide };
   const beaconHome = new THREE.MeshBasicMaterial(Object.assign({ color: 0xffc23d }, beaconOpts));
   const beaconMat = new THREE.MeshBasicMaterial(Object.assign({ color: 0x5fe0d0 }, beaconOpts));
+  const beaconDest = new THREE.MeshBasicMaterial(Object.assign({ color: 0xff5f45 }, beaconOpts));
   const apVis = new Map();
   let apCI = NaN, apCJ = NaN;
   function updateAirports(){
@@ -995,31 +1083,67 @@ function boot(hot){
         m.position.set(a.x - a.fx * RWY_LEN / 2, rwyTop(a) - RWY_TOP, a.z - a.fz * RWY_LEN / 2); m.rotation.y = a.hdg;
         const b = new THREE.Mesh(beaconGeo, a.key === '0,0' ? beaconHome : beaconMat);
         b.position.set(a.x - a.rx * 25, rwyTop(a) + 800, a.z - a.rz * 25);
-        free.add(m, b); apVis.set(a.key, { m, b });
+        free.add(m, b); apVis.set(a.key, { m, b, a });
       }
       for (const [k, vis] of apVis) if (!want.has(k)){ free.remove(vis.m, vis.b); apVis.delete(k); }
     }
     for (const vis of apVis.values()){
       const k = Math.max(3, Math.hypot(vis.b.position.x - F.x, vis.b.position.z - F.z) * 0.004);
       vis.b.scale.set(k, 1, k);
+      vis.b.material = vis.a === F.dest ? beaconDest : vis.a.key === '0,0' ? beaconHome : beaconMat;
     }
     beaconHome.opacity = beaconMat.opacity = 0.25 + Math.sin(t * 3) * 0.1;
+    beaconDest.opacity = 0.4 + Math.sin(t * 5) * 0.15;
+  }
+  // The map: pause and list the airports around you, closest first; tapping one makes it the
+  // destination that the arrows point to and that LAND flies to.
+  function openAirports(){
+    if (state !== 'play') return;
+    const ci = cellOf(F.x), cj = cellOf(F.z), list = [];
+    for (let j = cj - 3; j <= cj + 3; j++) for (let i = ci - 3; i <= ci + 3; i++){ const a = airportOfCell(i, j); if (a) list.push(a); }
+    const dist = a => Math.hypot(a.x - F.x, a.z - F.z);
+    list.sort((a, b) => dist(a) - dist(b));
+    const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    $('aplist').innerHTML = list.slice(0, 12).map(a => {
+      const brg = Math.atan2(a.x - F.x, F.z - a.z) / (Math.PI * 2);   // 0 = north, clockwise
+      const dir = DIRS[Math.round((brg % 1 + 1) % 1 * 8) % 8];
+      return '<button type="button" class="apbtn" data-key="' + a.key + '" aria-pressed="' + (F.dest === a) + '"><b>' + a.name + (F.visited.has(a.key) ? ' ✓' : '') +
+        '</b><small>' + (dist(a) / 1000).toFixed(1) + ' km ' + dir + ' · ' + Math.round(a.elev * 3.28).toLocaleString() + ' ft high</small></button>';
+    }).join('');
+    state = 'paused'; sfx.engine(false, 0); show('airports');
+  }
+  function toggleGear(){
+    if (state !== 'play' || F.crashT > 0) return;
+    if (plane.fixedGear){ toast("Floats can't fold up", 'info'); return; }
+    if (F.ground){ toast('Not on the ground!', 'warn'); return; }
+    F.gear = !F.gear; F.gearWarned = false; sfx.gear();
+    toast(F.gear ? 'Gear down' : 'Gear up', 'info');
+  }
+  // Flip: roll over and stay upside down. Up/down and the roll target swap so the controls
+  // still feel the same on screen, and the camera stays the right way up.
+  function toggleFlip(){
+    if (state !== 'play' || F.crashT > 0) return;
+    if (F.ground){ toast('Take off first!', 'info'); return; }
+    if (F.auto){ toast('Auto-land is flying', 'info'); return; }
+    F.flipped = !F.flipped; sfx.ap(F.flipped);
+    toast(F.flipped ? 'Upside down!' : 'Right way up', '');
   }
   function toggleAutoLand(){
     if (state !== 'play' || F.crashT > 0) return;
     if (F.ground){ toast('Already on the ground', 'info'); return; }
-    F.auto = !F.auto; F.autoFinal = false; sfx.ap(F.auto);
-    if (F.auto) F.target = nearestAirport(F.x, F.z);
+    F.auto = !F.auto; F.autoFinal = false; F.flipped = false; sfx.ap(F.auto);
+    if (F.auto) F.target = F.dest || nearestAirport(F.x, F.z);
     toast(F.auto ? 'Auto-land: flying to ' + F.target.name : 'Auto-land off', 'info');
   }
-  // highest ground (or water) on the plane's path over the next 450 m
+  // highest ground (or water) on the plane's path over the next few seconds (at least 450 m)
   function terrainAhead(){
     const ahead = d => groundAt(F.x - Math.sin(F.yaw) * d, F.z - Math.cos(F.yaw) * d);
-    return Math.max(groundAt(F.x, F.z), ahead(200), ahead(450), 0);
+    const v = Math.max(F.speed, 90);
+    return Math.max(groundAt(F.x, F.z), ahead(v * 1.5), ahead(v * 3), ahead(v * 5), ahead(v * 7), 0);
   }
-  // up/down input that pitches the nose towards a target height
+  // up/down input that pitches the nose towards a target height (climbing steeply if needed)
   function pitchToward(altT){
-    const pitchT = clamp((altT - F.y) * 0.02, -0.3, 0.35);
+    const pitchT = clamp((altT - F.y) * 0.02, -0.3, 0.6);
     return clamp((pitchT - F.pitch) * 4, -1, 1);
   }
   // Auto-land: fly to a point 1.6 km before the target airport's runway, turn onto the
@@ -1028,7 +1152,10 @@ function boot(hot){
     const a = F.target, gAhead = terrainAhead(), l = apLocal(a, F.x, F.z);
     const back = -l.u, touch = rwyTop(a) + PLANE_SCALE;   // back: how far short of the runway's middle
     if (F.autoFinal && (Math.abs(l.v) > 220 || back < -200)) F.autoFinal = false;
-    if (!F.autoFinal && Math.abs(l.v) < 150 && back > 0 && back < 1900 && Math.abs(wrapA(F.yaw - a.hdg)) < 0.5) F.autoFinal = true;
+    if (!F.autoFinal && Math.abs(l.v) < 150 && back > 0 && back < 1900 && Math.abs(wrapA(F.yaw - a.hdg)) < 0.5){
+      F.autoFinal = true;
+      if (!F.gear){ F.gear = true; sfx.gear(); toast('Gear down', 'info'); }
+    }
     let yawT, altT;
     F.apDist = 0;
     if (F.autoFinal){
@@ -1052,10 +1179,10 @@ function boot(hot){
   function startFree(){
     sfx.init(); sfx.resume();
     clearFreeItems();
-    score = 0; coins = 0; chain = 0; mult = 1; lastCoinT = -9;
+    chain = 0; mult = 1; lastCoinT = -9;   // coins, score, fuel and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, hiTold: false, ceilTold: false, loopAcc: 0, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0 });
-    setLevel(0, 0); camUpS.set(0, 1, 0);
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false });
+    setLevel(0, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
     for (let i = 0; i < 16; i++) spawnCluster();
@@ -1065,34 +1192,36 @@ function boot(hot){
     state = 'play'; show(null); toast('Cleared for takeoff', 'info');
   }
   function goMenu(){
+    if (state === 'play' || state === 'paused') saveProgress();
     clearFreeItems(); $('prompt').hidden = true; sfx.engine(false, 0);
-    Object.assign(F, { auto: false, autoFinal: false, crashT: 0, boostHeld: false, ground: false, pitch: 0, speed: 65 });
+    Object.assign(F, { auto: false, autoFinal: false, crashT: 0, boostHeld: false, ground: false, pitch: 0, speed: 65, gear: true, gearT: 1, flipped: false });
+    showGear(1);
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 150);
     setLevel(F.yaw, 0);
     boostT = 0; planeRoot.visible = true;
     state = 'attract'; show('start');
   }
-  function crashFree(inWater){
-    F.crashT = 1.6; F.auto = false; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
+  function crashFree(inWater, msg){
+    F.crashT = 1.6; F.auto = false; F.flipped = false; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
     if (inWater){ sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); }
     else { sfx.hit(); burst(F.x, F.y, F.z, 0xb7a998, 18, 1.4); }
-    toast(inWater ? 'Splash!' : 'Crash!', 'warn');
+    toast(msg || (inWater ? 'Splash!' : 'Crash!'), 'warn');
   }
   // Out of fuel and down (or stuck on a lake): the plane is towed to the nearest airport,
-  // lined up at the start of its runway with a full tank.
+  // lined up at the start of its runway with free emergency fuel (more costs coins there).
   function towToAirport(){
     const a = nearestAirport(F.x, F.z);
     F.x = a.x - a.fx * (RWY_LEN / 2 - 20); F.z = a.z - a.fz * (RWY_LEN / 2 - 20); F.y = rwyTop(a) + PLANE_SCALE;
     setLevel(a.hdg, 0); F.speed = 0; F.ground = true; F.autoBrake = true; F.auto = false;
-    F.fuel = 100; F.lowTold = false; F.stuckT = 0; F.lastLand = t; planeRoot.visible = true;
+    F.fuel = Math.max(F.fuel, EMERGENCY_FUEL); F.broke = false; F.lowTold = false; F.stuckT = 0; F.lastLand = t; F.gear = true; F.gearT = 1; F.flipped = false; showGear(1); planeRoot.visible = true;
     camBase.set(F.x, F.y + 5, F.z).addScaledVector(vFwd, -13 * (plane.cam || 1));
-    toast('Towed to ' + a.name + ', tank full', 'info');
+    toast('Towed to ' + a.name + ' with free emergency fuel', 'info');
   }
   function respawnFree(){
     if (F.fuel <= 0){ towToAirport(); return; }
     // put the plane back in the sky right above where it went down
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 220);
-    setLevel(F.yaw, 0); F.speed = 65; F.ground = false; planeRoot.visible = true;
+    setLevel(F.yaw, 0); F.speed = 65; F.ground = false; F.gear = true; F.gearT = 1; showGear(1); planeRoot.visible = true;
     toast('Back in the air', 'info');
   }
 
@@ -1109,14 +1238,18 @@ function boot(hot){
     }
     const live = state === 'play';
     if (!live){ const a = demoInput(); ax = a.ax; ay = a.ay; }
-    // a full tank lasts FUEL_TIME seconds in the air; landing at an airport fills it again
+    const engineOn = F.fuel > 0;
+    // auto-land boosts on long trips, but not towards high ground
+    const autoBoost = F.auto && !F.autoFinal && F.apDist > 2500 && terrainAhead() < F.y - 150;
+    const burning = engineOn && (!!(keys.b || F.boostHeld) || autoBoost);   // boost you chose (ring boosts are free)
+    const boosting = burning || (engineOn && boostT > 0);
+    // a full tank lasts FUEL_TIME seconds in the air, BOOST_BURN times faster while boosting;
+    // landing at an airport fills it again
     if (live && !F.ground && F.crashT <= 0 && F.fuel > 0){
-      F.fuel = Math.max(0, F.fuel - 100 / FUEL_TIME * dt);
+      F.fuel = Math.max(0, F.fuel - 100 / FUEL_TIME * dt * (burning ? BOOST_BURN : 1));
       if (F.fuel < 20 && !F.lowTold){ F.lowTold = true; toast('Low fuel: land soon!', 'warn'); }
       if (F.fuel <= 0) toast('Out of fuel! Glide to an airport', 'warn');
     }
-    const engineOn = F.fuel > 0;
-    const boosting = engineOn && (!!(keys.b || F.boostHeld) || boostT > 0 || (F.auto && !F.autoFinal && F.apDist > 2500));
     boostT = Math.max(0, boostT - dt); shake = Math.max(0, shake - dt * 1.6);
 
     if (F.crashT > 0){
@@ -1128,8 +1261,18 @@ function boot(hot){
       if (ay > 0.3) F.autoBrake = false;
       if (F.autoBrake || ay < -0.3 || !engineOn) F.speed = Math.max(0, F.speed - 24 * dt);
       else F.speed = Math.min(F.speed + 13 * dt, 70);
-      if (live && onAirfield(F.x, F.z) && F.fuel < 100){
-        F.fuel = Math.min(100, F.fuel + 35 * dt);
+      if (live && onAirfield(F.x, F.z) && F.fuel < 100 && !F.broke){
+        let add = Math.min(35 * dt, 100 - F.fuel);
+        if (F.fuel < EMERGENCY_FUEL) add = Math.min(add, EMERGENCY_FUEL - F.fuel);   // free emergency fuel
+        else {
+          // pay as you pump: fuelCredit is fuel already paid for but not yet pumped
+          add = Math.min(add, F.fuelCredit + coins * FUEL_PER_COIN);
+          F.fuelCredit -= add;
+          while (F.fuelCredit < 0 && coins > 0){ coins--; F.fuelCredit += FUEL_PER_COIN; }
+          F.fuelCredit = Math.max(0, F.fuelCredit);
+          if (add <= 1e-6){ F.broke = true; toast('Out of coins! Grab coins in the sky for more fuel', 'warn'); }
+        }
+        F.fuel = Math.min(100, F.fuel + add);
         if (F.fuel >= 100){ F.lowTold = false; toast('Tank full!', ''); }
       }
       // empty tank somewhere with no fuel (a lake): get a tow after a moment
@@ -1141,46 +1284,54 @@ function boot(hot){
       F.y = restAt(F.x, F.z);
       const leaving = !onAirfield(F.x, F.z) && !onWater(F.x, F.z);
       const fieldEnd = (l => l && Math.abs(l.u) > AP_HALF_L - 45)(airfieldAt(F.x, F.z));
-      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
+      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; F.broke = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
       else if (g < 0.5 && !plane.water) crashFree(true);
     } else {
       // up/down pitches around the wings with no limit, so holding up flies a full loop
       const pulling = Math.abs(ay) > 0.2;
-      rotLocal(AX, ay * plane.pitch * dt);
+      // flipped (upside down): up/down pitch the other way and the roll target is turned
+      // over by half a circle, so up still climbs and right still turns right
+      const flip = F.flipped ? -1 : 1;
+      rotLocal(AX, ay * flip * plane.pitch * dt);
       // left/right banks; let go (and stop pulling) and it rolls back level, which also
-      // turns the plane right way up after half a loop
-      if (ax || !pulling) rotLocal(AZ, clamp(wrapA(-ax * 1.0 - F.roll) * 3, -3, 3) * (plane.turn / 1.3) * dt);
+      // turns the plane right way up after half a loop (or upside down when flipped)
+      const rollT = F.flipped ? Math.PI + ax * 1.0 : -ax * 1.0;
+      if (ax || !pulling) rotLocal(AZ, clamp(wrapA(rollT - F.roll) * 3, -3, 3) * (plane.turn / 1.3) * dt);
       readAxes();
       rotWorld(AY, vRight.y * plane.turn * dt);               // a banked plane turns
-      if (!ay && vUp.y > 0.3) rotLocal(AX, -F.pitch * 0.35 * dt); // nose eases back to level
-      if (F.y > CEIL - 400 && vFwd.y > 0) rotLocal(AX, -(vUp.y < 0 ? -1 : 1) * dt * 1.2 * (F.y - (CEIL - 400)) / 400);
+      if (!ay && vUp.y * flip > 0.3) rotLocal(AX, -flip * F.pitch * 0.35 * dt); // nose eases back to level
+      if (live && vUp.y < -0.8) score += 5 * dt;              // upside-down bonus
       Q.normalize(); readAxes();
       if (live && pulling){
         F.loopAcc += ay * plane.pitch * dt;
         if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); }
       } else F.loopAcc *= Math.max(0, 1 - dt * 2);
-      const cruise = boosting ? plane.boost : plane.cruise;
+      const cruise = (boosting ? plane.boost : plane.cruise) * (1 - 0.08 * F.gearT);   // the gear down slows you a little
       if (engineOn) F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8);
       else F.speed -= 2 * dt;                                    // engine off: just gliding
       F.speed -= vFwd.y * 14 * dt;
       F.speed = clamp(F.speed, 30, plane.boost + 40);
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
       if (!engineOn) F.y -= 5 * dt;                              // and slowly sinking
-      if (F.y >= CEIL){ F.y = CEIL; if (!F.ceilTold){ F.ceilTold = true; toast('Max altitude!', 'info'); } }
-      if (F.y < CEIL - 800) F.ceilTold = false;
-      if (F.y > 3048 && !F.hiTold){ F.hiTold = true; toast('10,000 ft!', ''); }
-      if (F.y < 2900) F.hiTold = false;
+      // no altitude limit: call-outs on the way up (each again after dropping well below it)
+      const ms = MILESTONES[F.milestone];
+      if (ms && F.y > ms[0]){ F.milestone++; if (live) toast(ms[1], ''); }
+      if (F.milestone > 0 && F.y < MILESTONES[F.milestone - 1][0] * 0.9) F.milestone--;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
       const water = onWater(F.x, F.z);
-      if ((onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1){
-        F.ground = true; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
+      const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
+      if (touching && !water && F.gearT < 0.9 && !plane.fixedGear) crashFree(false, 'Belly landing! The gear was up');
+      else if (touching){
+        F.ground = true; F.flipped = false; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
         if (t - F.lastLand > 5){
           const field = airfieldAt(F.x, F.z);
-          if (field && !F.visited.has(field.a.key)){
-            F.visited.add(field.a.key); score += 400; toast('Welcome to ' + field.a.name + '! +400', '');
-          } else {
-            score += 100; toast(field ? 'Landed at ' + field.a.name + '! +100' : 'Splashdown! +100', '');
-          }
+          const isNew = field && !F.visited.has(field.a.key), arrived = field && field.a === F.dest;
+          const pts = (isNew ? 400 : 100) + (arrived ? 200 : 0);
+          score += pts;
+          if (field) F.visited.add(field.a.key);
+          if (arrived){ F.dest = null; toast('You made it to ' + field.a.name + '! +' + pts, ''); }
+          else if (isNew) toast('Welcome to ' + field.a.name + '! +' + pts, '');
+          else toast(field ? 'Landed at ' + field.a.name + '! +' + pts : 'Splashdown! +' + pts, '');
           sfx.land();
           burst(F.x, F.y - PLANE_SCALE + 0.2, F.z, water ? 0xe6f4ff : 0xf4f1ea, 10, 0.7);
         }
@@ -1233,6 +1384,8 @@ function boot(hot){
     // the plane
     planeRoot.position.set(F.x, F.y, F.z);
     planeRoot.quaternion.copy(Q);
+    const gearTo = F.gear || plane.fixedGear ? 1 : 0;
+    if (F.gearT !== gearTo){ F.gearT = gearTo > F.gearT ? Math.min(1, F.gearT + dt * 1.2) : Math.max(0, F.gearT - dt * 1.2); showGear(F.gearT); }
     for (const sp of spinners) sp.o.rotation[sp.axis] += dt * sp.rate * (engineOn ? 1 : 0.15);
     for (const fl of flames) fl.scale.y = engineOn ? (boosting && !F.ground ? 1.5 : fl.userData.idle) * (0.85 + Math.random() * 0.3) : 0.001;
     const field = airfieldAt(F.x, F.z), gTop = Math.max(onRunway(field) ? rwyTop(field.a) : groundAt(F.x, F.z), 0);
@@ -1242,8 +1395,10 @@ function boot(hot){
 
     // chase camera behind the plane; it leans with the plane once it tips past steep
     // banks, so it follows right round a loop instead of flipping over at the top
-    const lean = clamp((0.85 - vUp.y) / 0.85, 0, 1);
-    camUp.set(0, 1, 0).lerp(vUp, lean).normalize();
+    // (measured against "upside down" while flipped, so then the world stays right way up)
+    const fl = F.flipped && !F.ground ? -1 : 1;
+    const lean = clamp((0.85 - vUp.y * fl) / 0.85, 0, 1);
+    camUp.set(0, 1, 0).lerp(camFlip.copy(vUp).multiplyScalar(fl), lean).normalize();
     camUpS.lerp(camUp, 1 - Math.exp(-dt * 5)).normalize();
     const camK = plane.cam || 1;
     camT.set(F.x, F.y, F.z).addScaledVector(vFwd, -13 * camK).addScaledVector(camUpS, 4 * camK);
@@ -1262,6 +1417,14 @@ function boot(hot){
     skyDist += F.speed * dt; applySky(skyDist);
     const hk = clamp((F.y - 1200) / 4800, 0, 1);
     skyMat.uniforms.top.value.lerp(SPACE_C, hk * 0.85);
+    // above about 20,000 ft the sky goes on darkening to black and the stars come out
+    const sk = clamp((F.y - 6000) / 24000, 0, 1);
+    skyMat.uniforms.top.value.lerp(BLACK, sk);
+    skyMat.uniforms.mid.value.lerp(SPACE_HAZE, sk * 0.9);
+    scene.fog.color.copy(skyMat.uniforms.mid.value);
+    stars.material.opacity = clamp((F.y - 5000) / 15000, 0, 1);
+    stars.visible = stars.material.opacity > 0.01;
+    stars.position.copy(camera.position);
     skyMat.uniforms.low.value.copy(skyMat.uniforms.mid.value);
     scene.fog.far = Math.min(3000 + F.y * 2.5, 12500);
     scene.fog.near = Math.min(300 + F.y * 0.6, scene.fog.far * 0.45);
@@ -1271,6 +1434,8 @@ function boot(hot){
     sunLight.position.set(F.x + sunDir.x * 100, F.y + Math.max(0.2, sunDir.y) * 100 + 30, F.z + sunDir.z * 100);
     sunLight.target.position.set(F.x, F.y, F.z);
 
+    if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
+    audioTick -= dt;
     if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live && engineOn, Math.min(F.speed, 190), snd.mul, snd.vol); }
     if (live) updateFreeHud();
   }
@@ -1283,11 +1448,20 @@ function boot(hot){
     txt(H.spd, String(Math.round(F.speed * 1.944)));
     const hdg = ((-F.yaw * 180 / Math.PI) % 360 + 360) % 360;
     txt(H.hdg, String(Math.round(hdg) % 360).padStart(3, '0'));
-    // the nearest airport (or the one auto-land is heading for), with an arrow to it
-    const ap = F.auto && F.target ? F.target : nearestAirport(F.x, F.z);
+    // the airport auto-land is heading for, else your chosen destination, else the nearest
+    const ap = (F.auto && F.target) || F.dest || nearestAirport(F.x, F.z);
+    const apDist = Math.hypot(ap.x - F.x, ap.z - F.z), turn = (Math.atan2(ap.x - F.x, F.z - ap.z) + F.yaw).toFixed(3);
     txt(H.apName, ap.name);
-    txt(H.home, (Math.hypot(ap.x - F.x, ap.z - F.z) / 1000).toFixed(1));
-    H.homeArrow.style.transform = 'rotate(' + (Math.atan2(ap.x - F.x, F.z - ap.z) + F.yaw).toFixed(3) + 'rad)';
+    txt(H.home, (apDist / 1000).toFixed(1));
+    H.homeArrow.style.transform = 'rotate(' + turn + 'rad)';
+    H.apChip.classList.toggle('dest', ap === F.dest);
+    // a big arrow towards the chosen destination while you fly there yourself
+    const guiding = !!F.dest && !F.ground && F.crashT <= 0;
+    H.guide.hidden = !guiding;
+    if (guiding){
+      H.guideArrow.style.transform = 'rotate(' + turn + 'rad)';
+      txt(H.guideText, F.dest.name + ' · ' + (apDist / 1000).toFixed(1) + ' km');
+    }
     const left = Math.ceil(F.fuel / 100 * FUEL_TIME);
     txt(H.fuel, Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'));
     H.fuelFill.style.width = F.fuel.toFixed(1) + '%';
@@ -1296,7 +1470,8 @@ function boot(hot){
     const up = invertY ? 'DOWN' : 'UP';
     if (F.crashT <= 0 && F.ground){
       if (F.autoBrake && F.speed > 1) prompt = 'Landed! Braking…';
-      else if (F.fuel < 100 && onAirfield(F.x, F.z)) prompt = 'Refuelling… ' + Math.floor(F.fuel) + '%';
+      else if (F.fuel < 100 && onAirfield(F.x, F.z) && !F.broke) prompt = F.fuel < EMERGENCY_FUEL ? 'Free emergency fuel… ' + Math.floor(F.fuel) + '%' : 'Buying fuel (1 coin = 2%)… ' + Math.floor(F.fuel) + '%';
+      else if (F.broke && F.speed < 1) prompt = 'No coins left for fuel. Hold ' + up + ' to take off';
       else if (F.fuel <= 0) prompt = 'Out of fuel: calling a tow…';
       else if (F.autoBrake) prompt = 'Hold ' + up + ' to take off again';
       else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : 'Climb! Hold ' + up + ' or drag ' + up.toLowerCase();
@@ -1305,20 +1480,27 @@ function boot(hot){
     } else if (F.crashT <= 0 && F.auto){
       prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying to ' + F.target.name;
     } else if (F.crashT <= 0 && airfieldAt(F.x, F.z) && F.y < airfieldAt(F.x, F.z).a.elev + 80){
-      prompt = airfieldAt(F.x, F.z).a.name + ' below: go down gently to land';
+      const field = airfieldAt(F.x, F.z);
+      if (F.flipped) prompt = 'Flip back (F) to land';
+      else if (!F.gear && !plane.fixedGear){
+        prompt = 'Gear is up! Press G to land';
+        if (!F.gearWarned){ F.gearWarned = true; toast('Gear is up!', 'warn'); }
+      } else prompt = field.a.name + ' below: go down gently to land';
     } else if (F.crashT <= 0 && onWater(F.x, F.z) && F.y < 50){
       prompt = 'Lake below: go down gently to land on it';
     }
     H.prompt.hidden = !prompt; txt(H.prompt, prompt);
     H.prompt.classList.toggle('go', F.ground && F.speed >= VR && !F.autoBrake);
     H.land.classList.toggle('on', F.auto);
+    H.gearBtn.classList.toggle('on', !F.gear);
+    H.flipBtn.classList.toggle('on', F.flipped);
     updatePowers(false);
   }
 
   /* ---------------- Main loop ---------------- */
   const camBase = new THREE.Vector3(0, 12, 14), camT = new THREE.Vector3(), look = new THREE.Vector3();
-  const camUp = new THREE.Vector3(0, 1, 0), camUpS = new THREE.Vector3(0, 1, 0);
-  let last = performance.now(), audioTick = 0;
+  const camUp = new THREE.Vector3(0, 1, 0), camUpS = new THREE.Vector3(0, 1, 0), camFlip = new THREE.Vector3();
+  let last = performance.now(), audioTick = 0, saveTick = 2;
   function frame(now){
     requestAnimationFrame(frame);
     let dt = (now - last) / 1000; last = now;
