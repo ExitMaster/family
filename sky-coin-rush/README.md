@@ -10,7 +10,8 @@ like (all the way up into space), grabbing coins that float in the sky.
 
 | | |
 |---|---|
-| Fly (left/right turns, up climbs, down dives; hold up to loop) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
+| Fly (left/right turns, up climbs, down dives; hold up to loop) | `↑` `↓` `←` `→` or `W` `A` `D` |
+| Fire a missile | `S` or the **FIRE** button (hold to keep firing) |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Map: choose an airport to fly to | `M` or the **MAP** button |
 | Auto-land at your chosen airport (or the nearest one) | `L` (or `Q`) or the **LAND** button |
@@ -25,7 +26,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **40 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **48 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -72,12 +73,20 @@ turns):
 | **Racer** | gold air racer | 233 / 544 kt | very quick |
 | **Ptero** | pterodactyl with a head crest and huge wings | 117 / 292 kt | quick |
 | **Bus** | yellow school bus with wings and two propellers | 117 / 272 kt | slow to turn |
+| **Hog** | tough green jet with two engines on its back | 165 / 389 kt | medium |
+| **Eagle** | bald eagle, almost silent | 136 / 350 kt | quick |
+| **Pizza** | a flying slice of pepperoni pizza with a propeller | 107 / 253 kt | quick |
+| **Tiger** | orange striped jet with eyes, ears and teeth | 204 / 505 kt | quick |
+| **Sleigh** | a sleigh full of presents pulled by four flying reindeer (one with a red nose) | 107 / 272 kt | medium |
+| **Gyro** | autogyro with a big spinning rotor and a propeller behind | 97 / 224 kt | medium |
+| **Bat** | night bat with pointy ears and fangs | 97 / 243 kt | very quick |
+| **Whale** | big blue flying whale with a water spout: **lands on lakes** | 87 / 214 kt | slow to turn |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard) can land on and take off from any
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale) can land on and take off from any
 lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
-white vapour cone round the plane. Bubbles, Origami, Retro, Balloon and the floats/hulls of the lake planes don't fold up.
+white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh and the floats/hulls of the lake planes don't fold up.
 
 ## Flying
 
@@ -116,6 +125,11 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon and the floa
 - **Other planes:** 59 computer-flown planes from the plane list cruise around you, flying
   between airports and over the hills at a safe height. Fly within about 45 m of one for a
   **close fly-by** (+25). They can't crash into you.
+- **Missiles:** press **S** (or tap FIRE) to fire a missile from under a wing. A red
+  ring marks the other plane nearest the middle of your view (up to about 2.6 km away);
+  the missile chases that plane and blows it up (+150). Don't worry, the pilot floats
+  down on a parachute, and a new plane turns up somewhere else. With no ring the missile
+  flies straight ahead. Missiles leave a smoke trail and explode if they hit the ground.
 - **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps

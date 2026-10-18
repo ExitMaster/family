@@ -55,7 +55,7 @@ body{
 .chip.power.boost{background:var(--coral)}
 .iconbtn{pointer-events:auto;width:38px;height:38px;border-radius:10px;border:0;background:var(--glass);color:var(--hud-fg);font:700 14px/1 var(--hud);cursor:pointer;display:grid;place-items:center}
 .iconbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(520px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
+.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(620px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
 .ap{pointer-events:auto;border:0;border-radius:12px;background:var(--glass);color:var(--hud-fg);font:700 15px/1 var(--hud);letter-spacing:.08em;padding:0 14px;cursor:pointer;display:flex;align-items:center;gap:6px;min-height:44px}
 .ap.on{background:var(--teal);box-shadow:0 0 0 2px var(--mint)}
 .ap:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
@@ -64,6 +64,8 @@ body{
 .freebar .hint{flex:1;min-width:0;background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:12px;padding:8px 12px;font-size:12px;line-height:1.35;display:flex;align-items:center}
 .ap.boost{background:var(--coral)}
 .ap.boost.held{box-shadow:0 0 0 2px var(--gold)}
+.ap.fire{background:#b0302a}
+.ap.fire.held{box-shadow:0 0 0 2px var(--gold)}
 #guide{display:grid;justify-items:center;gap:4px;pointer-events:none}
 #guide i{width:0;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-bottom:32px solid var(--coral);filter:drop-shadow(0 2px 0 var(--ink))}
 #guide span{font:700 12px/1.2 var(--hud);letter-spacing:.06em;background:var(--glass);padding:3px 8px;border-radius:8px;white-space:nowrap}
@@ -157,6 +159,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div id="guide" hidden><i id="guideArrow"></i><span id="guideText"></span></div>
     <div class="freebar">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
+      <button class="ap fire" id="btn-fire" aria-label="Fire a missile (S)">FIRE</button>
       <button class="ap" id="btn-land" aria-label="Auto-land at the nearest airport">LAND</button>
       <button class="ap" id="btn-gear" aria-label="Landing gear up or down (G)">GEAR</button>
       <button class="ap" id="btn-flip" aria-label="Fly upside down (F)">FLIP</button>
@@ -181,8 +184,10 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="btn" id="btn-play">Take off</button>
       <hr class="perf">
       <div class="keys">
-        <span><kbd>←↑↓→</kbd> <kbd>WASD</kbd></span><span>Fly: left and right turn, up climbs, down dives. Keep holding up to fly a loop! On touch, drag anywhere.</span>
+        <span><kbd>←↑↓→</kbd> <kbd>WAD</kbd></span><span>Fly: left and right turn, up climbs, down dives. Keep holding up to fly a loop! On touch, drag anywhere.</span>
         <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST)</span>
+        <span><kbd>S</kbd></span><span>Fire a missile at the plane in the red ring (or tap FIRE)</span>
+        <span><kbd>C</kbd></span><span>Front view: see the front of your plane (or tap VIEW)</span>
         <span><kbd>G</kbd></span><span>Landing gear up or down (or tap GEAR)</span>
         <span><kbd>F</kbd></span><span>Flip and fly upside down (or tap FLIP)</span>
         <span><kbd>M</kbd></span><span>Map: choose an airport to fly to (or tap MAP)</span>
@@ -284,6 +289,8 @@ const sfx = (() => {
     coin(chain){ const b = 880 * Math.pow(2, Math.min(chain, 12) / 12); tone(b, 0.07, 'square', 0.05); tone(b * 1.5, 0.16, 'square', 0.045, 0.055); },
     ring(){ noise(0.6, 0.3, 400, 3500, 'bandpass'); tone(523, 0.35, 'triangle', 0.1, 0, 1046); },
     boom(){ noise(1.4, 0.9, 700, 40); tone(60, 1.0, 'sine', 0.35, 0, 28); },
+    missile(){ noise(0.9, 0.35, 3500, 500, 'bandpass'); tone(220, 0.4, 'sawtooth', 0.04, 0, 660); },
+    blast(v){ noise(1.1, 0.8 * v, 900, 50); tone(70, 0.7, 'sine', 0.3 * v, 0, 30); },
     hit(){ noise(0.4, 0.55, 1800, 150); tone(120, 0.45, 'sawtooth', 0.18, 0, 40); },
     splash(){ noise(0.9, 0.5, 2500, 200); },
     land(){ noise(0.25, 0.35, 3000, 900, 'bandpass'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, 0.15 + i * 0.09)); },
@@ -427,7 +434,15 @@ function boot(hot){
     { id: 'coastguard', name: 'Coast Guard', note: 'Rescue helicopter, lands on lakes', color: '#e8432e', cruise: 55, boost: 120, pitch: 1.5, turn: 1.6, cam: 1.2, water: true, fixedGear: true, sound: { mul: 0.6, vol: 0.05 } },
     { id: 'racer', name: 'Racer', note: 'Gold air racer, very nimble', color: '#ffc23d', cruise: 120, boost: 280, pitch: 2.1, turn: 2.0, sound: { mul: 1.3, vol: 0.045 } },
     { id: 'ptero', name: 'Ptero', note: 'Pterodactyl dinosaur', color: '#c77a3a', cruise: 60, boost: 150, pitch: 1.7, turn: 1.7, cam: 1.2, sound: { mul: 0.45, vol: 0.03 } },
-    { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, sound: { mul: 0.9, vol: 0.05 } }
+    { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, sound: { mul: 0.9, vol: 0.05 } },
+    { id: 'hog', name: 'Hog', note: 'Tough jet, engines on its back', color: '#6b7a5a', cruise: 85, boost: 200, pitch: 1.4, turn: 1.3, cam: 1.15, sound: { mul: 1.9, vol: 0.04 } },
+    { id: 'eagle', name: 'Eagle', note: 'Bald eagle, soars and dives', color: '#5a3a22', cruise: 70, boost: 180, pitch: 1.9, turn: 1.8, cam: 1.15, sound: { mul: 2.6, vol: 0.01 } },
+    { id: 'pizza', name: 'Pizza', note: 'A flying slice of pizza', color: '#ffb347', cruise: 55, boost: 130, pitch: 1.8, turn: 1.7, fixedGear: true, sound: { mul: 1.7, vol: 0.035 } },
+    { id: 'tiger', name: 'Tiger', note: 'Striped jet with teeth', color: '#ff8a1d', cruise: 105, boost: 260, pitch: 1.9, turn: 1.7, sound: { mul: 2.3, vol: 0.04 } },
+    { id: 'sleigh', name: 'Sleigh', note: 'Pulled by flying reindeer', color: '#c0392b', cruise: 55, boost: 140, pitch: 1.5, turn: 1.5, cam: 1.35, fixedGear: true, sound: { mul: 3.0, vol: 0.02 } },
+    { id: 'gyro', name: 'Gyro', note: 'Autogyro with a big rotor', color: '#ffd23d', cruise: 50, boost: 115, pitch: 1.6, turn: 1.6, cam: 1.15, sound: { mul: 1.5, vol: 0.04 } },
+    { id: 'bat', name: 'Bat', note: 'Night bat, very twisty', color: '#3a2e4a', cruise: 50, boost: 125, pitch: 2.2, turn: 2.1, sound: { mul: 3.2, vol: 0.008 } },
+    { id: 'whale', name: 'Whale', note: 'Flying whale, lands on lakes', color: '#3f6fa8', cruise: 45, boost: 110, pitch: 1.0, turn: 0.9, cam: 1.5, water: true, fixedGear: true, sound: { mul: 0.35, vol: 0.04 } }
   ];
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
   planeRoot.add(planeBody); scene.add(planeRoot);
@@ -728,6 +743,104 @@ function boot(hot){
         [[0.95, 1.8], [-0.95, 1.8], [0.95, -1.8], [-0.95, -1.8]].forEach(([x, z]) => gearBox(0.3, 0.6, 0.6, x, -0.7, z));
         break;
       }
+      case 'hog': {   // tough jet with two engines on its back and a gun in the nose
+        const G = 0x6b7a5a;
+        tube(0.55, 0.6, 6.0, G, 0, 0, 0); nose(0.55, 1.2, G, -3.6); tube(0.08, 0.08, 0.8, DARK, 0, -0.3, -4.3);
+        ball(0.45, glassMat, 0, 0.5, -2.2, 1, 0.8, 1.4);
+        box(9, 0.18, 1.6, G, 0, -0.2, 0);
+        both((x) => box(0.2, 0.2, 1.4, WHITE, x, -0.45, 0), 2.6);
+        both((x) => { tube(0.45, 0.45, 1.6, GRAY, x, 0.75, 1.4); box(0.15, 0.5, 0.4, G, x, 0.35, 1.4); flame(x, 0.75, 2.2, 0.32, 0.2); }, 0.95);
+        box(3.4, 0.12, 0.9, G, 0, 0.3, 2.9); both((x) => box(0.12, 1.2, 0.9, G, x, 0.85, 2.9), 1.6);
+        wheel(0.9, -0.3); wheel(-0.9, -0.3); gearBox(0.2, 0.6, 0.2, 0, -0.7, -2.4);
+        break;
+      }
+      case 'eagle': {   // bald eagle
+        const Br = 0x5a3a22, Wg = 0x3e2716, Yl = 0xffc23d;
+        ball(0.8, Br, 0, 0, 0, 0.9, 0.8, 2.0); ball(0.55, WHITE, 0, 0.35, -1.6, 0.9, 0.95, 1.1);
+        const bk = add(new THREE.ConeGeometry(0.18, 0.6, 8), Yl, 0, 0.25, -2.25); bk.rotation.x = -Math.PI / 2 - 0.3;
+        both((x) => ball(0.07, 0x111111, x, 0.5, -1.95), 0.25);
+        tris([[-0.5, 0.3, -0.6], [-5.2, 0.9, 0.0], [-0.5, 0.3, 0.9], [-5.2, 0.9, 0.0], [-4.4, 0.7, 1.0], [-0.5, 0.3, 0.9],
+              [0.5, 0.3, -0.6], [5.2, 0.9, 0.0], [0.5, 0.3, 0.9], [5.2, 0.9, 0.0], [4.4, 0.7, 1.0], [0.5, 0.3, 0.9]], Wg);
+        tris([[0, 0.1, 1.4], [-0.8, 0.1, 2.8], [0.8, 0.1, 2.8]], WHITE);
+        both((x) => gearBox(0.12, 0.6, 0.12, x, -0.75, 0.2, Yl), 0.3);
+        break;
+      }
+      case 'pizza': {   // a slice of pepperoni pizza with a propeller on its point
+        tris([[0, 0.2, -3.0], [-2.2, 0.2, 1.6], [2.2, 0.2, 1.6]], 0xffd23d);
+        tris([[0, -0.05, -3.0], [2.2, -0.05, 1.6], [-2.2, -0.05, 1.6]], 0xe0a050);
+        const crust = add(new THREE.CylinderGeometry(0.35, 0.35, 4.6, 12), 0xc8833a, 0, 0.1, 1.7); crust.rotation.z = Math.PI / 2;
+        [[0, -1.3], [-0.8, 0.6], [0.8, 0.4], [0, 0.9], [0.3, -0.2], [-0.4, -0.4]].forEach(([x, z]) => add(new THREE.CylinderGeometry(0.33, 0.33, 0.06, 14), 0xb03a2e, x, 0.24, z));
+        propeller(0, 0.1, -3.1, 1.6);
+        break;
+      }
+      case 'tiger': {   // orange jet with black stripes, eyes and teeth
+        const O = 0xff8a1d, K = 0x1b1b1b;
+        box(1.0, 0.9, 5.2, O, 0, 0, 0.2); nose(0.5, 1.6, O, -3.2);
+        [-1.6, -0.6, 0.4, 1.4, 2.3].forEach(z => box(1.03, 0.93, 0.22, K, 0, 0, z));
+        box(0.6, 0.45, 1.3, glassMat, 0, 0.6, -1.0);
+        box(0.8, 0.12, 0.5, 0x5a1a1a, 0, -0.32, -2.4);
+        for (let i = -2; i <= 2; i++){ const tooth = add(new THREE.ConeGeometry(0.06, 0.18, 4), WHITE, i * 0.14, -0.24, -2.62); tooth.rotation.x = Math.PI; }
+        both((x) => ball(0.12, 0xffd23d, x, 0.25, -2.2), 0.4);
+        both((x) => add(new THREE.ConeGeometry(0.2, 0.4, 4), O, x, 0.6, -0.4), 0.35);
+        both((x, sd) => { box(3.6, 0.12, 1.7, O, x, -0.1, 0.6, 0, -0.5 * sd); box(0.3, 0.14, 1.72, K, x + 0.7 * sd, -0.1, 0.95, 0, -0.5 * sd); }, 1.9);
+        box(0.12, 1.4, 1.3, O, 0, 0.85, 2.3, 0.4);
+        both((x, sd) => box(1.6, 0.1, 0.8, O, x, 0.1, 2.5, 0, -0.4 * sd), 0.9);
+        tube(0.4, 0.45, 0.6, DARK, 0, 0, 3.0); flame(0, 0, 3.3, 0.35);
+        gearBox(0.2, 0.6, 0.2, 0, -0.7, -1.8); wheel(0.6, 0.6); wheel(-0.6, 0.6);
+        break;
+      }
+      case 'sleigh': {   // a sleigh full of presents and two pairs of reindeer
+        const Gd = 0xffc23d, Rd = 0x8a5a32;
+        box(1.8, 0.9, 2.6, RED, 0, 0, 0.6); box(1.8, 0.9, 0.4, RED, 0, 0.4, -0.8, -0.5);
+        box(1.85, 0.1, 2.65, Gd, 0, 0.45, 0.6); box(1.8, 0.8, 0.3, RED, 0, 0.75, 1.8);
+        ball(0.6, 0x8a5a32, 0, 0.75, 1.2); box(0.5, 0.5, 0.5, 0x3fa34d, 0.5, 0.65, 0.3); box(0.4, 0.4, 0.4, 0x3fa9f5, -0.5, 0.6, 0.5);
+        both((x) => { box(0.1, 0.1, 3.4, Gd, x, -0.75, 0.4); box(0.1, 0.6, 0.1, Gd, x, -0.45, -0.4); box(0.1, 0.6, 0.1, Gd, x, -0.45, 1.4); }, 0.75);
+        [-2.6, -4.4].forEach((z, k) => both((x, sd) => {
+          ball(0.35, Rd, x, 0.2, z, 1, 1, 1.8);
+          box(0.1, 0.6, 0.1, Rd, x, -0.3, z - 0.4); box(0.1, 0.6, 0.1, Rd, x, -0.3, z + 0.4);
+          ball(0.22, Rd, x, 0.65, z - 0.65);
+          box(0.05, 0.45, 0.05, 0xe9d8a6, x + 0.1 * sd, 1.0, z - 0.6, 0, 0, -0.4 * sd);
+          ball(0.08, k === 1 && sd > 0 ? 0xff2020 : 0x111111, x, 0.6, z - 0.88);
+          box(0.03, 0.03, 1.8, DARK, x, 0.3, z + 1.1);
+        }, 0.5));
+        break;
+      }
+      case 'gyro': {   // autogyro: a free-spinning rotor on top and a pusher propeller behind
+        const Y = 0xffd23d;
+        ball(0.7, Y, 0, 0, 0, 0.8, 0.8, 1.5); ball(0.4, glassMat, 0, 0.4, -0.6, 1, 0.8, 1.2);
+        box(0.12, 1.2, 0.12, DARK, 0, 0.9, 0.2);
+        const rotor = new THREE.Group();
+        rotor.add(new THREE.Mesh(new THREE.BoxGeometry(7, 0.06, 0.35), mat(DARK)), new THREE.Mesh(new THREE.CircleGeometry(3.5, 24).rotateX(-Math.PI / 2), blurMat));
+        rotor.position.set(0, 1.5, 0.2); root.add(rotor); sp.push({ o: rotor, axis: 'y', rate: 14 });
+        tube(0.1, 0.1, 2.4, DARK, 0, 0.1, 2.0);
+        box(0.1, 0.9, 0.7, Y, 0, 0.5, 3.1); box(1.4, 0.08, 0.6, Y, 0, 0.2, 3.1);
+        propeller(0, 0, 1.2, 1.6);
+        wheel(0.6, 0.2); wheel(-0.6, 0.2); gearBox(0.15, 0.5, 0.15, 0, -0.75, -0.9);
+        break;
+      }
+      case 'bat': {   // bat with pointy ears, little fangs and scalloped wings
+        const B = 0x3a2e4a, Wb = 0x5a4a6a;
+        ball(0.6, B, 0, 0, 0, 0.8, 0.8, 1.6); ball(0.45, B, 0, 0.15, -1.1);
+        both((x, sd) => { const e = add(new THREE.ConeGeometry(0.15, 0.5, 6), B, x, 0.6, -1.15); e.rotation.z = -0.3 * sd; }, 0.2);
+        both((x) => ball(0.07, 0xffd23d, x, 0.25, -1.5), 0.18);
+        both((x) => { const f = add(new THREE.ConeGeometry(0.04, 0.15, 4), WHITE, x, -0.1, -1.48); f.rotation.x = Math.PI; }, 0.08);
+        const wing = sd => { const S = [0.4 * sd, 0.2, -0.4], T = [4.2 * sd, 0.8, -0.2], a = [3.2 * sd, 0.3, 0.9], b = [2.0 * sd, 0.4, 0.5], c = [1.0 * sd, 0.2, 1.0], d = [0.4 * sd, 0.1, 0.6];
+          return [S, T, a, S, a, b, S, b, c, S, c, d]; };
+        tris([...wing(1), ...wing(-1)], Wb);
+        both((x) => gearBox(0.08, 0.5, 0.08, x, -0.7, 0.4, B), 0.25);
+        break;
+      }
+      case 'whale': {   // a big blue whale with a water spout
+        const Bl = 0x3f6fa8;
+        ball(1.3, Bl, 0, 0, 0, 1.0, 0.9, 3.0); ball(1.2, 0xd8e6f0, 0, -0.35, -0.3, 0.9, 0.6, 2.6);
+        both((x) => ball(0.12, 0x111111, x, 0.1, -2.6), 0.95);
+        box(1.0, 0.06, 0.06, DARK, 0, -0.35, -3.3);
+        both((x, sd) => box(1.6, 0.12, 0.7, Bl, x, -0.6, -0.8, 0, -0.4 * sd, -0.4 * sd), 1.5);
+        tube(0.2, 0.7, 1.6, Bl, 0, 0.1, 4.0);
+        tris([[0, 0.1, 4.6], [-1.8, 0.4, 5.6], [-0.4, 0.1, 5.2], [0, 0.1, 4.6], [1.8, 0.4, 5.6], [0.4, 0.1, 5.2]], Bl);
+        ball(0.25, 0xbfe6ff, 0, 1.4, -1.0, 1, 2.0, 1); both((x) => ball(0.18, 0xbfe6ff, x, 1.9, -1.0), 0.3);
+        break;
+      }
       case 'blimp': {
         const P = 0xff8fb8, V = 0x7a5ad8;
         ball(1, P, 0, 0.6, 0, 1.6, 1.6, 4.2);
@@ -932,7 +1045,7 @@ function boot(hot){
     const ang = F.yaw + rnd(-1.4, 1.4), d = anywhere ? rnd(300, 2600) : rnd(2000, 3200);
     a.x = F.x - Math.sin(ang) * d; a.z = F.z - Math.cos(ang) * d;
     a.alt = rnd(110, 650); a.y = Math.max(groundAt(a.x, a.z), 0) + a.alt;
-    a.yaw = rnd(0, Math.PI * 2); a.pitch = 0; a.roll = 0; a.speed = a.def.cruise; a.byT = 0;
+    a.yaw = rnd(0, Math.PI * 2); a.pitch = 0; a.roll = 0; a.speed = a.def.cruise; a.byT = 0; a.gen = (a.gen || 0) + 1;
     aiWaypoint(a);
   }
   function updateAI(dt, live){
@@ -960,6 +1073,159 @@ function boot(hot){
       if (live && !a.byT && planeRoot.visible && !F.ground && Math.hypot(a.x - F.x, a.y - F.y, a.z - F.z) < 45){
         a.byT = 6; score += 25; toast('Close fly-by: ' + a.def.name + '! +25', '');
       }
+    }
+  }
+  /* ---------------- Missiles ---------------- */
+  // S fires a missile from under a wing. It chases the other plane nearest the middle of
+  // your view (marked with a red ring) and blows it up: the pilot floats down on a
+  // parachute and a new plane turns up somewhere else.
+  const MSL_LIFE = 6, LOCK_RANGE = 2600, LOCK_COS = Math.cos(0.4), HIT_R = 11;
+  const NEG_Z = new THREE.Vector3(0, 0, -1), mslAim = new THREE.Vector3();
+  const missiles = [], booms = [], chutes = [];
+  let fireT = 0, shots = 0, lockOn = null;
+  for (let i = 0; i < 10; i++){
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.6, 10), mat(WHITE)); body.rotation.x = Math.PI / 2;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 10), mat(RED)); tip.rotation.x = -Math.PI / 2; tip.position.z = -1.6;
+    const fins = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.4), mat(RED)); fins.position.z = 1.1;
+    const fins2 = fins.clone(); fins2.rotation.z = Math.PI / 2;
+    const fire = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.6, 8), flameMat); fire.rotation.x = Math.PI / 2; fire.position.z = 2.1;
+    g.add(body, tip, fins, fins2, fire); g.scale.setScalar(PLANE_SCALE); g.visible = false; scene.add(g);
+    missiles.push({ g, fire, pos: new THREE.Vector3(), dir: new THREE.Vector3(), prev: new THREE.Vector3(), speed: 0, cap: 0, life: 0, target: null, gen: 0, puffT: 0 });
+  }
+  // fireballs
+  for (let i = 0; i < 6; i++){
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    m.visible = false; scene.add(m); booms.push({ m, t: 0, size: 1 });
+  }
+  // smoke puffs (missile trails and explosions) share one instanced mesh
+  const PUFFS = 300, puffs = [], puffObj = new THREE.Object3D(), puffCol = new THREE.Color();
+  const puffMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), PUFFS);
+  puffMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); puffMesh.frustumCulled = false; scene.add(puffMesh);
+  puffObj.scale.setScalar(0); puffObj.updateMatrix();
+  for (let i = 0; i < PUFFS; i++){ puffs.push({ x: 0, y: 0, z: 0, life: 0, max: 1, size: 1 }); puffMesh.setMatrixAt(i, puffObj.matrix); puffMesh.setColorAt(i, puffCol.setHex(0xffffff)); }
+  let puffIdx = 0;
+  function puff(x, y, z, size, life, color){
+    const i = puffIdx = (puffIdx + 1) % PUFFS, q = puffs[i];
+    q.x = x; q.y = y; q.z = z; q.size = size; q.life = q.max = life;
+    puffMesh.setColorAt(i, puffCol.setHex(color || 0xeeeef2)); puffMesh.instanceColor.needsUpdate = true;
+  }
+  // a parachute (the pilot of a plane you hit floats down safely)
+  function makeChute(){
+    const g = new THREE.Group(), cols = [0xe8432e, 0xffffff];
+    for (let k = 0; k < 8; k++){
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(4, 4, 6, k / 8 * Math.PI * 2, Math.PI / 4, 0, Math.PI / 2), lam(cols[k % 2], { side: THREE.DoubleSide }));
+      seg.position.y = 5; g.add(seg);
+    }
+    for (let k = 0; k < 4; k++){
+      const a = k / 4 * Math.PI * 2 + Math.PI / 4, l = new THREE.Mesh(new THREE.BoxGeometry(0.05, 5.4, 0.05), mat(DARK));
+      l.position.set(Math.cos(a) * 1.9, 2.6, Math.sin(a) * 1.9); l.rotation.set(Math.sin(a) * 0.62, 0, -Math.cos(a) * 0.62); g.add(l);
+    }
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.0, 0.4), mat(0x3fa9f5)), head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), mat(0xf2c9a0));
+    body.position.y = -0.2; head.position.y = 0.55; g.add(body, head);
+    g.visible = false; scene.add(g);
+    return { g, life: 0 };
+  }
+  for (let i = 0; i < 4; i++) chutes.push(makeChute());
+
+  function explode(x, y, z, big){
+    const b = booms.find(b => b.t <= 0) || booms[0];
+    b.m.position.set(x, y, z); b.t = 1; b.size = big ? 16 : 7; b.m.visible = true;
+    for (let i = 0; i < (big ? 14 : 6); i++) puff(x + rnd(-1, 1) * b.size * 0.5, y + rnd(-0.5, 1) * b.size * 0.5, z + rnd(-1, 1) * b.size * 0.5, b.size * rnd(0.3, 0.55), rnd(1.6, 2.6), 0x55504c);
+    burst(x, y, z, 0xffa040, big ? 16 : 8, big ? 3 : 2);
+    const d = Math.hypot(x - F.x, y - F.y, z - F.z);
+    sfx.blast(clamp(1 - d / 2500, 0.12, 1));
+    if (d < 160) shake = Math.max(shake, REDUCED ? 0.15 : 0.45);
+  }
+  function hitPlane(a, live){
+    explode(a.x, a.y, a.z, true);
+    const c = chutes.find(c => c.life <= 0) || chutes[0];
+    c.g.position.set(a.x, a.y + 4, a.z); c.life = 16; c.g.visible = true;
+    if (live){ score += 150; toast('Hit! ' + a.def.name + ' +150 (the pilot is safe)', ''); }
+    aiSpawn(a, false);
+  }
+  function lockTarget(){
+    let best = null, bc = LOCK_COS;
+    for (const a of aiPlanes){
+      if (!a.def) continue;
+      const dx = a.x - F.x, dy = a.y - F.y, dz = a.z - F.z, d = Math.hypot(dx, dy, dz);
+      if (d > LOCK_RANGE || d < 25) continue;
+      const c = (dx * vFwd.x + dy * vFwd.y + dz * vFwd.z) / d;
+      if (c > bc){ bc = c; best = a; }
+    }
+    return best;
+  }
+  function fireMissile(){
+    if (fireT > 0 || !planeRoot.visible || F.ground || F.crashT > 0) return;
+    let m = missiles.find(m => m.life <= 0);
+    if (!m){ m = missiles.reduce((a, b) => a.life < b.life ? a : b); explode(m.pos.x, m.pos.y, m.pos.z, false); }
+    const side = shots++ % 2 ? 1 : -1;
+    m.pos.set(F.x, F.y, F.z).addScaledVector(vRight, side * 1.6 * PLANE_SCALE).addScaledVector(vUp, -0.9 * PLANE_SCALE).addScaledVector(vFwd, 1);
+    m.prev.copy(m.pos); m.dir.copy(vFwd);
+    m.speed = F.speed + 60; m.cap = F.speed + 330; m.life = MSL_LIFE; m.puffT = 0;
+    m.target = lockOn; m.gen = lockOn ? lockOn.gen : 0;
+    m.g.visible = true; fireT = 0.35;
+    sfx.missile();
+  }
+  // shortest distance from point (px,py,pz) to the segment a-b
+  function segDist(a, b, px, py, pz){
+    const abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z, l2 = abx * abx + aby * aby + abz * abz;
+    const k = l2 ? clamp(((px - a.x) * abx + (py - a.y) * aby + (pz - a.z) * abz) / l2, 0, 1) : 0;
+    return Math.hypot(a.x + abx * k - px, a.y + aby * k - py, a.z + abz * k - pz);
+  }
+  const lockRing = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 6, 36), new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.9, depthTest: false }));
+  lockRing.renderOrder = 10; lockRing.visible = false; scene.add(lockRing);
+
+  function updateMissiles(dt, live){
+    fireT = Math.max(0, fireT - dt);
+    lockOn = live && planeRoot.visible && !F.ground ? lockTarget() : null;
+    if (live && keys.f) fireMissile();
+    lockRing.visible = !!lockOn;
+    if (lockOn){
+      lockRing.position.set(lockOn.x, lockOn.y, lockOn.z); lockRing.quaternion.copy(camera.quaternion);
+      lockRing.scale.setScalar(Math.max(8, camera.position.distanceTo(lockRing.position) * 0.03) * (1 + Math.sin(t * 10) * 0.08));
+    }
+    for (const m of missiles){
+      if (m.life <= 0) continue;
+      m.life -= dt; m.speed = Math.min(m.cap, m.speed + 160 * dt);
+      const a = m.target;
+      if (a && a.gen === m.gen){
+        // aim where the target will be when the missile gets there
+        const lead = Math.hypot(a.x - m.pos.x, a.y - m.pos.y, a.z - m.pos.z) / m.speed, cp = Math.cos(a.pitch) * a.speed * lead;
+        mslAim.set(a.x - Math.sin(a.yaw) * cp - m.pos.x, a.y + Math.sin(a.pitch) * a.speed * lead - m.pos.y, a.z - Math.cos(a.yaw) * cp - m.pos.z).normalize();
+        m.dir.lerp(mslAim, Math.min(1, dt * 4)).normalize();
+      }
+      m.prev.copy(m.pos); m.pos.addScaledVector(m.dir, m.speed * dt);
+      let gone = false;
+      for (const p of aiPlanes){
+        if (p.def && segDist(m.prev, m.pos, p.x, p.y, p.z) < HIT_R){ hitPlane(p, live); gone = true; break; }
+      }
+      if (!gone && (m.pos.y < Math.max(groundAt(m.pos.x, m.pos.z), 0) + 0.5 || m.life <= 0)){ explode(m.pos.x, m.pos.y, m.pos.z, false); gone = true; }
+      if (gone){ m.life = 0; m.g.visible = false; continue; }
+      m.puffT -= dt;
+      if (m.puffT <= 0){ m.puffT = 0.03; puff(m.pos.x - m.dir.x * 3, m.pos.y - m.dir.y * 3, m.pos.z - m.dir.z * 3, 0.9, 1.4); }
+      m.g.position.copy(m.pos); m.g.quaternion.setFromUnitVectors(NEG_Z, m.dir);
+      m.fire.scale.y = 0.8 + Math.random() * 0.5;
+    }
+    for (const b of booms){
+      if (b.t <= 0) continue;
+      b.t -= dt * 1.5;
+      if (b.t <= 0){ b.m.visible = false; continue; }
+      b.m.scale.setScalar(b.size * (0.3 + (1 - b.t) * 0.9)); b.m.material.opacity = b.t * 0.9;
+    }
+    for (let i = 0; i < PUFFS; i++){
+      const q = puffs[i];
+      if (q.life <= 0) continue;
+      q.life -= dt; q.y += dt * 1.5;
+      const k = 1 - q.life / q.max;
+      puffObj.position.set(q.x, q.y, q.z); puffObj.scale.setScalar(q.life > 0 ? q.size * (0.5 + k * 1.8) * Math.min(1, q.life * 2) : 0);
+      puffObj.updateMatrix(); puffMesh.setMatrixAt(i, puffObj.matrix);
+    }
+    puffMesh.instanceMatrix.needsUpdate = true;
+    for (const c of chutes){
+      if (c.life <= 0) continue;
+      c.life -= dt; c.g.position.y -= dt * 6; c.g.rotation.z = Math.sin(t * 1.3 + c.life) * 0.12; c.g.rotation.y += dt * 0.3;
+      if (c.life <= 0 || c.g.position.y < Math.max(groundAt(c.g.position.x, c.g.position.z), 0)){ c.life = 0; c.g.visible = false; }
     }
   }
   const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
@@ -1065,7 +1331,7 @@ function boot(hot){
 
   /* ---------------- Input ---------------- */
   const keys = {};
-  const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', Space: 'b', ShiftLeft: 'b', ShiftRight: 'b' };
+  const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'f', Space: 'b', ShiftLeft: 'b', ShiftRight: 'b' };
   window.addEventListener('keydown', e => {
     if (e.target && e.target.tagName === 'INPUT') return;
     const k = KEYMAP[e.code];
@@ -1132,6 +1398,10 @@ function boot(hot){
   $('btn-gear').addEventListener('click', e => { toggleGear(); e.currentTarget.blur(); });
   $('btn-flip').addEventListener('click', e => { toggleFlip(); e.currentTarget.blur(); });
   $('btn-view').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
+  const fireBtn = $('btn-fire');
+  const holdFire = on => e => { keys.f = on; fireBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
+  fireBtn.addEventListener('pointerdown', holdFire(true));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => fireBtn.addEventListener(n, holdFire(false)));
   $('btn-map').addEventListener('click', e => { e.currentTarget.blur(); openAirports(); });
   $('aplist').addEventListener('click', e => {
     const b = e.target.closest('.apbtn'); if (!b) return;
@@ -1698,6 +1968,7 @@ function boot(hot){
     fWater.position.set(F.x, 0, F.z);
     updateAirports();
     updateAI(dt, live);
+    updateMissiles(dt, live);
     for (const c of fClouds){
       const p = c.position;
       if (p.x - F.x > 3500) p.x -= 7000; else if (p.x - F.x < -3500) p.x += 7000;
