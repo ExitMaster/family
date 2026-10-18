@@ -24,7 +24,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **24 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -33,16 +33,34 @@ turns):
 |---|---|---|---|
 | **Red Cub** | the all-rounder | 126 / 292 kt | medium |
 | **Barnstormer** | yellow biplane | 107 / 233 kt | very loopy, turns fast |
-| **Puffin** | seaplane on floats: **can land on and take off from any lake** | 117 / 253 kt | gentle |
+| **Puffin** | seaplane on floats: **lands on lakes** | 117 / 253 kt | gentle |
 | **Zippy** | stunt plane | 136 / 311 kt | fastest loops and turns |
 | **Feather** | glider with very long wings, almost silent | 87 / 185 kt | gentle |
 | **Hauler** | big cargo plane with two propellers | 117 / 243 kt | slow to turn |
 | **Swift** | jet, afterburner flame when boosting | 185 / 428 kt | medium |
-| **Thunder** | twin-tail fighter, two flames | 214 / 505 kt | quick |
-| **Shadow** | black stealth flying wing | 194 / 467 kt | medium |
+| **Thunder** | twin-tail fighter, two flames, **breaks Mach 1** | 214 / 739 kt | quick |
+| **Shadow** | black stealth flying wing, **breaks Mach 1** | 194 / 729 kt | medium |
 | **Jumbo** | four-engine airliner | 175 / 389 kt | slowest to turn |
-| **Rocket** | space plane, three engines always glowing | 233 / 622 kt | gentle |
+| **Rocket** | space plane, three engines always glowing, **breaks Mach 1** | 233 / 836 kt | gentle |
 | **Saucer** | a UFO with a little green alien inside | 156 / 389 kt | very quick |
+| **Pelican** | flying boat with two engines: **lands on lakes** | 117 / 253 kt | slow to turn |
+| **Otter** | green bush plane on floats: **lands on lakes** | 121 / 272 kt | medium |
+| **Firebird** | red and yellow water bomber: **lands on lakes** | 126 / 262 kt | gentle |
+| **Ducky** | a rubber duck with a propeller beanie: **lands on lakes** | 107 / 243 kt | quick |
+| **Whirly** | helicopter with a spinning rotor and tail rotor | 107 / 233 kt | quick |
+| **Bubbles** | slow, floaty pink blimp | 68 / 136 kt | slowest |
+| **Origami** | a paper plane, silent | 97 / 194 kt | quick |
+| **Kite** | tiny hang-glider with a motor | 78 / 165 kt | quick |
+| **Ace** | old-time fighter with a big four-blade propeller | 175 / 408 kt | quick |
+| **Zoom** | flying car with jets | 146 / 350 kt | quick |
+| **Arrow** | needle-nosed supersonic jet, **breaks Mach 1** | 272 / 758 kt | slow to turn |
+| **Comet** | starfighter with X-shaped wings, **breaks Mach 1** | 253 / 797 kt | very quick |
+
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky) can land on and take off from any
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet) go
+faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
+crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
+white vapour cone round the plane. Bubbles and Origami have no landing gear to fold up.
 
 ## Flying
 
@@ -112,8 +130,8 @@ doesn't hide: yellow at Home Field, teal everywhere else.
 - **Land anywhere on an airport's meadow**, not just the runway. Below 80 m over it the
   screen says "*Airport name* below". The first landing at a new airport gives
   "Welcome to *name*! +400"; landing again gives +100 (once per 5 seconds). With the
-  **Puffin** seaplane you can also land on any lake ("Splashdown!") and take off from it
-  again; any other plane that hits the water splashes.
+  lake planes you can also land on any lake ("Splashdown!") and take off from it again;
+  any other plane that hits the water splashes.
 - After touching down the brakes stop the plane by themselves; hold up to roll again and
   take off.
 - **Choose where to go:** tap **MAP** (or press `M`). The game pauses and lists the

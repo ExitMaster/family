@@ -151,6 +151,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <span class="chip fuelchip" id="fuelChip">FUEL<b id="fuel">5:00</b><span class="fbar"><i id="fuelFill"></i></span></span>
       <span class="chip">ALT<b id="alt">0</b> ft</span>
       <span class="chip">IAS<b id="spd">0</b> kt</span>
+      <span class="chip" id="machChip" hidden>MACH<b id="mach">0.00</b></span>
       <span class="chip">HDG<b id="hdg">000</b></span>
       <span class="chip" id="apChip"><span class="apname" id="apName">Home Field</span><b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
     </div>
@@ -288,6 +289,7 @@ const sfx = (() => {
     resume(){ if (ctx && ctx.state === 'suspended') ctx.resume(); },
     coin(chain){ const b = 880 * Math.pow(2, Math.min(chain, 12) / 12); tone(b, 0.07, 'square', 0.05); tone(b * 1.5, 0.16, 'square', 0.045, 0.055); },
     ring(){ noise(0.6, 0.3, 400, 3500, 'bandpass'); tone(523, 0.35, 'triangle', 0.1, 0, 1046); },
+    boom(){ noise(1.4, 0.9, 700, 40); tone(60, 1.0, 'sine', 0.35, 0, 28); },
     hit(){ noise(0.4, 0.55, 1800, 150); tone(120, 0.45, 'sawtooth', 0.18, 0, 40); },
     splash(){ noise(0.9, 0.5, 2500, 200); },
     land(){ noise(0.25, 0.35, 3000, 900, 'bandpass'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, 0.15 + i * 0.09)); },
@@ -399,16 +401,29 @@ function boot(hot){
     { id: 'glider', name: 'Feather', note: 'Long wings, very quiet', color: '#e9e4d8', cruise: 45, boost: 95, pitch: 1.3, turn: 1.2, cam: 1.3, sound: { mul: 2.4, vol: 0.012 } },
     { id: 'hauler', name: 'Hauler', note: 'Big cargo, two props', color: '#6b7a3a', cruise: 60, boost: 125, pitch: 1.0, turn: 0.9, cam: 1.25, sound: { mul: 0.8, vol: 0.05 } },
     { id: 'swift', name: 'Swift', note: 'Fast jet', color: '#2a6ccc', cruise: 95, boost: 220, pitch: 1.6, turn: 1.4, sound: { mul: 2.2, vol: 0.035 } },
-    { id: 'thunder', name: 'Thunder', note: 'Fighter, very fast', color: '#4a5262', cruise: 110, boost: 260, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
-    { id: 'stealth', name: 'Shadow', note: 'Stealth flying wing', color: '#2b2f3a', cruise: 100, boost: 240, pitch: 1.5, turn: 1.4, cam: 1.1, sound: { mul: 2.0, vol: 0.025 } },
+    { id: 'thunder', name: 'Thunder', note: 'Fighter, Mach 1.1', color: '#4a5262', cruise: 110, boost: 380, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
+    { id: 'stealth', name: 'Shadow', note: 'Stealth wing, Mach 1.1', color: '#2b2f3a', cruise: 100, boost: 375, pitch: 1.5, turn: 1.4, cam: 1.1, sound: { mul: 2.0, vol: 0.025 } },
     { id: 'jumbo', name: 'Jumbo', note: 'Huge airliner', color: '#c9d2dc', cruise: 90, boost: 200, pitch: 0.9, turn: 0.8, cam: 1.6, sound: { mul: 1.8, vol: 0.04 } },
-    { id: 'rocket', name: 'Rocket', note: 'Space plane, wild boost', color: '#f4f1ea', cruise: 120, boost: 320, pitch: 1.3, turn: 1.1, cam: 1.15, sound: { mul: 1.4, vol: 0.05 } },
-    { id: 'saucer', name: 'Saucer', note: 'Is that a UFO?', color: '#7fd1a6', cruise: 80, boost: 200, pitch: 2.2, turn: 2.0, cam: 1.1, sound: { mul: 3.2, vol: 0.03 } }
+    { id: 'rocket', name: 'Rocket', note: 'Space plane, Mach 1.25', color: '#f4f1ea', cruise: 120, boost: 430, pitch: 1.3, turn: 1.1, cam: 1.15, sound: { mul: 1.4, vol: 0.05 } },
+    { id: 'saucer', name: 'Saucer', note: 'Is that a UFO?', color: '#7fd1a6', cruise: 80, boost: 200, pitch: 2.2, turn: 2.0, cam: 1.1, sound: { mul: 3.2, vol: 0.03 } },
+    { id: 'pelican', name: 'Pelican', note: 'Flying boat, lands on lakes', color: '#2a4fa8', cruise: 60, boost: 130, pitch: 1.0, turn: 0.9, cam: 1.35, water: true, fixedGear: true, sound: { mul: 0.85, vol: 0.05 } },
+    { id: 'otter', name: 'Otter', note: 'Bush plane on floats', color: '#2e8b57', cruise: 62, boost: 140, pitch: 1.6, turn: 1.4, water: true, fixedGear: true },
+    { id: 'firebird', name: 'Firebird', note: 'Water bomber, lands on lakes', color: '#ff5f45', cruise: 65, boost: 135, pitch: 1.2, turn: 1.1, cam: 1.2, water: true, fixedGear: true, sound: { mul: 0.85, vol: 0.05 } },
+    { id: 'ducky', name: 'Ducky', note: 'Rubber duck, floats on lakes', color: '#ffd23d', cruise: 55, boost: 125, pitch: 1.8, turn: 1.7, water: true, sound: { mul: 1.6, vol: 0.035 } },
+    { id: 'whirly', name: 'Whirly', note: 'Helicopter', color: '#3fa9f5', cruise: 55, boost: 120, pitch: 1.5, turn: 1.6, cam: 1.2, sound: { mul: 0.6, vol: 0.05 } },
+    { id: 'blimp', name: 'Bubbles', note: 'Slow, floaty blimp', color: '#ff8fb8', cruise: 35, boost: 70, pitch: 0.7, turn: 0.7, cam: 1.6, fixedGear: true, sound: { mul: 0.7, vol: 0.03 } },
+    { id: 'origami', name: 'Origami', note: 'Paper plane, silent', color: '#f4f1ea', cruise: 50, boost: 100, pitch: 1.8, turn: 1.5, fixedGear: true, sound: { mul: 2.5, vol: 0.008 } },
+    { id: 'kite', name: 'Kite', note: 'Tiny motor hang-glider', color: '#7a5ad8', cruise: 40, boost: 85, pitch: 1.6, turn: 1.5, cam: 1.1, sound: { mul: 1.9, vol: 0.03 } },
+    { id: 'ace', name: 'Ace', note: 'Old-time fighter', color: '#5a6b3a', cruise: 90, boost: 210, pitch: 1.9, turn: 1.7 },
+    { id: 'zoom', name: 'Zoom', note: 'Flying car', color: '#e8432e', cruise: 75, boost: 180, pitch: 1.6, turn: 1.6, sound: { mul: 2.0, vol: 0.035 } },
+    { id: 'arrow', name: 'Arrow', note: 'Supersonic jet, Mach 1.15', color: '#9fb6d9', cruise: 140, boost: 390, pitch: 1.0, turn: 0.9, cam: 1.4, sound: { mul: 2.2, vol: 0.04 } },
+    { id: 'comet', name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } }
   ];
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
   planeRoot.add(planeBody); scene.add(planeRoot);
-  const matCache = {};
+  const matCache = {}, matCache2 = {};
   const mat = hex => matCache[hex] || (matCache[hex] = lam(hex));
+  const mat2 = hex => matCache2[hex] || (matCache2[hex] = lam(hex, { side: THREE.DoubleSide }));   // for flat paper-thin parts
   const glassMat = new THREE.MeshPhongMaterial({ color: 0x7fd3e8, emissive: 0x113344, shininess: 100, specular: 0xffffff });
   const darkGlass = new THREE.MeshPhongMaterial({ color: 0x223344, emissive: 0x050a10, shininess: 100, specular: 0xffffff });
   const silverMat = new THREE.MeshPhongMaterial({ color: 0xc9d2dc, specular: 0xffffff, shininess: 90 });
@@ -427,7 +442,13 @@ function boot(hot){
     const nose = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = -Math.PI / 2; return o; };
     const tail = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = Math.PI / 2; return o; };
     // landing gear folds up into the plane: these parts shrink upwards when it's raised
-    const gearBox = (w, h, d, x, y, z) => { const o = box(w, h, d, DARK, x, y, z); o.userData.gy = y; o.userData.gh = h; gearParts.push(o); return o; };
+    const gearBox = (w, h, d, x, y, z, c) => { const o = box(w, h, d, c || DARK, x, y, z); o.userData.gy = y; o.userData.gh = h; gearParts.push(o); return o; };
+    const ball = (r, m, x, y, z, sx, sy, sz) => { const o = add(new THREE.SphereGeometry(r, 18, 12), m, x, y, z); o.scale.set(sx || 1, sy || 1, sz || 1); return o; };
+    // flat triangles (paper and sail wings): a list of [x, y, z] corners, three per triangle
+    const tris = (pts, hex) => {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); g.computeVertexNormals();
+      planeBody.add(new THREE.Mesh(g, mat2(hex)));
+    };
     const wheel = (x, z) => gearBox(0.28, 0.5, 0.28, x, -0.75, z);
     const propeller = (x, y, z, size) => {
       const g = new THREE.Group(), b = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, 0.06), mat(DARK)), b2 = b.clone();
@@ -552,6 +573,123 @@ function boot(hot){
         gearBox(0.25, 0.5, 0.25, 0, -0.75, -2.0); wheel(0.7, 1.0); wheel(-0.7, 1.0);
         break;
       }
+      case 'pelican': {   // flying boat: the hull is the boat, floats under the wingtips
+        const B = 0x2a4fa8;
+        box(1.6, 1.4, 6.0, WHITE, 0, 0.1, 0); box(1.4, 0.4, 5.6, B, 0, -0.8, 0.1); box(1.4, 1.2, 0.8, WHITE, 0, 0.05, -3.3);
+        box(1.2, 0.4, 0.3, glassMat, 0, 0.55, -3.55);
+        box(10, 0.18, 1.6, WHITE, 0, 1.2, -0.8);
+        both((x) => { tube(0.35, 0.4, 1.6, GRAY, x, 1.35, -1.4); propeller(x, 1.35, -2.3, 2.4); }, 2.2);
+        both((x) => { box(0.3, 0.35, 1.0, WHITE, x, 0.5, -0.8); box(0.06, 0.6, 0.06, DARK, x, 0.85, -0.8); }, 4.6);
+        box(1.0, 0.8, 1.8, WHITE, 0, 0.5, 3.6, -0.25); box(0.14, 1.6, 1.2, B, 0, 1.4, 4.2); box(3.2, 0.12, 0.9, WHITE, 0, 1.0, 4.3);
+        break;
+      }
+      case 'otter': {
+        const G = 0x2e8b57, FL = 0xdfe6ee;
+        box(1.1, 1.1, 4.2, G, 0, 0.15, 0); box(1.2, 1.15, 0.7, CREAM, 0, 0.15, -2.2);
+        nose(0.3, 0.5, DARK, -2.75, 0.15); propeller(0, 0.15, -2.6, 2.8);
+        box(8.4, 0.16, 1.5, CREAM, 0, 0.8, -0.5); both((x) => box(0.08, 0.9, 0.08, DARK, x, 0.3, -0.5), 1.4);
+        box(0.85, 0.45, 1.0, glassMat, 0, 0.6, -1.0);
+        box(2.8, 0.12, 0.8, CREAM, 0, 0.35, 2.8); box(0.14, 1.2, 0.9, G, 0, 0.95, 2.8);
+        both((x) => { box(0.45, 0.4, 4.6, FL, x, -0.8, -0.1); box(0.07, 0.6, 0.07, DARK, x, -0.35, -1.1); box(0.07, 0.6, 0.07, DARK, x, -0.35, 0.8); }, 1.0);
+        break;
+      }
+      case 'firebird': {   // water bomber: boat hull with a keel
+        const Y = 0xffc23d;
+        box(1.4, 1.3, 5.2, RED, 0, 0, 0); box(1.42, 0.3, 5.22, Y, 0, -0.25, 0); box(0.8, 0.35, 4.6, RED, 0, -0.82, 0.1);
+        box(1.3, 1.1, 0.6, RED, 0, -0.05, -2.8); box(1.1, 0.4, 0.3, glassMat, 0, 0.3, -3.0);
+        box(9.0, 0.18, 1.5, Y, 0, 0.75, -0.6);
+        both((x) => { tube(0.36, 0.4, 1.8, GRAY, x, 0.5, -1.2); propeller(x, 0.5, -2.2, 2.4); box(0.3, 0.3, 1.0, Y, x * 1.7, 0.2, -0.6); }, 2.3);
+        box(0.14, 1.4, 1.0, RED, 0, 0.9, 3.0); box(3.0, 0.12, 0.8, Y, 0, 0.5, 3.0);
+        break;
+      }
+      case 'ducky': {   // a rubber duck with a propeller beanie
+        const Y = 0xffd23d, O = 0xff8a3d;
+        ball(1.2, Y, 0, 0.12, 0, 1, 0.85, 1.3); ball(0.75, Y, 0, 1.0, -1.0);
+        nose(0.28, 0.6, O, -1.85, 0.9);
+        both((x) => box(0.12, 0.16, 0.1, DARK, x, 1.25, -1.62), 0.3);
+        both((x, sd) => box(1.6, 0.2, 1.0, Y, x, 0.15, 0.1, 0, 0, 0.3 * sd), 1.4);
+        tail(0.35, 0.7, Y, 1.7, 0.6).rotation.x = Math.PI / 3;
+        box(0.5, 0.25, 0.5, 0x2a6ccc, 0, 1.75, -1.0);
+        const hat = new THREE.Group(), blade = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 0.15), mat(RED));
+        hat.add(blade); hat.position.set(0, 1.92, -1.0); planeBody.add(hat); spinners.push({ o: hat, axis: 'y', rate: 30 });
+        both((x) => gearBox(0.4, 0.3, 0.6, x, -0.85, 0.2, O), 0.4);
+        break;
+      }
+      case 'whirly': {   // helicopter: big rotor on top, little one on the tail
+        const B = 0x3fa9f5;
+        ball(1.3, B, 0, 0.15, -0.3, 1, 0.9, 1.3); ball(0.95, glassMat, 0, 0.3, -1.05);
+        box(0.35, 0.35, 3.6, B, 0, 0.35, 2.2); box(0.1, 1.0, 0.6, B, 0, 0.8, 3.9);
+        const tr = new THREE.Group(), tb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.2, 0.12), mat(DARK)), tb2 = tb.clone();
+        tb2.rotation.x = Math.PI / 2; tr.add(tb, tb2); tr.position.set(0.12, 0.8, 3.95); planeBody.add(tr); spinners.push({ o: tr, axis: 'x', rate: 50 });
+        box(0.2, 0.5, 0.2, DARK, 0, 1.35, -0.3);
+        const rotor = new THREE.Group(), rb = new THREE.Mesh(new THREE.BoxGeometry(7, 0.06, 0.35), mat(DARK)), rb2 = rb.clone();
+        rb2.rotation.y = Math.PI / 2;
+        const disc = new THREE.Mesh(new THREE.CircleGeometry(3.5, 24), blurMat); disc.rotation.x = -Math.PI / 2;
+        rotor.add(rb, rb2, disc); rotor.position.set(0, 1.62, -0.3); planeBody.add(rotor); spinners.push({ o: rotor, axis: 'y', rate: 25 });
+        both((x) => { gearBox(0.14, 0.14, 2.8, x, -0.93, -0.3); gearBox(0.08, 0.5, 0.08, x, -0.62, -1.0); gearBox(0.08, 0.5, 0.08, x, -0.62, 0.4); }, 0.9);
+        break;
+      }
+      case 'blimp': {
+        const P = 0xff8fb8, V = 0x7a5ad8;
+        ball(1, P, 0, 0.6, 0, 1.6, 1.6, 4.2);
+        box(0.12, 1.6, 1.2, V, 0, 1.9, 3.6); box(0.12, 1.6, 1.2, V, 0, -0.7, 3.6);
+        both((x) => box(1.6, 0.12, 1.2, V, x, 0.6, 3.6), 1.3);
+        box(0.9, 0.6, 2.0, CREAM, 0, -0.7, -0.2); box(0.92, 0.2, 1.6, glassMat, 0, -0.55, -0.2);
+        propeller(0, -0.7, 1.0, 1.4);
+        break;
+      }
+      case 'origami':   // a folded paper plane
+        tris([[0, 0, -3], [-2.2, 0.1, 2.2], [0, 0, 2.2], [0, 0, -3], [0, 0, 2.2], [2.2, 0.1, 2.2],
+              [0, 0, -3], [0, 0, 2.2], [0, -1, 2.2]], 0xf4f1ea);
+        tris([[-2.2, 0.1, 2.2], [-1.9, 0.35, 2.2], [-0.8, 0.05, 0]], 0xd9d3c4);
+        tris([[2.2, 0.1, 2.2], [1.9, 0.35, 2.2], [0.8, 0.05, 0]], 0xd9d3c4);
+        break;
+      case 'kite': {   // a sail wing with a little trike and a pusher propeller
+        tris([[0, 1.5, -1.8], [-3.6, 1.3, 1.4], [0, 1.5, 1.0], [0, 1.5, -1.8], [0, 1.5, 1.0], [3.6, 1.3, 1.4]], 0x7a5ad8);
+        tris([[0, 1.52, -1.8], [-1.2, 1.45, 0.9], [0, 1.52, 1.0], [0, 1.52, -1.8], [0, 1.52, 1.0], [1.2, 1.45, 0.9]], 0xffc23d);
+        box(0.08, 1.6, 0.08, DARK, 0, 0.7, -0.2); box(1.2, 0.06, 0.06, DARK, 0, 0.3, -0.6);
+        box(0.6, 0.45, 1.6, RED, 0, -0.25, 0); ball(0.25, 0xffd9b0, 0, 0.25, -0.3);
+        propeller(0, -0.1, 0.95, 1.5);
+        wheel(0.5, 0.3); wheel(-0.5, 0.3); wheel(0, -0.8);
+        break;
+      }
+      case 'ace': {   // old-time fighter with a big four-blade propeller
+        const O = 0x5a6b3a, Y = 0xffc23d;
+        tube(0.45, 0.65, 4.6, O, 0, 0, 0.3); tube(0.68, 0.68, 0.9, Y, 0, 0, -2.3);
+        nose(0.3, 0.6, RED, -3.0); propeller(0, 0, -2.85, 3.4);
+        box(8.0, 0.16, 1.6, O, 0, -0.2, -0.4); both((x) => box(0.3, 0.17, 1.62, WHITE, x, -0.2, -0.4), 2.2);
+        ball(0.45, glassMat, 0, 0.55, -0.4, 1, 0.8, 1.6);
+        box(2.6, 0.12, 0.9, O, 0, 0.1, 2.6); box(0.12, 1.1, 1.0, O, 0, 0.6, 2.5);
+        wheel(1.2, -0.6); wheel(-1.2, -0.6);
+        break;
+      }
+      case 'zoom': {   // flying car: the wheels fold away for flight
+        box(1.8, 0.8, 3.6, RED, 0, -0.2, 0); box(1.5, 0.6, 1.6, glassMat, 0, 0.45, 0.1);
+        both((x) => { box(1.0, 0.08, 0.8, RED, x, 0, 0.4); tube(0.25, 0.3, 0.8, GRAY, x * 0.55, 0, 1.9); flame(x * 0.55, 0, 2.3, 0.22); box(0.3, 0.15, 0.06, 0xfff1c0, x * 0.6, -0.1, -1.82); }, 1.3);
+        box(1.8, 0.08, 0.4, DARK, 0, 0.45, 1.75);
+        [[0.95, 1.2], [-0.95, 1.2], [0.95, -1.2], [-0.95, -1.2]].forEach(([x, z]) => gearBox(0.3, 0.8, 0.8, x, -0.6, z));
+        break;
+      }
+      case 'arrow': {   // supersonic airliner with a needle nose
+        tube(0.55, 0.65, 9, WHITE, 0, 0, 0.5); nose(0.65, 2.6, WHITE, -5.3);
+        box(1.32, 0.1, 8.5, 0x2a4fa8, 0, -0.05, 0.5); box(1.31, 0.08, 6.5, DARK, 0, 0.25, 0.3);
+        both((x, sd) => box(3.4, 0.12, 4.0, WHITE, x, -0.3, 1.6, 0, -0.7 * sd), 1.9);
+        box(0.12, 2.0, 2.2, WHITE, 0, 1.2, 3.9, 0.5);
+        both((x) => { tube(0.22, 0.25, 1.6, GRAY, x, -0.55, 2.4); flame(x, -0.55, 3.2, 0.2, 0.3); }, 1.2);
+        gearBox(0.25, 0.4, 0.25, 0, -0.8, -3.0); wheel(1.0, 1.4); wheel(-1.0, 1.4);
+        break;
+      }
+      case 'comet': {   // starfighter with X-shaped wings
+        const O = 0xff8a3d;
+        box(0.8, 0.7, 6.0, WHITE, 0, 0, 0); nose(0.4, 1.4, WHITE, -3.7);
+        box(0.5, 0.35, 1.2, darkGlass, 0, 0.45, -1.2); box(0.82, 0.2, 2.0, O, 0, 0.1, -2.0);
+        for (const sx of [-1, 1]) for (const sy of [-1, 1]){
+          box(3.2, 0.1, 1.3, WHITE, sx * 1.7, sy * 0.45, 1.3, 0, 0, sx * sy * 0.28);
+          tube(0.28, 0.3, 1.6, GRAY, sx * 0.9, sy * 0.55, 1.6); flame(sx * 0.9, sy * 0.55, 2.45, 0.22, 0.4);
+        }
+        gearBox(0.2, 0.55, 0.2, 0, -0.72, -2.0); wheel(0.5, 1.0); wheel(-0.5, 1.0);
+        break;
+      }
       case 'saucer': {
         add(new THREE.CylinderGeometry(3.0, 3.2, 0.5, 28), silverMat, 0, 0, 0);
         add(new THREE.CylinderGeometry(1.6, 3.0, 0.5, 28), silverMat, 0, -0.5, 0);
@@ -581,6 +719,11 @@ function boot(hot){
   }
   let plane = PLANES.find(pl => pl.id === store.get('scr.plane', 'cub')) || PLANES[0];
   buildPlane(plane);
+  // the white vapour cone that flashes round the plane as it breaks the sound barrier
+  const vapor = new THREE.Mesh((() => { const g = new THREE.ConeGeometry(4.2, 7, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 1.2); return g; })(),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+  vapor.visible = false; planeRoot.add(vapor);
+  const MACH1 = 343;   // speed of sound, m/s
   const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
 
@@ -773,7 +916,7 @@ function boot(hot){
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.className = '', 1150);
   }
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
-  const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), powers: $('powers'),
+  const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), mach: $('mach'), machChip: $('machChip'), powers: $('powers'),
     hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), fuel: $('fuel'), fuelChip: $('fuelChip'), fuelFill: $('fuelFill'), land: $('btn-land'), gearBtn: $('btn-gear'), flipBtn: $('btn-flip'), prompt: $('prompt'),
     apChip: $('apChip'), guide: $('guide'), guideArrow: $('guideArrow'), guideText: $('guideText') };
   let powKey = '';
@@ -1017,7 +1160,7 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false };
+  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), fuel: 100, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false, supersonic: false, vaporT: 0 };
   // Progress is never reset: coins, score, fuel and the airports you've visited carry over
   // from flight to flight and are saved in the browser.
   (function loadProgress(){
@@ -1112,9 +1255,10 @@ function boot(hot){
     }).join('');
     state = 'paused'; sfx.engine(false, 0); show('airports');
   }
+  const hasGear = () => !plane.fixedGear && gearParts.length > 0;
   function toggleGear(){
     if (state !== 'play' || F.crashT > 0) return;
-    if (plane.fixedGear){ toast("Floats can't fold up", 'info'); return; }
+    if (!hasGear()){ toast(plane.water ? "Floats can't fold up" : 'This one has no landing gear', 'info'); return; }
     if (F.ground){ toast('Not on the ground!', 'warn'); return; }
     F.gear = !F.gear; F.gearWarned = false; sfx.gear();
     toast(F.gear ? 'Gear down' : 'Gear up', 'info');
@@ -1181,7 +1325,7 @@ function boot(hot){
     clearFreeItems();
     chain = 0; mult = 1; lastCoinT = -9;   // coins, score, fuel and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, lowTold: false, stuckT: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, fuelCredit: 0, broke: false, supersonic: false, vaporT: 0 });
     setLevel(0, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -1251,6 +1395,12 @@ function boot(hot){
       if (F.fuel <= 0) toast('Out of fuel! Glide to an airport', 'warn');
     }
     boostT = Math.max(0, boostT - dt); shake = Math.max(0, shake - dt * 1.6);
+    // breaking the sound barrier: a boom, a shake and a flash of vapour round the plane
+    if (live && !F.supersonic && F.speed >= MACH1 && !F.ground){
+      F.supersonic = true; F.vaporT = 1; sfx.boom(); shake = REDUCED ? 0.2 : 0.8;
+      toast('SONIC BOOM! Mach 1', ''); score += 100;
+    }
+    if (F.speed < MACH1 - 15) F.supersonic = false;
 
     if (F.crashT > 0){
       F.crashT -= dt;
@@ -1320,7 +1470,7 @@ function boot(hot){
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
       const water = onWater(F.x, F.z);
       const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
-      if (touching && !water && F.gearT < 0.9 && !plane.fixedGear) crashFree(false, 'Belly landing! The gear was up');
+      if (touching && !water && F.gearT < 0.9 && hasGear()) crashFree(false, 'Belly landing! The gear was up');
       else if (touching){
         F.ground = true; F.flipped = false; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
         if (t - F.lastLand > 5){
@@ -1340,7 +1490,8 @@ function boot(hot){
     }
 
     // keep the world built around the plane
-    const sx = Math.round(F.x / (FS * 2)) * FS * 2, sz = Math.round(F.z / (FS * 2)) * FS * 2;
+    const snap = FS * (F.speed > 200 ? 4 : 2);
+    const sx = Math.round(F.x / snap) * snap, sz = Math.round(F.z / snap) * snap;
     if (sx !== fCX || sz !== fCZ) buildTerrain(sx, sz);
     const tx = Math.floor(F.x / TC), tz = Math.floor(F.z / TC);
     if (tx !== treeCX || tz !== treeCZ) buildTrees(tx, tz);
@@ -1384,9 +1535,11 @@ function boot(hot){
     // the plane
     planeRoot.position.set(F.x, F.y, F.z);
     planeRoot.quaternion.copy(Q);
-    const gearTo = F.gear || plane.fixedGear ? 1 : 0;
+    const gearTo = F.gear || !hasGear() ? 1 : 0;
     if (F.gearT !== gearTo){ F.gearT = gearTo > F.gearT ? Math.min(1, F.gearT + dt * 1.2) : Math.max(0, F.gearT - dt * 1.2); showGear(F.gearT); }
     for (const sp of spinners) sp.o.rotation[sp.axis] += dt * sp.rate * (engineOn ? 1 : 0.15);
+    F.vaporT = Math.max(0, F.vaporT - dt * 1.2);
+    vapor.visible = F.vaporT > 0; vapor.material.opacity = F.vaporT * 0.55; vapor.scale.setScalar(1 + (1 - F.vaporT) * 0.6);
     for (const fl of flames) fl.scale.y = engineOn ? (boosting && !F.ground ? 1.5 : fl.userData.idle) * (0.85 + Math.random() * 0.3) : 0.001;
     const field = airfieldAt(F.x, F.z), gTop = Math.max(onRunway(field) ? rwyTop(field.a) : groundAt(F.x, F.z), 0);
     planeShadow.position.set(F.x, gTop + 0.08, F.z);
@@ -1446,6 +1599,9 @@ function boot(hot){
     if (t - lastCoinT > 1.15 && chain){ chain = 0; mult = 1; }
     txt(H.alt, Math.round(Math.max(0, F.y) * 3.28).toLocaleString());
     txt(H.spd, String(Math.round(F.speed * 1.944)));
+    H.machChip.hidden = F.speed < MACH1 * 0.7;
+    if (!H.machChip.hidden) txt(H.mach, (F.speed / MACH1).toFixed(2));
+    H.machChip.classList.toggle('dest', F.speed >= MACH1);
     const hdg = ((-F.yaw * 180 / Math.PI) % 360 + 360) % 360;
     txt(H.hdg, String(Math.round(hdg) % 360).padStart(3, '0'));
     // the airport auto-land is heading for, else your chosen destination, else the nearest
@@ -1482,7 +1638,7 @@ function boot(hot){
     } else if (F.crashT <= 0 && airfieldAt(F.x, F.z) && F.y < airfieldAt(F.x, F.z).a.elev + 80){
       const field = airfieldAt(F.x, F.z);
       if (F.flipped) prompt = 'Flip back (F) to land';
-      else if (!F.gear && !plane.fixedGear){
+      else if (!F.gear && hasGear()){
         prompt = 'Gear is up! Press G to land';
         if (!F.gearWarned){ F.gearWarned = true; toast('Gear is up!', 'warn'); }
       } else prompt = field.a.name + ' below: go down gently to land';
