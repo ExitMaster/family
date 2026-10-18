@@ -441,10 +441,14 @@ function boot(hot){
   const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
   let spinners = [], flames = [], gearParts = [], gearShown = 1;
   const RED = 0xe8432e, CREAM = 0xfff1d6, DARK = 0x2a2f45, WHITE = 0xf4f1ea, GRAY = 0xc9d2dc;
-  function buildPlane(def){
-    planeBody.traverse(o => { if (o.geometry) o.geometry.dispose(); });
-    planeBody.clear(); spinners = []; flames = []; gearParts = [];
-    const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); planeBody.add(o); return o; };
+  // Builds a plane model into root (the player's plane by default) and returns its moving
+  // parts: propellers/rotors, flames and landing gear.
+  function buildPlane(def, target){
+    const root = target || planeBody, mine = root === planeBody;
+    root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    root.clear();
+    const sp = [], fl = [], gp = [];
+    const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, typeof m === 'number' ? mat(m) : m); o.position.set(x, y, z); root.add(o); return o; };
     const box = (w, h, d, m, x, y, z, rx, ry, rz) => { const o = add(new THREE.BoxGeometry(w, h, d), m, x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); return o; };
     const both = (fn, x, ...rest) => { fn(x, 1, ...rest); fn(-x, -1, ...rest); };   // build a part on each side
     // a cylinder along z (r1 at the back, r2 at the front) and cones pointing forward or back
@@ -452,25 +456,25 @@ function boot(hot){
     const nose = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = -Math.PI / 2; return o; };
     const tail = (r, len, m, z, y) => { const o = add(new THREE.ConeGeometry(r, len, 14), m, 0, y || 0, z); o.rotation.x = Math.PI / 2; return o; };
     // landing gear folds up into the plane: these parts shrink upwards when it's raised
-    const gearBox = (w, h, d, x, y, z, c) => { const o = box(w, h, d, c || DARK, x, y, z); o.userData.gy = y; o.userData.gh = h; gearParts.push(o); return o; };
+    const gearBox = (w, h, d, x, y, z, c) => { const o = box(w, h, d, c || DARK, x, y, z); o.userData.gy = y; o.userData.gh = h; gp.push(o); return o; };
     const ball = (r, m, x, y, z, sx, sy, sz) => { const o = add(new THREE.SphereGeometry(r, 18, 12), m, x, y, z); o.scale.set(sx || 1, sy || 1, sz || 1); return o; };
     // flat triangles (paper and sail wings): a list of [x, y, z] corners, three per triangle
     const tris = (pts, hex) => {
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); g.computeVertexNormals();
-      planeBody.add(new THREE.Mesh(g, mat2(hex)));
+      root.add(new THREE.Mesh(g, mat2(hex)));
     };
     const wheel = (x, z) => gearBox(0.28, 0.5, 0.28, x, -0.75, z);
     const propeller = (x, y, z, size) => {
       const g = new THREE.Group(), b = new THREE.Mesh(new THREE.BoxGeometry(size, 0.2, 0.06), mat(DARK)), b2 = b.clone();
       b2.rotation.z = Math.PI / 2;
       const blur = new THREE.Mesh(new THREE.CircleGeometry(size * 0.52, 20), blurMat); blur.position.z = -0.02;
-      g.add(b, b2, blur); g.position.set(x, y, z); planeBody.add(g);
-      spinners.push({ o: g, axis: 'z', rate: 42 });
+      g.add(b, b2, blur); g.position.set(x, y, z); root.add(g);
+      sp.push({ o: g, axis: 'z', rate: 42 });
     };
     const flame = (x, y, z, r, idle, forward) => {   // points backwards, or forwards (dragon fire)
       const geo = new THREE.ConeGeometry(r, 2.2, 10); geo.translate(0, 1.1, 0);
       const o = new THREE.Mesh(geo, flameMat); o.rotation.x = forward ? -Math.PI / 2 : Math.PI / 2; o.position.set(x, y, z);
-      o.userData.idle = idle || 0.35; planeBody.add(o); flames.push(o);
+      o.userData.idle = idle || 0.35; root.add(o); fl.push(o);
     };
     switch (def.id){
       case 'cub':
@@ -621,7 +625,7 @@ function boot(hot){
         tail(0.35, 0.7, Y, 1.7, 0.6).rotation.x = Math.PI / 3;
         box(0.5, 0.25, 0.5, 0x2a6ccc, 0, 1.75, -1.0);
         const hat = new THREE.Group(), blade = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 0.15), mat(RED));
-        hat.add(blade); hat.position.set(0, 1.92, -1.0); planeBody.add(hat); spinners.push({ o: hat, axis: 'y', rate: 30 });
+        hat.add(blade); hat.position.set(0, 1.92, -1.0); root.add(hat); sp.push({ o: hat, axis: 'y', rate: 30 });
         both((x) => gearBox(0.4, 0.3, 0.6, x, -0.85, 0.2, O), 0.4);
         break;
       }
@@ -631,12 +635,12 @@ function boot(hot){
         if (cg) ball(1.31, WHITE, 0, 0.1, 0.1, 1, 0.25, 1.1);   // white stripe round the cabin
         box(0.35, 0.35, 3.6, B, 0, 0.35, 2.2); box(0.1, 1.0, 0.6, B, 0, 0.8, 3.9);
         const tr = new THREE.Group(), tb = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.2, 0.12), mat(DARK)), tb2 = tb.clone();
-        tb2.rotation.x = Math.PI / 2; tr.add(tb, tb2); tr.position.set(0.12, 0.8, 3.95); planeBody.add(tr); spinners.push({ o: tr, axis: 'x', rate: 50 });
+        tb2.rotation.x = Math.PI / 2; tr.add(tb, tb2); tr.position.set(0.12, 0.8, 3.95); root.add(tr); sp.push({ o: tr, axis: 'x', rate: 50 });
         box(0.2, 0.5, 0.2, DARK, 0, 1.35, -0.3);
         const rotor = new THREE.Group(), rb = new THREE.Mesh(new THREE.BoxGeometry(7, 0.06, 0.35), mat(DARK)), rb2 = rb.clone();
         rb2.rotation.y = Math.PI / 2;
         const disc = new THREE.Mesh(new THREE.CircleGeometry(3.5, 24), blurMat); disc.rotation.x = -Math.PI / 2;
-        rotor.add(rb, rb2, disc); rotor.position.set(0, 1.62, -0.3); planeBody.add(rotor); spinners.push({ o: rotor, axis: 'y', rate: 25 });
+        rotor.add(rb, rb2, disc); rotor.position.set(0, 1.62, -0.3); root.add(rotor); sp.push({ o: rotor, axis: 'y', rate: 25 });
         if (cg) both((x) => { box(0.42, 0.36, 2.9, WHITE, x, -0.82, -0.3); box(0.08, 0.5, 0.08, DARK, x, -0.45, -1.0); box(0.08, 0.5, 0.08, DARK, x, -0.45, 0.4); }, 1.0);   // floats
         else both((x) => { gearBox(0.14, 0.14, 2.8, x, -0.93, -0.3); gearBox(0.08, 0.5, 0.08, x, -0.62, -1.0); gearBox(0.08, 0.5, 0.08, x, -0.62, 0.4); }, 0.9);
         break;
@@ -664,7 +668,7 @@ function boot(hot){
         both((x) => { box(0.04, 1.3, 0.04, DARK, x, 0.4, 0.45); box(0.04, 1.3, 0.04, DARK, x, 0.4, -0.45); }, 0.45);
         const fg = new THREE.ConeGeometry(0.25, 1.2, 10); fg.translate(0, 0.6, 0);
         const fire = new THREE.Mesh(fg, flameMat); fire.position.set(0, -0.15, 0); fire.userData.idle = 0.35;
-        planeBody.add(fire); flames.push(fire);
+        root.add(fire); fl.push(fire);
         break;
       }
       case 'owl': {
@@ -886,13 +890,14 @@ function boot(hot){
           const a = i / 12 * Math.PI * 2, l = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), new THREE.MeshBasicMaterial({ color: cols[i % 4] }));
           l.position.set(Math.cos(a) * 3.15, 0, Math.sin(a) * 3.15); ring.add(l);
         }
-        planeBody.add(ring); spinners.push({ o: ring, axis: 'y', rate: 2.5 });
+        root.add(ring); sp.push({ o: ring, axis: 'y', rate: 2.5 });
         for (let i = 0; i < 3; i++){ const a = i / 3 * Math.PI * 2; gearBox(0.12, 0.5, 0.12, Math.cos(a) * 1.4, -0.75, Math.sin(a) * 1.4); }
         break;
       }
     }
-    planeBody.scale.setScalar(PLANE_SCALE);
-    showGear(gearShown);
+    root.scale.setScalar(PLANE_SCALE);
+    if (mine){ spinners = sp; flames = fl; gearParts = gp; showGear(gearShown); }
+    return { sp, fl, gp };
   }
   function showGear(k){
     gearShown = k;
@@ -908,6 +913,54 @@ function boot(hot){
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
   vapor.visible = false; planeRoot.add(vapor);
   const MACH1 = 343;   // speed of sound, m/s
+
+  /* ---------------- Other planes ---------------- */
+  // 59 computer-flown planes cruise around near you. Each is a random plane from the list
+  // flying towards a waypoint (often an airport) at a safe height over the hills; one that
+  // drifts too far away is swapped for a new plane somewhere ahead of you. They can't hit
+  // you, but a close fly-by scores.
+  const AI_N = 59, AI_FAR = 3600, aiPlanes = [];
+  function aiWaypoint(a){
+    if (Math.random() < 0.5){ const ap = nearestAirport(a.x + rnd(-3000, 3000), a.z + rnd(-3000, 3000)); a.wx = ap.x; a.wz = ap.z; }
+    else { a.wx = a.x + rnd(-3000, 3000); a.wz = a.z + rnd(-3000, 3000); }
+  }
+  function aiSpawn(a, anywhere){
+    a.def = PLANES[(Math.random() * PLANES.length) | 0];
+    a.parts = buildPlane(a.def, a.g);
+    a.parts.gp.forEach(o => o.visible = false);   // gear up while flying
+    const ang = F.yaw + rnd(-1.4, 1.4), d = anywhere ? rnd(300, 2600) : rnd(2000, 3200);
+    a.x = F.x - Math.sin(ang) * d; a.z = F.z - Math.cos(ang) * d;
+    a.alt = rnd(110, 650); a.y = Math.max(groundAt(a.x, a.z), 0) + a.alt;
+    a.yaw = rnd(0, Math.PI * 2); a.pitch = 0; a.roll = 0; a.speed = a.def.cruise; a.byT = 0;
+    aiWaypoint(a);
+  }
+  function updateAI(dt, live){
+    if (!aiPlanes.length) for (let k = 0; k < AI_N; k++){ const g = new THREE.Group(); g.rotation.order = 'YXZ'; free.add(g); aiPlanes.push({ g }); }
+    for (const a of aiPlanes){
+      if (!a.def) aiSpawn(a, true);
+      if (Math.hypot(a.x - F.x, a.z - F.z) > AI_FAR) aiSpawn(a, false);
+      if (Math.hypot(a.wx - a.x, a.wz - a.z) < 300) aiWaypoint(a);
+      // bank towards the waypoint; a banked plane turns
+      const e = wrapA(Math.atan2(a.x - a.wx, a.z - a.wz) - a.yaw);
+      a.roll += (clamp(e * 1.5, -0.7, 0.7) - a.roll) * Math.min(1, dt * 2);
+      a.yaw += a.roll * a.def.turn * 0.8 * dt;
+      // keep a safe height over the ground ahead
+      const ahead = d => Math.max(groundAt(a.x - Math.sin(a.yaw) * d, a.z - Math.cos(a.yaw) * d), 0);
+      const g = Math.max(groundAt(a.x, a.z), 0), want = Math.max(g + a.alt, ahead(400) + 120, ahead(900) + 120);
+      a.pitch += (clamp((want - a.y) * 0.01, -0.25, 0.3) - a.pitch) * Math.min(1, dt * 2);
+      const cp = Math.cos(a.pitch);
+      a.x -= Math.sin(a.yaw) * cp * a.speed * dt; a.z -= Math.cos(a.yaw) * cp * a.speed * dt;
+      a.y = Math.max(a.y + Math.sin(a.pitch) * a.speed * dt, g + 30);
+      a.g.position.set(a.x, a.y, a.z); a.g.rotation.set(a.pitch, a.yaw, a.roll);
+      for (const s of a.parts.sp) s.o.rotation[s.axis] += dt * s.rate;
+      for (const f of a.parts.fl) f.scale.y = f.userData.idle * (0.85 + Math.random() * 0.3);
+      // close fly-by bonus (once every few seconds per plane)
+      a.byT = Math.max(0, a.byT - dt);
+      if (live && !a.byT && planeRoot.visible && !F.ground && Math.hypot(a.x - F.x, a.y - F.y, a.z - F.z) < 45){
+        a.byT = 6; score += 25; toast('Close fly-by: ' + a.def.name + '! +25', '');
+      }
+    }
+  }
   const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
 
@@ -1155,12 +1208,13 @@ function boot(hot){
     return (n - 0.42) * 240 + Math.max(0, cont - 0.42) * 2 * r * r * 1100;
   }
 
-  // Airports: one in most 5 km cells of an endless grid, placed, named and pointed by a
+  // Airports: one in most 3 km cells of an endless grid, placed, named and pointed by a
   // hash of the cell. Cells are centred on multiples of AP_CELL and an airport stays within
-  // 1.5 km of its cell's centre, so its flat meadow never reaches into another cell. Home
+  // 750 m of its cell's centre, so its flat meadow (up to ~610 m out) never reaches into
+  // another cell. Home
   // Field sits at the origin. In an airport's own coordinates u runs along the landing
   // direction from the middle of the runway and v runs across it to the right.
-  const AP_CELL = 5000, AP_HALF_L = 345, AP_HALF_W = 115, AP_BLEND = 260;
+  const AP_CELL = 3000, AP_HALF_L = 345, AP_HALF_W = 115, AP_BLEND = 260;
   const AP_NAMES = ['Pine Valley', 'Eagle Peak', 'Lakeside', 'Sunny Meadow', 'Cloud Hill', 'Fox Creek', 'Maple Ridge', 'Blue Lagoon',
     'Owl Rock', 'Windy Point', 'Honey Farm', 'Bear Lake', 'Snowcap', 'Rainbow Fields', 'Otter Bay', 'Tall Pines', 'Golden Sands',
     'Misty Glen', 'Puffin Isle', 'Thunder Bluff', 'Daisy Downs', 'Kite Hill', 'Moose Marsh', 'Starfall', 'Cherry Hill',
@@ -1171,8 +1225,8 @@ function boot(hot){
     if (airports.has(key)) return airports.get(key);
     let a = null;
     if (i === 0 && j === 0) a = { x: 0, z: 0, hdg: 0, elev: 5.5, name: 'Home Field' };
-    else if (hash2(i * 31 + 7, j * 17 - 3) < 0.8){
-      const x = (i + (hash2(i, j + 101) - 0.5) * 0.6) * AP_CELL, z = (j + (hash2(i + 211, j) - 0.5) * 0.6) * AP_CELL;
+    else if (hash2(i * 31 + 7, j * 17 - 3) < 0.9){
+      const x = (i + (hash2(i, j + 101) - 0.5) * 0.5) * AP_CELL, z = (j + (hash2(i + 211, j) - 0.5) * 0.5) * AP_CELL;
       // on a lake the airport becomes an island strip; on a mountain, a high plateau
       const elev = Math.max(baseH(x, z), 4);
       // Try a few runway directions and keep the first whose approach stays under a 4%
@@ -1349,10 +1403,10 @@ function boot(hot){
     const saved = store.get('scr.progress', null);
     if (!saved) return;
     coins = Math.max(0, saved.coins | 0); score = Math.max(0, +saved.score || 0);
-    F.visited = new Set(['0,0'].concat(Array.isArray(saved.visited) ? saved.visited : []));
+    F.visited = new Set(['0,0'].concat(Array.isArray(saved.visited3k) ? saved.visited3k : []));   // airports on the 3 km grid
   })();
   function saveProgress(){
-    store.set('scr.progress', { coins, score: Math.floor(score), visited: Array.from(F.visited) });
+    store.set('scr.progress', { coins, score: Math.floor(score), visited3k: Array.from(F.visited) });
   }
   window.addEventListener('pagehide', saveProgress);
   // the airport whose meadow the point is on (null if none), in its own coordinates
@@ -1640,6 +1694,7 @@ function boot(hot){
     fTrunks.visible = fLeaves.visible = F.y < 2500;
     fWater.position.set(F.x, 0, F.z);
     updateAirports();
+    updateAI(dt, live);
     for (const c of fClouds){
       const p = c.position;
       if (p.x - F.x > 3500) p.x -= 7000; else if (p.x - F.x < -3500) p.x += 7000;

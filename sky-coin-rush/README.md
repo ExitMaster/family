@@ -109,6 +109,9 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon and the floa
   sky. Coins are 10 points each; grab them less than about a second apart to build a
   chain (every 5 in a row adds one to the multiplier, up to x5). Rings give a 3-second
   boost and +50.
+- **Other planes:** 59 computer-flown planes from the plane list cruise around you, flying
+  between airports and over the hills at a safe height. Fly within about 45 m of one for a
+  **close fly-by** (+25). They can't crash into you.
 - **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps
@@ -119,7 +122,7 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon and the floa
 
 ## Airports
 
-The world has airports everywhere: one in most 5 km squares of an endless grid, each with
+The world has airports everywhere: one in most 3 km squares of an endless grid (so there's nearly always one within a couple of km), each with
 its own name (Pine Valley, Otter Bay, Snowcap…) and its runway pointing its own way. You
 start at **Home Field**. The ground around each one is flattened into a meadow: an airport
 on a lake becomes an island strip, and one on a mountain sits on a high plateau (up to
