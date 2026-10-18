@@ -12,7 +12,10 @@ the home airfield and fly anywhere you like over an endless open world, as high 
 |---|---|
 | Fly (left/right turns, up climbs, down dives; hold up to loop) | `↑` `↓` `←` `→` or `W` `S` `A` `D` |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
-| Auto-land at the nearest airport | `L` (or `Q`) or the **LAND** button |
+| Map: choose an airport to fly to | `M` or the **MAP** button |
+| Auto-land at your chosen airport (or the nearest one) | `L` (or `Q`) or the **LAND** button |
+| Landing gear up / down | `G` or the **GEAR** button |
+| Flip and fly upside down | `F` or the **FLIP** button |
 | Pause | `ESC` or `P` |
 | Phone / tablet | drag anywhere: a joystick appears where your finger lands |
 
@@ -51,13 +54,22 @@ turns):
   flies right over the top, upside down, and round to level again (+200 for each full
   loop). The camera follows you round. Let go while upside down and the plane rolls back
   right way up by itself.
+- **Upside down.** Press **F** (or FLIP) and the plane rolls over and stays on its back,
+  with the world still the right way up on screen. Up still climbs and left/right still
+  turn the way you'd expect. Flying upside down earns +5 points a second. Press F again
+  to roll back. You have to be right way up to land.
+- **Landing gear.** Press **G** (or GEAR) in the air to fold the wheels (or skids, or the
+  saucer's legs) away: the plane flies about 8% faster. Land with the gear up and it's a
+  belly-landing crash; low over an airport the screen warns "Gear is up! Press G".
+  Auto-land puts the gear down for you. The Puffin's floats don't fold up.
 - **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
   every direction, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
   haze clears as you climb. The top is 19,700 ft (6,000 m); there's a call-out when you
   pass 10,000 ft. The sky also moves from morning to noon to golden hour to dusk as you
   fly.
-- **HUD:** altitude (ft), airspeed (kt), compass heading (HDG, 000 = north) and the
-  **nearest airport**: its name, distance and an arrow pointing to it.
+- **HUD:** fuel (time left), altitude (ft), airspeed (kt), compass heading (HDG, 000 =
+  north) and an airport chip: its name, distance and an arrow pointing to it (your chosen
+  destination, or else the nearest airport).
 - **Coins and orange rings** float in clusters all around you, some of them high in the
   sky. Coins are 10 points each; grab them less than about a second apart to build a
   chain (every 5 in a row adds one to the multiplier, up to x5). Rings give a 3-second
@@ -66,15 +78,23 @@ turns):
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps
   cruising over the hills.
+- **Nothing resets:** your coins, score, fuel and the airports you've visited carry over
+  from flight to flight and stay saved in the browser.
 
 ## Fuel
 
-A full tank lasts **5 minutes** in the air (it doesn't drain on the ground). The FUEL chip
-shows the time left; under a minute it turns red and says "Low fuel: land soon!". Landing
-at any airport refuels you while you're on the ground (lakes have no fuel). If the tank
-runs dry the engine stops and the plane glides, slowly sinking: glide to an airport or
-tap LAND. If you crash (or end up stuck on a lake) with an empty tank, the plane is towed
-to the nearest airport with a full tank.
+A full tank lasts **5 minutes** in the air (it doesn't drain on the ground). **Boosting
+burns fuel 3 times faster** (boosts from orange rings are free). The FUEL chip shows the
+time left; under a minute it turns red and says "Low fuel: land soon!".
+
+**Fuel costs coins.** On the ground at any airport you buy fuel with the coins you've
+collected: 1 coin for every 2%, so a full tank is 50 coins (lakes have no fuel). Below
+25% it's free, so with no coins you still get enough emergency fuel to fly off and grab
+more coins.
+
+If the tank runs dry the engine stops and the plane glides, slowly sinking: glide to an
+airport or tap LAND. If you crash (or end up stuck on a lake) with an empty tank, the plane
+is towed to the nearest airport with free emergency fuel.
 
 ## Airports
 
@@ -95,11 +115,18 @@ doesn't hide: yellow at Home Field, teal everywhere else.
   again; any other plane that hits the water splashes.
 - After touching down the brakes stop the plane by themselves; hold up to roll again and
   take off.
-- **Auto-land:** tap **LAND** (or press `L`) and the plane picks the **nearest airport**,
-  flies there (boosting when it's far away), lines up 1.6 km out with that airport's
-  runway, follows a 6% glide path down and lands. The HUD shows where it's going.
+- **Choose where to go:** tap **MAP** (or press `M`). The game pauses and lists the
+  airports around you, closest first, with distance, direction, height and a ✓ for ones
+  you've landed at. Tap one to make it your destination: its beacon turns red, the
+  airport chip turns red, and a big arrow above the buttons points the way with the
+  distance, so you can fly there yourself. Landing there gives "You made it to *name*!"
+  and +200 extra. "Nearest airport" clears it.
+- **Auto-land:** tap **LAND** (or press `L`) and the plane flies to **your destination**
+  (or, with none chosen, the nearest airport), boosting when it's far away unless high
+  ground is ahead. It lines up 1.6 km out with that airport's runway, puts the gear down,
+  follows a 6% glide path and lands. The HUD shows where it's going.
   Steer yourself, or tap LAND again, to take back control.
 
 ## Saved in the browser
 
-Your plane, the pilot-style control setting and sound on/off are kept in `localStorage`.
+Your coins, score, fuel, visited airports, plane, the pilot-style control setting and sound on/off are kept in `localStorage`.
