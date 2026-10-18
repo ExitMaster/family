@@ -236,8 +236,8 @@ const pick = arr => arr[(Math.random() * arr.length) | 0];
 
 // PLANE_SCALE sizes the plane model; its wheels sit PLANE_SCALE below its centre.
 const PLANE_SCALE = 1.3;
-// Home runway: RWY_LEN long, RWY_W wide; the plane can lift off from VR (m/s).
-const RWY_LEN = 260, RWY_W = 10, RWY_TOP = 0, VR = 30;
+// Runways: RWY_LEN long, RWY_W wide; the plane can lift off from VR (m/s).
+const RWY_LEN = 260, RWY_W = 30, RWY_TOP = 0, VR = 30;
 
 /* ---------------- Sound ---------------- */
 const sfx = (() => {
@@ -410,7 +410,15 @@ function boot(hot){
     { id: 'ace', name: 'Ace', note: 'Old-time fighter', color: '#5a6b3a', cruise: 90, boost: 210, pitch: 1.9, turn: 1.7 },
     { id: 'zoom', name: 'Zoom', note: 'Flying car', color: '#e8432e', cruise: 75, boost: 180, pitch: 1.6, turn: 1.6, sound: { mul: 2.0, vol: 0.035 } },
     { id: 'arrow', name: 'Arrow', note: 'Supersonic jet, Mach 1.15', color: '#9fb6d9', cruise: 140, boost: 390, pitch: 1.0, turn: 0.9, cam: 1.4, sound: { mul: 2.2, vol: 0.04 } },
-    { id: 'comet', name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } }
+    { id: 'comet', name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } },
+    { id: 'dragon', name: 'Dragon', note: 'Breathes fire when boosting', color: '#3fa34d', cruise: 70, boost: 170, pitch: 2.0, turn: 1.8, cam: 1.15, sound: { mul: 0.5, vol: 0.04 } },
+    { id: 'bee', name: 'Bee', note: 'Buzzy bumblebee', color: '#ffc23d', cruise: 50, boost: 120, pitch: 2.2, turn: 2.1, sound: { mul: 3.5, vol: 0.03 } },
+    { id: 'shark', name: 'Shark', note: 'Shark jet, lands on lakes', color: '#6f7f8f', cruise: 100, boost: 260, pitch: 1.7, turn: 1.6, water: true, sound: { mul: 2.1, vol: 0.035 } },
+    { id: 'retro', name: 'Retro', note: 'Rocket ship, Mach 1.25', color: '#c0392b', cruise: 130, boost: 430, pitch: 1.4, turn: 1.3, cam: 1.1, fixedGear: true, sound: { mul: 1.2, vol: 0.05 } },
+    { id: 'penguin', name: 'Penguin', note: 'Jetpack penguin, lands on lakes', color: '#1b2340', cruise: 60, boost: 150, pitch: 2.0, turn: 1.9, water: true, sound: { mul: 2.4, vol: 0.035 } },
+    { id: 'mega', name: 'Mega', note: 'Giant six-engine cargo jet', color: '#8a9bb0', cruise: 80, boost: 180, pitch: 0.7, turn: 0.6, cam: 1.9, sound: { mul: 1.6, vol: 0.05 } },
+    { id: 'triple', name: 'Triple', note: 'Red triplane, super loopy', color: '#c0392b', cruise: 55, boost: 120, pitch: 2.3, turn: 1.9 },
+    { id: 'swan', name: 'Swan', note: 'Graceful swan, lands on lakes', color: '#fbfaf6', cruise: 55, boost: 120, pitch: 1.6, turn: 1.5, cam: 1.15, water: true, fixedGear: true, sound: { mul: 2.6, vol: 0.015 } }
   ];
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
   planeRoot.add(planeBody); scene.add(planeRoot);
@@ -418,6 +426,7 @@ function boot(hot){
   const mat = hex => matCache[hex] || (matCache[hex] = lam(hex));
   const mat2 = hex => matCache2[hex] || (matCache2[hex] = lam(hex, { side: THREE.DoubleSide }));   // for flat paper-thin parts
   const glassMat = new THREE.MeshPhongMaterial({ color: 0x7fd3e8, emissive: 0x113344, shininess: 100, specular: 0xffffff });
+  const wingMat = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, shininess: 100, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
   const darkGlass = new THREE.MeshPhongMaterial({ color: 0x223344, emissive: 0x050a10, shininess: 100, specular: 0xffffff });
   const silverMat = new THREE.MeshPhongMaterial({ color: 0xc9d2dc, specular: 0xffffff, shininess: 90 });
   const blurMat = new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
@@ -450,9 +459,9 @@ function boot(hot){
       g.add(b, b2, blur); g.position.set(x, y, z); planeBody.add(g);
       spinners.push({ o: g, axis: 'z', rate: 42 });
     };
-    const flame = (x, y, z, r, idle) => {
+    const flame = (x, y, z, r, idle, forward) => {   // points backwards, or forwards (dragon fire)
       const geo = new THREE.ConeGeometry(r, 2.2, 10); geo.translate(0, 1.1, 0);
-      const o = new THREE.Mesh(geo, flameMat); o.rotation.x = Math.PI / 2; o.position.set(x, y, z);
+      const o = new THREE.Mesh(geo, flameMat); o.rotation.x = forward ? -Math.PI / 2 : Math.PI / 2; o.position.set(x, y, z);
       o.userData.idle = idle || 0.35; planeBody.add(o); flames.push(o);
     };
     switch (def.id){
@@ -683,6 +692,96 @@ function boot(hot){
         gearBox(0.2, 0.55, 0.2, 0, -0.72, -2.0); wheel(0.5, 1.0); wheel(-0.5, 1.0);
         break;
       }
+      case 'dragon': {
+        const G = 0x3fa34d, Rw = 0xc0392b;
+        ball(1.0, G, 0, 0.1, 0, 0.9, 0.8, 2.0); ball(0.8, 0xe9d8a6, 0, -0.15, -0.2, 0.75, 0.55, 1.7);
+        box(0.55, 0.55, 1.2, G, 0, 0.5, -1.5, -0.45); ball(0.6, G, 0, 0.75, -2.1, 0.9, 0.8, 1.3); box(0.5, 0.35, 0.7, G, 0, 0.62, -2.75);
+        both((x) => { box(0.14, 0.14, 0.1, 0xffd23d, x, 0.95, -2.5); const h = add(new THREE.ConeGeometry(0.11, 0.55, 8), WHITE, x, 1.25, -1.9); h.rotation.x = 0.4; }, 0.27);
+        tris([[-0.6, 0.4, -0.8], [-4.2, 1.3, 0.2], [-0.6, 0.4, 0.9], [-4.2, 1.3, 0.2], [-3.2, 0.6, 1.4], [-0.6, 0.4, 0.9],
+              [0.6, 0.4, -0.8], [4.2, 1.3, 0.2], [0.6, 0.4, 0.9], [4.2, 1.3, 0.2], [3.2, 0.6, 1.4], [0.6, 0.4, 0.9]], Rw);
+        tube(0.06, 0.45, 3.0, G, 0, 0.1, 3.3);
+        tris([[0, 0.1, 4.7], [-0.45, 0.1, 5.3], [0.45, 0.1, 5.3]], Rw);
+        for (let i = 0; i < 5; i++){ const sp = add(new THREE.ConeGeometry(0.13, 0.4, 6), Rw, 0, 0.9 - i * 0.08, -0.9 + i * 0.6); sp.rotation.x = -0.3; }
+        both((x) => { gearBox(0.3, 0.6, 0.4, x, -0.7, -0.7, G); gearBox(0.3, 0.6, 0.4, x, -0.7, 0.7, G); }, 0.5);
+        flame(0, 0.6, -3.1, 0.55, 0.02, true);   // fire, only when boosting
+        break;
+      }
+      case 'bee': {
+        const Y = 0xffc23d, K = 0x1b1b1b;
+        ball(1.0, Y, 0, 0, 0, 0.9, 0.9, 1.6);
+        [-0.7, 0, 0.7].forEach(z => tube(0.88 - Math.abs(z) * 0.1, 0.88 - Math.abs(z) * 0.1, 0.28, K, 0, 0, z));
+        ball(0.6, K, 0, 0.1, -1.7); both((x) => ball(0.16, WHITE, x, 0.3, -2.15), 0.25);
+        both((x, sd) => { box(0.05, 0.7, 0.05, K, x, 0.75, -1.9, -0.4, 0, -0.3 * sd); ball(0.09, K, x * 1.8, 1.05, -2.1); }, 0.2);
+        tail(0.15, 0.6, K, 1.85);
+        both((x, sd) => box(2.2, 0.04, 1.0, wingMat, x, 0.85, -0.2, 0, 0, 0.4 * sd), 1.2);
+        both((x) => { gearBox(0.1, 0.5, 0.1, x, -0.75, -0.4, K); gearBox(0.1, 0.5, 0.1, x, -0.75, 0.4, K); }, 0.4);
+        break;
+      }
+      case 'shark': {
+        const S = 0x6f7f8f;
+        ball(1, S, 0, 0, 0, 0.9, 0.85, 3.0); ball(1, WHITE, 0, -0.25, -0.2, 0.8, 0.6, 2.6);
+        box(0.9, 0.12, 0.5, 0x5a1a1a, 0, -0.25, -2.6);
+        for (let i = -3; i <= 3; i++){ const tooth = add(new THREE.ConeGeometry(0.06, 0.18, 4), WHITE, i * 0.12, -0.17, -2.62); tooth.rotation.x = Math.PI; }
+        both((x) => ball(0.1, 0x111111, x, 0.25, -2.3), 0.45);
+        tris([[0, 0.7, -0.6], [0, 1.9, 0.6], [0, 0.7, 0.8]], S);
+        tris([[0, 0, 2.6], [0, 1.6, 3.6], [0, 0, 3.0], [0, 0, 2.6], [0, -1.0, 3.4], [0, 0, 3.0]], S);
+        both((x, sd) => box(2.2, 0.12, 1.1, S, x, -0.3, -0.2, 0, -0.5 * sd, 0.25 * sd), 1.4);
+        flame(0, 0, 3.0, 0.3, 0.3);
+        gearBox(0.2, 0.4, 0.2, 0, -0.8, -1.8); wheel(0.7, 0.8); wheel(-0.7, 0.8);
+        break;
+      }
+      case 'retro': {   // classic rocket ship: the fins are its legs
+        const R2 = 0xc0392b;
+        tube(0.9, 0.9, 4.0, WHITE, 0, 0, 0.5); nose(0.9, 2.0, R2, -2.5); tube(0.75, 0.9, 0.6, R2, 0, 0, 2.8);
+        [-0.6, 0.6].forEach(z => ball(0.25, glassMat, 0.85, 0.15, z, 0.4, 1, 1)); [-0.6, 0.6].forEach(z => ball(0.25, glassMat, -0.85, 0.15, z, 0.4, 1, 1));
+        box(0.12, 1.6, 1.4, R2, 0, 1.2, 2.3, 0.3);
+        both((x, sd) => box(1.6, 0.12, 1.4, R2, x, -0.35, 2.3, 0.3, 0, -0.55 * sd), 1.0);
+        box(0.12, 1.0, 1.4, R2, 0, -0.5, 2.3);
+        flame(0, 0, 3.1, 0.6, 0.6);
+        break;
+      }
+      case 'penguin': {   // flies tummy-down with a jetpack
+        const K = 0x1b2340, O = 0xff8a3d;
+        ball(0.9, K, 0, 0, 0, 0.9, 1, 1.4); ball(0.8, WHITE, 0, -0.15, -0.1, 0.85, 0.8, 1.35);
+        ball(0.55, K, 0, 0.2, -1.5); ball(0.42, WHITE, 0, 0.15, -1.75); nose(0.15, 0.4, O, -2.15, 0.1);
+        both((x) => ball(0.07, 0x111111, x, 0.32, -2.08), 0.15);
+        both((x, sd) => box(1.2, 0.12, 0.5, K, x, 0, -0.2, 0, 0, 0.2 * sd), 1.0);
+        box(0.9, 0.5, 1.0, GRAY, 0, 0.75, 0.2);
+        both((x) => { tube(0.18, 0.2, 0.9, GRAY, x, 0.75, 0.8); flame(x, 0.75, 1.25, 0.17, 0.35); }, 0.3);
+        both((x) => gearBox(0.3, 0.2, 0.5, x, -0.9, 1.0, O), 0.3);
+        break;
+      }
+      case 'mega': {   // giant cargo jet
+        const B = 0x8a9bb0;
+        tube(1.0, 1.0, 9.5, B, 0, 0.1, 0.3); nose(1.0, 1.6, B, -5.25, 0.1); tail(1.0, 2.0, B, 6.05, 0.3);
+        box(1.0, 0.25, 0.4, DARK, 0, 0.75, -4.4);
+        box(14, 0.25, 2.4, B, 0, 0.95, -0.6);
+        [2.2, 4.2, 6.2].forEach(x => both((xx) => tube(0.32, 0.38, 1.6, GRAY, xx, 0.45, -1.1), x));
+        box(0.18, 2.4, 1.8, B, 0, 2.0, 5.6, 0.25); box(4.6, 0.18, 1.2, B, 0, 3.1, 6.0);
+        [[1.0, -0.4], [-1.0, -0.4], [1.0, 1.4], [-1.0, 1.4], [0, -3.6]].forEach(([x, z]) => wheel(x, z));
+        break;
+      }
+      case 'triple': {   // red triplane: three wings stacked up
+        const R2 = 0xc0392b;
+        box(1.0, 1.0, 3.8, R2, 0, 0, 0); box(1.1, 1.1, 0.6, DARK, 0, 0, -2.0);
+        nose(0.3, 0.5, DARK, -2.55); propeller(0, 0, -2.4, 2.8);
+        box(6.0, 0.13, 1.1, R2, 0, -0.45, -0.6); box(6.4, 0.13, 1.1, R2, 0, 0.45, -0.7); box(6.8, 0.13, 1.1, R2, 0, 1.35, -0.8);
+        both((x) => box(0.08, 1.8, 0.08, DARK, x, 0.45, -0.7), 2.4);
+        box(0.6, 0.3, 0.8, DARK, 0, 0.55, 0.5);
+        box(2.4, 0.1, 0.8, R2, 0, 0.15, 2.4); box(0.12, 1.0, 0.9, R2, 0, 0.65, 2.4);
+        wheel(0.7, -1.0); wheel(-0.7, -1.0);
+        break;
+      }
+      case 'swan': {   // a swan: its body is the boat
+        const O = 0xff8a3d;
+        ball(1.0, 0xfbfaf6, 0, 0.1, 0, 1, 0.8, 1.8); box(0.9, 0.3, 2.2, 0xfbfaf6, 0, -0.85, 0);
+        box(0.35, 1.7, 0.35, 0xfbfaf6, 0, 1.0, -1.35, -0.35); ball(0.35, 0xfbfaf6, 0, 1.85, -1.75, 0.9, 0.9, 1.3);
+        nose(0.12, 0.5, O, -2.25, 1.8); box(0.32, 0.18, 0.2, 0x111111, 0, 1.85, -2.0);
+        tris([[-0.8, 0.5, -0.8], [-3.6, 1.2, 0.0], [-0.8, 0.5, 0.9], [-3.6, 1.2, 0.0], [-2.6, 0.8, 1.2], [-0.8, 0.5, 0.9],
+              [0.8, 0.5, -0.8], [3.6, 1.2, 0.0], [0.8, 0.5, 0.9], [3.6, 1.2, 0.0], [2.6, 0.8, 1.2], [0.8, 0.5, 0.9]], 0xf0eee6);
+        tail(0.3, 0.7, 0xfbfaf6, 1.9, 0.35).rotation.x = Math.PI / 2.6;
+        break;
+      }
       case 'saucer': {
         add(new THREE.CylinderGeometry(3.0, 3.2, 0.5, 28), silverMat, 0, 0, 0);
         add(new THREE.CylinderGeometry(1.6, 3.0, 0.5, 28), silverMat, 0, -0.5, 0);
@@ -732,27 +831,29 @@ function boot(hot){
       g.applyMatrix4(new THREE.Matrix4().makeRotationX(rx || 0).setPosition(x, y, z));
       parts.push([g, new THREE.Color(color)]);
     };
-    add(new THREE.BoxGeometry(18, 1.0, RWY_LEN + 50), 0xdcc791, 0, RWY_TOP - 0.55, -RWY_LEN / 2);
+    add(new THREE.BoxGeometry(RWY_W + 8, 1.0, RWY_LEN + 50), 0xdcc791, 0, RWY_TOP - 0.55, -RWY_LEN / 2);
     add(new THREE.BoxGeometry(RWY_W, 0.2, RWY_LEN), 0x4a4f5c, 0, RWY_TOP - 0.1, -RWY_LEN / 2);
     const paint = 0xf4f1ea, y = RWY_TOP + 0.01;
-    const dash = new THREE.BoxGeometry(0.35, 0.02, 6);
+    const dash = new THREE.BoxGeometry(0.9, 0.02, 8);
     for (let z = -22; z > -RWY_LEN + 20; z -= 14) add(dash, paint, 0, y, z);
-    const bar = new THREE.BoxGeometry(0.55, 0.02, 9);
-    [-4, -3, -2, -1, 1, 2, 3, 4].forEach(i => { add(bar, paint, i * 0.95, y, -6); add(bar, paint, i * 0.95, y, -RWY_LEN + 6); });
-    const tdz = new THREE.BoxGeometry(1.3, 0.02, 9);
-    [-40, -70].forEach(z => { add(tdz, paint, 2.4, y, z); add(tdz, paint, -2.4, y, z); });
+    // threshold "piano keys" across both ends, and touchdown-zone marks either side of the centreline
+    const bar = new THREE.BoxGeometry(1.2, 0.02, 12);
+    for (let k = 0; k < 6; k++) for (const sd of [-1, 1]){ add(bar, paint, sd * (1.6 + k * 2.2), y, -8); add(bar, paint, sd * (1.6 + k * 2.2), y, -RWY_LEN + 8); }
+    const tdz = new THREE.BoxGeometry(3, 0.02, 12);
+    [-40, -70].forEach(z => { add(tdz, paint, RWY_W / 4, y, z); add(tdz, paint, -RWY_W / 4, y, z); });
     const lightGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
     const edge = 0xfff1c0, green = 0x4dff88, red = 0xff4a3a;
     for (let z = 0; z >= -RWY_LEN; z -= 20){ add(lightGeo, edge, RWY_W / 2 + 0.5, RWY_TOP + 0.15, z); add(lightGeo, edge, -RWY_W / 2 - 0.5, RWY_TOP + 0.15, z); }
-    for (let x = -4.5; x <= 4.5; x += 1.5){ add(lightGeo, green, x, RWY_TOP + 0.15, 1); add(lightGeo, red, x, RWY_TOP + 0.15, -RWY_LEN - 1); }
+    for (let x = -RWY_W / 2 + 0.5; x <= RWY_W / 2; x += 2){ add(lightGeo, green, x, RWY_TOP + 0.15, 1); add(lightGeo, red, x, RWY_TOP + 0.15, -RWY_LEN - 1); }
     // PAPI lights beside the touchdown zone: two white over two red is "on the glide path"
     [0, 1, 2, 3].forEach(i => add(new THREE.BoxGeometry(0.5, 0.4, 0.4), i < 2 ? edge : red, -RWY_W / 2 - 1.5 - i * 0.8, RWY_TOP + 0.2, -40));
     // control tower and windsock
-    add(new THREE.BoxGeometry(1.6, 6, 1.6), 0xfff1d6, 7.6, RWY_TOP + 3, -90);
-    add(new THREE.BoxGeometry(2.4, 1.3, 2.4), 0x7fd3e8, 7.6, RWY_TOP + 6.6, -90);
-    add(new THREE.BoxGeometry(2.8, 0.3, 2.8), 0xe8432e, 7.6, RWY_TOP + 7.4, -90);
-    add(new THREE.CylinderGeometry(0.08, 0.08, 4, 5), 0x2a2f45, 7.4, RWY_TOP + 2, -25);
-    add(new THREE.ConeGeometry(0.45, 2, 8), 0xff8a3d, 7.4, RWY_TOP + 3.7, -24, -Math.PI / 2.3);
+    const side = RWY_W / 2 + 2.6;   // on the sand beside the runway
+    add(new THREE.BoxGeometry(1.6, 6, 1.6), 0xfff1d6, side, RWY_TOP + 3, -90);
+    add(new THREE.BoxGeometry(2.4, 1.3, 2.4), 0x7fd3e8, side, RWY_TOP + 6.6, -90);
+    add(new THREE.BoxGeometry(2.8, 0.3, 2.8), 0xe8432e, side, RWY_TOP + 7.4, -90);
+    add(new THREE.CylinderGeometry(0.08, 0.08, 4, 5), 0x2a2f45, side - 0.2, RWY_TOP + 2, -25);
+    add(new THREE.ConeGeometry(0.45, 2, 8), 0xff8a3d, side - 0.2, RWY_TOP + 3.7, -24, -Math.PI / 2.3);
     let n = 0; parts.forEach(([g]) => n += g.attributes.position.count);
     const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
     let o = 0;

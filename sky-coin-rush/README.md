@@ -24,7 +24,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **24 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **32 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -55,12 +55,20 @@ turns):
 | **Zoom** | flying car with jets | 146 / 350 kt | quick |
 | **Arrow** | needle-nosed supersonic jet, **breaks Mach 1** | 272 / 758 kt | slow to turn |
 | **Comet** | starfighter with X-shaped wings, **breaks Mach 1** | 253 / 797 kt | very quick |
+| **Dragon** | green dragon with red wings, **breathes fire when boosting** | 136 / 330 kt | quick |
+| **Bee** | buzzy bumblebee with see-through wings | 97 / 233 kt | very quick |
+| **Shark** | shark-shaped jet with teeth: **lands on lakes** | 194 / 505 kt | quick |
+| **Retro** | old-style rocket ship, **breaks Mach 1** | 253 / 836 kt | medium |
+| **Penguin** | penguin with a jetpack: **lands on lakes** | 117 / 292 kt | very quick |
+| **Mega** | giant six-engine cargo jet | 156 / 350 kt | slowest to turn |
+| **Triple** | red triplane with three wings | 107 / 233 kt | very loopy |
+| **Swan** | graceful white swan: **lands on lakes** | 107 / 233 kt | medium |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky) can land on and take off from any
-lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet) go
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan) can land on and take off from any
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
-white vapour cone round the plane. Bubbles and Origami have no landing gear to fold up.
+white vapour cone round the plane. Bubbles, Origami, Retro and the floats/hulls of the lake planes don't fold up.
 
 ## Flying
 
