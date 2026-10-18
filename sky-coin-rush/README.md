@@ -126,10 +126,12 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   between airports and over the hills at a safe height. Fly within about 45 m of one for a
   **close fly-by** (+25). They can't crash into you.
 - **Missiles:** press **S** (or tap FIRE) to fire a missile from under a wing. A red
-  ring marks the other plane nearest the middle of your view (up to about 2.6 km away);
-  the missile chases that plane and blows it up (+150). Don't worry, the pilot floats
-  down on a parachute, and a new plane turns up somewhere else. With no ring the missile
-  flies straight ahead. Missiles leave a smoke trail and explode if they hit the ground.
+  ring marks its target: the other plane nearest the middle of your view, or if none is
+  in front of you, the closest one (even behind you: the missile turns round). The
+  missile chases that plane and blows it up (+150). Don't worry, the pilot floats down on
+  a parachute, and a new plane turns up somewhere else. If its plane is shot down first,
+  the missile goes after another one. Missiles leave a smoke trail and explode if they
+  hit the ground.
 - **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps
