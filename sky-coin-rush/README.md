@@ -16,6 +16,7 @@ like (all the way up into space), grabbing coins that float in the sky.
 | Auto-land at your chosen airport (or the nearest one) | `L` (or `Q`) or the **LAND** button |
 | Landing gear up / down | `G` or the **GEAR** button |
 | Flip and fly upside down | `F` or the **FLIP** button |
+| Front view (see the front of the plane) / back to chase view | `C` (or `V`) or the **VIEW** button |
 | Pause | `ESC` or `P` |
 | Phone / tablet | drag anywhere: a joystick appears where your finger lands |
 
@@ -92,6 +93,9 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon and the floa
   with the world still the right way up on screen. Up still climbs and left/right still
   turn the way you'd expect. Flying upside down earns +5 points a second. Press F again
   to roll back. You have to be right way up to land.
+- **Front view.** Press **C** (or VIEW) and the camera jumps out in front of the plane,
+  looking back at its nose, so you can see the front of your plane (and its face, if it
+  has one) as it flies towards you. Press C again for the normal view from behind.
 - **Landing gear.** Press **G** (or GEAR) in the air to fold the wheels (or skids, or the
   saucer's legs) away: the plane flies about 8% faster. Land with the gear up and it's a
   belly-landing crash; low over an airport the screen warns "Gear is up! Press G".
