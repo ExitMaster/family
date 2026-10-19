@@ -144,6 +144,8 @@ select{
 }
 #hurt{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(200,0,0,0) 40%,rgba(200,0,0,.55));opacity:0;transition:opacity .35s}
 #hurt.on{opacity:1;transition:none}
+#sleep{position:fixed;inset:0;background:#05060c;opacity:0;pointer-events:none;transition:opacity 1s}
+#sleep.on{opacity:1}
 .slot .cnt{left:auto;top:auto;right:3px;bottom:1px;font-size:11px;font-weight:600;color:var(--ink);text-shadow:0 1px 0 #000}
 #invUI{
   position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,12,8,.6);overflow-y:auto;touch-action:pan-y;
@@ -190,6 +192,7 @@ select{
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
 <canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
 <div id="hurt"></div>
+<div id="sleep"></div>
 
 <div id="touch" hidden>
   <div id="joy" aria-label="Move stick"><div id="knob"></div></div>
@@ -236,6 +239,7 @@ select{
       <dt>Pick block</dt><dd><kbd>1</kbd>–<kbd>9</kbd> or mouse wheel</dd>
       <dt>Backpack</dt><dd><kbd>E</kbd> opens your inventory and crafting</dd>
       <dt>Eat</dt><dd>Right click while holding food (Survival)</dd>
+      <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
       <dt>Sound</dt><dd><kbd>M</kbd> mutes</dd>
       <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
     </dl>
@@ -294,9 +298,9 @@ let TOUCH = matchMedia('(pointer: coarse)').matches;
 
 /* ---------- blocks ---------- */
 const CS = 16, H = 64, PH = H + 2, PX = CS + 2, WATER = 26;
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19, BED=20, BEDH = 9 / 16;
 const T = {GRASS_TOP:0, GRASS_SIDE:1, DIRT:2, STONE:3, SAND:4, WATER:5, LOG_SIDE:6, LOG_TOP:7, LEAVES:8, PLANKS:9, COBBLE:10, GLASS:11, BRICK:12, BEDROCK:13, COAL:14,
-  IRON:15, SNOW:16, SNOW_SIDE:17, TNT_SIDE:18, TNT_TOP:19, TNT_BOTTOM:20, SBRICK:21, WOOL:22, TORCH:23};
+  IRON:15, SNOW:16, SNOW_SIDE:17, TNT_SIDE:18, TNT_TOP:19, TNT_BOTTOM:20, SBRICK:21, WOOL:22, TORCH:23, BED_TOP:24, BED_SIDE:25};
 const BLOCKS = [];
 const def = (id, n, top, bottom = top, side = top) => BLOCKS[id] = {n, t: [top, bottom, side]};
 def(GRASS, 'Grass', T.GRASS_TOP, T.DIRT, T.GRASS_SIDE);
@@ -318,11 +322,12 @@ def(TNT, 'TNT', T.TNT_TOP, T.TNT_BOTTOM, T.TNT_SIDE);
 def(SBRICK, 'Stone bricks', T.SBRICK);
 def(WOOL, 'Wool', T.WOOL);
 def(TORCH, 'Torch', T.TORCH);
+def(BED, 'Bed', T.BED_TOP, T.PLANKS, T.BED_SIDE);
 
 const NB = 32, SOLID = new Uint8Array(NB), TRANSP = new Uint8Array(NB), AOS = new Uint8Array(NB);
 for (let i = 1; i < NB; i++) { SOLID[i] = i !== WATERB ? 1 : 0; AOS[i] = (i !== WATERB && i !== GLASS) ? 1 : 0; }
-TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = TRANSP[TORCH] = 1;
-SOLID[TORCH] = AOS[TORCH] = 0;
+TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = TRANSP[TORCH] = TRANSP[BED] = 1;
+SOLID[TORCH] = AOS[TORCH] = AOS[BED] = 0;
 const DEFAULT_HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, GLASS, TORCH, TNT];
 
 /* ---------- textures (procedural 16px tiles in an 8x8 atlas) ---------- */
@@ -416,6 +421,16 @@ tile(T.TORCH, () => (x, y, r) => {
   if (x < 7 || x > 8 || y < 6) return [0, 0, 0, 0];
   if (y < 8) return y === 6 ? [255, 238, 150] : [255, 184, 60];
   return J([120, 88, 50], r, 14);
+});
+tile(T.BED_TOP, () => (x, y, r) => {
+  if (y < 5) return (x === 0 || x === 15 || y === 0) ? J([200, 52, 44], r, 10) : J([242, 242, 236], r, 8);
+  return (x === 0 || x === 15) ? J([160, 36, 36], r, 8) : (y % 4 === 1) ? J([226, 80, 66], r, 8) : J([200, 52, 44], r, 14);
+});
+tile(T.BED_SIDE, () => (x, y, r) => {
+  if (y < 7) return [0, 0, 0, 0];
+  if (y < 10) return J([200, 52, 44], r, 12);
+  if (y < 13) return J([150, 112, 68], r, 12);
+  return (x < 3 || x > 12) ? J([120, 88, 50], r, 10) : [0, 0, 0, 0];
 });
 tile(T.WOOL, () => (x, y, r) => (x + y * 3) % 5 === 0 ? J([214, 214, 210], r, 8) : J([236, 236, 232], r, 12));
 
@@ -643,6 +658,7 @@ function buildChunk(c) {
       const pi = col + y, b = pad[pi];
       if (!b) continue;
       if (b === TORCH) { emitTorch(o, ox + x, y, oz + z); continue; }
+      if (b === BED) { emitBed(o, ox + x, y, oz + z, litAt(pi), near.length ? torchLight(near, ox + x + .5, y + 1, oz + z + .5, [0, 1, 0]) : 0); continue; }
       const isW = b === WATERB, g = isW ? w : o, tiles = BLOCKS[b].t;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f];
@@ -777,7 +793,7 @@ function collides() {
   const x0 = Math.floor(P.x - HW), x1 = Math.floor(P.x + HW), y0 = Math.floor(P.y), y1 = Math.floor(P.y + PHGT);
   const z0 = Math.floor(P.z - HW), z1 = Math.floor(P.z + HW);
   for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++)
-    if (SOLID[getBlock(x, y, z)]) return true;
+    { const b = getBlock(x, y, z); if (SOLID[b] && !(b === BED && P.y >= y + BEDH - .001)) return true; }
   return false;
 }
 function moveAxis(a, d) {
@@ -785,7 +801,7 @@ function moveAxis(a, d) {
   P[a] += d;
   if (!collides()) return;
   if (a === 'y') {
-    if (d < 0) { P.y = Math.floor(P.y) + 1; P.onGround = true; } else P.y = Math.floor(P.y + PHGT) - PHGT - .001;
+    if (d < 0) { const fy = Math.floor(P.y); P.y = fy + BEDH; if (collides()) P.y = fy + 1; P.onGround = true; } else P.y = Math.floor(P.y + PHGT) - PHGT - .001;
     P.vy = 0;
   } else {
     P[a] = d > 0 ? Math.floor(P[a] + HW) - HW - .001 : Math.floor(P[a] - HW) + 1 + HW + .001;
@@ -865,7 +881,8 @@ function updateTarget() {
   if (target) highlight.position.set(target.x + .5, target.y + .5, target.z + .5);
 }
 function act(button) {
-  if (dead) return;
+  if (dead || sleeping) return;
+  if (button === 2 && target && target.b === BED) { useBed(target.x, target.y, target.z); return; }
   const s = inv[sel];
   if (button === 0) {
     const reach = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) - .4 : 4;
@@ -1318,6 +1335,12 @@ function addMob(kind, x, y, z) {
 }
 function removeMob(i) { scene.remove(mobs[i].g); mobs.splice(i, 1); }
 function clearMobs() { while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
+const LAND = ['pig', 'sheep', 'cow', 'chicken', 'rabbit'], LAND_W = [3, 3, 3, 3, 1.5];
+function pickKind() {
+  let r = Math.random() * LAND_W.reduce((a, b) => a + b);
+  for (let i = 0; i < LAND.length; i++) if ((r -= LAND_W[i]) < 0) return LAND[i];
+  return LAND[0];
+}
 function trySpawn() {
   const ang = Math.random() * 6.283, r = 18 + Math.random() * 30;
   const x = Math.floor(P.x + Math.cos(ang) * r), z = Math.floor(P.z + Math.sin(ang) * r);
@@ -1325,11 +1348,15 @@ function trySpawn() {
   for (let y = H - 2; y > 1; y--) {
     const b = getBlock(x, y, z);
     if (b === AIR) continue;
-    if (b === GRASS && getBlock(x, y + 1, z) === AIR && getBlock(x, y + 2, z) === AIR) {
-      const kind = Math.random() < .5 ? 'pig' : 'sheep';
-      addMob(kind, x + .5, y + 1, z + .5);
-      if (Math.random() < .5 && getBlock(x + 1, y + 1, z) === AIR && getBlock(x + 1, y, z) !== AIR) addMob(kind, x + 1.5, y + 1, z + .5);
+    if (b === WATERB) {
+      if (getBlock(x, y - 2, z) === WATERB) for (let k = 1 + Math.floor(Math.random() * 3); k > 0; k--) addMob('fish', x + .3 + Math.random() * .4, y - 1.4, z + .3 + Math.random() * .4);
+      return;
     }
+    if (getBlock(x, y + 1, z) !== AIR || getBlock(x, y + 2, z) !== AIR) return;
+    const kind = b === GRASS ? pickKind() : (b === SAND || b === SNOW) && Math.random() < .3 ? 'rabbit' : null;
+    if (!kind) return;
+    addMob(kind, x + .5, y + 1, z + .5);
+    if (Math.random() < .5 && getBlock(x + 1, y + 1, z) === AIR && getBlock(x + 1, y, z) !== AIR) addMob(kind, x + 1.5, y + 1, z + .5);
     return;
   }
 }
@@ -1353,13 +1380,14 @@ function updateMobs(dt) {
     spawnT = 1.5;
     let pass = 0, host = 0;
     for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
-    if (pass < 8) trySpawn();
+    if (pass < 12) trySpawn();
     if (mode === 's' && host < 5 && !dead) trySpawnZombie();
   }
   const fl = Math.floor;
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i], K = KINDS[m.kind], dx = m.x - P.x, dz = m.z - P.z;
     if (dx * dx + dz * dz > 90 * 90 || m.y < -10) { removeMob(i); continue; }
+    if (K.swim) { swim(m, K, dt); continue; }
     m.t -= dt; m.flee -= dt;
     if (K.hostile) {
       if (mode !== 's') { removeMob(i); continue; }
@@ -1374,12 +1402,13 @@ function updateMobs(dt) {
     const sp = m.walk ? K.speed * (m.flee > 0 ? 2.4 : 1) : 0, k = Math.min(1, 8 * dt);
     m.vx += (-Math.sin(m.yaw) * sp - m.vx) * k; m.vz += (-Math.cos(m.yaw) * sp - m.vz) * k;
     const inW = getBlock(fl(m.x), fl(m.y + .3), fl(m.z)) === WATERB;
-    m.vy = inW ? Math.min(m.vy + 16 * dt, 2) : Math.max(m.vy - 30 * dt, -40);
+    m.vy = inW ? Math.min(m.vy + 16 * dt, 2) : Math.max(m.vy - 30 * dt, K.flutter ? -2.5 : -40);
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(m.vx), Math.abs(m.vy), Math.abs(m.vz)) * dt / .3)), h = dt / steps;
     const wasGround = m.ground; m.ground = false;
     let wall = false;
     for (let s = 0; s < steps; s++) { wall = moveMob(m, K, 'x', m.vx * h) || wall; wall = moveMob(m, K, 'z', m.vz * h) || wall; moveMob(m, K, 'y', m.vy * h); }
     if (wall && m.walk && (wasGround || m.ground || inW)) m.vy = 7.5;
+    else if (K.hop && m.walk && m.ground && sp > 0) m.vy = 5;
     let dy = m.yaw - m.ry; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); m.ry += dy * Math.min(1, 6 * dt);
     const v = Math.hypot(m.vx, m.vz);
     m.ph += dt * v * 5;
@@ -1513,6 +1542,12 @@ function iconURL(id) {
   if (iconCache[id]) return iconCache[id];
   let url;
   if (id === TORCH) { const c = tileCanvas(T.TORCH); outline(c); url = c.toDataURL(); }
+  else if (id === BED) {
+    const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d');
+    rects(g, '#8a6a3e', [[1, 8, 14, 3], [1, 11, 2, 3], [13, 11, 2, 3]]); rects(g, '#c8342c', [[5, 5, 10, 3]]);
+    rects(g, '#a0262a', [[5, 7, 10, 1]]); rects(g, '#f2f2ee', [[1, 5, 4, 3]]);
+    outline(c); url = c.toDataURL();
+  }
   else if (id < 64) url = blockIcon(id);
   else { const c = document.createElement('canvas'); c.width = c.height = 16; ITEMS[id].draw(c.getContext('2d')); outline(c); url = c.toDataURL(); }
   return iconCache[id] = url;
@@ -1906,6 +1941,106 @@ function trySpawnZombie() {
   addMob('zombie', x + .5, y, z + .5);
 }
 
+/* ---------- more animals ---------- */
+const BEEF = 77, STEAK = 78, RCHICK = 79, CCHICK = 80, RFISH = 81, CFISH = 82;
+const drum = (c, hi) => g => { rects(g, c, [[3, 3, 7, 6], [4, 2, 5, 8], [2, 4, 9, 4]]); rects(g, hi, [[4, 4, 2, 2]]); diag(g, '#f4f0e0', 9, 9, 4, 1, 1); rects(g, '#f4f0e0', [[13, 11, 2, 2], [11, 13, 2, 2]]); };
+const fishI = (c, lo) => g => { rects(g, c, [[3, 6, 8, 4], [4, 5, 6, 6]]); rects(g, lo, [[11, 7, 1, 2], [12, 5, 2, 6], [5, 9, 5, 1]]); rects(g, '#141414', [[5, 7, 1, 1]]); };
+item(BEEF, 'Raw beef', chop('#c8443a', '#eaa49a'), {food: 3});
+item(STEAK, 'Steak', chop('#7a4424', '#a8683e'), {food: 8});
+item(RCHICK, 'Raw chicken', drum('#f2c4b0', '#fbe0d4'), {food: 2});
+item(CCHICK, 'Cooked chicken', drum('#c98a46', '#e2b070'), {food: 6});
+item(RFISH, 'Raw fish', fishI('#7fa8c8', '#5a82a2'), {food: 2});
+item(CFISH, 'Cooked fish', fishI('#c08850', '#94622e'), {food: 5});
+PALETTE.push(BEEF, STEAK, RCHICK, CCHICK, RFISH, CFISH);
+RECIPES.push(
+  [BED, 1, [[WOOL, 3], [PLANKS, 3]]],
+  [STEAK, 2, [[BEEF, 2], [COALI, 1]]],
+  [CCHICK, 2, [[RCHICK, 2], [COALI, 1]]],
+  [CFISH, 2, [[RFISH, 2], [COALI, 1]]]);
+HARD[BED] = .4; MAT[BED] = 'cloth';
+
+KINDS.cow = {hw: .45, h: 1.4, speed: 1.1, hp: 10, col: 0x5a3a24, hurtF: 300, build(g) {
+  const c = this.col, w = 0xf2efe6, horn = 0xe8e2d0;
+  part(g, c, .7, .62, 1.15, 0, 1, 0); part(g, w, .72, .3, .36, 0, 1.06, .18); part(g, w, .72, .26, .3, 0, .9, -.3);
+  part(g, c, .5, .48, .4, 0, 1.2, -.74); part(g, 0xe8b0a0, .3, .18, .08, 0, 1.06, -.96); eyes(g, 1.3, -.95, .14);
+  part(g, horn, .08, .12, .08, -.22, 1.5, -.74); part(g, horn, .08, .12, .08, .22, 1.5, -.74);
+  return [leg(g, c, .22, .7, -.2, -.36), leg(g, c, .22, .7, .2, .36), leg(g, c, .22, .7, .2, -.36), leg(g, c, .22, .7, -.2, .36)];
+}, say(at) { tone(150, 105, .8, .2, 'sawtooth', at); }, drop() { give(BEEF, 1 + (Math.random() < .5 ? 1 : 0)); }};
+KINDS.chicken = {hw: .2, h: .75, speed: 1, hp: 4, col: 0xf4f4f0, hurtF: 1100, flutter: true, biped: true, build(g) {
+  const c = this.col, wing = 0xe4e4dc, foot = 0xe8b030;
+  part(g, c, .32, .32, .44, 0, .42, 0); part(g, c, .22, .3, .2, 0, .72, -.2);
+  part(g, 0xe8a020, .1, .08, .12, 0, .72, -.36); part(g, 0xd02020, .06, .1, .04, 0, .62, -.32); eyes(g, .78, -.305, .07);
+  part(g, wing, .04, .2, .3, -.18, .45, 0); part(g, wing, .04, .2, .3, .18, .45, 0);
+  return [leg(g, foot, .06, .26, -.08, 0), leg(g, foot, .06, .26, .08, 0)];
+}, say(at) { for (let k = 0; k < 3; k++) tone(950, 700, .06, .1, 'square', at, k * .12); }, drop() { give(RCHICK, 1); }};
+KINDS.rabbit = {hw: .18, h: .6, speed: 2.2, hp: 3, col: 0xa08060, hurtF: 1300, hop: true, build(g) {
+  const c = this.col;
+  part(g, c, .28, .26, .38, 0, .28, 0); part(g, c, .22, .22, .22, 0, .46, -.2); part(g, 0xf0f0f0, .1, .1, .08, 0, .3, .22);
+  part(g, c, .06, .22, .04, -.06, .66, -.18); part(g, c, .06, .22, .04, .06, .66, -.18); eyes(g, .5, -.315, .07);
+  return [leg(g, c, .08, .15, -.08, -.12), leg(g, c, .08, .15, .08, .12), leg(g, c, .08, .15, .08, -.12), leg(g, c, .08, .15, -.08, .12)];
+}, say() {}};
+KINDS.fish = {hw: .15, h: .25, speed: 1.6, hp: 2, col: 0xe88a3a, hurtF: 1500, swim: true, build(g) {
+  const c = this.col, fin = 0xc86a24;
+  part(g, c, .12, .22, .46, 0, .12, 0); part(g, fin, .03, .1, .16, 0, .27, 0); eyes(g, .16, -.231, .065);
+  const tail = new THREE.Group(); tail.position.set(0, .12, .23); part(tail, fin, .04, .2, .16, 0, 0, .08); g.add(tail);
+  return [tail];
+}, say() {}, drop() { give(RFISH, 1); }};
+function swim(m, K, dt) {
+  const fl = Math.floor;
+  m.t -= dt; m.flee -= dt;
+  if (getBlock(fl(m.x), fl(m.y + .12), fl(m.z)) === WATERB) {
+    m.dry = 0;
+    if (m.t <= 0) { m.yaw = Math.random() * 6.283; m.ty = (Math.random() - .5) * .8; m.t = 1 + Math.random() * 3; }
+    const sp = K.speed * (m.flee > 0 ? 2.2 : 1), k = Math.min(1, 3 * dt);
+    m.vx += (-Math.sin(m.yaw) * sp - m.vx) * k; m.vz += (-Math.cos(m.yaw) * sp - m.vz) * k; m.vy += ((m.ty || 0) - m.vy) * k;
+    const nx = m.x + m.vx * dt, ny = m.y + m.vy * dt, nz = m.z + m.vz * dt;
+    if (getBlock(fl(nx), fl(ny + .12), fl(nz)) === WATERB) { m.x = nx; m.y = ny; m.z = nz; }
+    else { m.yaw += Math.PI; m.ty = -(m.ty || 0); m.vx = -m.vx; m.vz = -m.vz; m.vy = 0; }
+  } else {
+    // flopping on land
+    m.vy = Math.max(m.vy - 20 * dt, -20); m.vx *= .9; m.vz *= .9; m.ground = false;
+    moveMob(m, K, 'x', m.vx * dt); moveMob(m, K, 'z', m.vz * dt); moveMob(m, K, 'y', m.vy * dt);
+    if (m.ground && Math.random() < dt * 3) { m.vy = 4; m.yaw = Math.random() * 6.283; m.vx = (Math.random() - .5) * 3; m.vz = (Math.random() - .5) * 3; }
+    if ((m.dry = (m.dry || 0) + dt) > 10) { killMob(m); return; }
+  }
+  let dy = m.yaw - m.ry; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); m.ry += dy * Math.min(1, 5 * dt);
+  m.ph += dt * 10;
+  m.legs[0].rotation.y = Math.sin(m.ph) * .5;
+  m.g.position.set(m.x, m.y, m.z); m.g.rotation.y = m.ry;
+}
+
+/* ---------- beds ---------- */
+const sleepEl = $('#sleep');
+let sleeping = false;
+function useBed(x, y, z) {
+  spawnPt = [x + .5, y + BEDH, z + .5]; saveDirty = true;
+  if (dayAmt > .35) { toast('Spawn point set. You can only sleep at night.', 2600); return; }
+  if (mobs.some(m => KINDS[m.kind].hostile && Math.hypot(m.x - x, m.y - y, m.z - z) < 10)) { toast("You can't sleep now, monsters are nearby", 2600); return; }
+  sleeping = true; mine.on = false; held = null;
+  for (const k in keys) keys[k] = false;
+  P.x = x + .5; P.z = z + .5; P.y = y + BEDH; P.vx = P.vy = P.vz = 0;
+  sleepEl.classList.add('on');
+  [392, 330, 262].forEach((f, i) => tone(f, f * .99, .7, .12, 'sine', null, i * .55));
+  setTimeout(() => {
+    tod = .02; sleeping = false; saveDirty = true;
+    sleepEl.classList.remove('on');
+    toast('Good morning!', 2000);
+  }, 2400);
+}
+function emitBed(g, x, y, z, sl, tl) {
+  for (let f = 0; f < 6; f++) {
+    const F = FACES[f], uv = TUV[f === 2 ? T.BED_TOP : f === 3 ? T.PLANKS : T.BED_SIDE];
+    const v1 = f === 2 || f === 3 ? uv[3] : uv[2] + (uv[3] - uv[2]) * BEDH, vi = g.p.length / 3;
+    for (let k = 0; k < 4; k++) {
+      const cv = F.c[k];
+      g.p.push(x + cv[0], y + cv[1] * BEDH, z + cv[2]);
+      g.c.push(F.shade, F.shade, F.shade); g.l.push(sl, tl);
+      g.u.push(k === 0 || k === 3 ? uv[0] : uv[1], k < 2 ? uv[2] : v1);
+    }
+    g.i.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+  }
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1913,7 +2048,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(.05, (now - last) / 1000); last = now; frame++;
   if (playing) {
-    if (!dead) physics(dt);
+    if (!dead && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt);
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }

@@ -18,6 +18,7 @@ build on it, fly over it. The world saves in the browser.
 | Copy block | middle click puts the targeted block in your hand |
 | Backpack & crafting | `E` (touch: Bag button) |
 | Eat | right click while holding food (Survival) |
+| Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
 | Pick block | `1`–`9` or mouse wheel |
 | Mute | `M` (or the Sound button in the pause menu) |
 | Pause | `ESC` |
@@ -31,8 +32,10 @@ build on it, fly over it. The world saves in the browser.
   go into your backpack; stone needs a pickaxe, iron ore a stone pickaxe. Zombies come out at
   night and in dark caves and burn in daylight. If you die you respawn with your backpack.
 - **Crafting** in the backpack: planks, sticks, torches, wooden/stone/iron pickaxes and swords,
-  iron ingots (raw iron + coal), cooked porkchops, glass, stone, stone bricks, bricks and TNT.
+  iron ingots (raw iron + coal), beds, cooked porkchops, steak, chicken and fish, glass, stone, stone bricks, bricks and TNT.
 - **Torches** light up caves and the night with a warm glow.
+- **Beds** (3 wool + 3 planks): sleep through the night if no monsters are close, and wake up
+  there after dying.
 
 ## World
 
@@ -43,7 +46,9 @@ build on it, fly over it. The world saves in the browser.
 - **Dig to the other side**: break through the bedrock at the very bottom and you fall out of the
   sky on the other side of the world. Do it again to come home.
 - **TNT**: hit it to light the fuse; it blows a hole, sets off nearby TNT and knocks you back.
-- **Animals**: pigs and sheep wander the grass, run when you hit them.
+- **Animals**: pigs, sheep, cows, chickens and hopping rabbits wander the land, and fish swim in
+  lakes and the sea. They run when you hit them. In Survival they drop porkchops, wool, beef,
+  chicken and fish, which you can cook with coal.
 - **Sound effects** for digging, building, footsteps, splashes, animals and explosions (all synthesized).
 - 10-minute day/night cycle with sun, moon and sunset sky.
 - **New world** in the pause menu deletes the current world and makes a new seed.
