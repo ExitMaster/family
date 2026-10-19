@@ -197,6 +197,7 @@ select{
 <div id="touch" hidden>
   <div id="joy" aria-label="Move stick"><div id="knob"></div></div>
   <div id="tbtns">
+    <button class="tb" id="bExit" type="button" hidden>Exit</button>
     <button class="tb" id="bBag" type="button">Bag</button>
     <button class="tb" id="bMode" type="button">Break</button>
     <button class="tb" id="bFly" type="button">Fly</button>
@@ -239,6 +240,8 @@ select{
       <dt>Pick block</dt><dd><kbd>1</kbd>–<kbd>9</kbd> or mouse wheel</dd>
       <dt>Backpack</dt><dd><kbd>E</kbd> opens your inventory and crafting</dd>
       <dt>Eat</dt><dd>Right click while holding food (Survival)</dd>
+      <dt>Villagers</dt><dd>Right click a villager to trade for emeralds (Survival)</dd>
+      <dt>Airplane</dt><dd>Place it, right click to get in, <kbd>W</kbd> to speed up, look up to take off, <kbd>Shift</kbd> to get out</dd>
       <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
       <dt>Sound</dt><dd><kbd>M</kbd> mutes</dd>
       <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
@@ -563,6 +566,7 @@ function genData(cx, cz) {
     }
     for (let dy = 1; dy <= th; dy++) put(tx, h + dy, tz, LOG, false);
   }
+  buildVillages(cx, cz, put);
   const e = edits.get(ck(cx, cz));
   if (e) for (const [i, b] of e) d[i] = b;
   return d;
@@ -570,7 +574,7 @@ function genData(cx, cz) {
 function getChunk(cx, cz) {
   const k = ck(cx, cz);
   let c = chunks.get(k);
-  if (!c) { c = {cx, cz, data: genData(cx, cz), torches: torchSet(cx, cz), mesh: null, water: null, built: false, dirty: false}; chunks.set(k, c); }
+  if (!c) { const data = genData(cx, cz); c = {cx, cz, data, torches: torchSet(data), mesh: null, water: null, built: false, dirty: false}; chunks.set(k, c); }
   return c;
 }
 function getBlock(x, y, z) {
@@ -626,7 +630,13 @@ for (const F of FACES) {
 }
 const AOL = [.45, .64, .82, 1];
 const pad = new Uint8Array(PH * PX * PX), tops = new Int16Array(PX * PX);
-const litAt = p => { const col = (p / PH) | 0; return p - col * PH - 1 > tops[col] ? 1 : 0; };
+// sky light: 1 under open sky, .7 right next to an open column (under eaves and overhangs), else dark
+const litAt = p => {
+  const col = (p / PH) | 0, y = p - col * PH - 1;
+  if (y > tops[col]) return 1;
+  for (const n of [col - 1, col + 1, col - PX, col + PX]) if (n >= 0 && n < PX * PX && y > tops[n]) return .7;
+  return 0;
+};
 function fillPad(cx, cz) {
   for (let lz = -1; lz <= CS; lz++) for (let lx = -1; lx <= CS; lx++) {
     let ccx = cx, ccz = cz, x = lx, z = lz;
@@ -876,12 +886,21 @@ function raycast(o, d, maxD) {
 let target = null;
 function updateTarget() {
   dirV.set(0, 0, -1).applyQuaternion(cam.quaternion);
-  target = raycast(cam.position, dirV, 6);
+  target = riding ? null : raycast(cam.position, dirV, 6);
   highlight.visible = !!target && playing;
   if (target) highlight.position.set(target.x + .5, target.y + .5, target.z + .5);
 }
 function act(button) {
-  if (dead || sleeping) return;
+  if (dead || sleeping || riding) return;
+  if (button === 0 || button === 2) {
+    const far = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) : 5;
+    const pl = planeHit(Math.min(5, far));
+    if (pl) { if (button === 2) board(pl); else pickPlane(pl); return; }
+  }
+  if (button === 2) {
+    const m = mobHit(4);
+    if (m && m.kind === 'villager') { talk(m); return; }
+  }
   if (button === 2 && target && target.b === BED) { useBed(target.x, target.y, target.z); return; }
   const s = inv[sel];
   if (button === 0) {
@@ -896,6 +915,7 @@ function act(button) {
     if (b === TNT) { setBlock(x, y, z, AIR); igniteTNT(x, y, z, 3); toast('Run!'); return; }
     if (mode === 'c') breakBlock(x, y, z);
   } else if (button === 2) {
+    if (s && s.id === PLANE) { placePlane(target.px + .5, target.py, target.pz + .5); return; }
     if (!s || s.id >= 64) return;
     const {px, py, pz} = target, b = s.id;
     if (py < 0 || py >= H) return;
@@ -937,6 +957,7 @@ function unloadFar() {
   }
 }
 function resetWorld() {
+  villageCache.clear();
   for (const c of chunks.values()) disposeMeshes(c);
   chunks.clear(); urgent.clear();
 }
@@ -998,7 +1019,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1008,7 +1029,8 @@ function serialize() {
   const e = {};
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
-    mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt};
+    mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100))};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1038,7 +1060,7 @@ function applySave(s) {
     invs = {c: creativeInv(), s: Array(36).fill(null)};
     if (s.invs) { invs.c = unpackInv(s.invs.c) || invs.c; invs.s = unpackInv(s.invs.s) || invs.s; }
     else if (Array.isArray(s.hotbar)) s.hotbar.forEach((b, i) => { if (i < 9 && BLOCKS[b]) invs.c[i] = {id: b, n: 1}; });
-    mode = s.mode === 's' ? 's' : 'c'; inv = invs[mode];
+    mode = s.mode === 's' ? 's' : 'c'; inv = invs[mode]; ensurePlane();
     if (typeof s.hp === 'number') st.hp = Math.max(1, Math.min(20, s.hp | 0));
     if (typeof s.food === 'number') st.food = Math.max(0, Math.min(20, s.food | 0));
     if (Array.isArray(s.spawn) && s.spawn.length === 3) spawnPt = s.spawn;
@@ -1047,6 +1069,8 @@ function applySave(s) {
     if (typeof s.tod === 'number') tod = s.tod;
     P.fly = !!s.fly;
     if (s.snd === false) S.on = false;
+    clearPlanes();
+    if (Array.isArray(s.planes)) s.planes.forEach(a => { if (Array.isArray(a) && a.length === 4) addPlane(+a[0], +a[1], +a[2], +a[3]); });
     if (Array.isArray(s.p)) { [P.x, P.y, P.z, P.yaw, P.pitch] = s.p; return; }
   } else {
     SEED = Math.floor(Math.random() * 1e6);
@@ -1057,7 +1081,7 @@ function newWorld() {
   resetWorld(); edits.clear(); clearMobs();
   SEED = Math.floor(Math.random() * 1e6);
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
-  invs = {c: creativeInv(), s: Array(36).fill(null)}; inv = invs[mode];
+  invs = {c: creativeInv(), s: Array(36).fill(null)}; inv = invs[mode]; ensurePlane();
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false});
   spawn(); renderHotbar(); refreshMeta(); persist();
 }
@@ -1069,7 +1093,7 @@ function refreshMeta() {
   $('#gm').value = mode; $('#stats').hidden = mode !== 's'; statsKey = '';
 }
 function toggleSound() {
-  S.on = !S.on; if (S.on) audio();
+  S.on = !S.on; if (S.on) audio(); else engineOff();
   refreshMeta(); toast(S.on ? 'Sound on' : 'Sound off'); saveDirty = true;
 }
 
@@ -1084,6 +1108,7 @@ function startPlaying(drag) {
 }
 function pause() {
   if (!playing) return;
+  engineOff();
   playing = false; held = null; overlay.hidden = false;
   for (const k in keys) keys[k] = false;
   joy.x = joy.y = 0; $('#knob').style.transform = '';
@@ -1142,6 +1167,13 @@ addEventListener('keydown', e => {
   if (!playing) return;
   if (invOpen) { if (!e.repeat && (e.code === 'KeyE' || e.code === 'Escape')) closeInv(e.code === 'KeyE'); return; }
   if (dead) return;
+  if (riding) {
+    if (e.code.startsWith('Shift') && !e.repeat) exitPlane();
+    if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+    if (e.code === 'KeyM' && !e.repeat) toggleSound();
+    keys[e.code] = true;
+    return;
+  }
   if (e.code === 'Space') {
     e.preventDefault();
     if (!e.repeat) {
@@ -1334,7 +1366,7 @@ function addMob(kind, x, y, z) {
   mobs.push({kind, g, legs, x, y, z, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28, ry: 0, t: 0, walk: false, flee: 0, hp: KINDS[kind].hp, ph: 0, ground: false});
 }
 function removeMob(i) { scene.remove(mobs[i].g); mobs.splice(i, 1); }
-function clearMobs() { while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
+function clearMobs() { clearPlanes(); while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
 const LAND = ['pig', 'sheep', 'cow', 'chicken', 'rabbit'], LAND_W = [3, 3, 3, 3, 1.5];
 function pickKind() {
   let r = Math.random() * LAND_W.reduce((a, b) => a + b);
@@ -1381,6 +1413,7 @@ function updateMobs(dt) {
     let pass = 0, host = 0;
     for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
     if (pass < 12) trySpawn();
+    spawnVillagers();
     if (mode === 's' && host < 5 && !dead) trySpawnZombie();
   }
   const fl = Math.floor;
@@ -1389,7 +1422,8 @@ function updateMobs(dt) {
     if (dx * dx + dz * dz > 90 * 90 || m.y < -10) { removeMob(i); continue; }
     if (K.swim) { swim(m, K, dt); continue; }
     m.t -= dt; m.flee -= dt;
-    if (K.hostile) {
+    if (K.villager) villagerThink(m, dt);
+    else if (K.hostile) {
       if (mode !== 's') { removeMob(i); continue; }
       zombieThink(m, dt);
     } else if (m.flee > 0) {
@@ -1667,9 +1701,10 @@ function craft(out, n, ing) {
 function renderInv() {
   const grid = $('#invGrid'), hot = $('#invHot'), rec = $('#recipes'), surv = mode === 's';
   grid.textContent = ''; hot.textContent = ''; rec.textContent = '';
-  $('#invTitle').textContent = surv ? 'Backpack' : 'All blocks and items';
+  $('#invTitle').textContent = curTrades ? curTrades.name : surv ? 'Backpack' : 'All blocks and items';
+  $('#craft h3').textContent = curTrades ? 'Trades' : 'Crafting';
   $('#craft').hidden = !surv;
-  $('#invHint').textContent = surv
+  $('#invHint').textContent = curTrades ? 'Pick a trade. Villagers pay emeralds for food and supplies, and sell tools, food and beds.' : surv
     ? 'Click to pick up and put down · right-click takes half · shift-click moves between hotbar and backpack. Start by punching a tree for logs.'
     : 'Click anything to put it in the selected hotbar slot. Click a hotbar slot below to choose it.';
   if (surv) for (let i = 9; i < 36; i++) grid.append(mkSlot(i));
@@ -1680,7 +1715,7 @@ function renderInv() {
   }
   for (let i = 0; i < 9; i++) hot.append(mkSlot(i));
   if (surv) {
-    const list = RECIPES.map(r => [r, r[2].every(([id, k]) => countOf(id) >= k)]).sort((a, b) => b[1] - a[1]);
+    const list = (curTrades ? curTrades.list : RECIPES).map(r => [r, r[2].every(([id, k]) => countOf(id) >= k)]).sort((a, b) => b[1] - a[1]);
     for (const [[out, n, ing], ok] of list) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'rec'; b.disabled = !ok;
@@ -1696,16 +1731,16 @@ function renderInv() {
   handEl.hidden = !hand;
   if (hand) { handEl.querySelector('img').src = iconURL(hand.id); handEl.querySelector('span').textContent = hand.n > 1 ? hand.n : ''; }
 }
-function openInv() {
+function openInv(trades) {
   if (!playing || dead || invOpen) return;
-  invOpen = true; mine.on = false; held = null;
+  invOpen = true; mine.on = false; held = null; curTrades = trades || null;
   for (const k in keys) keys[k] = false;
   renderInv(); invUI.hidden = false;
   if (locked) document.exitPointerLock();
 }
 function closeInv(relock) {
   if (!invOpen) return;
-  invOpen = false; invUI.hidden = true;
+  invOpen = false; invUI.hidden = true; curTrades = null;
   if (hand) { addItem(hand.id, hand.n); hand = null; }
   handEl.hidden = true; renderHotbar();
   if (!TOUCH && !dragMode) { if (relock) requestLock(); else toast('Click to look around', 2500); }
@@ -1797,7 +1832,7 @@ function updateSurvival(dt) {
 function setMode(m) {
   if (m === mode) return;
   if (hand) { addItem(hand.id, hand.n); hand = null; }
-  mode = m; inv = invs[m];
+  mode = m; inv = invs[m]; ensurePlane();
   if (m === 's') { P.fly = false; st.fallY = null; }
   statsKey = '';
   refreshMeta(); renderHotbar(); persist();
@@ -1850,9 +1885,9 @@ function updateMining(dt) {
 }
 
 /* ---------- torches & darkness ---------- */
-function torchSet(cx, cz) {
-  const s = new Set(), e = edits.get(ck(cx, cz));
-  if (e) for (const [i, b] of e) if (b === TORCH) s.add(i);
+function torchSet(d) {
+  const s = new Set();
+  for (let i = 0; i < d.length; i++) if (d[i] === TORCH) s.add(i);
   return s;
 }
 function torchesAround(cx, cz, fn) {
@@ -2041,6 +2076,305 @@ function emitBed(g, x, y, z, sl, tl) {
   }
 }
 
+/* ---------- villages ---------- */
+// The world is cut into 96-block regions; about a third of them hold a village (the one at the origin always does).
+const VR = 96, villageCache = new Map();
+function village(rx, rz) {
+  const key = rx + ',' + rz;
+  if (villageCache.has(key)) return villageCache.get(key);
+  let v = null;
+  if ((rx === 0 && rz === 0) || hash2(rx, rz, 900) < .35) {
+    const cx = rx * VR + 24 + Math.floor(hash2(rx, rz, 901) * 48), cz = rz * VR + 24 + Math.floor(hash2(rx, rz, 902) * 48);
+    const houses = [], n = 3 + Math.floor(hash2(rx, rz, 903) * 3);
+    for (let i = 0; i < n; i++) {
+      const a = i / n * 6.283 + hash2(rx, rz, 910 + i) * .8, d = 10 + hash2(rx, rz, 920 + i) * 4;
+      const x = Math.round(cx + Math.cos(a) * d), z = Math.round(cz + Math.sin(a) * d), h = heightAt(x, z);
+      if (h <= WATER + 1 || h > WATER + 16) continue;
+      const dx = cx - x, dz = cz - z; // the door faces the middle of the village
+      houses.push({x, z, h, side: Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 0 : 1) : (dz > 0 ? 2 : 3)});
+    }
+    const h = heightAt(cx, cz);
+    v = {key, x: cx, z: cz, h, houses, well: h > WATER + 1 && h <= WATER + 16};
+  }
+  villageCache.set(key, v);
+  return v;
+}
+function buildVillages(ccx, ccz, put) {
+  const ox = ccx * CS, oz = ccz * CS;
+  const set = (x, y, z, b) => put(x - ox, y, z - oz, b, false), soft = (x, y, z, b) => put(x - ox, y, z - oz, b, true);
+  const hits = (x, z, r) => x + r >= ox && x - r < ox + CS && z + r >= oz && z - r < oz + CS;
+  for (let rx = Math.floor((ox - 40) / VR); rx <= Math.floor((ox + CS + 40) / VR); rx++)
+    for (let rz = Math.floor((oz - 40) / VR); rz <= Math.floor((oz + CS + 40) / VR); rz++) {
+      const v = village(rx, rz);
+      if (!v) continue;
+      for (const hh of v.houses) if (hits(hh.x, hh.z, 3)) buildHouse(hh, set, soft);
+      if (v.well && hits(v.x, v.z, 1)) buildWell(v, set);
+    }
+}
+function buildHouse({x, z, h, side}, set, soft) {
+  for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+    const ax = Math.abs(dx), az = Math.abs(dz), r = Math.max(ax, az), wx = x + dx, wz = z + dz;
+    for (let y = h + 1; y <= h + 8; y++) set(wx, y, wz, AIR);
+    if (r <= 2) {
+      for (let y = h - 4; y < h; y++) soft(wx, y, wz, COBBLE);
+      set(wx, h, wz, r === 2 ? COBBLE : PLANKS);
+      if (r === 2) for (let y = h + 1; y <= h + 3; y++) set(wx, y, wz, ax === 2 && az === 2 ? LOG : PLANKS);
+      set(wx, h + 4, wz, PLANKS);
+    }
+    set(wx, h + 7 - r, wz, BRICK); // red pyramid roof
+  }
+  [[2, 0], [-2, 0], [0, 2], [0, -2]].forEach(([dx, dz], i) => {
+    if (i === side) {
+      set(x + dx, h + 1, z + dz, AIR); set(x + dx, h + 2, z + dz, AIR);
+      soft(x + dx + Math.sign(dx), h, z + dz + Math.sign(dz), COBBLE);
+    } else set(x + dx, h + 2, z + dz, GLASS);
+  });
+  set(x - 1, h + 1, z - 1, TORCH);
+  set(x + 1, h + 1, z + 1, BED);
+}
+function buildWell({x, z, h}, set) {
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const wx = x + dx, wz = z + dz;
+    for (let y = h + 1; y <= h + 6; y++) set(wx, y, wz, AIR);
+    if (!dx && !dz) { set(wx, h, wz, WATERB); set(wx, h - 1, wz, WATERB); set(wx, h - 2, wz, COBBLE); }
+    else { set(wx, h, wz, COBBLE); set(wx, h + 1, wz, COBBLE); }
+    if (dx && dz) { set(wx, h + 2, wz, LOG); set(wx, h + 3, wz, LOG); }
+    set(wx, h + 4, wz, PLANKS);
+  }
+}
+
+/* ---------- villagers & trading ---------- */
+const EMERALD = 83, PLANE = 84;
+item(EMERALD, 'Emerald', g => {
+  rects(g, '#2ec46a', [[7, 3, 2, 1], [6, 4, 4, 1], [5, 5, 6, 5], [6, 10, 4, 1], [7, 11, 2, 1]]);
+  rects(g, '#a8f0c0', [[6, 5, 2, 2]]); rects(g, '#18884a', [[9, 8, 2, 2], [7, 10, 2, 1]]);
+});
+item(PLANE, 'Airplane', g => {
+  rects(g, '#f2f2f2', [[2, 7, 11, 3]]); rects(g, '#d8342c', [[6, 2, 3, 12], [12, 5, 2, 4], [1, 7, 1, 3]]);
+  rects(g, '#8fd0ff', [[4, 7, 2, 1]]); rects(g, '#333333', [[0, 5, 1, 7]]);
+}, {max: 1});
+PALETTE.push(EMERALD, PLANE);
+// Survival always carries an airplane: placing one never uses it up.
+function ensurePlane() { if (mode === 's' && !countOf(PLANE)) addItem(PLANE, 1); }
+const PROFS = {
+  farmer: {n: 'Farmer', col: 0x8a6a3a, hat: 0xd8c070, trades: [
+    [EMERALD, 1, [[RCHICK, 3]]], [EMERALD, 1, [[BEEF, 3]]], [APPLE, 4, [[EMERALD, 1]]], [CCHICK, 3, [[EMERALD, 1]]]]},
+  fisher: {n: 'Fisher', col: 0x3a6aa0, hat: 0x2a4a70, trades: [
+    [EMERALD, 1, [[RFISH, 3]]], [EMERALD, 1, [[PORK, 3]]], [CFISH, 4, [[EMERALD, 1]]], [STEAK, 3, [[EMERALD, 1]]]]},
+  smith: {n: 'Blacksmith', col: 0x3a3a40, hat: 0, trades: [
+    [EMERALD, 1, [[COALI, 8]]], [EMERALD, 1, [[RAWIRON, 3]]], [IPICK, 1, [[EMERALD, 3]]], [ISWORD, 1, [[EMERALD, 3]]]]},
+  librarian: {n: 'Librarian', col: 0xeeeeee, hat: 0, trades: [
+    [EMERALD, 1, [[WOOL, 4]]], [EMERALD, 1, [[PLANKS, 16]]], [TORCH, 8, [[EMERALD, 1]]], [BED, 1, [[EMERALD, 2]]], [GLASS, 8, [[EMERALD, 1]]]]},
+};
+const PROF_KEYS = Object.keys(PROFS);
+let curTrades = null;
+KINDS.villager = {hw: .3, h: 1.95, speed: 1, hp: 20, col: 0xc89870, hurtF: 400, biped: true, villager: true, prof: 'farmer', build(g) {
+  const skin = this.col, pr = PROFS[this.prof];
+  part(g, pr.col, .5, 1.1, .32, 0, .95, 0);
+  part(g, skin, .46, .5, .46, 0, 1.75, 0); part(g, 0xb07a58, .1, .2, .1, 0, 1.66, -.27);
+  eyes(g, 1.8, -.235, .1); part(g, 0x3a2a1a, .3, .04, .02, 0, 1.9, -.235);
+  part(g, pr.col, .62, .18, .22, 0, 1.25, -.2); part(g, skin, .2, .16, .2, 0, 1.25, -.32);
+  if (pr.hat) part(g, pr.hat, .7, .06, .7, 0, 2.02, 0);
+  return [leg(g, 0x4a3a2a, .2, .4, -.11, 0), leg(g, 0x4a3a2a, .2, .4, .11, 0)];
+}, say(at) { tone(230, 170, .22, .18, 'triangle', at); tone(200, 240, .18, .14, 'triangle', at, .22); }};
+function villagerThink(m, dt) {
+  const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
+  if (m.flee > 0) { if (m.t <= 0) { m.yaw = Math.atan2(dx, dz) + (Math.random() - .5); m.t = .7; } m.walk = true; return; }
+  if (d < 4 && !dead) { m.walk = false; m.yaw = Math.atan2(-dx, -dz); m.t = 1; return; }
+  if (m.t <= 0) {
+    const hx = m.home[0] - m.x, hz = m.home[1] - m.z;
+    if (Math.hypot(hx, hz) > 12) { m.yaw = Math.atan2(-hx, -hz); m.walk = true; m.t = 2; }
+    else { m.walk = Math.random() < .5; m.yaw = Math.random() * 6.283; m.t = 2 + Math.random() * 4; }
+    if (Math.random() < .2) KINDS.villager.say([m.x, m.y + 1.7, m.z]);
+  }
+}
+function spawnVillagers() {
+  for (let rx = Math.floor((P.x - 70) / VR); rx <= Math.floor((P.x + 70) / VR); rx++)
+    for (let rz = Math.floor((P.z - 70) / VR); rz <= Math.floor((P.z + 70) / VR); rz++) {
+      const v = village(rx, rz);
+      if (!v || Math.hypot(v.x - P.x, v.z - P.z) > 70 || mobs.some(m => m.vk === v.key)) continue;
+      if (!v.houses.every(hh => chunks.has(ck(Math.floor(hh.x / CS), Math.floor(hh.z / CS))))) continue;
+      for (const hh of v.houses) {
+        KINDS.villager.prof = PROF_KEYS[Math.floor(hash2(hh.x, hh.z, 950) * PROF_KEYS.length)];
+        addMob('villager', hh.x + .5, hh.h + 1, hh.z + .5);
+        const m = mobs[mobs.length - 1];
+        m.prof = KINDS.villager.prof; m.vk = v.key; m.home = [v.x, v.z];
+      }
+    }
+}
+function talk(m) {
+  KINDS.villager.say([m.x, m.y + 1.7, m.z]);
+  m.t = 3; m.walk = false;
+  if (mode !== 's') { toast('Hmm! Villagers trade in Survival mode', 2400); return; }
+  const pr = PROFS[m.prof];
+  openInv({name: pr.n, list: pr.trades});
+}
+
+/* ---------- airplanes ---------- */
+const planes = [];
+let riding = null, engine = null;
+function addPlane(x, y, z, yaw) {
+  const g = new THREE.Group(), red = 0xd8342c, white = 0xf2f2f2, dark = 0x2a2a2a;
+  part(g, white, .9, .9, 4, 0, .75, 0); part(g, red, .7, .7, .4, 0, .75, -2.2);
+  part(g, red, 6, .12, 1.1, 0, .8, -.4); part(g, white, 6.02, .04, .3, 0, .8, -.4);
+  part(g, red, .1, .9, .7, 0, 1.45, 1.7); part(g, red, 2.2, .1, .6, 0, .85, 1.8);
+  part(g, 0x9fd8ff, .7, .4, .8, 0, 1.3, -.6);
+  part(g, dark, .2, .35, .35, -.6, .18, -.9); part(g, dark, .2, .35, .35, .6, .18, -.9); part(g, dark, .15, .25, .25, 0, .3, 1.8);
+  part(g, 0x666666, .06, .4, .06, -.6, .4, -.9); part(g, 0x666666, .06, .4, .06, .6, .4, -.9);
+  const prop = new THREE.Group(); prop.position.set(0, .75, -2.45);
+  part(prop, dark, .14, 1.8, .06, 0, 0, 0); part(prop, dark, 1.8, .14, .06, 0, 0, 0);
+  g.add(prop); g.rotation.order = 'YXZ'; scene.add(g);
+  const pl = {g, prop, x, y, z, yaw, pitch: 0, roll: 0, speed: 0, vy: 0};
+  planes.push(pl);
+  syncPlane(pl);
+  return pl;
+}
+function syncPlane(pl) { pl.g.position.set(pl.x, pl.y, pl.z); pl.g.rotation.set(pl.pitch, pl.yaw, pl.roll); }
+function removePlane(pl) { scene.remove(pl.g); planes.splice(planes.indexOf(pl), 1); }
+function clearPlanes() { if (riding) exitPlane(); while (planes.length) removePlane(planes[0]); }
+function rayBox(mn, mx, maxD) {
+  const o = [cam.position.x, cam.position.y, cam.position.z], d = [dirV.x, dirV.y, dirV.z];
+  let t0 = 0, t1 = maxD;
+  for (let a = 0; a < 3; a++) {
+    if (Math.abs(d[a]) < 1e-9) { if (o[a] < mn[a] || o[a] > mx[a]) return -1; continue; }
+    let ta = (mn[a] - o[a]) / d[a], tb = (mx[a] - o[a]) / d[a];
+    if (ta > tb) [ta, tb] = [tb, ta];
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+    if (t0 > t1) return -1;
+  }
+  return t0;
+}
+function planeHit(maxD) {
+  let best = null, bt = maxD;
+  for (const pl of planes) {
+    const t = rayBox([pl.x - 1.6, pl.y, pl.z - 1.6], [pl.x + 1.6, pl.y + 1.6, pl.z + 1.6], bt);
+    if (t >= 0 && t < bt) { bt = t; best = pl; }
+  }
+  return best;
+}
+function planeHits(x, y, z) {
+  const fl = Math.floor;
+  for (let by = fl(y); by <= fl(y + 1.3); by++) for (let bz = fl(z - 1.1); bz <= fl(z + 1.1); bz++) for (let bx = fl(x - 1.1); bx <= fl(x + 1.1); bx++) {
+    const b = getBlock(bx, by, bz);
+    if (SOLID[b] || b === WATERB) return true;
+  }
+  return false;
+}
+function board(pl) {
+  riding = pl; P.fly = false; P.yaw = pl.yaw; P.pitch = -.1;
+  mine.on = false; held = null;
+  $('#bExit').hidden = false;
+  toast(TOUCH ? 'Push the stick up to speed up, look up to take off' : 'W speeds up, S slows down, look up to take off · Shift gets out', 4500);
+  engineOn();
+}
+function exitPlane() {
+  const pl = riding;
+  if (!pl) return;
+  riding = null; engineOff(); $('#bExit').hidden = true;
+  P.x = pl.x + Math.cos(pl.yaw) * 2.8; P.z = pl.z - Math.sin(pl.yaw) * 2.8; P.y = pl.y + .1;
+  for (let i = 0; i < 8 && collides(); i++) P.y += 1;
+  P.vx = P.vy = P.vz = 0; st.fallY = null;
+  if (!planeHits(pl.x, pl.y - .1, pl.z)) { st.noFall = true; toast('Parachute!'); }
+  pl.roll = 0; pl.speed = Math.min(pl.speed, 4);
+  saveDirty = true;
+}
+function placePlane(x, y, z) {
+  for (let i = 0; i < 6 && planeHits(x, y, z); i++) y += 1;
+  addPlane(x, y, z, P.yaw); saveDirty = true;
+  toast('Right click the airplane to get in', 2500);
+}
+function pickPlane(pl) {
+  removePlane(pl);
+  blockSfx('break', PLANKS, Math.floor(pl.x), Math.floor(pl.y), Math.floor(pl.z));
+  saveDirty = true;
+}
+function engineOn() {
+  const c = audio();
+  if (!c || engine) return;
+  const o = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+  o.type = 'sawtooth'; o2.type = 'square'; o.frequency.value = 50; o2.frequency.value = 52;
+  f.type = 'lowpass'; f.frequency.value = 500; g.gain.value = 0;
+  o.connect(f); o2.connect(f); f.connect(g); g.connect(S.out); o.start(); o2.start();
+  engine = {o, o2, g};
+}
+function engineOff() {
+  if (!engine) return;
+  const e = engine; engine = null;
+  e.g.gain.setTargetAtTime(0, S.ctx.currentTime, .08);
+  setTimeout(() => { e.o.stop(); e.o2.stop(); }, 400);
+}
+function flyPlane(dt) {
+  const pl = riding;
+  if (!engine && S.on) engineOn();
+  const thr = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y + (keys.Space || keys.touchJump ? 1 : 0);
+  if (planeHits(pl.x, pl.y + .05, pl.z)) pl.y += Math.min(1, 6 * dt); // wedged in the ground: pop up
+  const ground = planeHits(pl.x, pl.y - .08, pl.z);
+  pl.speed = Math.max(0, Math.min(42, pl.speed + (thr > .2 ? 14 : thr < -.2 ? -20 : ground ? -6 : -1.5) * dt));
+  // steer towards where the camera looks; bank into the turn
+  let dy = P.yaw - pl.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  const rate = ground ? 1.4 : 1.8;
+  pl.yaw += Math.max(-rate, Math.min(rate, dy * 2.5)) * dt;
+  pl.roll += ((ground ? 0 : Math.max(-.7, Math.min(.7, -dy * 1.5))) - pl.roll) * Math.min(1, 4 * dt);
+  const lift = Math.min(1, pl.speed / 14);
+  pl.pitch += (Math.max(-.7, Math.min(.7, P.pitch + .1)) * lift - pl.pitch) * Math.min(1, 3 * dt);
+  if (ground && pl.pitch < 0) pl.pitch = 0;
+  pl.vy = lift >= 1 ? 0 : Math.max(-20, pl.vy - 18 * (1 - lift) * dt);
+  const c = Math.cos(pl.pitch);
+  const vx = -Math.sin(pl.yaw) * c * pl.speed, vz = -Math.cos(pl.yaw) * c * pl.speed, vy = Math.sin(pl.pitch) * pl.speed + pl.vy;
+  const steps = Math.max(1, Math.ceil(Math.hypot(vx, vy, vz) * dt / .4));
+  for (let i = 0; i < steps; i++) {
+    const mx = vx * dt / steps, mz = vz * dt / steps, my = vy * dt / steps;
+    for (const [a, d] of [['x', mx], ['z', mz]]) {
+      if (!d) continue;
+      const nx = a === 'x' ? pl.x + d : pl.x, nz = a === 'z' ? pl.z + d : pl.z;
+      if (!planeHits(nx, pl.y, nz)) { pl[a] += d; continue; }
+      if (ground && !planeHits(nx, pl.y + 1.05, nz)) { pl[a] += d; pl.y += 1.05; continue; } // roll up a step
+      crash(pl); break;
+    }
+    if (planeHits(pl.x, pl.y + my, pl.z)) {
+      if (my < 0) { if (-vy > 14) crash(pl); pl.y = Math.floor(pl.y + my) + 1; pl.vy = 0; if (pl.pitch < 0) pl.pitch = 0; }
+      break;
+    }
+    pl.y = Math.min(H + 60, pl.y + my);
+  }
+  pl.prop.rotation.z += dt * (4 + pl.speed * 2);
+  P.x = pl.x; P.y = pl.y + .5; P.z = pl.z; P.vx = P.vy = P.vz = 0; st.fallY = null;
+  if (P.y < -4) { pl.y = H + 30; pl.x += pl.x > FAR / 2 ? -FAR : FAR; pl.z = -pl.z; toast('You flew out the other side of the world!', 3000); }
+  if (engine) {
+    const t = S.ctx.currentTime;
+    engine.o.frequency.setTargetAtTime(45 + pl.speed * 3, t, .1); engine.o2.frequency.setTargetAtTime(47 + pl.speed * 3.1, t, .1);
+    engine.g.gain.setTargetAtTime(.05 + pl.speed * .004, t, .1);
+  }
+}
+function crash(pl) {
+  if (pl.speed > 18) {
+    noise(.6, 'lowpass', 900, .7, 1.2, null, 120); shake = Math.max(shake, .6);
+    hurtPlayer(Math.round((pl.speed - 16) / 3));
+    toast('Crash!');
+  }
+  pl.speed *= .15;
+}
+function updatePlanes(dt) {
+  for (const pl of planes) {
+    if (pl !== riding) {
+      pl.speed = Math.max(0, pl.speed - 8 * dt); pl.pitch *= .9;
+      if (!planeHits(pl.x, pl.y - .08, pl.z)) {
+        pl.vy = Math.max(-25, pl.vy - 20 * dt);
+        const ny = pl.y + pl.vy * dt;
+        if (planeHits(pl.x, ny, pl.z)) { pl.y = Math.floor(ny) + 1; pl.vy = 0; } else pl.y = ny;
+        if (pl.y < -20) { pl.y = H + 20; pl.vy = 0; }
+      } else pl.vy = 0;
+      pl.prop.rotation.z += dt * pl.speed * 2;
+    }
+    syncPlane(pl);
+  }
+}
+function chaseCam() {
+  const cp = Math.cos(P.pitch), f = [-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp];
+  cam.position.set(riding.x - f[0] * 9, riding.y + 3.2 - f[1] * 9, riding.z - f[2] * 9);
+}
+$('#bExit').addEventListener('click', exitPlane);
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2048,11 +2382,12 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(.05, (now - last) / 1000); last = now; frame++;
   if (playing) {
-    if (!dead && !sleeping) physics(dt);
+    if (riding && !dead) flyPlane(dt);
+    else if (!dead && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt);
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
-    updateMobs(dt); updateTNT(dt);
+    updateMobs(dt); updateTNT(dt); updatePlanes(dt);
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;
   }
@@ -2064,6 +2399,7 @@ function loop(now) {
     cam.position.x += (Math.random() - .5) * shake * .6; cam.position.y += (Math.random() - .5) * shake * .6;
   }
   cam.rotation.set(P.pitch, P.yaw, 0);
+  if (riding) chaseCam();
   cam.updateMatrixWorld();
   const hw = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)) === WATERB;
   if (hw !== headInWater) { headInWater = hw; tintEl.hidden = !hw; }

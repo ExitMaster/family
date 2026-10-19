@@ -18,6 +18,8 @@ build on it, fly over it. The world saves in the browser.
 | Copy block | middle click puts the targeted block in your hand |
 | Backpack & crafting | `E` (touch: Bag button) |
 | Eat | right click while holding food (Survival) |
+| Trade | right click a villager (Survival) |
+| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, look where you want to fly (look up to take off), `Shift` to get out (touch: stick up to speed up, Exit button) |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
 | Pick block | `1`–`9` or mouse wheel |
 | Mute | `M` (or the Sound button in the pause menu) |
@@ -34,6 +36,13 @@ build on it, fly over it. The world saves in the browser.
 - **Crafting** in the backpack: planks, sticks, torches, wooden/stone/iron pickaxes and swords,
   iron ingots (raw iron + coal), beds, cooked porkchops, steak, chicken and fish, glass, stone, stone bricks, bricks and TNT.
 - **Torches** light up caves and the night with a warm glow.
+- **Villages**: little towns of plank houses with red roofs, glass windows, a torch and a bed
+  inside, and a well in the middle. There is always one near the start. Villagers (farmers,
+  fishers, blacksmiths and librarians) wander around, look at you when you come close, and
+  trade: they pay emeralds for food and supplies and sell tools, food, torches, glass and beds.
+- **Airplanes**: in Creative take one from the `E` menu; in Survival you always have one. Place it,
+  climb in, speed up and pull up to take off. Fly fast to stay up; crash into a hill too fast
+  and it hurts. Jump out in the air and a parachute opens. Planes stay where you leave them.
 - **Beds** (3 wool + 3 planks): sleep through the night if no monsters are close, and wake up
   there after dying.
 
