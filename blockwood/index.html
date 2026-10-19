@@ -2158,14 +2158,24 @@ PALETTE.push(EMERALD, PLANE);
 function ensurePlane() { if (mode === 's' && !countOf(PLANE)) addItem(PLANE, 1); }
 const PROFS = {
   farmer: {n: 'Farmer', col: 0x8a6a3a, hat: 0xd8c070, trades: [
-    [EMERALD, 1, [[RCHICK, 3]]], [EMERALD, 1, [[BEEF, 3]]], [APPLE, 4, [[EMERALD, 1]]], [CCHICK, 3, [[EMERALD, 1]]]]},
+    [EMERALD, 1, [[RCHICK, 3]]], [EMERALD, 1, [[BEEF, 3]]], [APPLE, 4, [[EMERALD, 1]]], [CCHICK, 3, [[EMERALD, 1]]],
+    [APPLE, 16, [[DIRT, 5]]], [CPORK, 6, [[SAND, 8]]], [WOOL, 8, [[EMERALD, 1]]], [BED, 1, [[DIRT, 10]]]]},
   fisher: {n: 'Fisher', col: 0x3a6aa0, hat: 0x2a4a70, trades: [
-    [EMERALD, 1, [[RFISH, 3]]], [EMERALD, 1, [[PORK, 3]]], [CFISH, 4, [[EMERALD, 1]]], [STEAK, 3, [[EMERALD, 1]]]]},
+    [EMERALD, 1, [[RFISH, 3]]], [EMERALD, 1, [[PORK, 3]]], [CFISH, 4, [[EMERALD, 1]]], [STEAK, 3, [[EMERALD, 1]]],
+    [CFISH, 12, [[SAND, 10]]], [RFISH, 8, [[COBBLE, 5]]], [EMERALD, 2, [[CFISH, 3]]]]},
   smith: {n: 'Blacksmith', col: 0x3a3a40, hat: 0, trades: [
-    [EMERALD, 1, [[COALI, 8]]], [EMERALD, 1, [[RAWIRON, 3]]], [IPICK, 1, [[EMERALD, 3]]], [ISWORD, 1, [[EMERALD, 3]]]]},
+    [EMERALD, 1, [[COALI, 8]]], [EMERALD, 1, [[RAWIRON, 3]]], [IPICK, 1, [[EMERALD, 3]]], [ISWORD, 1, [[EMERALD, 3]]],
+    [IRONI, 8, [[COBBLE, 20]]], [COALI, 32, [[DIRT, 10]]], [SPICK, 1, [[COBBLE, 5]]], [SSWORD, 1, [[COBBLE, 5]]], [TNT, 4, [[EMERALD, 1]]]]},
   librarian: {n: 'Librarian', col: 0xeeeeee, hat: 0, trades: [
-    [EMERALD, 1, [[WOOL, 4]]], [EMERALD, 1, [[PLANKS, 16]]], [TORCH, 8, [[EMERALD, 1]]], [BED, 1, [[EMERALD, 2]]], [GLASS, 8, [[EMERALD, 1]]]]},
+    [EMERALD, 1, [[WOOL, 4]]], [EMERALD, 1, [[PLANKS, 16]]], [TORCH, 8, [[EMERALD, 1]]], [BED, 1, [[EMERALD, 2]]], [GLASS, 8, [[EMERALD, 1]]],
+    [TORCH, 32, [[DIRT, 5]]], [WOOL, 16, [[PLANKS, 8]]]]},
+  builder: {n: 'Builder', col: 0xc8762a, hat: 0xf2c230, trades: [
+    [SBRICK, 64, [[DIRT, 8]]], [BRICK, 64, [[SAND, 8]]], [PLANKS, 64, [[DIRT, 5]]], [LOG, 32, [[DIRT, 5]]],
+    [WOOL, 32, [[DIRT, 5]]], [SNOW, 32, [[DIRT, 3]]], [STONE, 64, [[COBBLE, 16]]], [TNT, 8, [[SAND, 10]]]]},
 };
+// every villager also makes these deals
+const COMMON_TRADES = [[GLASS, 60, [[DIRT, 5]]], [EMERALD, 1, [[DIRT, 16]]], [TORCH, 16, [[COBBLE, 4]]]];
+for (const k in PROFS) PROFS[k].trades.push(...COMMON_TRADES);
 const PROF_KEYS = Object.keys(PROFS);
 let curTrades = null;
 KINDS.villager = {hw: .3, h: 1.95, speed: 1, hp: 20, col: 0xc89870, hurtF: 400, biped: true, villager: true, prof: 'farmer', build(g) {

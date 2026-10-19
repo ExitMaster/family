@@ -38,8 +38,11 @@ build on it, fly over it. The world saves in the browser.
 - **Torches** light up caves and the night with a warm glow.
 - **Villages**: little towns of plank houses with red roofs, glass windows, a torch and a bed
   inside, and a well in the middle. There is always one near the start. Villagers (farmers,
-  fishers, blacksmiths and librarians) wander around, look at you when you come close, and
-  trade: they pay emeralds for food and supplies and sell tools, food, torches, glass and beds.
+  fishers, blacksmiths, librarians and builders) wander around, look at you when you come close,
+  and trade. Lots of trades are big bargains, like 5 dirt for 60 glass (every villager does that
+  one), 8 dirt for 64 stone bricks, 5 dirt for 32 logs, 20 cobblestone for 8 iron ingots or
+  5 dirt for 16 apples. They also buy food and supplies for emeralds and sell tools, food,
+  torches, TNT and beds.
 - **Airplanes**: in Creative take one from the `E` menu; in Survival you always have one. Place it,
   climb in, speed up and pull up to take off. Fly fast to stay up; crash into a hill too fast
   and it hurts. Jump out in the air and a parachute opens. Planes stay where you leave them.
