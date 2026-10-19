@@ -459,6 +459,12 @@ function boot(hot){
     { id: 'blaster', name: 'Blaster', note: 'Rocket with 8 boosters, Mach 1.3', color: '#e8432e', cruise: 130, boost: 445, pitch: 1.3, turn: 1.2, cam: 1.2, fixedGear: true, pax: 12, sound: { mul: 1.2, vol: 0.055 } },
     { id: 'whale', name: 'Whale', note: 'Flying whale, lands on lakes', color: '#3f6fa8', cruise: 45, boost: 110, pitch: 1.0, turn: 0.9, cam: 1.5, water: true, fixedGear: true, sound: { mul: 0.35, vol: 0.04 } }
   ];
+  // every plane carries passengers (the big ones were set above)
+  const PAX = { cub: 3, biplane: 2, seaplane: 4, zippy: 2, glider: 2, hauler: 30, swift: 8, thunder: 2, stealth: 2, rocket: 6, saucer: 3,
+    pelican: 20, otter: 8, firebird: 10, ducky: 2, whirly: 4, blimp: 12, origami: 1, kite: 1, ace: 1, zoom: 4, comet: 2, dragon: 3, bee: 1,
+    shark: 6, retro: 4, penguin: 1, mega: 60, triple: 2, swan: 2, unicorn: 2, balloon: 4, owl: 1, butterfly: 1, coastguard: 6, racer: 1,
+    ptero: 2, hog: 2, eagle: 1, pizza: 2, tiger: 2, sleigh: 6, gyro: 2, bat: 1, whale: 50 };
+  PLANES.forEach(pl => { pl.pax = pl.pax || PAX[pl.id] || 2; });
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
   planeRoot.add(planeBody); scene.add(planeRoot);
   const matCache = {}, matCache2 = {};
@@ -1613,9 +1619,17 @@ function boot(hot){
     if (sfx.muted || !window.speechSynthesis) return;
     try {
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; u.pitch = 0.9;
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.95;
+      const v = britishVoice(); if (v) u.voice = v;
       setTimeout(() => speechSynthesis.speak(u), 800);
     } catch (e){}
+  }
+  // a clear British voice: a known good UK voice if the device has one, else any en-GB voice
+  function britishVoice(){
+    const vs = speechSynthesis.getVoices().filter(v => /^en[-_]GB/i.test(v.lang));
+    const pref = ['Google UK English Male', 'Daniel', 'Arthur', 'Microsoft Ryan', 'Microsoft George', 'Google UK English Female', 'Serena', 'Kate', 'Microsoft Sonia', 'Microsoft Libby', 'Microsoft Hazel'];
+    for (const n of pref){ const v = vs.find(v => v.name.startsWith(n)); if (v) return v; }
+    return vs[0] || null;
   }
   function hushAnnounce(){
     $('announce').hidden = true; clearTimeout(annTimer);
