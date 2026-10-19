@@ -132,9 +132,10 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
 - **Other planes:** 59 computer-flown planes from the plane list cruise around you, flying
   between airports and over the hills at a safe height. Fly within about 45 m of one for a
   **close fly-by** (+25). They can't crash into you.
-- **Passengers and announcements.** The 8-engine planes, Jumbo, Arrow and Bus carry
-  passengers (a PAX chip shows how many). The captain makes announcements with a ding-dong,
-  a caption above the buttons and (with sound on) a spoken voice: welcome aboard at takeoff,
+- **Passengers and announcements.** Every plane is a passenger plane: from 1 passenger
+  (Origami, Kite, Bee, Owl…) up to 400 in the Jumbo, and a PAX chip shows how many. The captain makes announcements with a ding-dong,
+  a caption above the buttons and (with sound on) a clear British voice (or another English
+  voice if the device has no British one; with no English voice at all, just the caption): welcome aboard at takeoff,
   reaching cruising height, breaking the sound barrier, loops, flying upside down, missile
   warnings and the descent into an airport. Land at an airport and the passengers clap,
   with a bonus of one point for every 5 passengers.
