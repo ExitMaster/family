@@ -53,6 +53,7 @@ body{
 .chip.power{background:var(--teal)}
 .apname{text-transform:uppercase}
 .chip.power.boost{background:var(--coral)}
+.chip.power.warn{background:#d0202a;animation:pulse .35s ease-in-out infinite alternate}
 .iconbtn{pointer-events:auto;width:38px;height:38px;border-radius:10px;border:0;background:var(--glass);color:var(--hud-fg);font:700 14px/1 var(--hud);cursor:pointer;display:grid;place-items:center}
 .iconbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(620px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
@@ -70,6 +71,8 @@ body{
 #guide i{width:0;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-bottom:32px solid var(--coral);filter:drop-shadow(0 2px 0 var(--ink))}
 #guide span{font:700 12px/1.2 var(--hud);letter-spacing:.06em;background:var(--glass);padding:3px 8px;border-radius:8px;white-space:nowrap}
 .chip.dest{background:var(--coral)}
+#announce{max-width:100%;background:var(--glass);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:12px;padding:8px 14px;font:600 14px/1.35 var(--hud);color:var(--hud-fg);text-align:center}
+#announce b{color:var(--gold)}
 #prompt{position:absolute;left:0;right:0;top:40%;text-align:center;font:400 clamp(20px,5vw,28px)/1.2 var(--display);color:var(--hud-fg);-webkit-text-stroke:1px var(--ink);text-shadow:0 3px 0 var(--ink)}
 #prompt.go{color:var(--gold);animation:pulse .7s ease-in-out infinite alternate}
 @keyframes pulse{to{transform:scale(1.08)}}
@@ -149,6 +152,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <span class="chip">IAS<b id="spd">0</b> kt</span>
       <span class="chip" id="machChip" hidden>MACH<b id="mach">0.00</b></span>
       <span class="chip">HDG<b id="hdg">000</b></span>
+      <span class="chip" id="paxChip" hidden>PAX<b id="pax">0</b></span>
       <span class="chip" id="apChip"><span class="apname" id="apName">Home Field</span><b id="home">0.0</b> km<i class="arrow" id="homeArrow"></i></span>
     </div>
     <div class="row" id="powers"></div>
@@ -156,6 +160,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
   <div id="toast"></div>
   <div id="prompt" hidden></div>
   <div class="bottom">
+    <div id="announce" hidden></div>
     <div id="guide" hidden><i id="guideArrow"></i><span id="guideText"></span></div>
     <div class="freebar">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
@@ -275,9 +280,9 @@ const sfx = (() => {
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
   }
-  function noise(dur, vol, f0, f1, type){
+  function noise(dur, vol, f0, f1, type, when){
     if (!ctx) return;
-    const t0 = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    const t0 = ctx.currentTime + (when || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = noiseBuf; f.type = type || 'lowpass';
     f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
     g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
@@ -290,6 +295,9 @@ const sfx = (() => {
     ring(){ noise(0.6, 0.3, 400, 3500, 'bandpass'); tone(523, 0.35, 'triangle', 0.1, 0, 1046); },
     boom(){ noise(1.4, 0.9, 700, 40); tone(60, 1.0, 'sine', 0.35, 0, 28); },
     missile(){ noise(0.9, 0.35, 3500, 500, 'bandpass'); tone(220, 0.4, 'sawtooth', 0.04, 0, 660); },
+    chime(){ tone(784, 0.5, 'sine', 0.08); tone(622, 0.8, 'sine', 0.08, 0.35); },
+    applause(){ for (let i = 0; i < 40; i++) noise(0.05, 0.05 + Math.random() * 0.08, 2600, 1400, 'bandpass', Math.random() * 1.8); },
+    warn(){ tone(1250, 0.09, 'square', 0.045); },
     blast(v){ noise(1.1, 0.8 * v, 900, 50); tone(70, 0.7, 'sine', 0.3 * v, 0, 30); },
     hit(){ noise(0.4, 0.55, 1800, 150); tone(120, 0.45, 'sawtooth', 0.18, 0, 40); },
     splash(){ noise(0.9, 0.5, 2500, 200); },
@@ -404,7 +412,7 @@ function boot(hot){
     { id: 'swift', name: 'Swift', note: 'Fast jet', color: '#2a6ccc', cruise: 95, boost: 220, pitch: 1.6, turn: 1.4, sound: { mul: 2.2, vol: 0.035 } },
     { id: 'thunder', name: 'Thunder', note: 'Fighter, Mach 1.1', color: '#4a5262', cruise: 110, boost: 380, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
     { id: 'stealth', name: 'Shadow', note: 'Stealth wing, Mach 1.1', color: '#2b2f3a', cruise: 100, boost: 375, pitch: 1.5, turn: 1.4, cam: 1.1, sound: { mul: 2.0, vol: 0.025 } },
-    { id: 'jumbo', name: 'Jumbo', note: 'Huge airliner', color: '#c9d2dc', cruise: 90, boost: 200, pitch: 0.9, turn: 0.8, cam: 1.6, sound: { mul: 1.8, vol: 0.04 } },
+    { id: 'jumbo', name: 'Jumbo', note: 'Huge airliner', color: '#c9d2dc', cruise: 90, boost: 200, pitch: 0.9, turn: 0.8, cam: 1.6, pax: 400, sound: { mul: 1.8, vol: 0.04 } },
     { id: 'rocket', name: 'Rocket', note: 'Space plane, Mach 1.25', color: '#f4f1ea', cruise: 120, boost: 430, pitch: 1.3, turn: 1.1, cam: 1.15, sound: { mul: 1.4, vol: 0.05 } },
     { id: 'saucer', name: 'Saucer', note: 'Is that a UFO?', color: '#7fd1a6', cruise: 80, boost: 200, pitch: 2.2, turn: 2.0, cam: 1.1, sound: { mul: 3.2, vol: 0.03 } },
     { id: 'pelican', name: 'Pelican', note: 'Flying boat, lands on lakes', color: '#2a4fa8', cruise: 60, boost: 130, pitch: 1.0, turn: 0.9, cam: 1.35, water: true, fixedGear: true, sound: { mul: 0.85, vol: 0.05 } },
@@ -417,7 +425,7 @@ function boot(hot){
     { id: 'kite', name: 'Kite', note: 'Tiny motor hang-glider', color: '#7a5ad8', cruise: 40, boost: 85, pitch: 1.6, turn: 1.5, cam: 1.1, sound: { mul: 1.9, vol: 0.03 } },
     { id: 'ace', name: 'Ace', note: 'Old-time fighter', color: '#5a6b3a', cruise: 90, boost: 210, pitch: 1.9, turn: 1.7 },
     { id: 'zoom', name: 'Zoom', note: 'Flying car', color: '#e8432e', cruise: 75, boost: 180, pitch: 1.6, turn: 1.6, sound: { mul: 2.0, vol: 0.035 } },
-    { id: 'arrow', name: 'Arrow', note: 'Supersonic jet, Mach 1.15', color: '#9fb6d9', cruise: 140, boost: 390, pitch: 1.0, turn: 0.9, cam: 1.4, sound: { mul: 2.2, vol: 0.04 } },
+    { id: 'arrow', name: 'Arrow', note: 'Supersonic jet, Mach 1.15', color: '#9fb6d9', cruise: 140, boost: 390, pitch: 1.0, turn: 0.9, cam: 1.4, pax: 100, sound: { mul: 2.2, vol: 0.04 } },
     { id: 'comet', name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } },
     { id: 'dragon', name: 'Dragon', note: 'Breathes fire when boosting', color: '#3fa34d', cruise: 70, boost: 170, pitch: 2.0, turn: 1.8, cam: 1.15, sound: { mul: 0.5, vol: 0.04 } },
     { id: 'bee', name: 'Bee', note: 'Buzzy bumblebee', color: '#ffc23d', cruise: 50, boost: 120, pitch: 2.2, turn: 2.1, sound: { mul: 3.5, vol: 0.03 } },
@@ -434,7 +442,7 @@ function boot(hot){
     { id: 'coastguard', name: 'Coast Guard', note: 'Rescue helicopter, lands on lakes', color: '#e8432e', cruise: 55, boost: 120, pitch: 1.5, turn: 1.6, cam: 1.2, water: true, fixedGear: true, sound: { mul: 0.6, vol: 0.05 } },
     { id: 'racer', name: 'Racer', note: 'Gold air racer, very nimble', color: '#ffc23d', cruise: 120, boost: 280, pitch: 2.1, turn: 2.0, sound: { mul: 1.3, vol: 0.045 } },
     { id: 'ptero', name: 'Ptero', note: 'Pterodactyl dinosaur', color: '#c77a3a', cruise: 60, boost: 150, pitch: 1.7, turn: 1.7, cam: 1.2, sound: { mul: 0.45, vol: 0.03 } },
-    { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, sound: { mul: 0.9, vol: 0.05 } },
+    { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, pax: 40, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'hog', name: 'Hog', note: 'Tough jet, engines on its back', color: '#6b7a5a', cruise: 85, boost: 200, pitch: 1.4, turn: 1.3, cam: 1.15, sound: { mul: 1.9, vol: 0.04 } },
     { id: 'eagle', name: 'Eagle', note: 'Bald eagle, soars and dives', color: '#5a3a22', cruise: 70, boost: 180, pitch: 1.9, turn: 1.8, cam: 1.15, sound: { mul: 2.6, vol: 0.01 } },
     { id: 'pizza', name: 'Pizza', note: 'A flying slice of pizza', color: '#ffb347', cruise: 55, boost: 130, pitch: 1.8, turn: 1.7, fixedGear: true, sound: { mul: 1.7, vol: 0.035 } },
@@ -442,6 +450,13 @@ function boot(hot){
     { id: 'sleigh', name: 'Sleigh', note: 'Pulled by flying reindeer', color: '#c0392b', cruise: 55, boost: 140, pitch: 1.5, turn: 1.5, cam: 1.35, fixedGear: true, sound: { mul: 3.0, vol: 0.02 } },
     { id: 'gyro', name: 'Gyro', note: 'Autogyro with a big rotor', color: '#ffd23d', cruise: 50, boost: 115, pitch: 1.6, turn: 1.6, cam: 1.15, sound: { mul: 1.5, vol: 0.04 } },
     { id: 'bat', name: 'Bat', note: 'Night bat, very twisty', color: '#3a2e4a', cruise: 50, boost: 125, pitch: 2.2, turn: 2.1, sound: { mul: 3.2, vol: 0.008 } },
+    { id: 'octo', name: 'Octo', note: '8 engines, 300 passengers, Mach 1.15', color: '#7d8a96', cruise: 110, boost: 395, pitch: 1.0, turn: 0.9, cam: 1.6, pax: 300, sound: { mul: 1.7, vol: 0.05 } },
+    { id: 'starliner', name: 'Starliner', note: '8-engine airliner, Mach 1.2', color: '#2a6ccc', cruise: 120, boost: 410, pitch: 0.9, turn: 0.8, cam: 1.75, pax: 250, sound: { mul: 1.9, vol: 0.05 } },
+    { id: 'hydra', name: 'Hydra', note: '8-engine jet, Mach 1.25', color: '#3a2f5a', cruise: 130, boost: 430, pitch: 1.9, turn: 1.7, cam: 1.1, pax: 40, sound: { mul: 2.6, vol: 0.045 } },
+    { id: 'spider', name: 'Spider', note: '8 legs, 8 engines, Mach 1.15', color: '#1b1b1b', cruise: 100, boost: 395, pitch: 2.0, turn: 1.9, cam: 1.2, pax: 3, sound: { mul: 3.0, vol: 0.04 } },
+    { id: 'halo', name: 'Halo', note: 'Ring of 8 engines, Mach 1.2', color: '#5fe0d0', cruise: 115, boost: 410, pitch: 1.7, turn: 1.6, cam: 1.25, pax: 4, sound: { mul: 2.4, vol: 0.04 } },
+    { id: 'manta', name: 'Manta', note: '8-engine manta ray, Mach 1.2', color: '#2a6ccc', cruise: 120, boost: 415, pitch: 1.5, turn: 1.4, cam: 1.3, pax: 2, sound: { mul: 2.0, vol: 0.045 } },
+    { id: 'blaster', name: 'Blaster', note: 'Rocket with 8 boosters, Mach 1.3', color: '#e8432e', cruise: 130, boost: 445, pitch: 1.3, turn: 1.2, cam: 1.2, fixedGear: true, pax: 12, sound: { mul: 1.2, vol: 0.055 } },
     { id: 'whale', name: 'Whale', note: 'Flying whale, lands on lakes', color: '#3f6fa8', cruise: 45, boost: 110, pitch: 1.0, turn: 0.9, cam: 1.5, water: true, fixedGear: true, sound: { mul: 0.35, vol: 0.04 } }
   ];
   const planeRoot = new THREE.Group(), planeBody = new THREE.Group();
@@ -451,6 +466,8 @@ function boot(hot){
   const mat2 = hex => matCache2[hex] || (matCache2[hex] = lam(hex, { side: THREE.DoubleSide }));   // for flat paper-thin parts
   const glassMat = new THREE.MeshPhongMaterial({ color: 0x7fd3e8, emissive: 0x113344, shininess: 100, specular: 0xffffff });
   const wingMat = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, shininess: 100, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+  const bubbleMat = new THREE.MeshPhongMaterial({ color: 0xbfefff, transparent: true, opacity: 0.35, shininess: 120, specular: 0xffffff, depthWrite: false });
+  const SKIN = [0xf2c9a0, 0xc68a5a, 0x8a5a3a, 0xffdcb8];
   const darkGlass = new THREE.MeshPhongMaterial({ color: 0x223344, emissive: 0x050a10, shininess: 100, specular: 0xffffff });
   const silverMat = new THREE.MeshPhongMaterial({ color: 0xc9d2dc, specular: 0xffffff, shininess: 90 });
   const blurMat = new THREE.MeshBasicMaterial({ color: 0x2a2f45, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
@@ -492,6 +509,12 @@ function boot(hot){
       const o = new THREE.Mesh(geo, flameMat); o.rotation.x = forward ? -Math.PI / 2 : Math.PI / 2; o.position.set(x, y, z);
       o.userData.idle = idle || 0.35; root.add(o); fl.push(o);
     };
+    // a jet engine pointing backwards with its own flame
+    const jet = (x, y, z, r, len, c) => { tube(r * 0.85, r, len, c || GRAY, x, y, z); flame(x, y, z + len / 2, r * 0.8, 0.3); };
+    // a row of n passenger windows down each side, from z0 to z1
+    const windows = (x, y, z0, z1, n) => { for (let i = 0; i < n; i++) both((xx) => box(0.06, 0.2, 0.24, 0x9fdcff, xx, y, z0 + (z1 - z0) * i / (n - 1)), x); };
+    // passengers' heads (seen through glass)
+    const heads = list => list.forEach(([x, y, z], i) => ball(0.13, SKIN[i % 4], x, y, z));
     switch (def.id){
       case 'cub':
         box(1.15, 1.05, 4.0, RED, 0, 0, 0); box(1.25, 1.15, 0.7, CREAM, 0, 0, -2.2); box(0.72, 0.7, 1.5, RED, 0, 0.12, 2.6);
@@ -830,6 +853,90 @@ function boot(hot){
         both((x) => gearBox(0.08, 0.5, 0.08, x, -0.7, 0.4, B), 0.25);
         break;
       }
+      case 'octo': {   // big airliner with eight engines in four pairs under swept wings
+        const G = 0x7d8a96;
+        tube(0.8, 0.85, 9, G, 0, 0, 0); nose(0.8, 1.6, G, -5.3); box(0.9, 0.4, 1.0, darkGlass, 0, 0.6, -4.2);
+        windows(0.82, 0.15, -3.4, 3.4, 9);
+        both((x, sd) => box(5.6, 0.16, 2.2, G, x, 0.3, 0.6, 0, -0.42 * sd), 3.1);
+        [2.2, 4.4].forEach(px => [-0.32, 0.32].forEach(dx => both((x) => jet(x, -0.1, -0.5 + Math.abs(x) * 0.45, 0.27, 1.6), px + dx)));
+        box(0.16, 2.2, 1.8, G, 0, 1.4, 4.0, 0.35);
+        both((x, sd) => box(2.2, 0.12, 1.0, G, x, 0.3, 4.2, 0, -0.4 * sd), 1.2);
+        gearBox(0.3, 0.5, 0.3, 0, -0.75, -3.0); wheel(0.7, 0.8); wheel(-0.7, 0.8);
+        break;
+      }
+      case 'starliner': {   // supersonic airliner: delta wings with four engines under each
+        const Bl = 0x2a6ccc;
+        tube(0.9, 0.95, 11, WHITE, 0, 0, 0); nose(0.9, 2.4, WHITE, -6.7); box(1.0, 0.35, 0.9, darkGlass, 0, 0.55, -5.3);
+        both((x) => box(0.06, 0.14, 10.4, Bl, x, -0.25, 0), 0.9);
+        windows(0.92, 0.2, -4.4, 4.0, 11);
+        tris([[-0.8, -0.2, -3.0], [-6.2, -0.2, 3.6], [-0.8, -0.2, 4.6], [0.8, -0.2, -3.0], [6.2, -0.2, 3.6], [0.8, -0.2, 4.6]], WHITE);
+        [1.6, 2.6, 3.6, 4.6].forEach(px => both((x) => jet(x, -0.55, 3.4, 0.3, 2.0), px));
+        tris([[0, 0.8, 2.6], [0, 3.4, 5.4], [0, 0.8, 5.5]], Bl);
+        gearBox(0.3, 0.5, 0.3, 0, -0.75, -4.0); wheel(1.2, 1.0); wheel(-1.2, 1.0);
+        break;
+      }
+      case 'hydra': {   // fast jet with eight engines in a block at the back
+        const P = 0x3a2f5a, Gd = 0xffc23d;
+        box(1.6, 0.95, 6.0, P, 0, 0, 0); nose(0.6, 2.0, P, -4.0); box(0.62, 0.5, 1.4, glassMat, 0, 0.65, -2.4);
+        windows(0.81, 0.15, -1.4, 1.6, 5);
+        both((x) => box(0.05, 0.1, 6.0, Gd, x, -0.25, 0), 0.81);
+        both((x, sd) => box(4.2, 0.12, 2.6, P, x, -0.05, 0.9, 0, -0.55 * sd), 2.3);
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) jet((i - 1.5) * 0.4, (j - 0.5) * 0.45, 3.3, 0.18, 0.6, DARK);
+        both((x, sd) => box(0.12, 1.4, 1.3, P, x, 0.95, 2.3, 0.45, 0, -0.25 * sd), 0.6);
+        both((x, sd) => box(1.6, 0.1, 0.8, P, x, 0.1, 2.6, 0, -0.4 * sd), 1.1);
+        gearBox(0.2, 0.6, 0.2, 0, -0.7, -2.0); wheel(0.8, 1.0); wheel(-0.8, 1.0);
+        break;
+      }
+      case 'spider': {   // a big black spider: passengers ride in its glass head, a jet on each of its 8 legs
+        const K = 0x1b1b1b;
+        ball(1.0, K, 0, 0.3, 0.9, 1, 0.85, 1.3); ball(0.35, RED, 0, 1.05, 1.0, 1, 0.3, 1.2);
+        ball(0.8, bubbleMat, 0, 0.2, -0.9); heads([[-0.25, 0.15, -0.9], [0.25, 0.15, -0.9], [0, 0.2, -0.5]]);
+        [[-0.2, 0.15], [0.2, 0.15], [-0.4, 0], [0.4, 0]].forEach(([x, y]) => ball(0.07, RED, x, 0.35 + y, -1.62));
+        for (let k = 0; k < 4; k++) both((x, sd) => {
+          const z = -0.9 + k * 0.65;
+          box(2.0, 0.14, 0.14, K, x, 0.55, z, 0, 0, 0.35 * sd);
+          jet(sd * 2.45, 0.9, z, 0.2, 1.0, RED);
+          if (k === 0 || k === 3) gearBox(0.1, 1.9, 0.1, sd * 2.45, -0.05, z, K);
+        }, 1.4);
+        break;
+      }
+      case 'halo': {   // a flat ring with eight engines round it and a glass cabin in the middle
+        const T = 0x5fe0d0;
+        const ring = add(new THREE.TorusGeometry(3.0, 0.32, 10, 44), T, 0, 0, 0.3); ring.rotation.x = Math.PI / 2;
+        tube(0.6, 0.7, 4.6, WHITE, 0, 0, 0.2); nose(0.6, 1.4, WHITE, -2.8);
+        ball(0.7, bubbleMat, 0, 0.5, -0.6, 1, 0.8, 1.8); heads([[-0.22, 0.75, -1.2], [0.22, 0.75, -1.2], [-0.22, 0.75, -0.3], [0.22, 0.75, -0.3]]);
+        for (let k = 0; k < 4; k++){ const a = k * Math.PI / 2 + Math.PI / 4; box(2.4, 0.1, 0.5, T, Math.cos(a) * 1.75, 0, 0.3 + Math.sin(a) * 1.75, 0, -a, 0); }
+        for (let k = 0; k < 8; k++){ const a = k * Math.PI / 4 + Math.PI / 8; jet(Math.cos(a) * 3.0, 0.1, 0.3 + Math.sin(a) * 3.0, 0.26, 1.2); }
+        box(0.1, 0.9, 0.8, T, 0, 0.6, 2.4);
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -1.6); wheel(1.5, 1.2); wheel(-1.5, 1.2);
+        break;
+      }
+      case 'manta': {   // a manta ray flying wing with eight engines along its back
+        const B = 0x2a6ccc;
+        tris([[0, 0.15, -3.0], [-6.0, 0, 1.4], [0, 0.15, 2.2], [0, 0.15, -3.0], [6.0, 0, 1.4], [0, 0.15, 2.2]], B);
+        tris([[0, -0.1, -3.0], [-5.6, -0.05, 1.3], [0, -0.1, 2.0], [0, -0.1, -3.0], [5.6, -0.05, 1.3], [0, -0.1, 2.0]], 0xe9eef5);
+        ball(1.0, B, 0, 0, -0.2, 1.1, 0.45, 2.4);
+        both((x) => box(0.3, 0.12, 1.1, B, x, 0, -3.1), 0.65);
+        both((x) => ball(0.1, 0x111111, x, 0.3, -2.4), 0.55);
+        ball(0.5, bubbleMat, 0, 0.4, -1.2, 1, 0.6, 1.4); heads([[-0.15, 0.55, -1.3], [0.15, 0.55, -1.0]]);
+        [0.7, 1.6, 2.5, 3.4].forEach(px => both((x) => jet(x, 0.35, 1.7 - Math.abs(x) * 0.13, 0.2, 1.0, DARK), px));
+        tube(0.03, 0.12, 3.2, B, 0, 0, 3.8);
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -1.5); wheel(1.0, 0.8); wheel(-1.0, 0.8);
+        break;
+      }
+      case 'blaster': {   // a rocket ship with eight booster rockets strapped round it
+        tube(0.8, 0.8, 6, RED, 0, 0.2, 0); nose(0.8, 2.0, WHITE, -4.0, 0.2);
+        windows(0.76, 0.5, -2.2, 1.6, 4);
+        ball(0.5, bubbleMat, 0, 0.95, -1.8, 1, 0.7, 1.3); heads([[0, 1.1, -1.8]]);
+        for (let k = 0; k < 8; k++){
+          const a = k * Math.PI / 4 + Math.PI / 8, bx = Math.cos(a) * 1.0, by = 0.2 + Math.sin(a) * 1.0;
+          tube(0.26, 0.26, 3.6, WHITE, bx, by, 1.0);
+          const c = add(new THREE.ConeGeometry(0.26, 0.7, 10), RED, bx, by, -1.15); c.rotation.x = -Math.PI / 2;
+          flame(bx, by, 2.8, 0.22, 0.4);
+        }
+        both((x) => box(1.4, 0.1, 1.2, RED, x, 0.2, 2.4), 1.5); box(0.1, 1.4, 1.2, RED, 0, 1.4, 2.4);
+        break;
+      }
       case 'whale': {   // a big blue whale with a water spout
         const Bl = 0x3f6fa8;
         ball(1.3, Bl, 0, 0, 0, 1.0, 0.9, 3.0); ball(1.2, 0xd8e6f0, 0, -0.35, -0.3, 0.9, 0.6, 2.6);
@@ -1045,7 +1152,7 @@ function boot(hot){
     const ang = F.yaw + rnd(-1.4, 1.4), d = anywhere ? rnd(300, 2600) : rnd(2000, 3200);
     a.x = F.x - Math.sin(ang) * d; a.z = F.z - Math.cos(ang) * d;
     a.alt = rnd(110, 650); a.y = Math.max(groundAt(a.x, a.z), 0) + a.alt;
-    a.yaw = rnd(0, Math.PI * 2); a.pitch = 0; a.roll = 0; a.speed = a.def.cruise; a.byT = 0; a.gen = (a.gen || 0) + 1;
+    a.yaw = rnd(0, Math.PI * 2); a.pitch = 0; a.roll = 0; a.speed = a.def.cruise; a.byT = 0; a.gen = (a.gen || 0) + 1; a.angryT = 0;
     aiWaypoint(a);
   }
   function updateAI(dt, live){
@@ -1053,14 +1160,24 @@ function boot(hot){
     for (const a of aiPlanes){
       if (!a.def) aiSpawn(a, true);
       if (Math.hypot(a.x - F.x, a.z - F.z) > AI_FAR) aiSpawn(a, false);
-      if (Math.hypot(a.wx - a.x, a.wz - a.z) < 300) aiWaypoint(a);
+      // a plane you shot at (or its wingmen) chases you and fires back for a while
+      if (a.angryT > 0){
+        a.angryT -= dt; a.wx = F.x; a.wz = F.z;
+        a.speed = Math.max(a.def.cruise, Math.min(a.def.boost * 0.7, F.speed));
+        a.shotT -= dt;
+        if (live && a.shotT <= 0){
+          if (planeRoot.visible && F.crashT <= 0 && Math.hypot(a.x - F.x, a.y - F.y, a.z - F.z) < 2500){ fireEnemy(a); a.shotT = rnd(4, 6); }
+          else a.shotT = 1;
+        }
+        if (a.angryT <= 0){ a.speed = a.def.cruise; aiWaypoint(a); }
+      } else if (Math.hypot(a.wx - a.x, a.wz - a.z) < 300) aiWaypoint(a);
       // bank towards the waypoint; a banked plane turns
       const e = wrapA(Math.atan2(a.x - a.wx, a.z - a.wz) - a.yaw);
       a.roll += (clamp(e * 1.5, -0.7, 0.7) - a.roll) * Math.min(1, dt * 2);
       a.yaw += a.roll * a.def.turn * 0.8 * dt;
       // keep a safe height over the ground ahead
       const ahead = d => Math.max(groundAt(a.x - Math.sin(a.yaw) * d, a.z - Math.cos(a.yaw) * d), 0);
-      const g = Math.max(groundAt(a.x, a.z), 0), want = Math.max(g + a.alt, ahead(400) + 120, ahead(900) + 120);
+      const g = Math.max(groundAt(a.x, a.z), 0), want = Math.max(a.angryT > 0 ? Math.max(F.y, g + 60) : g + a.alt, ahead(400) + 120, ahead(900) + 120);
       a.pitch += (clamp((want - a.y) * 0.01, -0.25, 0.3) - a.pitch) * Math.min(1, dt * 2);
       const cp = Math.cos(a.pitch);
       a.x -= Math.sin(a.yaw) * cp * a.speed * dt; a.z -= Math.cos(a.yaw) * cp * a.speed * dt;
@@ -1081,18 +1198,20 @@ function boot(hot){
   // floats down on a parachute and a new plane turns up somewhere else.
   const MSL_LIFE = 9, LOCK_RANGE = 3600, LOCK_COS = Math.cos(0.4), HIT_R = 11;
   const NEG_Z = new THREE.Vector3(0, 0, -1), mslAim = new THREE.Vector3();
-  const missiles = [], booms = [], chutes = [];
-  let fireT = 0, shots = 0, lockOn = null;
-  for (let i = 0; i < 10; i++){
+  const missiles = [], enemyMsl = [], booms = [], chutes = [];
+  let fireT = 0, shots = 0, lockOn = null, warnT = 0;
+  function makeMissile(bodyC, tipC){
     const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.6, 10), mat(WHITE)); body.rotation.x = Math.PI / 2;
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 10), mat(RED)); tip.rotation.x = -Math.PI / 2; tip.position.z = -1.6;
-    const fins = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.4), mat(RED)); fins.position.z = 1.1;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.6, 10), mat(bodyC)); body.rotation.x = Math.PI / 2;
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.6, 10), mat(tipC)); tip.rotation.x = -Math.PI / 2; tip.position.z = -1.6;
+    const fins = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.4), mat(tipC)); fins.position.z = 1.1;
     const fins2 = fins.clone(); fins2.rotation.z = Math.PI / 2;
     const fire = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.6, 8), flameMat); fire.rotation.x = Math.PI / 2; fire.position.z = 2.1;
     g.add(body, tip, fins, fins2, fire); g.scale.setScalar(PLANE_SCALE); g.visible = false; scene.add(g);
-    missiles.push({ g, fire, pos: new THREE.Vector3(), dir: new THREE.Vector3(), prev: new THREE.Vector3(), speed: 0, cap: 0, life: 0, target: null, gen: 0, puffT: 0 });
+    return { g, fire, pos: new THREE.Vector3(), dir: new THREE.Vector3(), prev: new THREE.Vector3(), speed: 0, cap: 0, life: 0, target: null, gen: 0, puffT: 0 };
   }
+  for (let i = 0; i < 10; i++) missiles.push(makeMissile(WHITE, RED));
+  for (let i = 0; i < 8; i++) enemyMsl.push(makeMissile(DARK, 0xffc23d));
   // fireballs
   for (let i = 0; i < 6; i++){
     const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -1100,7 +1219,7 @@ function boot(hot){
   }
   // smoke puffs (missile trails and explosions) share one instanced mesh
   const PUFFS = 300, puffs = [], puffObj = new THREE.Object3D(), puffCol = new THREE.Color();
-  const puffMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), PUFFS);
+  const puffMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x606060, transparent: true, opacity: 0.7, depthWrite: false }), PUFFS);
   puffMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); puffMesh.frustumCulled = false; scene.add(puffMesh);
   puffObj.scale.setScalar(0); puffObj.updateMatrix();
   for (let i = 0; i < PUFFS; i++){ puffs.push({ x: 0, y: 0, z: 0, life: 0, max: 1, size: 1 }); puffMesh.setMatrixAt(i, puffObj.matrix); puffMesh.setColorAt(i, puffCol.setHex(0xffffff)); }
@@ -1168,6 +1287,35 @@ function boot(hot){
     m.target = lockOn; m.gen = lockOn ? lockOn.gen : 0;
     m.g.visible = true; fireT = 0.35;
     sfx.missile();
+    provoke(lockOn);
+  }
+  // shooting at a plane makes it fire straight back, and its two nearest wingmen come after you too
+  function provoke(a){
+    if (!a) return;
+    const near = aiPlanes.filter(p => p.def && p !== a && !(p.angryT > 0))
+      .sort((p, q) => Math.hypot(p.x - a.x, p.z - a.z) - Math.hypot(q.x - a.x, q.z - a.z)).slice(0, 2);
+    if (!(a.angryT > 0)) a.shotT = 0.4;
+    a.angryT = 30;
+    near.forEach(p => { p.angryT = 30; p.shotT = rnd(2, 4); });
+  }
+  function calmAI(){
+    aiPlanes.forEach(a => { if (a.angryT > 0){ a.angryT = 0; a.speed = a.def.cruise; aiWaypoint(a); } });
+    enemyMsl.forEach(m => { m.life = 0; m.g.visible = false; });
+  }
+  function clearMissiles(){ calmAI(); missiles.forEach(m => { m.life = 0; m.g.visible = false; }); }
+  function fireEnemy(a){
+    const m = enemyMsl.find(m => m.life <= 0);
+    if (!m) return;
+    const cp = Math.cos(a.pitch);
+    m.dir.set(-Math.sin(a.yaw) * cp, Math.sin(a.pitch), -Math.cos(a.yaw) * cp);
+    m.pos.set(a.x, a.y - 2, a.z).addScaledVector(m.dir, 6); m.prev.copy(m.pos);
+    m.speed = a.speed + 40; m.cap = 250; m.life = 6.5; m.puffT = 0;
+    m.g.visible = true;
+    if (!enemyMsl.some(o => o !== m && o.life > 0)){
+      toast('Missile coming! Turn hard or boost!', 'warn');
+      announce('Missile warning! Please stay in your seats.');
+    }
+    sfx.missile();
   }
   // shortest distance from point (px,py,pz) to the segment a-b
   function segDist(a, b, px, py, pz){
@@ -1211,6 +1359,28 @@ function boot(hot){
       m.g.position.copy(m.pos); m.g.quaternion.setFromUnitVectors(NEG_Z, m.dir);
       m.fire.scale.y = 0.8 + Math.random() * 0.5;
     }
+    // missiles fired back at you: they chase you (less nimbly than yours) for a few seconds
+    let incoming = 0;
+    for (const m of enemyMsl){
+      if (m.life <= 0) continue;
+      m.life -= dt; m.speed = Math.min(m.cap, m.speed + 120 * dt); incoming++;
+      if (planeRoot.visible && F.crashT <= 0){
+        mslAim.set(F.x - m.pos.x, F.y - m.pos.y, F.z - m.pos.z).normalize();
+        m.dir.lerp(mslAim, Math.min(1, dt * 1.8)).normalize();
+      }
+      m.prev.copy(m.pos); m.pos.addScaledVector(m.dir, m.speed * dt);
+      let gone = false;
+      if (planeRoot.visible && F.crashT <= 0 && segDist(m.prev, m.pos, F.x, F.y, F.z) < 6){
+        explode(F.x, F.y, F.z, true); crashFree(false, 'Hit by a missile!'); gone = true;
+      } else if (m.pos.y < Math.max(groundAt(m.pos.x, m.pos.z), 0) + 0.5 || m.life <= 0){ explode(m.pos.x, m.pos.y, m.pos.z, false); gone = true; }
+      if (gone){ m.life = 0; m.g.visible = false; continue; }
+      m.puffT -= dt;
+      if (m.puffT <= 0){ m.puffT = 0.03; puff(m.pos.x - m.dir.x * 3, m.pos.y - m.dir.y * 3, m.pos.z - m.dir.z * 3, 0.9, 1.4, 0xb8b4ae); }
+      m.g.position.copy(m.pos); m.g.quaternion.setFromUnitVectors(NEG_Z, m.dir);
+      m.fire.scale.y = 0.8 + Math.random() * 0.5;
+    }
+    F.incoming = live && incoming > 0;
+    if (F.incoming && (warnT -= dt) <= 0){ warnT = 0.45; sfx.warn(); }
     for (const b of booms){
       if (b.t <= 0) continue;
       b.t -= dt * 1.5;
@@ -1431,16 +1601,37 @@ function boot(hot){
     el.textContent = text; el.className = 'show' + (cls ? ' ' + cls : '');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.className = '', 1150);
   }
+  // the captain talks to the passengers (planes that carry them): a chime, a caption and,
+  // with sound on, a spoken voice
+  let annTimer = 0;
+  function announce(text){
+    if (!plane.pax || state !== 'play') return;
+    const el = $('announce');
+    sfx.chime();
+    el.innerHTML = '<b>Captain:</b> '; el.append(text); el.hidden = false;
+    clearTimeout(annTimer); annTimer = setTimeout(() => el.hidden = true, 6000);
+    if (sfx.muted || !window.speechSynthesis) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; u.pitch = 0.9;
+      setTimeout(() => speechSynthesis.speak(u), 800);
+    } catch (e){}
+  }
+  function hushAnnounce(){
+    $('announce').hidden = true; clearTimeout(annTimer);
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e){}
+  }
   const txt = (el, v) => { if (el._v !== v){ el._v = v; el.textContent = v; } };
   const H = { score: $('score'), coins: $('coins'), mult: $('mult'), alt: $('alt'), spd: $('spd'), mach: $('mach'), machChip: $('machChip'), powers: $('powers'),
     hdg: $('hdg'), home: $('home'), homeArrow: $('homeArrow'), apName: $('apName'), land: $('btn-land'), gearBtn: $('btn-gear'), flipBtn: $('btn-flip'), prompt: $('prompt'),
-    apChip: $('apChip'), guide: $('guide'), guideArrow: $('guideArrow'), guideText: $('guideText') };
+    apChip: $('apChip'), paxChip: $('paxChip'), pax: $('pax'), guide: $('guide'), guideArrow: $('guideArrow'), guideText: $('guideText') };
   let powKey = '';
   function updatePowers(force){
     const parts = [];
     if (boostT > 0) parts.push('<span class="chip power boost">BOOST<b>' + Math.ceil(boostT) + 's</b></span>');
     if (state === 'play' && !F.gear) parts.push('<span class="chip power">GEAR UP</span>');
     if (state === 'play' && F.flipped) parts.push('<span class="chip power boost">UPSIDE DOWN</span>');
+    if (state === 'play' && F.incoming) parts.push('<span class="chip power warn">MISSILE!</span>');
     const k = parts.join('');
     if (force || k !== powKey){ powKey = k; H.powers.innerHTML = k; }
   }
@@ -1783,6 +1974,7 @@ function boot(hot){
     if (F.auto){ toast('Auto-land is flying', 'info'); return; }
     F.flipped = !F.flipped; sfx.ap(F.flipped);
     toast(F.flipped ? 'Upside down!' : 'Right way up', '');
+    if (F.flipped) announce('We are now flying upside down. Please hold on to your hats!');
   }
   function toggleAutoLand(){
     if (state !== 'play' || F.crashT > 0) return;
@@ -1834,10 +2026,10 @@ function boot(hot){
   function demoInput(){ return { ax: 0.18, ay: vUp.y < 0.5 ? 0 : pitchToward(Math.max(groundAt(F.x, F.z), terrainAhead()) + 140) }; }
   function startFree(){
     sfx.init(); sfx.resume();
-    clearFreeItems();
+    clearFreeItems(); clearMissiles(); hushAnnounce();
     chain = 0; mult = 1; lastCoinT = -9;   // coins, score and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0 });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0, annCruise: false, annDesc: null, incoming: false });
     setLevel(0, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -1849,7 +2041,7 @@ function boot(hot){
   }
   function goMenu(){
     if (state === 'play' || state === 'paused') saveProgress();
-    clearFreeItems(); $('prompt').hidden = true; sfx.engine(false, 0);
+    clearFreeItems(); clearMissiles(); hushAnnounce(); $('prompt').hidden = true; sfx.engine(false, 0);
     Object.assign(F, { auto: false, autoFinal: false, crashT: 0, boostHeld: false, ground: false, pitch: 0, speed: 65, gear: true, gearT: 1, flipped: false });
     showGear(1);
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 150);
@@ -1859,6 +2051,7 @@ function boot(hot){
   }
   function crashFree(inWater, msg){
     F.crashT = 1.6; F.auto = false; F.flipped = false; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
+    calmAI();
     if (inWater){ sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); }
     else { sfx.hit(); burst(F.x, F.y, F.z, 0xb7a998, 18, 1.4); }
     toast(msg || (inWater ? 'Splash!' : 'Crash!'), 'warn');
@@ -1891,6 +2084,7 @@ function boot(hot){
     if (live && !F.supersonic && F.speed >= MACH1 && !F.ground){
       F.supersonic = true; F.vaporT = 1; sfx.boom(); shake = REDUCED ? 0.2 : 0.8;
       toast('SONIC BOOM! Mach 1', ''); score += 100;
+      announce('We just broke the sound barrier! Hold on to your drinks!');
     }
     if (F.speed < MACH1 - 15) F.supersonic = false;
 
@@ -1909,7 +2103,8 @@ function boot(hot){
       F.y = restAt(F.x, F.z);
       const leaving = !onAirfield(F.x, F.z) && !onWater(F.x, F.z);
       const fieldEnd = (l => l && Math.abs(l.u) > AP_HALF_L - 45)(airfieldAt(F.x, F.z));
-      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; toast('Airborne!', ''); }
+      if (F.speed >= VR && !F.autoBrake && (ay > 0.3 || leaving || fieldEnd)){ F.ground = false; setLevel(F.yaw, 0.22); F.liftT = t; F.annCruise = false; F.annDesc = null; toast('Airborne!', '');
+        if (live) announce('Welcome aboard the ' + plane.name + ', with ' + plane.pax + (plane.pax === 1 ? ' passenger. ' : ' passengers. ') + (F.dest ? 'We are flying to ' + F.dest.name + '. ' : '') + 'Please keep your seatbelts fastened.'); }
       else if (g < 0.5 && !plane.water) crashFree(true);
     } else {
       // up/down pitches around the wings with no limit, so holding up flies a full loop
@@ -1929,7 +2124,7 @@ function boot(hot){
       Q.normalize(); readAxes();
       if (live && pulling){
         F.loopAcc += ay * plane.pitch * dt;
-        if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); }
+        if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); if (live) announce('The passengers loved that loop. Wheee!'); }
       } else F.loopAcc *= Math.max(0, 1 - dt * 2);
       const cruise = (boosting ? plane.boost : plane.cruise) * (1 - 0.08 * F.gearT);   // the gear down slows you a little
       F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8);
@@ -1941,6 +2136,7 @@ function boot(hot){
       if (ms && F.y > ms[0]){ F.milestone++; if (live) toast(ms[1], ''); }
       if (F.milestone > 0 && F.y < MILESTONES[F.milestone - 1][0] * 0.9) F.milestone--;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
+      if (live && !F.annCruise && F.y - top > 700){ F.annCruise = true; announce('We have reached cruising height. Sit back and enjoy the view!'); }
       const water = onWater(F.x, F.z);
       const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
       if (touching && !water && F.gearT < 0.9 && hasGear()) crashFree(false, 'Belly landing! The gear was up');
@@ -1949,13 +2145,16 @@ function boot(hot){
         if (t - F.lastLand > 5){
           const field = airfieldAt(F.x, F.z);
           const isNew = field && !F.visited.has(field.a.key), arrived = field && field.a === F.dest;
-          const pts = (isNew ? 400 : 100) + (arrived ? 200 : 0);
+          // passengers on board: a bonus for getting them there, and a round of applause
+          const paxPts = plane.pax && field ? Math.max(10, Math.round(plane.pax / 5)) : 0;
+          const pts = (isNew ? 400 : 100) + (arrived ? 200 : 0) + paxPts;
           score += pts;
           if (field) F.visited.add(field.a.key);
           if (arrived){ F.dest = null; toast('You made it to ' + field.a.name + '! +' + pts, ''); }
           else if (isNew) toast('Welcome to ' + field.a.name + '! +' + pts, '');
           else toast(field ? 'Landed at ' + field.a.name + '! +' + pts : 'Splashdown! +' + pts, '');
           sfx.land();
+          if (paxPts && live){ sfx.applause(); announce('Welcome to ' + field.a.name + '! Thank you for flying with us. Passengers delivered: +' + paxPts); }
           burst(F.x, F.y - PLANE_SCALE + 0.2, F.z, water ? 0xe6f4ff : 0xf4f1ea, 10, 0.7);
         }
         F.lastLand = t;
@@ -2096,6 +2295,11 @@ function boot(hot){
     txt(H.home, (apDist / 1000).toFixed(1));
     H.homeArrow.style.transform = 'rotate(' + turn + 'rad)';
     H.apChip.classList.toggle('dest', ap === F.dest);
+    H.paxChip.hidden = !plane.pax;
+    if (plane.pax) txt(H.pax, String(plane.pax));
+    if (!F.ground && apDist < 2500 && F.y - Math.max(groundAt(F.x, F.z), 0) < 450 && t - F.liftT > 30 && F.annDesc !== ap.key){
+      F.annDesc = ap.key; announce('We are starting our descent into ' + ap.name + '. Cabin crew, please prepare for landing.');
+    }
     // a big arrow towards the chosen destination while you fly there yourself
     const guiding = !!F.dest && !F.ground && F.crashT <= 0;
     H.guide.hidden = !guiding;
