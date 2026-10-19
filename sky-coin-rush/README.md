@@ -26,7 +26,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **48 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **55 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -81,12 +81,19 @@ turns):
 | **Gyro** | autogyro with a big spinning rotor and a propeller behind | 97 / 224 kt | medium |
 | **Bat** | night bat with pointy ears and fangs | 97 / 243 kt | very quick |
 | **Whale** | big blue flying whale with a water spout: **lands on lakes** | 87 / 214 kt | slow to turn |
+| **Octo** | big airliner, 8 engines in four pairs, 300 passengers, **breaks Mach 1** | 214 / 768 kt | slow to turn |
+| **Starliner** | delta-wing airliner, 8 engines, 250 passengers, **breaks Mach 1** | 233 / 797 kt | slowest to turn |
+| **Hydra** | purple jet with a block of 8 engines at the back, 40 passengers, **breaks Mach 1** | 253 / 836 kt | quick |
+| **Spider** | black spider with a jet on each of its 8 legs and passengers in its glass head, **breaks Mach 1** | 194 / 768 kt | very quick |
+| **Halo** | flat ring with 8 engines round it and a glass cabin, **breaks Mach 1** | 224 / 797 kt | quick |
+| **Manta** | manta ray flying wing with 8 engines on its back, **breaks Mach 1** | 233 / 807 kt | medium |
+| **Blaster** | rocket ship with 8 booster rockets, **breaks Mach 1** | 253 / 865 kt | medium |
 
 **Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale) can land on and take off from any
-lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro) go
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro and the seven 8-engine planes) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
-white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh and the floats/hulls of the lake planes don't fold up.
+white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh, Blaster and the floats/hulls of the lake planes don't fold up.
 
 ## Flying
 
@@ -125,6 +132,12 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
 - **Other planes:** 59 computer-flown planes from the plane list cruise around you, flying
   between airports and over the hills at a safe height. Fly within about 45 m of one for a
   **close fly-by** (+25). They can't crash into you.
+- **Passengers and announcements.** The 8-engine planes, Jumbo, Arrow and Bus carry
+  passengers (a PAX chip shows how many). The captain makes announcements with a ding-dong,
+  a caption above the buttons and (with sound on) a spoken voice: welcome aboard at takeoff,
+  reaching cruising height, breaking the sound barrier, loops, flying upside down, missile
+  warnings and the descent into an airport. Land at an airport and the passengers clap,
+  with a bonus of one point for every 5 passengers.
 - **Missiles:** press **S** (or tap FIRE) to fire a missile from under a wing. A red
   ring marks its target: the other plane nearest the middle of your view, or if none is
   in front of you, the closest one (even behind you: the missile turns round). The
@@ -132,6 +145,11 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   a parachute, and a new plane turns up somewhere else. If its plane is shot down first,
   the missile goes after another one. Missiles leave a smoke trail and explode if they
   hit the ground.
+- **They fire back** (only once you've shot at them): the plane you fire at shoots a
+  missile straight back, and its two nearest wingmen chase you and fire every few seconds
+  for 30 seconds. Their dark missiles with yellow tips chase you less nimbly than yours:
+  a MISSILE! warning flashes and beeps, so turn hard or boost to get away. Getting hit
+  counts as a crash (you're put back in the air) and everyone calms down again.
 - **Crashing** into a hill or the water doesn't end anything: after a moment the plane is
   put back in the air 220 m above the spot.
 - Pause and press **End flight** to go back to the start card, where the plane keeps
