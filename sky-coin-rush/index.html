@@ -1618,18 +1618,31 @@ function boot(hot){
     clearTimeout(annTimer); annTimer = setTimeout(() => el.hidden = true, 6000);
     if (sfx.muted || !window.speechSynthesis) return;
     try {
+      // only ever an English voice (the device's default one may speak another language)
+      const v = britishVoice();
+      if (!v) return;
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text); u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 0.95;
-      const v = britishVoice(); if (v) u.voice = v;
+      const u = new SpeechSynthesisUtterance(text.replace(/\+(\d+)/g, '$1 bonus points'));
+      u.voice = v; u.lang = v.lang; u.rate = 0.95; u.pitch = 0.95;
       setTimeout(() => speechSynthesis.speak(u), 800);
     } catch (e){}
   }
-  // a clear British voice: a known good UK voice if the device has one, else any en-GB voice
+  // the device's voices load in the background, so keep the list up to date
+  let voices = [];
+  function loadVoices(){ try { voices = speechSynthesis.getVoices() || []; } catch (e){} }
+  if (window.speechSynthesis){
+    loadVoices();
+    if (speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    else speechSynthesis.onvoiceschanged = loadVoices;
+  }
+  // a clear British voice: a known good UK voice if the device has one, else any en-GB
+  // voice, else any English voice; null if the device has no English voice at all
   function britishVoice(){
-    const vs = speechSynthesis.getVoices().filter(v => /^en[-_]GB/i.test(v.lang));
+    if (!voices.length) loadVoices();
+    const gb = voices.filter(v => /^en[-_]GB/i.test(v.lang));
     const pref = ['Google UK English Male', 'Daniel', 'Arthur', 'Microsoft Ryan', 'Microsoft George', 'Google UK English Female', 'Serena', 'Kate', 'Microsoft Sonia', 'Microsoft Libby', 'Microsoft Hazel'];
-    for (const n of pref){ const v = vs.find(v => v.name.startsWith(n)); if (v) return v; }
-    return vs[0] || null;
+    for (const n of pref){ const v = gb.find(v => v.name.startsWith(n)); if (v) return v; }
+    return gb[0] || voices.find(v => /^en[-_]/i.test(v.lang)) || null;
   }
   function hushAnnounce(){
     $('announce').hidden = true; clearTimeout(annTimer);
