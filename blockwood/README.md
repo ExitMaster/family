@@ -14,6 +14,7 @@ build on it, fly over it. The world saves in the browser.
 | Jump / swim | `SPACE` |
 | Fly | `F` or double-tap `SPACE`; `SPACE` rises, `SHIFT` sinks |
 | Break | left click (hold to keep digging); also hits animals and lights TNT |
+| Kill | `K` instantly kills the animal or monster you look at (or the nearest one) |
 | Place | right click |
 | Copy block | middle click puts the targeted block in your hand |
 | Backpack & crafting | `E` (touch: Bag button) |
@@ -33,6 +34,7 @@ build on it, fly over it. The world saves in the browser.
   and TNT hurt you; food slowly drains and full food heals you. Blocks take time to dig and
   go into your backpack; stone needs a pickaxe, iron ore a stone pickaxe. Zombies come out at
   night and in dark caves and burn in daylight. If you die you respawn with your backpack.
+  You always carry 100,000 cobblestone: it tops itself back up no matter how much you use.
 - **Crafting** in the backpack: planks, sticks, torches, wooden/stone/iron pickaxes and swords,
   iron ingots (raw iron + coal), beds, cooked porkchops, steak, chicken and fish, glass, stone, stone bricks, bricks and TNT.
 - **Torches** light up caves and the night with a warm glow.

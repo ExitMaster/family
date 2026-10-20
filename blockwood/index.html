@@ -243,6 +243,7 @@ select{
       <dt>Villagers</dt><dd>Right click a villager to trade for emeralds (Survival)</dd>
       <dt>Airplane</dt><dd>Place it, right click to get in. <kbd>W</kbd>/<kbd>S</kbd> speed up and slow down, arrow keys steer (<kbd>↑</kbd> climb, <kbd>↓</kbd> dive, <kbd>←</kbd><kbd>→</kbd> turn), <kbd>Shift</kbd> to get out</dd>
       <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
+      <dt>Kill</dt><dd><kbd>K</kbd> instantly kills the animal or monster you look at (or the nearest one)</dd>
       <dt>Sound</dt><dd><kbd>M</kbd> mutes</dd>
       <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
     </dl>
@@ -992,6 +993,7 @@ function toast(msg, ms = 1300) {
   toastEl.textContent = msg; toastEl.classList.add('on');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('on'), ms);
 }
+const fmtN = n => n >= 10000 ? Math.floor(n / 1000) + 'k' : n;
 function renderHotbar() {
   hotbarEl.textContent = '';
   for (let i = 0; i < 9; i++) {
@@ -1000,7 +1002,7 @@ function renderHotbar() {
     sl.setAttribute('aria-label', `Slot ${i + 1}: ${it ? nameOf(it.id) + (mode === 's' ? ' ×' + it.n : '') : 'empty'}`);
     if (it) {
       const img = document.createElement('img'); img.src = iconURL(it.id); img.alt = ''; sl.append(img);
-      if (mode === 's' && it.n > 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = it.n; sl.append(c); }
+      if (mode === 's' && it.n > 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = fmtN(it.n); sl.append(c); }
     }
     const n = document.createElement('span'); n.textContent = i + 1; sl.append(n);
     sl.addEventListener('pointerdown', e => { e.stopPropagation(); selectSlot(i); });
@@ -1187,6 +1189,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyF') toggleFly();
   if (e.code === 'KeyM') toggleSound();
   if (e.code === 'KeyE') openInv();
+  if (e.code === 'KeyK') killKey();
   if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code[5] - 1);
   if (e.code === 'Escape' && !locked) pause();
 });
@@ -1474,6 +1477,17 @@ function killMob(m) {
   removeMob(i);
   if (mode === 's' && KINDS[m.kind].drop) KINDS[m.kind].drop();
 }
+// K: instantly kill the creature you're looking at, or else the nearest one close by
+function killKey() {
+  if (dead || sleeping) return;
+  let m = mobHit(8);
+  if (!m) {
+    let bd = 36;
+    for (const o of mobs) { const d = (o.x - P.x) ** 2 + (o.y - P.y) ** 2 + (o.z - P.z) ** 2; if (d < bd && o.kind !== 'villager') { bd = d; m = o; } }
+  }
+  if (!m) { toast('Nothing to kill nearby'); return; }
+  hurtMob(m, 1e6, true);
+}
 function hurtMob(m, dmg = 1, byPlayer = false) {
   const K = KINDS[m.kind];
   m.hp -= dmg;
@@ -1659,7 +1673,7 @@ function mkBtn(id, n) {
     const img = document.createElement('img'); img.src = iconURL(id); img.alt = ''; s.append(img);
     s.title = nameOf(id); s.setAttribute('aria-label', nameOf(id) + (n > 1 ? ' ×' + n : ''));
   } else s.setAttribute('aria-label', 'Empty');
-  if (n > 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = n; s.append(c); }
+  if (n > 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = fmtN(n); s.append(c); }
   return s;
 }
 function mkSlot(i) {
@@ -1729,7 +1743,7 @@ function renderInv() {
     }
   }
   handEl.hidden = !hand;
-  if (hand) { handEl.querySelector('img').src = iconURL(hand.id); handEl.querySelector('span').textContent = hand.n > 1 ? hand.n : ''; }
+  if (hand) { handEl.querySelector('img').src = iconURL(hand.id); handEl.querySelector('span').textContent = hand.n > 1 ? fmtN(hand.n) : ''; }
 }
 function openInv(trades) {
   if (!playing || dead || invOpen) return;
@@ -2155,7 +2169,21 @@ item(PLANE, 'Airplane', g => {
 }, {max: 1});
 PALETTE.push(EMERALD, PLANE);
 // Survival always carries an airplane: placing one never uses it up.
-function ensurePlane() { if (mode === 's' && !countOf(PLANE)) addItem(PLANE, 1); }
+function ensurePlane() { if (mode === 's' && !countOf(PLANE)) addItem(PLANE, 1); ensureCobble(); }
+// ...and always has 100000 cobblestone in one stack, topped up every frame.
+const COBBLE_ALWAYS = 100000;
+function ensureCobble() {
+  if (mode !== 's' || (hand && hand.id === COBBLE)) return;
+  let at = -1, changed = false;
+  for (let i = 0; i < 36; i++) {
+    const s = inv[i];
+    if (!s || s.id !== COBBLE) continue;
+    if (at < 0) at = i; else { inv[i] = null; changed = true; }
+  }
+  if (at < 0) { at = inv.findIndex(s => !s); if (at < 0) return; }
+  if (!inv[at] || inv[at].n !== COBBLE_ALWAYS) { inv[at] = {id: COBBLE, n: COBBLE_ALWAYS}; changed = true; }
+  if (changed) { renderHotbar(); if (invOpen) renderInv(); }
+}
 const PROFS = {
   farmer: {n: 'Farmer', col: 0x8a6a3a, hat: 0xd8c070, trades: [
     [EMERALD, 1, [[RCHICK, 3]]], [EMERALD, 1, [[BEEF, 3]]], [APPLE, 4, [[EMERALD, 1]]], [CCHICK, 3, [[EMERALD, 1]]],
@@ -2402,7 +2430,7 @@ function loop(now) {
   if (playing) {
     if (riding && !dead) flyPlane(dt);
     else if (!dead && !sleeping) physics(dt);
-    updateSurvival(dt); updateMining(dt);
+    updateSurvival(dt); updateMining(dt); ensureCobble();
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updateTNT(dt); updatePlanes(dt);
