@@ -20,7 +20,7 @@ build on it, fly over it. The world saves in the browser.
 | Backpack & crafting | `E` (touch: Bag button) |
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
-| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `Shift` to get out (touch: stick up to speed up, Exit button) |
+| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
 | Pick block | `1`–`9` or mouse wheel |
 | Mute | `M` (or the Sound button in the pause menu) |
@@ -39,7 +39,8 @@ build on it, fly over it. The world saves in the browser.
   iron ingots (raw iron + coal), beds, cooked porkchops, steak, chicken and fish, glass, stone, stone bricks, bricks and TNT.
 - **Torches** light up caves and the night with a warm glow.
 - **Villages**: little towns of plank houses with red roofs, glass windows, a torch and a bed
-  inside, and a well in the middle. There is always one near the start. Villagers (farmers,
+  inside, a well in the middle and a runway with a dashed centre line and torch lights for your
+  airplane. There is always one near the start. Villagers (farmers,
   fishers, blacksmiths, librarians and builders) wander around, look at you when you come close,
   and trade. Lots of trades are big bargains, like 5 dirt for 60 glass (every villager does that
   one), 8 dirt for 64 stone bricks, 5 dirt for 32 logs, 20 cobblestone for 8 iron ingots or
