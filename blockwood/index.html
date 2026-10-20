@@ -2274,7 +2274,7 @@ function board(pl) {
   riding = pl; P.fly = false; P.yaw = pl.yaw; P.pitch = -.1;
   mine.on = false; held = null;
   $('#bExit').hidden = false;
-  toast(TOUCH ? 'Push the stick up to speed up, look up to take off' : 'W speeds up, S slows down, look up to take off · Shift gets out', 4500);
+  toast(TOUCH ? 'Push the stick up to speed up, look up to take off' : 'W speeds up, S slows down · Arrow keys steer (↑ climb, ↓ dive) · Shift gets out', 4500);
   engineOn();
 }
 function exitPlane() {
@@ -2316,7 +2316,15 @@ function engineOff() {
 function flyPlane(dt) {
   const pl = riding;
   if (!engine && S.on) engineOn();
-  const thr = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y + (keys.Space || keys.touchJump ? 1 : 0);
+  const thr = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) + joy.y + (keys.Space || keys.touchJump ? 1 : 0);
+  // arrow keys fly the plane: left/right turn, up climbs, down dives (the camera follows)
+  const ax = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0), ay = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0);
+  if (ax || ay) {
+    if (!pl.arrows) { P.yaw = pl.yaw; P.pitch = pl.pitch - .1; pl.arrows = true; }
+    P.yaw -= ax * 1.6 * dt;
+    P.pitch = Math.max(-1.2, Math.min(1.2, P.pitch + ay * 1.2 * dt));
+    if (ay > 0 && pl.speed < 20) pl.speed = Math.min(42, pl.speed + 14 * dt); // pulling up also speeds up so you can take off
+  } else pl.arrows = false;
   if (planeHits(pl.x, pl.y + .05, pl.z)) pl.y += Math.min(1, 6 * dt); // wedged in the ground: pop up
   const ground = planeHits(pl.x, pl.y - .08, pl.z);
   pl.speed = Math.max(0, Math.min(42, pl.speed + (thr > .2 ? 14 : thr < -.2 ? -20 : ground ? -6 : -1.5) * dt));

@@ -19,7 +19,7 @@ build on it, fly over it. The world saves in the browser.
 | Backpack & crafting | `E` (touch: Bag button) |
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
-| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, look where you want to fly (look up to take off), `Shift` to get out (touch: stick up to speed up, Exit button) |
+| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `Shift` to get out (touch: stick up to speed up, Exit button) |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
 | Pick block | `1`–`9` or mouse wheel |
 | Mute | `M` (or the Sound button in the pause menu) |
