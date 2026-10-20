@@ -10,7 +10,8 @@ like (all the way up into space), grabbing coins that float in the sky.
 
 | | |
 |---|---|
-| Fly (left/right turns, up climbs, down dives; hold up to loop) | `↑` `↓` `←` `→` or `W` `A` `D` |
+| Fly (left/right turns, up climbs, down points the nose down; hold up to loop) | `↑` `↓` `←` `→` (also `W` climbs, `A` turns left) |
+| Dive mode: fly into a lake and under the water | `D` or the **DIVE** button |
 | Fire a missile | `S` or the **FIRE** button (hold to keep firing) |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Map: choose an airport to fly to | `M` or the **MAP** button |
@@ -139,6 +140,13 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   reaching cruising height, breaking the sound barrier, loops, flying upside down, missile
   warnings and the descent into an airport. Land at an airport and the passengers clap,
   with a bonus of one point for every 5 passengers.
+- **Diving under the water.** Press **D** (or DIVE) for dive mode, then fly into any lake:
+  instead of splashing, the plane plunges in (+50) and flies under the water. Everything
+  turns blue, bubbles stream out behind you, little fish swim in circles, the engine sounds
+  muffled and a chip shows how deep you are. The water slows you down and you can't go
+  through the lake bed. Pull up to burst back out into the air. Hitting the shore under
+  the water is a crash. In dive mode you can't land on lakes, so press D again to turn it
+  off.
 - **Missiles:** press **S** (or tap FIRE) to fire a missile from under a wing. A red
   ring marks its target: the other plane nearest the middle of your view, or if none is
   in front of you, the closest one (even behind you: the missile turns round). The
