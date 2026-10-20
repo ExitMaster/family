@@ -56,7 +56,7 @@ body{
 .chip.power.warn{background:#d0202a;animation:pulse .35s ease-in-out infinite alternate}
 .iconbtn{pointer-events:auto;width:38px;height:38px;border-radius:10px;border:0;background:var(--glass);color:var(--hud-fg);font:700 14px/1 var(--hud);cursor:pointer;display:grid;place-items:center}
 .iconbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(620px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
+.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(700px,calc(100% - 32px));display:grid;gap:8px;justify-items:center}
 .ap{pointer-events:auto;border:0;border-radius:12px;background:var(--glass);color:var(--hud-fg);font:700 15px/1 var(--hud);letter-spacing:.08em;padding:0 14px;cursor:pointer;display:flex;align-items:center;gap:6px;min-height:44px}
 .ap.on{background:var(--teal);box-shadow:0 0 0 2px var(--mint)}
 .ap:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
@@ -170,6 +170,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="ap" id="btn-flip" aria-label="Fly upside down (F)">FLIP</button>
       <button class="ap" id="btn-map" aria-label="Choose an airport to fly to (M)">MAP</button>
       <button class="ap" id="btn-view" aria-label="Look at the front of the plane (C)">VIEW</button>
+      <button class="ap" id="btn-dive" aria-label="Dive mode: fly under the water (D)">DIVE</button>
       <span class="hint">Airports are everywhere: follow the arrow and the light beacons, or tap LAND (L) to fly to the nearest one and land.</span>
     </div>
   </div>
@@ -189,8 +190,9 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="btn" id="btn-play">Take off</button>
       <hr class="perf">
       <div class="keys">
-        <span><kbd>←↑↓→</kbd> <kbd>WAD</kbd></span><span>Fly: left and right turn, up climbs, down dives. Keep holding up to fly a loop! On touch, drag anywhere.</span>
+        <span><kbd>←↑↓→</kbd> <kbd>W</kbd> <kbd>A</kbd></span><span>Fly: left and right turn, up climbs, down points the nose down (W climbs, A turns left). Keep holding up to fly a loop! On touch, drag anywhere.</span>
         <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST)</span>
+        <span><kbd>D</kbd></span><span>Dive mode: fly into a lake and under the water (or tap DIVE)</span>
         <span><kbd>S</kbd></span><span>Fire a missile at the plane in the red ring (or tap FIRE)</span>
         <span><kbd>C</kbd></span><span>Front view: see the front of your plane (or tap VIEW)</span>
         <span><kbd>G</kbd></span><span>Landing gear up or down (or tap GEAR)</span>
@@ -345,7 +347,7 @@ function boot(hot){
 
   const lam = (color, extra) => new THREE.MeshLambertMaterial(Object.assign({ color }, extra || {}));
   const M = {
-    water: new THREE.MeshPhongMaterial({ color: 0x3f92c2, specular: 0xbfe6ff, shininess: 70, transparent: true, opacity: 0.92 }),
+    water: new THREE.MeshPhongMaterial({ color: 0x3f92c2, specular: 0xbfe6ff, shininess: 70, transparent: true, opacity: 0.92, side: THREE.DoubleSide }),
     trunk: lam(0x7a5236), leaf: lam(0xffffff), cloud: lam(0xffffff, { emissive: 0x7a7a7a }),
     coinFace: new THREE.MeshPhongMaterial({ color: 0xffc23d, emissive: 0x6a4200, specular: 0xfff2c0, shininess: 90 }),
     coinRim: new THREE.MeshPhongMaterial({ color: 0xd98f0f, emissive: 0x4a2a00, specular: 0xffffff, shininess: 60 }),
@@ -1408,6 +1410,32 @@ function boot(hot){
       if (c.life <= 0 || c.g.position.y < Math.max(groundAt(c.g.position.x, c.g.position.z), 0)){ c.life = 0; c.g.visible = false; }
     }
   }
+  /* ---------------- Fish ---------------- */
+  // little fish swimming in circles round you while you're under the water
+  const fish = [];
+  for (let i = 0; i < 16; i++){
+    const g = new THREE.Group(), c = [0xff8a3d, 0xffd23d, 0x5fe0d0, 0xff4f7a][i % 4];
+    const b = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), mat(c)); b.scale.set(0.5, 0.8, 1.4);
+    const tl = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.7, 4), mat(c)); tl.rotation.x = -Math.PI / 2; tl.position.z = 0.9;
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), mat(0x111111)); eye.position.set(0, 0.12, -0.45);
+    g.add(b, tl, eye); g.scale.setScalar(1.6); g.visible = false; scene.add(g);
+    fish.push({ g, on: false, a: 0, r: 0, cx: 0, cz: 0, y: 0, sp: 0 });
+  }
+  function updateFish(dt){
+    for (const f of fish){
+      if (!F.under){ f.g.visible = f.on = false; continue; }
+      if (!f.on || Math.hypot(f.cx - F.x, f.cz - F.z) > 160){
+        f.cx = F.x + rnd(-90, 90); f.cz = F.z + rnd(-90, 90);
+        const g = groundAt(f.cx, f.cz);
+        if (g > -4){ f.g.visible = f.on = false; continue; }
+        f.y = rnd(g + 1.5, -1.5); f.r = rnd(4, 14); f.a = rnd(0, Math.PI * 2); f.sp = rnd(0.4, 1.0) * (Math.random() < 0.5 ? 1 : -1); f.on = true;
+      }
+      f.a += f.sp * dt;
+      f.g.position.set(f.cx + Math.cos(f.a) * f.r, f.y + Math.sin(t * 2 + f.a) * 0.4, f.cz + Math.sin(f.a) * f.r);
+      f.g.rotation.y = f.sp > 0 ? Math.PI - f.a : -f.a;   // facing the way it swims
+      f.g.visible = true;
+    }
+  }
   const planeShadow = new THREE.Mesh(new THREE.CircleGeometry(2.2 * PLANE_SCALE / 0.85, 20), M.shadow);
   planeShadow.rotation.x = -Math.PI / 2; scene.add(planeShadow);
 
@@ -1511,7 +1539,7 @@ function boot(hot){
 
   /* ---------------- Input ---------------- */
   const keys = {};
-  const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'f', Space: 'b', ShiftLeft: 'b', ShiftRight: 'b' };
+  const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'f', Space: 'b', ShiftLeft: 'b', ShiftRight: 'b' };
   window.addEventListener('keydown', e => {
     if (e.target && e.target.tagName === 'INPUT') return;
     const k = KEYMAP[e.code];
@@ -1519,6 +1547,7 @@ function boot(hot){
     if ((e.code === 'KeyL' || e.code === 'KeyQ') && state === 'play'){ e.preventDefault(); toggleAutoLand(); }
     if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
     if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
+    if (e.code === 'KeyD' && state === 'play'){ e.preventDefault(); toggleDive(); }
     if ((e.code === 'KeyC' || e.code === 'KeyV') && state === 'play'){ e.preventDefault(); toggleView(); }
     if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
     if (e.code === 'Escape' || e.code === 'KeyP'){ state === 'play' ? pause() : state === 'paused' && resume(); }
@@ -1578,6 +1607,7 @@ function boot(hot){
   $('btn-gear').addEventListener('click', e => { toggleGear(); e.currentTarget.blur(); });
   $('btn-flip').addEventListener('click', e => { toggleFlip(); e.currentTarget.blur(); });
   $('btn-view').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
+  $('btn-dive').addEventListener('click', e => { toggleDive(); e.currentTarget.blur(); });
   const fireBtn = $('btn-fire');
   const holdFire = on => e => { keys.f = on; fireBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
   fireBtn.addEventListener('pointerdown', holdFire(true));
@@ -1658,6 +1688,8 @@ function boot(hot){
     if (boostT > 0) parts.push('<span class="chip power boost">BOOST<b>' + Math.ceil(boostT) + 's</b></span>');
     if (state === 'play' && !F.gear) parts.push('<span class="chip power">GEAR UP</span>');
     if (state === 'play' && F.flipped) parts.push('<span class="chip power boost">UPSIDE DOWN</span>');
+    if (state === 'play' && F.under) parts.push('<span class="chip power">UNDERWATER<b>' + Math.round(-F.y * 3.28 / 5) * 5 + ' ft</b></span>');
+    else if (state === 'play' && F.diveMode) parts.push('<span class="chip power">DIVE MODE</span>');
     if (state === 'play' && F.incoming) parts.push('<span class="chip power warn">MISSILE!</span>');
     const k = parts.join('');
     if (force || k !== powKey){ powKey = k; H.powers.innerHTML = k; }
@@ -2003,8 +2035,27 @@ function boot(hot){
     toast(F.flipped ? 'Upside down!' : 'Right way up', '');
     if (F.flipped) announce('We are now flying upside down. Please hold on to your hats!');
   }
+  // Dive mode: instead of splashing, the plane goes into a lake and flies under the water
+  function toggleDive(){
+    if (state !== 'play' || F.crashT > 0) return;
+    if (F.under){ toast('Pull up to the surface first!', 'info'); return; }
+    F.diveMode = !F.diveMode; sfx.ap(F.diveMode);
+    toast(F.diveMode ? 'Dive mode: fly into a lake!' : 'Dive mode off', '');
+    if (F.diveMode) announce('We are getting ready to dive under the water. Take a deep breath!');
+  }
+  function enterWater(){
+    F.under = true; sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); shake = Math.max(shake, REDUCED ? 0.1 : 0.35);
+    if (t - F.diveT > 6){ score += 50; toast('Dive! +50', ''); } else toast('Dive!', '');
+    F.diveT = t;
+    announce('We are now under the water. Look at all the fish!');
+  }
+  function leaveWater(){
+    F.under = false; sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4);
+    toast('Splash! Back in the air', '');
+  }
   function toggleAutoLand(){
     if (state !== 'play' || F.crashT > 0) return;
+    if (F.under){ toast('Pull up to the surface first!', 'info'); return; }
     if (F.ground){ toast('Already on the ground', 'info'); return; }
     F.auto = !F.auto; F.autoFinal = false; F.flipped = false; sfx.ap(F.auto);
     if (F.auto) F.target = F.dest || nearestAirport(F.x, F.z);
@@ -2056,7 +2107,7 @@ function boot(hot){
     clearFreeItems(); clearMissiles(); hushAnnounce();
     chain = 0; mult = 1; lastCoinT = -9;   // coins, score and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0, annCruise: false, annDesc: null, incoming: false });
+    Object.assign(F, { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0, annCruise: false, annDesc: null, incoming: false, diveMode: false, under: false, diveT: -99, bubT: 0 });
     setLevel(0, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -2077,7 +2128,7 @@ function boot(hot){
     state = 'attract'; show('start');
   }
   function crashFree(inWater, msg){
-    F.crashT = 1.6; F.auto = false; F.flipped = false; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
+    F.crashT = 1.6; F.auto = false; F.flipped = false; F.under = false; planeRoot.visible = false; shake = REDUCED ? 0.2 : 0.9;
     calmAI();
     if (inWater){ sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); }
     else { sfx.hit(); burst(F.x, F.y, F.z, 0xb7a998, 18, 1.4); }
@@ -2157,6 +2208,7 @@ function boot(hot){
       F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8);
       F.speed -= vFwd.y * 14 * dt;
       F.speed = clamp(F.speed, 30, plane.boost + 40);
+      if (F.under) F.speed -= (F.speed - 40) * Math.min(1, dt * 2);   // the water slows you right down
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
       // no altitude limit: call-outs on the way up (each again after dropping well below it)
       const ms = MILESTONES[F.milestone];
@@ -2164,7 +2216,7 @@ function boot(hot){
       if (F.milestone > 0 && F.y < MILESTONES[F.milestone - 1][0] * 0.9) F.milestone--;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
       if (live && !F.annCruise && F.y - top > 700){ F.annCruise = true; announce('We have reached cruising height. Sit back and enjoy the view!'); }
-      const water = onWater(F.x, F.z);
+      const water = !F.diveMode && onWater(F.x, F.z);
       const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
       if (touching && !water && F.gearT < 0.9 && hasGear()) crashFree(false, 'Belly landing! The gear was up');
       else if (touching){
@@ -2185,7 +2237,16 @@ function boot(hot){
           burst(F.x, F.y - PLANE_SCALE + 0.2, F.z, water ? 0xe6f4ff : 0xf4f1ea, 10, 0.7);
         }
         F.lastLand = t;
-      } else if (F.y < top + 1.4) crashFree(g < 0.5);
+      } else if (F.diveMode && g < -2 && F.y < 1.4){
+        // dive mode: into the lake and down to just above its bed
+        if (!F.under && F.y < 0.3) enterWater();
+        if (F.y < g + 2){ F.y = g + 2; if (vFwd.y < 0) setLevel(F.yaw, 0.05); }
+      } else if (F.y < top + 1.4) crashFree(g < 0.5, F.under ? 'Bonk! You hit the shore' : undefined);
+      if (F.under && F.y > 0.3) leaveWater();
+      if (F.under && (F.bubT -= dt) <= 0){
+        F.bubT = 0.1;
+        if (F.y < -2) puff(F.x - vFwd.x * 5 + rnd(-1.5, 1.5), F.y + rnd(-1, 1), F.z - vFwd.z * 5 + rnd(-1.5, 1.5), 0.15, 1.2, 0x9fd8ee);
+      }
     }
 
     // keep the world built around the plane
@@ -2199,6 +2260,7 @@ function boot(hot){
     updateAirports();
     updateAI(dt, live);
     updateMissiles(dt, live);
+    updateFish(dt);
     for (const c of fClouds){
       const p = c.position;
       if (p.x - F.x > 3500) p.x -= 7000; else if (p.x - F.x < -3500) p.x += 7000;
@@ -2266,7 +2328,7 @@ function boot(hot){
       if (camSnap) camBase.copy(camT); else camBase.lerp(camT, 1 - Math.exp(-dt * 6));
     }
     camSnap = false;
-    const camFloor = Math.max(groundAt(camBase.x, camBase.z), 0) + 1.5;
+    const cg = groundAt(camBase.x, camBase.z), camFloor = (F.under && cg < -2 ? cg : Math.max(cg, 0)) + 1.5;
     if (camBase.y < camFloor) camBase.y = camFloor;
     camera.position.copy(camBase);
     if (shake > 0){ const s = shake * shake; camera.position.x += (Math.random() - 0.5) * s * 1.6; camera.position.y += (Math.random() - 0.5) * s * 1.6; }
@@ -2293,6 +2355,11 @@ function boot(hot){
     scene.fog.far = Math.min(3000 + F.y * 2.5, 12500);
     scene.fog.near = Math.min(300 + F.y * 0.6, scene.fog.far * 0.45);
     sky.position.copy(camera.position);
+    // under the water: everything fades into blue close by
+    const camUnder = camera.position.y < 0 && groundAt(camera.position.x, camera.position.z) < 0;
+    sky.visible = sun.visible = !camUnder;
+    if (camUnder){ scene.fog.color.setHex(0x1b6e8c); scene.fog.near = 2; scene.fog.far = 140; scene.background = UNDER_C; }
+    else scene.background = null;
     sunDir.set(-0.45, skyEl, -1).normalize();
     sun.position.copy(camera.position).addScaledVector(sunDir, 12000); sun.lookAt(camera.position);
     sunLight.position.set(F.x + sunDir.x * 100, F.y + Math.max(0.2, sunDir.y) * 100 + 30, F.z + sunDir.z * 100);
@@ -2300,7 +2367,7 @@ function boot(hot){
 
     if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
     audioTick -= dt;
-    if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live, Math.min(F.speed, 190), snd.mul, snd.vol); }
+    if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
     if (live) updateFreeHud();
   }
   function updateFreeHud(){
@@ -2361,6 +2428,7 @@ function boot(hot){
   }
 
   /* ---------------- Main loop ---------------- */
+  const UNDER_C = new THREE.Color(0x1b6e8c);
   const camBase = new THREE.Vector3(0, 12, 14), camT = new THREE.Vector3(), look = new THREE.Vector3();
   const camUp = new THREE.Vector3(0, 1, 0), camUpS = new THREE.Vector3(0, 1, 0), camFlip = new THREE.Vector3();
   // camera view: 0 = chase (behind the plane), 1 = front (out ahead, looking back at the plane)
