@@ -217,6 +217,33 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
 - **Nothing resets:** your coins, score and the airports you've visited carry over
   from flight to flight and stay saved in the browser.
 
+## Ride as a passenger
+
+Press **Ride as a passenger** on the start card and be a passenger instead of the pilot.
+Walk with the arrows (or drag on a touch screen); press **SPACE** (or the big button) when
+there's something to do. A checklist in the corner shows what's next:
+
+1. **Book a flight at TICKETS.** You arrive by taxi outside the terminal. At the ticket
+   counter choose where to go (the nearest airports) and which passenger plane (the ones
+   with 20 or more seats), and get a **boarding pass** with your flight number, gate and
+   window seat.
+2. **Drop off your suitcase at BAG DROP.** It gets a tag and rides away on a belt.
+3. **Go through SECURITY.** Walk through the metal detector (beep beep, all clear). It
+   won't let you through without a pass and with your bag still in your hand.
+4. **Show your pass to the crew.** Go out through GATE 1 to your plane, parked on the apron
+   with stairs up to its door.
+5. **Find your seat.** Walk down the aisle past the other passengers to your seat (gold,
+   with a red arrow over it) and sit down.
+6. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
+   runway, takes off and the autopilot flies you to the airport you booked and lands.
+   You watch from your **window seat**, with a seatbelt sign that lights up for takeoff and
+   landing; VIEW (or C) swaps to the view from outside.
+
+After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
+your blue suitcase to come round, grab it, and walk out through the **EXIT**. Then book
+another flight from there, or go back to the menu. The terminal, gate and arrivals hall
+are busy with other travellers walking about, queueing and sitting at the gate.
+
 ## Airports
 
 The world has airports everywhere: one in most 3 km squares of an endless grid (so there's nearly always one within a couple of km), each with
