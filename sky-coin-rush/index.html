@@ -2317,6 +2317,7 @@ function boot(hot){
     if (boostT > 0) parts.push('<span class="chip power boost">BOOST<b>' + Math.ceil(boostT) + 's</b></span>');
     if (state === 'play' && !F.gear) parts.push('<span class="chip power">GEAR UP</span>');
     if (state === 'play' && F.flipped) parts.push('<span class="chip power boost">UPSIDE DOWN</span>');
+    if (state === 'play' && F.ride && ride.turbT > 0) parts.push('<span class="chip power warn">TURBULENCE</span>');
     if (state === 'play' && F.under) parts.push('<span class="chip power">UNDERWATER<b>' + Math.round(-F.y * 3.28 / 5) * 5 + ' ft</b></span>');
     else if (state === 'play' && F.diveMode) parts.push('<span class="chip power">DIVE MODE</span>');
     if (state === 'play' && F.incoming) parts.push('<span class="chip power warn">MISSILE!</span>');
@@ -3015,8 +3016,9 @@ function boot(hot){
     if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
     audioTick -= dt;
     if (audioTick <= 0){ audioTick = 0.1; const snd = plane.sound || {}; sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
-    if (live) updateFreeHud();
+    if (live){ dtHud = dt; updateFreeHud(); }
   }
+  let dtHud = 0;
   function updateFreeHud(){
     txt(H.score, Math.floor(score).toLocaleString());
     txt(H.coins, coins.toLocaleString());
@@ -3052,7 +3054,23 @@ function boot(hot){
     const up = invertY ? 'DOWN' : 'UP';
     if (F.ride){
       prompt = ride.arrived ? 'Arrived at ' + ride.to.name + '!' : '';
-      $('beltSign').classList.toggle('on', F.ground || F.autoFinal || F.y - Math.max(groundAt(F.x, F.z), 0) < 700);
+      // now and then at cruise the air gets bumpy: the seatbelt sign comes on until it's smooth again
+      const agl = F.y - Math.max(groundAt(F.x, F.z), 0);
+      if (ride.turbT > 0){
+        ride.turbT -= dtHud;
+        shake = Math.max(shake, (REDUCED ? 0.12 : 0.3) + Math.random() * 0.15);
+        F.y += (Math.random() - 0.5) * 7 * dtHud;
+        if (ride.turbT <= 0 || F.autoFinal){
+          ride.turbT = 0; ride.nextTurb = rnd(25, 45); sfx.chime();
+          toast('Smooth air again', 'info');
+          announce('Thank you for your patience. We are through the bumpy air, and the seatbelt sign is off.');
+        }
+      } else if (!F.ground && !F.autoFinal && F.crashT <= 0 && agl > 500 && t - F.liftT > 15 && (ride.nextTurb -= dtHud) <= 0){
+        ride.turbT = rnd(6, 10); sfx.chime();
+        toast('Turbulence! Seatbelt sign on', 'warn');
+        announce('Ladies and gentlemen, we are flying through some turbulence. Please return to your seats and fasten your seatbelts.');
+      }
+      $('beltSign').classList.toggle('on', F.ground || F.autoFinal || agl < 700 || ride.turbT > 0);
       if (!ride.arrived && F.ground && F.autoBrake && F.speed < 0.5){
         const f = airfieldAt(F.x, F.z);
         if (f && f.a === ride.to){ ride.arrived = true; setTimeout(rideArrived, 2200); }
@@ -3090,7 +3108,7 @@ function boot(hot){
   const CAM_NEAR = camera.near, CAM_FAR = camera.far;
   const ride = { active: false, from: null, to: null, plane: null, prevPlane: null, flight: '', row: 1, letter: 'A', side: -1,
     booked: false, bagDone: false, cleared: false, boarded: false, inCabin: false, seated: false, belted: false, arrived: false, ui: false,
-    hall: false, claimed: false, bagT: 0, bagA: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
+    hall: false, claimed: false, bagT: 0, bagA: 0, turbT: 0, nextTurb: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
   const RH = { steps: $('rideSteps'), prompt: $('ridePrompt'), act: $('btn-ride-act') };
   const rideScene = new THREE.Scene();
   rideScene.background = new THREE.Color(0xa9d8f2);
@@ -3428,7 +3446,7 @@ function boot(hot){
     const a = ride.from;
     plane = ride.plane; buildPlane(plane);
     resetFlight(a.x - a.fx * 112, a.z - a.fz * 112, a.hdg);
-    F.ride = true; F.dest = ride.to; ride.view = 0; ride.arrived = false;
+    F.ride = true; F.dest = ride.to; ride.view = 0; ride.arrived = false; ride.turbT = 0; ride.nextTurb = rnd(20, 35);
     $('hud').classList.add('riding'); $('winFrame').hidden = false;
     $('rideHud').hidden = false; $('rideHud').classList.add('flying');
     RH.steps.innerHTML = '<li class="now">Flight ' + ride.flight + ' · seat ' + ride.row + ride.letter + '</li><li>' + a.name + ' → ' + ride.to.name + '</li><li>Your captain is flying</li>';
