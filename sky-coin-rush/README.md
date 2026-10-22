@@ -27,7 +27,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **105 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **125 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -139,9 +139,29 @@ turns):
 | **Hummingbird** | tiny, turns super fast | 117 / 292 kt | very quick |
 | **X-Plane** | black rocket plane, **breaks Mach 1** | 330 / 933 kt | slow to turn |
 | **Flying Train** | steam engine with wings, 30 passengers | 97 / 233 kt | slow to turn |
+| **Beluga** | smiling whale-shaped cargo jet | 165 / 369 kt | slow to turn |
+| **Viper** | fighter jet with a bubble canopy, **breaks Mach 1** | 243 / 797 kt | quick |
+| **Raptor** | stealth fighter with a gold canopy, **breaks Mach 1** | 253 / 826 kt | quick |
+| **Flying Pig** | when pigs fly! | 87 / 214 kt | quick |
+| **Cow** | a spotty cow with a jetpack | 87 / 224 kt | medium |
+| **Puppy** | dog in flying goggles | 97 / 233 kt | quick |
+| **Super Kitty** | cat in a red cape | 107 / 262 kt | very quick |
+| **Robot** | robot on rocket boots | 136 / 350 kt | quick |
+| **Burger** | cheeseburger with everything | 78 / 194 kt | quick |
+| **Cupcake** | pink frosting and a cherry | 68 / 175 kt | quick |
+| **Star** | a smiling star | 117 / 311 kt | quick |
+| **Planet** | tiny ringed planet with an astronaut | 97 / 253 kt | medium |
+| **Satellite** | solar panels and a dish | 117 / 292 kt | medium |
+| **Lunar Lander** | moon lander on four legs | 78 / 194 kt | medium |
+| **Bathtub** | with bubbles and a rubber duck: **lands on lakes** | 68 / 165 kt | medium |
+| **Jellyfish** | glowing jellyfish: **lands on lakes** | 68 / 165 kt | quick |
+| **Flying Fish** | really flies: **lands on lakes** | 126 / 311 kt | quick |
+| **Sofa** | flying couch for three | 68 / 165 kt | medium |
+| **Sneaker** | giant shoe with wings | 97 / 233 kt | quick |
+| **Skateboard** | a kid on a rocket skateboard | 117 / 292 kt | very quick |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin, Submarine, Seagull, Turtle, Octopus) can land on and take off from any
-lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning, Delta Dart, Phoenix and X-Plane) go
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin, Submarine, Seagull, Turtle, Octopus, Bathtub, Jellyfish, Flying Fish) can land on and take off from any
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning, Delta Dart, Phoenix, X-Plane, Viper and Raptor) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
 white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh, Blaster and the floats/hulls of the lake planes don't fold up.
