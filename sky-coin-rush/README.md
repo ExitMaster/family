@@ -27,7 +27,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **55 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **85 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -89,9 +89,39 @@ turns):
 | **Halo** | flat ring with 8 engines round it and a glass cabin, **breaks Mach 1** | 224 / 797 kt | quick |
 | **Manta** | manta ray flying wing with 8 engines on its back, **breaks Mach 1** | 233 / 807 kt | medium |
 | **Blaster** | rocket ship with 8 booster rockets, **breaks Mach 1** | 253 / 865 kt | medium |
+| **Skyhawk** | white and blue high-wing trainer | 121 / 272 kt | medium |
+| **Commuter** | twin-propeller airliner, 50 passengers | 146 / 321 kt | slow to turn |
+| **Lear** | little business jet with a T-tail | 224 / 505 kt | medium |
+| **Concorde** | needle-nosed airliner, 100 passengers, **breaks Mach 1** | 292 / 875 kt | slow to turn |
+| **Blackbird** | long black spy jet, **breaks Mach 1** | 311 / 894 kt | slow to turn |
+| **Osprey** | tilt-rotor with huge propellers on its wingtips | 136 / 311 kt | medium |
+| **Twin Rotor** | helicopter with two big rotors | 107 / 233 kt | medium |
+| **Jump Jet** | jet with swivelling nozzles | 194 / 486 kt | quick |
+| **Spitfire** | old fighter with oval wings | 185 / 428 kt | quick |
+| **Zeppelin** | long silver airship, 40 passengers | 58 / 126 kt | slowest |
+| **Catalina** | flying boat with floats on its wingtips: **lands on lakes** | 113 / 243 kt | slow to turn |
+| **Jetpack** | fly like a superhero | 87 / 233 kt | very quick |
+| **Broomstick** | a witch and her black cat | 97 / 233 kt | very quick |
+| **Magic Carpet** | flying carpet with three passengers | 78 / 194 kt | quick |
+| **Fluffy** | a smiling cloud | 68 / 165 kt | medium |
+| **Balsa** | toy plane with a rubber band | 78 / 185 kt | quick |
+| **Pumpkin** | flying jack-o-lantern | 87 / 204 kt | quick |
+| **Teacup** | a flying cup of tea on its saucer | 68 / 175 kt | quick |
+| **Banana** | rocket banana in sunglasses | 136 / 330 kt | quick |
+| **Shuttle** | space shuttle, **breaks Mach 1** | 253 / 855 kt | slow to turn |
+| **Hexa** | ball cockpit between two hexagon wings | 175 / 428 kt | very quick |
+| **Dove** | white dove with an olive branch | 97 / 233 kt | very quick |
+| **Parrot** | rainbow parrot | 107 / 253 kt | very quick |
+| **Flamingo** | pink flamingo with long legs: **lands on lakes** | 97 / 233 kt | quick |
+| **Goose** | honk! **lands on lakes** | 107 / 253 kt | quick |
+| **Dolphin** | flying dolphin: **lands on lakes** | 136 / 330 kt | quick |
+| **Fire Truck** | fire engine with wings and a ladder | 107 / 253 kt | slow to turn |
+| **Tractor** | farm tractor with a propeller | 87 / 204 kt | medium |
+| **Lightning** | stealth fighter with a gold canopy, **breaks Mach 1** | 233 / 778 kt | quick |
+| **Delta Dart** | delta-wing jet with a red fin, **breaks Mach 1** | 243 / 816 kt | quick |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale) can land on and take off from any
-lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro and the seven 8-engine planes) go
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin) can land on and take off from any
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning and Delta Dart) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
 white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh, Blaster and the floats/hulls of the lake planes don't fold up.

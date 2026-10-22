@@ -459,7 +459,37 @@ function boot(hot){
     { id: 'halo', name: 'Halo', note: 'Ring of 8 engines, Mach 1.2', color: '#5fe0d0', cruise: 115, boost: 410, pitch: 1.7, turn: 1.6, cam: 1.25, pax: 4, sound: { mul: 2.4, vol: 0.04 } },
     { id: 'manta', name: 'Manta', note: '8-engine manta ray, Mach 1.2', color: '#2a6ccc', cruise: 120, boost: 415, pitch: 1.5, turn: 1.4, cam: 1.3, pax: 2, sound: { mul: 2.0, vol: 0.045 } },
     { id: 'blaster', name: 'Blaster', note: 'Rocket with 8 boosters, Mach 1.3', color: '#e8432e', cruise: 130, boost: 445, pitch: 1.3, turn: 1.2, cam: 1.2, fixedGear: true, pax: 12, sound: { mul: 1.2, vol: 0.055 } },
-    { id: 'whale', name: 'Whale', note: 'Flying whale, lands on lakes', color: '#3f6fa8', cruise: 45, boost: 110, pitch: 1.0, turn: 0.9, cam: 1.5, water: true, fixedGear: true, sound: { mul: 0.35, vol: 0.04 } }
+    { id: 'whale', name: 'Whale', note: 'Flying whale, lands on lakes', color: '#3f6fa8', cruise: 45, boost: 110, pitch: 1.0, turn: 0.9, cam: 1.5, water: true, fixedGear: true, sound: { mul: 0.35, vol: 0.04 } },
+    { id: 'cessna', name: 'Skyhawk', note: 'High-wing trainer', color: '#2a6ccc', cruise: 62, boost: 140, pitch: 1.5, turn: 1.4, pax: 4, sound: { mul: 1.1, vol: 0.045 } },
+    { id: 'dash8', name: 'Commuter', note: 'Twin-prop airliner', color: '#e8432e', cruise: 75, boost: 165, pitch: 1.1, turn: 1.0, cam: 1.45, pax: 50, sound: { mul: 0.9, vol: 0.05 } },
+    { id: 'lear', name: 'Lear', note: 'Little business jet', color: '#ffc23d', cruise: 115, boost: 260, pitch: 1.6, turn: 1.5, pax: 8, sound: { mul: 2.3, vol: 0.04 } },
+    { id: 'concorde', name: 'Concorde', note: 'Supersonic airliner, Mach 1.3', color: '#1b2a6c', cruise: 150, boost: 450, pitch: 1.0, turn: 0.9, cam: 1.55, pax: 100, sound: { mul: 2.0, vol: 0.05 } },
+    { id: 'blackbird', name: 'Blackbird', note: 'Black spy jet, Mach 1.35', color: '#1b1b22', cruise: 160, boost: 460, pitch: 1.2, turn: 1.0, cam: 1.4, pax: 2, sound: { mul: 1.8, vol: 0.05 } },
+    { id: 'osprey', name: 'Osprey', note: 'Tilt-rotor, huge propellers', color: '#6b7a5a', cruise: 70, boost: 160, pitch: 1.4, turn: 1.3, cam: 1.35, pax: 24, sound: { mul: 0.55, vol: 0.055 } },
+    { id: 'chinook', name: 'Twin Rotor', note: 'Helicopter with two rotors', color: '#5a6b3a', cruise: 55, boost: 120, pitch: 1.3, turn: 1.3, cam: 1.4, pax: 33, sound: { mul: 0.5, vol: 0.055 } },
+    { id: 'harrier', name: 'Jump Jet', note: 'Jet with swivel nozzles', color: '#7d8a96', cruise: 100, boost: 250, pitch: 1.9, turn: 1.8, pax: 1, sound: { mul: 2.4, vol: 0.045 } },
+    { id: 'spitfire', name: 'Spitfire', note: 'Old fighter with oval wings', color: '#5a6b3a', cruise: 95, boost: 220, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 1.0, vol: 0.05 } },
+    { id: 'zeppelin', name: 'Zeppelin', note: 'Long silver airship', color: '#c9d2dc', cruise: 30, boost: 65, pitch: 0.6, turn: 0.6, cam: 2.0, fixedGear: true, pax: 40, sound: { mul: 0.6, vol: 0.03 } },
+    { id: 'catalina', name: 'Catalina', note: 'Flying boat, lands on lakes', color: '#3a5a8a', cruise: 58, boost: 125, pitch: 1.1, turn: 1.0, cam: 1.5, water: true, fixedGear: true, pax: 20, sound: { mul: 0.8, vol: 0.05 } },
+    { id: 'jetpack', name: 'Jetpack', note: 'Fly like a superhero', color: '#e8432e', cruise: 45, boost: 120, pitch: 2.2, turn: 2.2, fixedGear: true, pax: 1, sound: { mul: 2.8, vol: 0.035 } },
+    { id: 'broom', name: 'Broomstick', note: 'Witch and cat on a broom', color: '#5a3a7a', cruise: 50, boost: 120, pitch: 2.0, turn: 2.0, fixedGear: true, pax: 2, sound: { mul: 3, vol: 0.006 } },
+    { id: 'carpet', name: 'Magic Carpet', note: 'Flying carpet', color: '#b0302a', cruise: 40, boost: 100, pitch: 1.6, turn: 1.8, fixedGear: true, pax: 3, sound: { mul: 3, vol: 0.004 } },
+    { id: 'cloud', name: 'Fluffy', note: 'A smiling cloud', color: '#dfe9f2', cruise: 35, boost: 85, pitch: 1.4, turn: 1.5, fixedGear: true, pax: 2, sound: { mul: 3, vol: 0.004 } },
+    { id: 'balsa', name: 'Balsa', note: 'Toy plane with a rubber band', color: '#e9d2a0', cruise: 40, boost: 95, pitch: 1.9, turn: 1.8, pax: 1, sound: { mul: 3.2, vol: 0.02 } },
+    { id: 'pumpkin', name: 'Pumpkin', note: 'Flying jack-o-lantern', color: '#ff8a1d', cruise: 45, boost: 105, pitch: 1.6, turn: 1.6, fixedGear: true, pax: 2, sound: { mul: 1.4, vol: 0.035 } },
+    { id: 'teacup', name: 'Teacup', note: 'Flying cup of tea', color: '#3fa9f5', cruise: 35, boost: 90, pitch: 1.5, turn: 1.7, fixedGear: true, pax: 2, sound: { mul: 2.6, vol: 0.03 } },
+    { id: 'banana', name: 'Banana', note: 'Rocket banana', color: '#ffd23d', cruise: 70, boost: 170, pitch: 1.8, turn: 1.8, fixedGear: true, pax: 1, sound: { mul: 1.8, vol: 0.04 } },
+    { id: 'shuttle', name: 'Shuttle', note: 'Space shuttle, Mach 1.3', color: '#f4f1ea', cruise: 130, boost: 440, pitch: 1.2, turn: 1.1, cam: 1.4, pax: 7, sound: { mul: 1.2, vol: 0.055 } },
+    { id: 'hexa', name: 'Hexa', note: 'Ball cockpit, hexagon wings', color: '#2a2f45', cruise: 90, boost: 220, pitch: 2.1, turn: 2.0, fixedGear: true, pax: 1, sound: { mul: 3.4, vol: 0.035 } },
+    { id: 'dove', name: 'Dove', note: 'White dove', color: '#f4f4f8', cruise: 50, boost: 120, pitch: 2.0, turn: 2.0, pax: 1, sound: { mul: 3, vol: 0.006 } },
+    { id: 'parrot', name: 'Parrot', note: 'Rainbow parrot', color: '#e8302a', cruise: 55, boost: 130, pitch: 2.1, turn: 2.1, pax: 1, sound: { mul: 3, vol: 0.008 } },
+    { id: 'flamingo', name: 'Flamingo', note: 'Pink flamingo, lands on lakes', color: '#ff8fb8', cruise: 50, boost: 120, pitch: 1.7, turn: 1.7, cam: 1.15, water: true, pax: 1, sound: { mul: 3, vol: 0.006 } },
+    { id: 'goose', name: 'Goose', note: 'Honk! Lands on lakes', color: '#8a8a7a', cruise: 55, boost: 130, pitch: 1.7, turn: 1.6, water: true, pax: 2, sound: { mul: 2.8, vol: 0.008 } },
+    { id: 'dolphin', name: 'Dolphin', note: 'Flying dolphin, lands on lakes', color: '#7a9ab8', cruise: 70, boost: 170, pitch: 1.9, turn: 1.8, cam: 1.15, water: true, fixedGear: true, pax: 3, sound: { mul: 3.2, vol: 0.01 } },
+    { id: 'firetruck', name: 'Fire Truck', note: 'Fire engine with wings', color: '#d0202a', cruise: 55, boost: 130, pitch: 1.1, turn: 1.0, cam: 1.3, pax: 6, sound: { mul: 0.9, vol: 0.05 } },
+    { id: 'tractor', name: 'Tractor', note: 'Farm tractor with a propeller', color: '#3fa34d', cruise: 45, boost: 105, pitch: 1.3, turn: 1.3, fixedGear: true, pax: 1, sound: { mul: 0.6, vol: 0.05 } },
+    { id: 'lightning', name: 'Lightning', note: 'Stealth fighter, Mach 1.15', color: '#5a6270', cruise: 120, boost: 400, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'dart', name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } }
   ];
   // every plane carries passengers (the big ones were set above)
   const PAX = { cub: 3, biplane: 2, seaplane: 4, zippy: 2, glider: 2, hauler: 30, swift: 8, thunder: 2, stealth: 2, rocket: 6, saucer: 3,
@@ -523,6 +553,14 @@ function boot(hot){
     const windows = (x, y, z0, z1, n) => { for (let i = 0; i < n; i++) both((xx) => box(0.06, 0.2, 0.24, 0x9fdcff, xx, y, z0 + (z1 - z0) * i / (n - 1)), x); };
     // passengers' heads (seen through glass)
     const heads = list => list.forEach(([x, y, z], i) => ball(0.13, SKIN[i % 4], x, y, z));
+    const mir = pts => [...pts, ...pts.map(([x, y, z]) => [-x, y, z])];   // triangles plus their mirror image
+    const spinner = (y, z, len, rate, wide) => {   // a rotor that spins round the up axis
+      const r = new THREE.Group();
+      r.add(new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.4), mat(DARK)), new THREE.Mesh(new THREE.CircleGeometry(len / 2, 24).rotateX(-Math.PI / 2), blurMat));
+      if (wide) r.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, len), mat(DARK)));
+      r.position.set(0, y, z); root.add(r); sp.push({ o: r, axis: 'y', rate });
+    };
+    const wheelY = (r, w, c, x, y, z) => { const o = add(new THREE.CylinderGeometry(r, r, w, 16), c, x, y, z); o.rotation.z = Math.PI / 2; return o; };
     switch (def.id){
       case 'cub':
         box(1.15, 1.05, 4.0, RED, 0, 0, 0); box(1.25, 1.15, 0.7, CREAM, 0, 0, -2.2); box(0.72, 0.7, 1.5, RED, 0, 0.12, 2.6);
@@ -943,6 +981,300 @@ function boot(hot){
           flame(bx, by, 2.8, 0.22, 0.4);
         }
         both((x) => box(1.4, 0.1, 1.2, RED, x, 0.2, 2.4), 1.5); box(0.1, 1.4, 1.2, RED, 0, 1.4, 2.4);
+        break;
+      }
+      case 'cessna': {   // high-wing trainer
+        const B = 0x2a6ccc;
+        box(1.1, 1.1, 3.6, WHITE, 0, 0, 0); nose(0.55, 0.9, WHITE, -2.2); propeller(0, 0, -2.7, 2.2);
+        box(1.12, 0.2, 3.62, B, 0, -0.1, 0); box(1.14, 0.45, 1.4, glassMat, 0, 0.28, -0.3);
+        tube(0.25, 0.5, 2.6, WHITE, 0, 0.15, 3.0);
+        box(8.5, 0.14, 1.3, WHITE, 0, 0.62, -0.3); both((x, sd) => box(0.08, 1.0, 0.08, GRAY, x, 0.1, -0.3, 0, 0, -0.6 * sd), 1.0);
+        box(0.1, 1.2, 1.0, B, 0, 0.75, 4.0); box(2.6, 0.08, 0.7, WHITE, 0, 0.2, 4.0);
+        wheel(0.8, 0.2); wheel(-0.8, 0.2); gearBox(0.2, 0.5, 0.2, 0, -0.75, -1.6);
+        break;
+      }
+      case 'dash8': {   // twin turboprop airliner with a high wing
+        const R = 0xe8432e;
+        tube(0.75, 0.8, 7.4, WHITE, 0, 0, 0); nose(0.75, 1.2, WHITE, -4.3); box(0.8, 0.3, 0.6, darkGlass, 0, 0.45, -3.9);
+        windows(0.79, 0.15, -2.6, 2.4, 8); both((x) => box(0.05, 0.12, 7.4, R, x, -0.25, 0), 0.79);
+        box(10, 0.16, 1.4, WHITE, 0, 0.75, -0.6);
+        both((x) => { tube(0.3, 0.35, 2.0, GRAY, x, 0.5, -0.9); propeller(x, 0.5, -1.95, 2.6); gearBox(0.25, 1.1, 0.25, x, -0.45, -0.6); }, 2.2);
+        box(0.14, 2.0, 1.4, R, 0, 1.4, 3.4, 0.3); box(3.0, 0.1, 0.8, WHITE, 0, 2.3, 3.8);
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -3.0);
+        break;
+      }
+      case 'lear': {   // little business jet with a T-tail
+        const Gd = 0xffc23d;
+        tube(0.55, 0.65, 6.0, WHITE, 0, 0, 0); nose(0.65, 1.6, WHITE, -3.8); box(0.7, 0.3, 0.7, darkGlass, 0, 0.45, -3.0);
+        windows(0.64, 0.12, -2.0, 0.8, 5); both((x) => box(0.05, 0.1, 6.0, Gd, x, -0.2, 0), 0.62);
+        both((x, sd) => box(3.4, 0.12, 1.4, WHITE, x, -0.35, 0.0, 0, -0.35 * sd), 2.0);
+        both((x) => jet(x, 0.35, 2.0, 0.3, 1.4), 0.85);
+        box(0.12, 1.6, 1.1, WHITE, 0, 1.0, 2.9, 0.4); box(2.4, 0.1, 0.7, WHITE, 0, 1.8, 3.2);
+        gearBox(0.18, 0.5, 0.18, 0, -0.75, -2.4); wheel(0.7, 0.3); wheel(-0.7, 0.3);
+        break;
+      }
+      case 'concorde': {   // supersonic airliner: needle nose, delta wing, four engines
+        const B = 0x1b2a6c;
+        tube(0.6, 0.65, 10, WHITE, 0, 0, 0); nose(0.6, 2.6, WHITE, -6.3); box(0.7, 0.3, 0.8, darkGlass, 0, 0.45, -4.6);
+        windows(0.63, 0.15, -3.8, 3.4, 10);
+        tris(mir([[-0.5, -0.2, -3.5], [-4.2, -0.2, 3.8], [-0.5, -0.2, 4.8]]), WHITE);
+        [1.3, 2.1].forEach(px => both((x) => jet(x, -0.5, 3.3, 0.28, 2.2), px));
+        tris([[0, 0.5, 2.6], [0, 3.0, 5.0], [0, 0.5, 5.2]], B);
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -3.5); wheel(1.3, 2.0); wheel(-1.3, 2.0);
+        break;
+      }
+      case 'blackbird': {   // long black spy jet with two big engines
+        const K = 0x1b1b22;
+        box(0.9, 0.6, 7.0, K, 0, 0, 0); nose(0.45, 2.6, K, -4.8); box(0.4, 0.3, 1.0, darkGlass, 0, 0.4, -2.6);
+        tris(mir([[-0.45, 0, -4.5], [-1.4, 0, -1.0], [-0.45, 0, 0]]), K);
+        tris(mir([[-1.3, 0, -1.0], [-4.0, 0, 2.6], [-1.3, 0, 3.3]]), K);
+        both((x, sd) => {
+          tube(0.5, 0.55, 4.6, K, x, 0, 1.0);
+          const c = add(new THREE.ConeGeometry(0.35, 1.2, 12), K, x, 0, -1.8); c.rotation.x = -Math.PI / 2;
+          flame(x, 0, 3.3, 0.45, 0.4);
+          box(0.1, 1.3, 1.1, K, x, 0.75, 2.6, 0, 0, -0.2 * sd);
+        }, 1.8);
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -2.6); wheel(1.0, 1.4); wheel(-1.0, 1.4);
+        break;
+      }
+      case 'osprey': {   // tilt-rotor: giant propellers on the wingtips
+        const G = 0x6b7a5a;
+        box(1.4, 1.4, 6.0, G, 0, 0, 0); nose(0.7, 1.2, G, -3.6); box(1.2, 0.5, 0.8, glassMat, 0, 0.35, -3.0);
+        windows(0.71, 0.2, -1.6, 1.6, 5);
+        box(8.6, 0.18, 1.3, G, 0, 0.85, -0.3);
+        both((x) => { tube(0.38, 0.38, 2.2, GRAY, x, 0.85, -0.6); propeller(x, 0.85, -1.8, 3.6); }, 4.3);
+        both((x) => box(0.12, 1.2, 0.9, G, x, 1.3, 3.0), 1.2); box(2.6, 0.1, 0.8, G, 0, 1.0, 3.0);
+        wheel(0.8, 0.6); wheel(-0.8, 0.6); gearBox(0.2, 0.5, 0.2, 0, -0.75, -2.4);
+        break;
+      }
+      case 'chinook': {   // twin-rotor helicopter
+        const G = 0x5a6b3a;
+        box(1.6, 1.6, 7.0, G, 0, 0.1, 0); ball(0.8, G, 0, 0, -3.5, 1, 1, 0.9); box(1.4, 0.5, 0.4, glassMat, 0, 0.35, -4.05);
+        windows(0.81, 0.4, -2.2, 2.0, 6);
+        box(0.8, 0.7, 1.0, G, 0, 1.1, -2.8); box(0.9, 1.4, 1.4, G, 0, 1.4, 3.0);
+        spinner(1.55, -2.8, 8, 12, true); spinner(2.2, 3.0, 8, -12, true);
+        both((x) => { gearBox(0.3, 0.5, 0.3, x, -0.75, -2.4); gearBox(0.3, 0.5, 0.3, x, -0.75, 2.4); }, 0.7);
+        break;
+      }
+      case 'harrier': {   // jump jet: swivelling nozzles under the wings
+        const G = 0x7d8a96;
+        box(1.2, 1.0, 5.4, G, 0, 0, 0.2); nose(0.5, 1.6, G, -3.3); box(0.6, 0.5, 1.2, glassMat, 0, 0.65, -2.0);
+        both((x) => ball(0.45, G, x, 0.05, -1.0, 0.7, 1, 1.4), 0.75);
+        both((x, sd) => box(3.2, 0.12, 1.8, G, x, 0.45, 0.6, 0, -0.45 * sd, -0.12 * sd), 1.9);
+        both((x) => add(new THREE.CylinderGeometry(0.22, 0.26, 0.6, 10), DARK, x, -0.45, 0.0), 0.75);
+        box(0.12, 1.3, 1.2, G, 0, 0.85, 2.4, 0.4); both((x, sd) => box(1.4, 0.1, 0.8, G, x, 0.2, 2.6, 0, -0.4 * sd, -0.15 * sd), 0.9);
+        tube(0.35, 0.4, 0.5, DARK, 0, 0, 3.0); flame(0, 0, 3.25, 0.3);
+        gearBox(0.25, 0.5, 0.25, 0, -0.75, -1.2); gearBox(0.25, 0.5, 0.25, 0, -0.75, 1.6);
+        both((x) => gearBox(0.1, 1.0, 0.1, x, -0.5, 0.8), 3.2);
+        break;
+      }
+      case 'spitfire': {   // old fighter with oval wings and roundels
+        const G = 0x5a6b3a;
+        tube(0.45, 0.6, 5.0, G, 0, 0, 0.3); nose(0.6, 1.0, G, -2.6); propeller(0, 0, -3.1, 2.8);
+        ball(0.4, glassMat, 0, 0.5, -0.6, 0.8, 0.8, 1.6);
+        ball(1, G, 0, -0.2, -0.3, 5.2, 0.1, 1.1);
+        both((x) => { add(new THREE.CylinderGeometry(0.45, 0.45, 0.02, 16), 0x1b2a6c, x, -0.11, -0.3); add(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 14), RED, x, -0.1, -0.3); }, 3.4);
+        ball(1, G, 0, 0.6, 2.6, 0.08, 0.6, 0.5); ball(1, G, 0, 0.1, 2.7, 1.4, 0.06, 0.45);
+        wheel(1.0, -0.4); wheel(-1.0, -0.4); gearBox(0.1, 0.3, 0.1, 0, -0.45, 2.6);
+        break;
+      }
+      case 'zeppelin': {   // long silver airship with a gondola underneath
+        ball(1, silverMat, 0, 1.2, 0, 1.8, 1.8, 6.0);
+        both((x) => box(1.6, 0.1, 1.4, RED, x, 1.2, 5.0), 1.2); box(0.1, 1.6, 1.4, RED, 0, 2.4, 5.0); box(0.1, 1.6, 1.4, RED, 0, 0.0, 5.0);
+        box(1.0, 0.7, 3.0, CREAM, 0, -0.65, -1.0); windows(0.51, -0.6, -2.2, 0.2, 5);
+        both((x) => { tube(0.25, 0.25, 0.8, GRAY, x, -0.2, 1.5); propeller(x, -0.2, 2.0, 1.2); }, 1.4);
+        break;
+      }
+      case 'catalina': {   // flying boat with its wing up on a pylon and floats on the tips
+        const B = 0x3a5a8a;
+        ball(1, B, 0, 0, 0, 0.9, 0.9, 3.6); ball(1, WHITE, 0, -0.35, -0.3, 0.85, 0.6, 3.2);
+        box(0.7, 0.4, 0.8, glassMat, 0, 0.75, -1.8); box(0.5, 1.0, 0.8, B, 0, 1.1, -0.2);
+        box(11, 0.16, 1.5, B, 0, 1.6, -0.2);
+        both((x) => { tube(0.32, 0.38, 1.6, GRAY, x, 1.5, -0.8); propeller(x, 1.5, -1.65, 2.4); }, 1.6);
+        both((x) => { box(0.1, 1.2, 0.1, B, x, 0.9, -0.2); ball(0.3, B, x, 0.25, -0.2, 1, 0.8, 2.2); }, 4.8);
+        box(0.12, 1.6, 1.2, B, 0, 1.0, 3.4); box(3.0, 0.1, 0.8, B, 0, 1.0, 3.6);
+        break;
+      }
+      case 'jetpack': {   // a superhero flying flat out with a jetpack
+        const Su = 0xe8432e, Y = -0.55;
+        ball(0.45, Su, 0, Y, 0, 1, 0.8, 2.0); ball(0.3, SKIN[0], 0, Y + 0.1, -1.15); ball(0.33, 0xffd23d, 0, Y + 0.2, -1.12, 1, 0.75, 1);
+        both((x) => box(0.14, 0.14, 0.9, Su, x, Y, -1.6), 0.3);
+        both((x) => box(0.16, 0.16, 1.2, 0x1b2a6c, x, Y - 0.05, 1.3), 0.15);
+        both((x) => { tube(0.18, 0.18, 1.0, GRAY, x, Y + 0.45, 0.0); flame(x, Y + 0.45, 0.5, 0.15, 0.5); box(1.2, 0.06, 0.5, GRAY, x * 4, Y + 0.45, 0.1); }, 0.2);
+        break;
+      }
+      case 'broom': {   // a witch and her black cat on a broomstick
+        const Br = 0x8a5a32, Pu = 0x5a3a7a, Y = -0.4;
+        tube(0.07, 0.07, 3.6, Br, 0, Y - 0.5, -0.4);
+        const bb = add(new THREE.ConeGeometry(0.45, 1.2, 10), 0xd9b25a, 0, Y - 0.5, 1.9); bb.rotation.x = -Math.PI / 2;
+        ball(0.35, Pu, 0, Y + 0.05, -0.2, 1, 1.3, 0.9); ball(0.22, SKIN[3], 0, Y + 0.6, -0.3);
+        add(new THREE.ConeGeometry(0.3, 0.8, 10), Pu, 0, Y + 1.15, -0.25); add(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 14), Pu, 0, Y + 0.8, -0.3);
+        both((x) => box(0.1, 0.1, 0.6, Pu, x, Y - 0.45, -0.6), 0.18);
+        ball(0.2, 0x111111, 0, Y - 0.25, 0.9); ball(0.14, 0x111111, 0, Y - 0.05, 0.75);
+        both((x) => { add(new THREE.ConeGeometry(0.05, 0.12, 4), 0x111111, x, Y + 0.07, 0.75); ball(0.03, 0xffd23d, x, Y - 0.03, 0.62); }, 0.07);
+        break;
+      }
+      case 'carpet': {   // a magic carpet with three passengers sitting on it
+        const Rd = 0xb0302a, Gd = 0xffc23d;
+        box(2.4, 0.08, 3.6, Rd, 0, -0.85, 0); box(1.6, 0.1, 2.8, 0x2a4f9a, 0, -0.84, 0); box(0.8, 0.11, 1.6, Gd, 0, -0.83, 0);
+        [-1.8, 1.8].forEach(z => { for (let k = 0; k < 5; k++) box(0.06, 0.04, 0.3, Gd, -1.0 + k * 0.5, -0.85, z + Math.sign(z) * 0.15); });
+        [[-0.5, -0.8, 0x3fa9f5], [0.5, 0.1, 0x3fa34d], [0, 1.0, 0xffd23d]].forEach(([x, z, c], i) => { ball(0.25, c, x, -0.55, z, 1, 1.2, 1); ball(0.17, SKIN[i], x, -0.15, z); });
+        break;
+      }
+      case 'cloud': {   // a fluffy cloud with a smiley face
+        const Wc = 0xffffff;
+        ball(1.2, Wc, 0, 0, 0, 1.3, 0.9, 1.6); both((x) => ball(0.9, Wc, x, -0.1, 0.3), 1.3); ball(0.9, Wc, 0, 0.5, 0.6); both((x) => ball(0.7, Wc, x, 0.3, -0.6), 0.8);
+        both((x) => { ball(0.1, 0x222222, x, 0.25, -1.85); ball(0.12, 0xff8fb8, x * 1.7, 0.0, -1.78); }, 0.35);
+        box(0.5, 0.06, 0.06, 0xff6f9a, 0, -0.15, -1.9);
+        break;
+      }
+      case 'balsa': {   // toy balsa-wood plane wound up with a rubber band
+        const Bs = 0xe9d2a0;
+        box(0.12, 0.3, 4.2, Bs, 0, 0, 0.3); box(0.2, 0.2, 0.2, RED, 0, 0, -1.85); propeller(0, 0, -1.95, 1.4);
+        box(0.03, 0.03, 3.0, 0x6b3a2a, 0, -0.2, 0.2);
+        box(5.0, 0.04, 0.9, Bs, 0, 0.25, -0.4); both((x) => box(0.3, 0.05, 0.9, RED, x, 0.25, -0.4), 2.4);
+        box(1.6, 0.04, 0.5, Bs, 0, 0.1, 2.2); box(0.04, 0.6, 0.5, Bs, 0, 0.4, 2.2);
+        both((x) => gearBox(0.04, 0.6, 0.04, x, -0.45, -1.0), 0.3); wheel(0.35, -1.0); wheel(-0.35, -1.0);
+        break;
+      }
+      case 'pumpkin': {   // a flying jack-o-lantern with leaf wings
+        const O = 0xff8a1d, Y = -0.35, K = 0x2a1a0a;
+        for (let k = 0; k < 6; k++){ const a = k / 6 * Math.PI * 2; ball(0.8, O, Math.cos(a) * 0.35, Y, Math.sin(a) * 0.35, 1, 0.75, 1); }
+        box(0.15, 0.4, 0.15, 0x3a7a2a, 0, Y + 0.75, 0);
+        both((x, sd) => box(0.25, 0.2, 0.05, K, x, Y + 0.2, -1.12, 0, 0, 0.5 * sd), 0.3); box(0.6, 0.12, 0.05, K, 0, Y - 0.2, -1.13);
+        both((x) => ball(0.6, 0x3a7a2a, x, Y + 0.1, 0, 1.6, 0.1, 0.8), 1.6);
+        propeller(0, Y, 1.25, 1.6);
+        break;
+      }
+      case 'teacup': {   // a flying teacup on its saucer, two passengers peeping out
+        const Tc = 0xffffff, Bl = 0x3fa9f5;
+        add(new THREE.CylinderGeometry(1.1, 0.75, 1.1, 20, 1, true), mat2(Tc), 0, -0.3, 0);
+        add(new THREE.CylinderGeometry(0.75, 0.75, 0.05, 20), Tc, 0, -0.85, 0); add(new THREE.CylinderGeometry(1.0, 1.0, 0.04, 20), 0x8a5a32, 0, 0.0, 0);
+        const rim = add(new THREE.TorusGeometry(1.1, 0.06, 6, 24), Bl, 0, 0.25, 0); rim.rotation.x = Math.PI / 2;
+        add(new THREE.TorusGeometry(0.35, 0.08, 6, 14), Tc, 1.25, -0.3, 0);
+        add(new THREE.CylinderGeometry(1.5, 1.3, 0.12, 24), Tc, 0, -0.92, 0);
+        heads([[-0.35, 0.15, 0.1], [0.35, 0.15, 0.1]]);
+        box(0.08, 0.08, 0.8, GRAY, 0, -0.3, -1.4); propeller(0, -0.3, -1.8, 1.4);
+        break;
+      }
+      case 'banana': {   // a banana with a rocket on the end and sunglasses
+        const Y = 0xffd23d, o = -0.4;
+        for (let k = 0; k < 7; k++){ const u = (k - 3) / 3; ball(0.55 - Math.abs(u) * 0.2, Y, 0, o + u * u * 0.6, u * 2.4, 1, 1, 1.3); }
+        ball(0.12, 0x5a3a1a, 0, o + 0.62, -2.6); box(0.15, 0.15, 0.4, 0x6b5a2a, 0, o + 0.7, 2.7);
+        both((x) => ball(0.14, 0x111111, x, o + 0.3, -1.65, 1, 0.7, 0.4), 0.22);
+        both((x, sd) => box(1.6, 0.08, 0.7, 0xffe680, x, o, 0, 0, -0.3 * sd), 1.0);
+        flame(0, o + 0.7, 2.9, 0.25, 0.4);
+        break;
+      }
+      case 'shuttle': {   // space shuttle with a black belly and three engines
+        const K = 0x1b1b22;
+        tube(0.8, 0.85, 7.0, WHITE, 0, 0.1, 0); nose(0.85, 1.6, WHITE, -4.3, 0.1); box(1.65, 0.3, 7.6, K, 0, -0.6, -0.2);
+        box(0.9, 0.35, 0.8, darkGlass, 0, 0.75, -3.4);
+        tris(mir([[-0.7, -0.4, -1.6], [-3.8, -0.4, 3.2], [-0.7, -0.4, 3.4]]), WHITE);
+        tris(mir([[-0.7, -0.45, -1.6], [-3.8, -0.45, 3.2], [-0.7, -0.45, 3.4]]), K);
+        tris([[0, 0.8, 1.8], [0, 3.2, 3.8], [0, 0.8, 3.7]], WHITE);
+        [[0, 0.65], [-0.45, 0.05], [0.45, 0.05]].forEach(([x, y]) => { tube(0.3, 0.24, 0.6, GRAY, x, y, 3.75); flame(x, y, 4.05, 0.26, 0.4); });
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -2.8); wheel(0.8, 1.5); wheel(-0.8, 1.5);
+        break;
+      }
+      case 'hexa': {   // a ball cockpit between two big hexagon wings
+        const Y = 0.4;
+        ball(0.75, GRAY, 0, Y, 0); const w = add(new THREE.CircleGeometry(0.45, 8), darkGlass, 0, Y, -0.76); w.rotation.y = Math.PI;
+        both((x) => { box(1.4, 0.2, 0.2, GRAY, x * 0.62, Y, 0); const h = add(new THREE.CylinderGeometry(1.4, 1.4, 0.12, 6), 0x2a2f45, x, Y, 0); h.rotation.z = Math.PI / 2; }, 1.8);
+        both((x) => flame(x, Y, 0.7, 0.12, 0.4), 0.25);
+        break;
+      }
+      case 'dove': {   // a white dove with an olive branch
+        ball(0.6, WHITE, 0, 0, 0, 0.9, 0.85, 1.8); ball(0.38, WHITE, 0, 0.3, -1.1);
+        const bk = add(new THREE.ConeGeometry(0.08, 0.3, 8), 0xff9f40, 0, 0.25, -1.55); bk.rotation.x = -Math.PI / 2;
+        both((x) => ball(0.05, 0x111111, x, 0.4, -1.38), 0.17);
+        box(0.04, 0.04, 0.6, 0x3a7a2a, 0.2, 0.2, -1.7); both((x) => ball(0.07, 0x5fa34d, 0.2 + x, 0.2, -1.8), 0.08);
+        tris(mir([[-0.4, 0.2, -0.4], [-3.6, 0.8, 0.2], [-0.4, 0.2, 0.7], [-3.6, 0.8, 0.2], [-2.8, 0.6, 0.9], [-0.4, 0.2, 0.7]]), 0xf4f4f8);
+        tris([[0, 0.05, 1.0], [-0.6, 0.05, 2.2], [0.6, 0.05, 2.2]], WHITE);
+        both((x) => gearBox(0.08, 0.5, 0.08, x, -0.75, 0.2, 0xff8fb8), 0.2);
+        break;
+      }
+      case 'parrot': {   // a rainbow parrot
+        const R = 0xe8302a, Yl = 0xffd23d, B = 0x2a6ccc;
+        ball(0.6, R, 0, 0, 0, 0.9, 0.9, 1.7); ball(0.42, R, 0, 0.35, -1.1);
+        const bk = add(new THREE.ConeGeometry(0.18, 0.5, 8), 0xf4f1ea, 0, 0.2, -1.55); bk.rotation.x = -Math.PI / 2 - 0.6;
+        both((x) => { ball(0.12, WHITE, x, 0.48, -1.32); ball(0.05, 0x111111, x * 1.15, 0.5, -1.4); }, 0.22);
+        tris(mir([[-0.4, 0.2, -0.4], [-1.7, 0.5, -0.2], [-0.4, 0.2, 0.8]]), R);
+        tris(mir([[-1.7, 0.5, -0.2], [-2.9, 0.7, 0.0], [-0.4, 0.2, 0.8]]), Yl);
+        tris(mir([[-2.9, 0.7, 0.0], [-3.6, 0.8, 0.5], [-0.4, 0.2, 0.8]]), B);
+        tris([[0, 0, 1.0], [-0.3, -0.1, 3.2], [0.3, -0.1, 3.2]], B);
+        both((x) => gearBox(0.1, 0.5, 0.1, x, -0.75, 0.2, 0x6b6b6b), 0.2);
+        break;
+      }
+      case 'flamingo': {   // pink flamingo: long neck, black wingtips, long legs
+        const P = 0xff8fb8, Pd = 0xe86a9a;
+        ball(0.6, P, 0, 0.1, 0, 0.9, 0.8, 1.6);
+        const n = tube(0.12, 0.12, 1.4, P, 0, 0.6, -1.3); n.rotation.x = Math.PI / 2 + 0.5;
+        ball(0.2, P, 0, 1.0, -2.0); const bk = add(new THREE.ConeGeometry(0.08, 0.4, 8), 0x222222, 0, 0.9, -2.3); bk.rotation.x = -Math.PI / 2 - 0.5;
+        tris(mir([[-0.4, 0.3, -0.4], [-3.4, 0.7, 0.3], [-0.4, 0.3, 0.8], [-3.4, 0.7, 0.3], [-2.6, 0.5, 1.0], [-0.4, 0.3, 0.8]]), P);
+        tris(mir([[-2.9, 0.64, 0.0], [-3.4, 0.72, 0.3], [-2.95, 0.62, 0.75]]), 0x222222);
+        both((x) => gearBox(0.06, 1.4, 0.06, x, -0.3, 0.3, Pd), 0.15);
+        break;
+      }
+      case 'goose': {   // a Canada goose
+        const Gr = 0x8a8a7a, K = 0x222222;
+        ball(0.7, Gr, 0, 0, 0, 0.9, 0.75, 1.6); ball(0.6, 0xe9e4d8, 0, -0.2, 0.1, 0.85, 0.55, 1.4);
+        const n = tube(0.13, 0.15, 1.2, K, 0, 0.55, -1.3); n.rotation.x = Math.PI / 2 + 0.6;
+        ball(0.22, K, 0, 0.95, -1.85, 1, 0.9, 1.3); both((x) => ball(0.08, WHITE, x, 0.92, -1.8), 0.17);
+        tris(mir([[-0.5, 0.3, -0.5], [-3.6, 0.7, 0.2], [-0.5, 0.3, 0.8], [-3.6, 0.7, 0.2], [-2.8, 0.5, 1.0], [-0.5, 0.3, 0.8]]), 0x6b6b5e);
+        both((x) => gearBox(0.12, 0.5, 0.15, x, -0.75, 0.4, 0xff8a1d), 0.25);
+        break;
+      }
+      case 'dolphin': {   // a flying dolphin
+        const B = 0x7a9ab8;
+        ball(1, B, 0, 0, 0, 0.8, 0.75, 2.6); ball(0.9, 0xe9eef5, 0, -0.2, -0.3, 0.7, 0.55, 2.2);
+        tube(0.3, 0.18, 0.8, B, 0, -0.1, -2.8); both((x) => ball(0.08, 0x111111, x, 0.15, -2.0), 0.5);
+        tris([[0, 0.6, 0], [0, 1.5, 0.8], [0, 0.6, 1.0]], B);
+        both((x, sd) => box(0.9, 0.08, 0.5, B, x, -0.45, -0.8, 0, -0.5 * sd, -0.4 * sd), 0.9);
+        tube(0.15, 0.45, 1.4, B, 0, 0.05, 3.0); tris(mir([[0, 0.05, 3.5], [-1.2, 0.1, 4.3], [-0.3, 0.05, 4.0]]), B);
+        break;
+      }
+      case 'firetruck': {   // a fire engine with wings, a ladder and flashing lights
+        const R = 0xd0202a;
+        box(2.0, 1.2, 5.4, R, 0, -0.1, 0.3); box(2.0, 0.7, 1.6, R, 0, 0.85, -1.6);
+        box(1.8, 0.5, 0.05, glassMat, 0, 0.85, -2.43); both((x) => box(0.05, 0.4, 1.0, glassMat, x, 0.9, -1.6), 1.01);
+        box(0.5, 0.15, 0.3, 0x3fa9f5, -0.45, 1.28, -1.6); box(0.5, 0.15, 0.3, RED, 0.45, 1.28, -1.6);
+        both((x) => box(0.08, 0.08, 4.0, GRAY, x, 0.6, 1.2), 0.35); for (let k = 0; k < 7; k++) box(0.7, 0.06, 0.06, GRAY, 0, 0.6, -0.6 + k * 0.6);
+        both((x) => box(0.05, 0.15, 5.4, WHITE, x, -0.3, 0.3), 1.01);
+        both((x) => { gearBox(0.3, 0.6, 0.6, x, -0.7, -1.6); gearBox(0.3, 0.6, 0.6, x, -0.7, 1.8); }, 0.95);
+        box(8, 0.15, 1.4, WHITE, 0, 0.2, 0.2);
+        both((x) => { tube(0.3, 0.35, 1.2, GRAY, x, 0.2, -0.6); propeller(x, 0.2, -1.25, 2.0); }, 2.8);
+        box(0.12, 1.2, 0.9, R, 0, 1.1, 2.7);
+        break;
+      }
+      case 'tractor': {   // a green farm tractor with a propeller and wings
+        const G = 0x3fa34d, Yl = 0xffd23d;
+        box(1.0, 0.9, 2.0, G, 0, 0, -0.9); box(1.4, 0.4, 1.4, G, 0, -0.05, 0.8); box(1.6, 0.1, 1.6, Yl, 0, 1.35, 0.8);
+        both((x) => { box(0.08, 1.3, 0.08, DARK, x, 0.7, 0.1); box(0.08, 1.3, 0.08, DARK, x, 0.7, 1.5); }, 0.7);
+        ball(0.25, 0x3fa9f5, 0, 0.4, 0.9); heads([[0, 0.75, 0.9]]);
+        box(0.12, 0.9, 0.12, DARK, 0.3, 0.8, -1.3);
+        both((x) => { wheelY(0.85, 0.5, DARK, x, -0.15, 0.8); wheelY(0.4, 0.52, Yl, x, -0.15, 0.8); wheelY(0.45, 0.35, DARK, x * 0.7, -0.55, -1.4); }, 1.0);
+        propeller(0, 0, -1.95, 1.8); box(7.0, 0.12, 1.2, Yl, 0, 0.5, -0.3);
+        break;
+      }
+      case 'lightning': {   // stealth fighter with a gold canopy
+        const G = 0x5a6270;
+        box(1.3, 0.8, 5.6, G, 0, 0, 0.2); nose(0.5, 1.8, G, -3.4); box(0.6, 0.45, 1.4, 0xd9b04a, 0, 0.55, -1.9);
+        both((x) => box(0.4, 0.6, 1.4, G, x, 0, -0.8), 0.8);
+        tris(mir([[-0.6, 0, -0.8], [-3.6, 0, 1.4], [-0.6, 0, 2.0]]), G);
+        both((x, sd) => box(0.1, 1.2, 1.1, G, x, 0.75, 2.0, 0.3, 0, -0.4 * sd), 0.55);
+        tris(mir([[-0.5, 0, 2.0], [-1.9, 0, 3.0], [-0.5, 0, 3.2]]), G);
+        tube(0.38, 0.42, 0.6, DARK, 0, 0, 3.1); flame(0, 0, 3.4, 0.35);
+        gearBox(0.2, 0.6, 0.2, 0, -0.7, -1.8); wheel(0.8, 0.8); wheel(-0.8, 0.8);
+        break;
+      }
+      case 'dart': {   // delta-wing jet with a red fin
+        const S = 0xc9d2dc;
+        tube(0.5, 0.55, 6.0, S, 0, 0, 0.3); nose(0.5, 2.2, S, -3.8); box(0.5, 0.4, 1.2, glassMat, 0, 0.5, -2.3);
+        tris(mir([[-0.5, 0, -1.2], [-4.0, 0, 2.8], [-0.5, 0, 3.2]]), 0x2a6ccc);
+        tris([[0, 0.4, 1.0], [0, 2.4, 3.0], [0, 0.4, 3.2]], RED);
+        tube(0.42, 0.5, 0.5, DARK, 0, 0, 3.5); flame(0, 0, 3.75, 0.4);
+        gearBox(0.18, 0.6, 0.18, 0, -0.7, -2.0); wheel(1.0, 1.6); wheel(-1.0, 1.6);
         break;
       }
       case 'whale': {   // a big blue whale with a water spout
