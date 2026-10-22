@@ -237,7 +237,9 @@ there's something to do. A checklist in the corner shows what's next:
 6. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
    runway, takes off and the autopilot flies you to the airport you booked and lands.
    You watch from your **window seat**, with a seatbelt sign that lights up for takeoff and
-   landing; VIEW (or C) swaps to the view from outside.
+   landing; VIEW (or C) swaps to the view from outside. Now and then at cruise height the
+   plane hits **turbulence**: everything shakes and bumps, the seatbelt sign dings on and
+   the captain asks everyone to sit down and buckle up, until the air is smooth again.
 
 After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
 your blue suitcase to come round, grab it, and walk out through the **EXIT**. Then book
