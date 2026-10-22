@@ -489,7 +489,27 @@ function boot(hot){
     { id: 'firetruck', name: 'Fire Truck', note: 'Fire engine with wings', color: '#d0202a', cruise: 55, boost: 130, pitch: 1.1, turn: 1.0, cam: 1.3, pax: 6, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'tractor', name: 'Tractor', note: 'Farm tractor with a propeller', color: '#3fa34d', cruise: 45, boost: 105, pitch: 1.3, turn: 1.3, fixedGear: true, pax: 1, sound: { mul: 0.6, vol: 0.05 } },
     { id: 'lightning', name: 'Lightning', note: 'Stealth fighter, Mach 1.15', color: '#5a6270', cruise: 120, boost: 400, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
-    { id: 'dart', name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } }
+    { id: 'dart', name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } },
+    { id: 'superjumbo', name: 'Superjumbo', note: 'Double-decker, 550 passengers', color: '#2a4f9a', cruise: 90, boost: 200, pitch: 0.8, turn: 0.7, cam: 1.9, pax: 550, sound: { mul: 1.6, vol: 0.055 } },
+    { id: 'cropduster', name: 'Crop Duster', note: 'Farm plane with a big engine', color: '#ffc23d', cruise: 60, boost: 140, pitch: 1.8, turn: 1.7, pax: 1, sound: { mul: 0.8, vol: 0.05 } },
+    { id: 'hotdog', name: 'Hot Dog', note: 'With mustard', color: '#b0442a', cruise: 45, boost: 110, pitch: 1.6, turn: 1.6, fixedGear: true, pax: 2, sound: { mul: 1.6, vol: 0.035 } },
+    { id: 'donut', name: 'Donut', note: 'Pink icing and sprinkles', color: '#ff8fb8', cruise: 40, boost: 100, pitch: 1.6, turn: 1.8, fixedGear: true, pax: 2, sound: { mul: 1.8, vol: 0.035 } },
+    { id: 'pencil', name: 'Pencil', note: 'Rocket pencil with an eraser', color: '#ffc23d', cruise: 75, boost: 190, pitch: 1.7, turn: 1.7, fixedGear: true, pax: 1, sound: { mul: 1.5, vol: 0.04 } },
+    { id: 'sub', name: 'Submarine', note: 'Yellow submarine, lands on lakes', color: '#ffd23d', cruise: 45, boost: 110, pitch: 1.2, turn: 1.1, cam: 1.3, water: true, fixedGear: true, pax: 8, sound: { mul: 0.6, vol: 0.045 } },
+    { id: 'ladybug', name: 'Ladybug', note: 'Red with black spots', color: '#d0202a', cruise: 45, boost: 110, pitch: 2.0, turn: 2.0, pax: 1, sound: { mul: 3.4, vol: 0.02 } },
+    { id: 'dragonfly', name: 'Dragonfly', note: 'Zippy dragonfly', color: '#2fb8a8', cruise: 65, boost: 160, pitch: 2.3, turn: 2.3, pax: 1, sound: { mul: 3.6, vol: 0.02 } },
+    { id: 'seagull', name: 'Seagull', note: 'Lands on lakes', color: '#b8c0c8', cruise: 55, boost: 130, pitch: 1.8, turn: 1.8, water: true, pax: 1, sound: { mul: 3, vol: 0.006 } },
+    { id: 'phoenix', name: 'Phoenix', note: 'Fire bird, Mach 1.15', color: '#ff6a1d', cruise: 110, boost: 395, pitch: 2.0, turn: 1.9, cam: 1.15, pax: 1, sound: { mul: 0.7, vol: 0.04 } },
+    { id: 'taxi', name: 'Taxi', note: 'Flying yellow cab', color: '#ffd23d', cruise: 55, boost: 130, pitch: 1.4, turn: 1.5, fixedGear: true, pax: 4, sound: { mul: 1.4, vol: 0.04 } },
+    { id: 'icecream', name: 'Ice Cream', note: 'Three scoops and a cherry', color: '#ff8fb8', cruise: 40, boost: 100, pitch: 1.6, turn: 1.7, fixedGear: true, pax: 1, sound: { mul: 2.6, vol: 0.02 } },
+    { id: 'snowman', name: 'Snowman', note: 'With a propeller hat', color: '#e9eef5', cruise: 40, boost: 100, pitch: 1.5, turn: 1.6, fixedGear: true, pax: 1, sound: { mul: 2.2, vol: 0.03 } },
+    { id: 'twinmustang', name: 'Twin Mustang', note: 'Two planes joined together', color: '#9aa5b0', cruise: 100, boost: 230, pitch: 1.6, turn: 1.4, cam: 1.2, pax: 2, sound: { mul: 1.0, vol: 0.05 } },
+    { id: 'trimotor', name: 'Trimotor', note: 'Old three-engine airliner', color: '#b8c0c8', cruise: 55, boost: 120, pitch: 1.1, turn: 1.0, cam: 1.4, pax: 12, sound: { mul: 0.8, vol: 0.05 } },
+    { id: 'turtle', name: 'Turtle', note: 'Slow and steady, lands on lakes', color: '#3f8a4a', cruise: 35, boost: 80, pitch: 1.2, turn: 1.2, water: true, fixedGear: true, pax: 2, sound: { mul: 0.5, vol: 0.02 } },
+    { id: 'octopus', name: 'Octopus', note: 'Eight arms, lands on lakes', color: '#9a4ab8', cruise: 45, boost: 110, pitch: 1.8, turn: 1.8, water: true, fixedGear: true, pax: 2, sound: { mul: 0.5, vol: 0.02 } },
+    { id: 'hummingbird', name: 'Hummingbird', note: 'Tiny, turns super fast', color: '#2fa86a', cruise: 60, boost: 150, pitch: 2.4, turn: 2.4, pax: 1, sound: { mul: 4, vol: 0.02 } },
+    { id: 'xplane', name: 'X-Plane', note: 'Rocket plane, Mach 1.4', color: '#1b1b22', cruise: 170, boost: 480, pitch: 1.1, turn: 1.0, cam: 1.4, pax: 1, sound: { mul: 1.4, vol: 0.055 } },
+    { id: 'train', name: 'Flying Train', note: 'Steam engine with wings', color: '#c0302a', cruise: 50, boost: 120, pitch: 1.0, turn: 1.0, cam: 1.35, fixedGear: true, pax: 30, sound: { mul: 0.7, vol: 0.05 } }
   ];
   // every plane carries passengers (the big ones were set above)
   const PAX = { cub: 3, biplane: 2, seaplane: 4, zippy: 2, glider: 2, hauler: 30, swift: 8, thunder: 2, stealth: 2, rocket: 6, saucer: 3,
@@ -1275,6 +1295,197 @@ function boot(hot){
         tris([[0, 0.4, 1.0], [0, 2.4, 3.0], [0, 0.4, 3.2]], RED);
         tube(0.42, 0.5, 0.5, DARK, 0, 0, 3.5); flame(0, 0, 3.75, 0.4);
         gearBox(0.18, 0.6, 0.18, 0, -0.7, -2.0); wheel(1.0, 1.6); wheel(-1.0, 1.6);
+        break;
+      }
+      case 'superjumbo': {   // double-decker airliner with four engines
+        const B = 0x2a4f9a;
+        tube(1.15, 1.2, 12, WHITE, 0, 0.2, 0); nose(1.2, 2.0, WHITE, -7.0, 0.2); box(1.2, 0.35, 0.8, darkGlass, 0, 0.9, -6.4);
+        windows(1.18, 0.0, -5, 5, 12); windows(1.08, 0.75, -4.6, 4.6, 11);
+        tris([[0, 1.2, 3.5], [0, 4.2, 6.4], [0, 1.2, 6.4]], B); box(4.4, 0.12, 1.4, WHITE, 0, 0.5, 5.8);
+        both((x, sd) => box(7.0, 0.18, 2.8, WHITE, x, 0.0, 0.8, 0, -0.45 * sd), 4.2);
+        [2.6, 5.2].forEach(px => both((x) => jet(x, -0.5, 0.5 + (Math.abs(x) - 4.2) * 0.48, 0.4, 2.0), px));
+        gearBox(0.3, 0.5, 0.3, 0, -0.75, -5.0); wheel(1.0, 0.5); wheel(-1.0, 0.5);
+        break;
+      }
+      case 'cropduster': {   // yellow farm plane with a big round engine and a spray bar
+        const Y = 0xffc23d;
+        box(1.0, 1.0, 4.4, Y, 0, 0, 0.2); const eng = add(new THREE.CylinderGeometry(0.75, 0.75, 0.6, 14), GRAY, 0, 0, -2.2); eng.rotation.x = Math.PI / 2;
+        propeller(0, 0, -2.6, 2.6); box(0.8, 0.5, 1.0, glassMat, 0, 0.65, 0.2);
+        box(9, 0.14, 1.5, Y, 0, -0.35, -0.4); box(8.0, 0.06, 0.06, DARK, 0, -0.5, 0.3);
+        box(0.12, 1.2, 1.0, Y, 0, 0.6, 2.4); box(2.8, 0.1, 0.8, Y, 0, 0.1, 2.5);
+        wheel(0.9, -0.8); wheel(-0.9, -0.8); gearBox(0.1, 0.3, 0.1, 0, -0.5, 2.2);
+        break;
+      }
+      case 'hotdog': {   // a hot dog in a bun with a squiggle of mustard
+        const Bun = 0xd9a05a, Sa = 0xb0442a, o = -0.2;
+        both((x) => ball(0.6, Bun, x, o - 0.35, 0, 0.7, 0.75, 2.4), 0.38);
+        ball(1, Sa, 0, o - 0.05, 0, 0.35, 0.35, 2.0);
+        for (let k = 0; k < 8; k++) box(0.06, 0.05, 0.4, 0xffd23d, k % 2 ? 0.12 : -0.12, o + 0.3, -1.4 + k * 0.4, 0, k % 2 ? 0.6 : -0.6, 0);
+        box(3.6, 0.06, 0.7, 0x3fa34d, 0, o - 0.3, 0.2); propeller(0, o - 0.05, -2.15, 1.4);
+        break;
+      }
+      case 'donut': {   // a pink-iced donut with sprinkles and a passenger in the hole
+        const o = -0.45, cols = [0xffffff, 0x3fa9f5, 0xffd23d, 0x3fa34d];
+        const d = add(new THREE.TorusGeometry(1.0, 0.5, 12, 24), 0xd9a05a, 0, o, 0); d.rotation.x = Math.PI / 2;
+        const ic = add(new THREE.TorusGeometry(1.0, 0.42, 10, 24), 0xff8fb8, 0, o + 0.14, 0); ic.rotation.x = Math.PI / 2; ic.scale.set(1, 1, 0.75);
+        for (let k = 0; k < 14; k++){ const a = k / 14 * Math.PI * 2, r = 1 + ((k % 3) - 1) * 0.25; box(0.05, 0.05, 0.22, cols[k % 4], Math.cos(a) * r, o + 0.5, Math.sin(a) * r, 0, a, 0); }
+        ball(0.22, 0x3fa9f5, 0, o, 0); heads([[0, o + 0.3, 0]]);
+        propeller(0, o, -1.6, 1.4);
+        break;
+      }
+      case 'pencil': {   // a rocket-powered pencil
+        const Y = 0xffc23d, o = -0.6;
+        const b = add(new THREE.CylinderGeometry(0.35, 0.35, 5, 6), Y, 0, o, 0); b.rotation.x = Math.PI / 2;
+        nose(0.35, 1.0, 0xe9c99a, -3.0, o); nose(0.12, 0.3, DARK, -3.4, o);
+        tube(0.36, 0.36, 0.3, silverMat, 0, o, 2.65); tube(0.35, 0.35, 0.5, 0xff8fb8, 0, o, 3.05);
+        both((x, sd) => box(1.6, 0.05, 0.8, RED, x, o, 0.8, 0, -0.4 * sd), 1.0);
+        flame(0, o, 3.3, 0.25, 0.4);
+        break;
+      }
+      case 'sub': {   // a yellow submarine with wings
+        const Y = 0xffd23d;
+        ball(1, Y, 0, 0, 0, 0.9, 0.9, 3.0); box(0.6, 0.9, 1.4, Y, 0, 1.1, -0.4);
+        box(0.08, 0.6, 0.08, GRAY, 0, 1.8, -0.8); box(0.08, 0.08, 0.3, GRAY, 0, 2.1, -0.9);
+        both((x) => [-1.2, 0, 1.2].forEach(z => ball(0.18, 0x7fd3e8, x, 0.1, z)), 0.82);
+        both((x) => box(1.2, 0.08, 0.6, Y, x, 0, 2.4), 0.7); box(0.08, 1.0, 0.6, Y, 0, 0.5, 2.6);
+        box(5.0, 0.1, 1.0, Y, 0, 0.1, -0.3); propeller(0, 0, 3.05, 1.2);
+        break;
+      }
+      case 'ladybug': {   // a ladybird with see-through wings
+        const R = 0xd0202a, K = 0x111111;
+        const sh = add(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), R, 0, -0.6, 0); sh.scale.set(1.0, 0.8, 1.3);
+        box(0.05, 0.06, 2.4, K, 0, 0.19, 0);
+        [[0.45, -0.05, -0.5], [-0.45, -0.05, -0.5], [0.55, -0.2, 0.5], [-0.55, -0.2, 0.5], [0.3, 0.1, 0.1], [-0.3, 0.1, 0.1]].forEach(([x, y, z]) => ball(0.15, K, x, y, z, 1, 0.5, 1));
+        ball(0.4, K, 0, -0.55, -1.2, 1, 0.8, 0.8); both((x) => ball(0.08, WHITE, x, -0.4, -1.5), 0.18);
+        both((x, sd) => box(0.03, 0.5, 0.03, K, x, -0.2, -1.45, -0.5, 0, -0.3 * sd), 0.12);
+        both((x, sd) => box(2.0, 0.03, 1.0, wingMat, x, 0.1, 0.2, 0, -0.3 * sd, 0.2 * sd), 1.4);
+        both((x) => [-0.4, 0.4].forEach(z => gearBox(0.06, 0.4, 0.06, x, -0.8, z, K)), 0.6);
+        break;
+      }
+      case 'dragonfly': {   // a dragonfly with four see-through wings
+        const G = 0x2fb8a8, B = 0x2a6ccc;
+        tube(0.1, 0.2, 4.0, G, 0, 0, 1.8); ball(0.35, G, 0, 0, -0.2, 1, 1, 1.6);
+        ball(0.35, B, 0, 0.05, -0.95); both((x) => ball(0.22, 0x1b6e8c, x, 0.15, -1.05), 0.22);
+        both((x, sd) => { box(2.6, 0.03, 0.5, wingMat, x, 0.25, -0.5, 0, -0.1 * sd); box(2.4, 0.03, 0.45, wingMat, x, 0.25, 0.15, 0, 0.1 * sd); }, 1.4);
+        both((x) => gearBox(0.04, 0.7, 0.04, x, -0.65, -0.2, 0x111111), 0.2);
+        break;
+      }
+      case 'seagull': {   // a seagull with grey gull wings and black tips
+        ball(0.55, WHITE, 0, 0, 0, 0.9, 0.85, 1.8); ball(0.35, WHITE, 0, 0.25, -1.0);
+        const bk = add(new THREE.ConeGeometry(0.08, 0.4, 8), 0xffc23d, 0, 0.2, -1.5); bk.rotation.x = -Math.PI / 2;
+        both((x) => ball(0.05, 0x111111, x, 0.35, -1.25), 0.17);
+        tris(mir([[-0.4, 0.2, -0.3], [-1.8, 0.7, 0.1], [-0.4, 0.2, 0.6], [-1.8, 0.7, 0.1], [-3.8, 0.3, 0.4], [-0.4, 0.2, 0.6]]), 0xb8c0c8);
+        tris(mir([[-3.2, 0.42, 0.25], [-3.8, 0.34, 0.4], [-3.3, 0.4, 0.55]]), 0x222222);
+        tris([[0, 0, 0.9], [-0.4, 0, 1.8], [0.4, 0, 1.8]], WHITE);
+        both((x) => gearBox(0.1, 0.5, 0.12, x, -0.75, 0.3, 0xffa040), 0.2);
+        break;
+      }
+      case 'phoenix': {   // a fire bird: flames stream out when it boosts
+        const O = 0xff6a1d, Yl = 0xffc23d, R = 0xd0202a;
+        ball(0.6, O, 0, 0, 0, 0.9, 0.85, 1.8); ball(0.4, R, 0, 0.3, -1.1);
+        const bk = add(new THREE.ConeGeometry(0.1, 0.4, 8), Yl, 0, 0.25, -1.6); bk.rotation.x = -Math.PI / 2;
+        both((x) => ball(0.06, 0x111111, x, 0.45, -1.4), 0.2);
+        tris([[0, 0.6, -1.2], [0, 1.3, -0.6], [0, 0.6, -0.8]], Yl);
+        tris(mir([[-0.4, 0.2, -0.4], [-2.0, 0.6, -0.2], [-0.4, 0.2, 0.8]]), R);
+        tris(mir([[-2.0, 0.6, -0.2], [-4.0, 0.9, 0.4], [-0.4, 0.2, 0.8]]), O);
+        tris(mir([[-4.0, 0.9, 0.4], [-4.4, 1.0, 1.0], [-3.0, 0.7, 1.0]]), Yl);
+        tris(mir([[0, 0, 1.0], [-0.6, -0.1, 3.4], [-0.05, 0, 2.8]]), Yl);
+        flame(0, 0, 1.4, 0.45, 0.1);
+        both((x) => gearBox(0.1, 0.5, 0.1, x, -0.75, 0.2, Yl), 0.2);
+        break;
+      }
+      case 'taxi': {   // a flying yellow cab
+        const Y = 0xffd23d, K = 0x111111;
+        box(1.8, 0.8, 4.2, Y, 0, -0.3, 0); box(1.6, 0.7, 2.0, Y, 0, 0.45, 0.2);
+        both((x) => box(0.04, 0.45, 1.6, glassMat, x, 0.48, 0.2), 0.81); box(1.4, 0.45, 0.05, glassMat, 0, 0.45, -0.82);
+        both((x) => { for (let k = 0; k < 8; k++) box(0.05, 0.2, 0.25, k % 2 ? K : WHITE, x, -0.15, -1.75 + k * 0.5); }, 0.91);
+        box(0.6, 0.25, 0.3, 0xfff1c0, 0, 0.95, 0.2);
+        both((x) => { wheelY(0.35, 0.3, K, x, -0.65, -1.3); wheelY(0.35, 0.3, K, x, -0.65, 1.3); }, 0.9);
+        box(6, 0.1, 1.0, WHITE, 0, 0.0, 0.2);
+        both((x) => { tube(0.2, 0.25, 0.8, GRAY, x, 0.0, -0.4); propeller(x, 0, -0.85, 1.4); }, 2.2);
+        break;
+      }
+      case 'icecream': {   // an ice-cream cone with three scoops and a cherry
+        const o = -0.4;
+        const c = add(new THREE.ConeGeometry(0.6, 2.4, 14), 0xd9a05a, 0, o, 1.0); c.rotation.x = Math.PI / 2;
+        ball(0.65, 0xff8fb8, 0, o, -0.3); ball(0.55, 0xfff1d6, 0, o, -1.0); ball(0.45, 0x9fe8c8, 0, o, -1.55); ball(0.15, RED, 0, o + 0.35, -1.75);
+        both((x, sd) => box(1.2, 0.08, 0.6, 0xd9a05a, x, o, 0.4, 0, -0.3 * sd), 0.9);
+        flame(0, o, 2.2, 0.15, 0.3);
+        break;
+      }
+      case 'snowman': {   // a snowman flying head first, with a propeller hat
+        const K = 0x111111;
+        ball(0.75, WHITE, 0, -0.25, 0.7); ball(0.55, WHITE, 0, -0.3, -0.4); ball(0.4, WHITE, 0, -0.3, -1.25);
+        nose(0.07, 0.4, 0xff8a1d, -1.8, -0.3); both((x) => ball(0.05, K, x, -0.15, -1.58), 0.13);
+        add(new THREE.CylinderGeometry(0.3, 0.3, 0.5, 14), K, 0, 0.25, -1.25); add(new THREE.CylinderGeometry(0.45, 0.45, 0.05, 14), K, 0, 0.05, -1.25);
+        add(new THREE.TorusGeometry(0.38, 0.08, 6, 16), RED, 0, -0.3, -0.85);
+        both((x, sd) => box(1.6, 0.06, 0.06, 0x6b4a2a, x, -0.3, -0.4, 0, 0.3 * sd, 0), 1.2);
+        spinner(0.55, -1.25, 1.4, 14);
+        break;
+      }
+      case 'twinmustang': {   // two fighter fuselages joined by one wing
+        const S = 0x9aa5b0;
+        both((x) => {
+          tube(0.4, 0.5, 5.0, S, x, 0, 0.3); const n = add(new THREE.ConeGeometry(0.5, 0.9, 14), S, x, 0, -2.65); n.rotation.x = -Math.PI / 2;
+          propeller(x, 0, -3.15, 2.4); ball(0.35, glassMat, x, 0.45, -0.8, 0.8, 0.8, 1.5); box(0.1, 1.0, 0.9, RED, x, 0.6, 2.6); wheel(x, -0.6);
+        }, 1.6);
+        box(9.6, 0.14, 1.6, S, 0, -0.15, -0.4); box(3.6, 0.1, 0.7, S, 0, 0.4, 2.7);
+        break;
+      }
+      case 'trimotor': {   // old corrugated-metal airliner with three engines
+        const S = 0xb8c0c8;
+        box(1.3, 1.5, 6.0, S, 0, 0.1, 0.3); tube(0.4, 0.45, 0.8, GRAY, 0, 0.1, -3.1); propeller(0, 0.1, -3.6, 2.2);
+        [-0.3, 0, 0.3, 0.6].forEach(y => both((x) => box(0.03, 0.04, 6.0, 0x9aa5b0, x, y, 0.3), 0.66));
+        windows(0.66, 0.4, -1.6, 1.8, 6);
+        box(11, 0.2, 1.8, S, 0, 0.95, -0.6);
+        both((x) => { tube(0.35, 0.4, 1.2, GRAY, x, 0.4, -1.4); propeller(x, 0.4, -2.1, 2.0); gearBox(0.25, 1.0, 0.25, x, -0.5, -0.9); }, 2.4);
+        box(0.12, 1.4, 1.2, S, 0, 1.1, 3.3); box(3.4, 0.1, 0.9, S, 0, 0.5, 3.4); gearBox(0.1, 0.4, 0.1, 0, -0.8, 3.0);
+        break;
+      }
+      case 'turtle': {   // a sea turtle with flippers
+        const G = 0x3f8a4a, o = -0.3;
+        const sh = add(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), 0x6b5a2a, 0, o - 0.55, 0); sh.scale.set(1.3, 0.8, 1.6);
+        ball(0.45, 0x8a7a3a, 0, o + 0.18, 0, 1, 0.3, 1.2); both((x) => ball(0.35, 0x8a7a3a, x, o - 0.05, 0, 1, 0.3, 1.4), 0.65);
+        const bl = add(new THREE.CylinderGeometry(1.25, 1.25, 0.15, 16), 0xd9c99a, 0, o - 0.6, 0); bl.scale.set(1, 1, 1.25);
+        ball(0.35, G, 0, o - 0.4, -1.9); both((x) => ball(0.06, 0x111111, x, o - 0.25, -2.15), 0.15);
+        both((x, sd) => { box(1.4, 0.08, 0.5, G, x, o - 0.6, -0.9, 0, -0.5 * sd); box(0.8, 0.08, 0.4, G, x * 0.8, o - 0.6, 1.1, 0, 0.5 * sd); }, 1.4);
+        break;
+      }
+      case 'octopus': {   // a purple octopus with its arms streaming behind
+        const P = 0x9a4ab8;
+        ball(1, P, 0, 0, -0.3, 0.9, 0.9, 1.4);
+        both((x) => { ball(0.25, WHITE, x, 0.25, -1.3); ball(0.12, 0x111111, x, 0.25, -1.5); }, 0.45);
+        for (let k = 0; k < 8; k++){ const a = k / 8 * Math.PI * 2; tube(0.05, 0.2, 2.6, P, Math.cos(a) * 0.5, Math.sin(a) * 0.5 - 0.1, 2.2); }
+        break;
+      }
+      case 'hummingbird': {   // a tiny hummingbird with a long beak
+        const G = 0x2fa86a, Rd = 0xd0202a;
+        ball(0.4, G, 0, 0, 0, 0.9, 0.85, 1.6); ball(0.25, Rd, 0, -0.1, -0.5); ball(0.28, G, 0, 0.15, -0.75);
+        nose(0.04, 1.0, 0x222222, -1.45, 0.12); both((x) => ball(0.04, 0x111111, x, 0.25, -0.95), 0.14);
+        both((x, sd) => box(1.8, 0.03, 0.5, wingMat, x, 0.25, -0.1, 0, -0.2 * sd, 0.3 * sd), 0.9);
+        tris(mir([[0, 0, 0.5], [-0.3, 0, 1.4], [0, 0, 1.2]]), G);
+        both((x) => gearBox(0.05, 0.5, 0.05, x, -0.75, 0.1, 0x222222), 0.12);
+        break;
+      }
+      case 'xplane': {   // black rocket plane
+        const K = 0x1b1b22;
+        box(1.0, 0.6, 7.0, K, 0, 0, 0); nose(0.5, 3.0, K, -5.0); box(1.02, 0.04, 7.0, WHITE, 0, 0.31, 0);
+        box(0.5, 0.3, 0.9, darkGlass, 0, 0.45, -2.6);
+        tris(mir([[-0.5, 0, 0.5], [-2.2, 0, 3.0], [-0.5, 0, 3.4]]), K);
+        both((x, sd) => box(0.1, 1.0, 1.0, K, x, 0.6, 3.0, 0.3, 0, -0.4 * sd), 0.55);
+        tube(0.4, 0.45, 0.6, DARK, 0, 0, 3.7); flame(0, 0, 4.0, 0.4, 0.5);
+        gearBox(0.2, 0.5, 0.2, 0, -0.75, -2.6); wheel(0.6, 1.6); wheel(-0.6, 1.6);
+        break;
+      }
+      case 'train': {   // a steam engine with wings
+        const R = 0xc0302a, K = 0x1b1b1b, Gd = 0xffc23d;
+        tube(0.7, 0.7, 3.6, K, 0, 0.1, -0.6); tube(0.72, 0.72, 0.3, DARK, 0, 0.1, -2.5);
+        add(new THREE.CylinderGeometry(0.25, 0.18, 0.8, 10), K, 0, 1.1, -1.8); ball(0.3, Gd, 0, 0.8, -0.5);
+        box(1.6, 1.6, 1.6, R, 0, 0.4, 1.9); box(1.8, 0.12, 1.9, K, 0, 1.25, 1.9); both((x) => box(0.04, 0.5, 0.6, glassMat, x, 0.7, 1.9), 0.81);
+        box(1.4, 0.4, 0.4, R, 0, -0.55, -2.7, 0.5); box(1.6, 0.3, 4.8, R, 0, -0.55, 0.2);
+        both((x) => [-1.6, -0.4, 0.8].forEach(z => wheelY(0.45, 0.2, R, x, -0.55, z)), 0.85);
+        box(7.0, 0.12, 1.4, WHITE, 0, 0.2, 0.2);
+        both((x) => { tube(0.25, 0.3, 1.0, GRAY, x, 0.2, -0.5); propeller(x, 0.2, -1.05, 1.8); }, 2.4);
         break;
       }
       case 'whale': {   // a big blue whale with a water spout

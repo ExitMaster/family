@@ -27,7 +27,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **85 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **105 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -119,9 +119,29 @@ turns):
 | **Tractor** | farm tractor with a propeller | 87 / 204 kt | medium |
 | **Lightning** | stealth fighter with a gold canopy, **breaks Mach 1** | 233 / 778 kt | quick |
 | **Delta Dart** | delta-wing jet with a red fin, **breaks Mach 1** | 243 / 816 kt | quick |
+| **Superjumbo** | double-decker airliner, 550 passengers | 175 / 389 kt | slowest to turn |
+| **Crop Duster** | yellow farm plane with a big round engine | 117 / 272 kt | quick |
+| **Hot Dog** | a hot dog with mustard | 87 / 214 kt | quick |
+| **Donut** | pink icing, sprinkles and a passenger in the hole | 78 / 194 kt | quick |
+| **Pencil** | rocket pencil with an eraser | 146 / 369 kt | quick |
+| **Submarine** | yellow submarine with wings: **lands on lakes** | 87 / 214 kt | slow to turn |
+| **Ladybug** | red with black spots | 87 / 214 kt | very quick |
+| **Dragonfly** | four see-through wings | 126 / 311 kt | very quick |
+| **Seagull** | grey gull wings: **lands on lakes** | 107 / 253 kt | quick |
+| **Phoenix** | fire bird, flames when boosting, **breaks Mach 1** | 214 / 768 kt | quick |
+| **Taxi** | flying yellow cab | 107 / 253 kt | medium |
+| **Ice Cream** | three scoops and a cherry | 78 / 194 kt | quick |
+| **Snowman** | with a carrot nose and a propeller hat | 78 / 194 kt | quick |
+| **Twin Mustang** | two fighters joined by one wing | 194 / 447 kt | medium |
+| **Trimotor** | old three-engine airliner | 107 / 233 kt | slow to turn |
+| **Turtle** | slow and steady: **lands on lakes** | 68 / 156 kt | medium |
+| **Octopus** | eight arms streaming behind: **lands on lakes** | 87 / 214 kt | quick |
+| **Hummingbird** | tiny, turns super fast | 117 / 292 kt | very quick |
+| **X-Plane** | black rocket plane, **breaks Mach 1** | 330 / 933 kt | slow to turn |
+| **Flying Train** | steam engine with wings, 30 passengers | 97 / 233 kt | slow to turn |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin) can land on and take off from any
-lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning and Delta Dart) go
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin, Submarine, Seagull, Turtle, Octopus) can land on and take off from any
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning, Delta Dart, Phoenix and X-Plane) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
 white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh, Blaster and the floats/hulls of the lake planes don't fold up.
