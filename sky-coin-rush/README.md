@@ -12,6 +12,7 @@ like (all the way up into space), grabbing coins that float in the sky.
 |---|---|
 | Fly (left/right turns, up climbs, down points the nose down; hold up to loop) | `↑` `↓` `←` `→` (also `W` climbs, `A` turns left) |
 | Dive mode: fly into a lake and under the water | `D` or the **DIVE** button |
+| Dolphin mode: jump in and out of the water | `J` or the **DOLPHIN** button |
 | Fire a missile | `S` or the **FIRE** button (hold to keep firing) |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Map: choose an airport to fly to | `M` or the **MAP** button |
@@ -237,6 +238,10 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   through the lake bed. Pull up to burst back out into the air. Hitting the shore under
   the water is a crash. In dive mode you can't land on lakes, so press D again to turn it
   off.
+- **Dolphin mode.** Press **J** (or DOLPHIN) and fly low over a lake: the plane leaps in
+  and out of the water all by itself, like a dolphin, a few metres under and a few metres
+  over (+10 for every jump). You still steer left and right. Near the shore it stays on
+  top of the water so you don't hit it. Press J again to stop.
 - **Missiles:** press **S** (or tap FIRE) to fire a missile from under a wing. A red
   ring marks its target: the other plane nearest the middle of your view, or if none is
   in front of you, the closest one (even behind you: the missile turns round). The
@@ -263,18 +268,23 @@ Press **Ride as a passenger** on the start card and be a passenger instead of th
 Walk with the arrows (or drag on a touch screen); press **SPACE** (or the big button) when
 there's something to do. A checklist in the corner shows what's next:
 
-1. **Book a flight at TICKETS.** You arrive by taxi outside the terminal. At the ticket
-   counter choose where to go (the nearest airports) and which passenger plane (the ones
-   with 20 or more seats), and get a **boarding pass** with your flight number, gate and
-   window seat.
+1. **Book a flight at TICKETS.** You arrive by taxi outside the terminal, with a suitcase
+   and a purple carry-on backpack. At the ticket counter choose where to go (every
+   airport for about 25 km around, with its distance and direction) and which plane (any
+   of them!), and get a **boarding pass** with your flight number, gate and window seat.
 2. **Drop off your suitcase at BAG DROP.** It gets a tag and rides away on a belt.
-3. **Go through SECURITY.** Walk through the metal detector (beep beep, all clear). It
-   won't let you through without a pass and with your bag still in your hand.
+3. **Go through SECURITY.** Walk through the metal detector (beep beep, all clear) while
+   your carry-on rides through the X-ray machine, then you pick it up again. It won't let
+   you through without a pass and with your suitcase still in your hand.
 4. **Show your pass to the crew.** Go out through GATE 1 to your plane, parked on the apron
-   with stairs up to its door.
-5. **Find your seat.** Walk down the aisle past the other passengers to your seat (gold,
-   with a red arrow over it) and sit down.
-6. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
+   with stairs up to its door. Other planes are parked at the other gates, and one taxis
+   back and forth behind yours.
+5. **Stow your carry-on.** Walk down the aisle to your row (your seat is gold, with a red
+   arrow over it) and put your backpack in the overhead bin. The cabin is as big as the
+   plane: 6 seats a row, as many rows as it needs, full of as many other passengers as it
+   carries (in a one-seat plane you're on your own).
+6. **Sit down** in your seat.
+7. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
    runway, takes off and the autopilot flies you to the airport you booked and lands.
    You watch from your **window seat**, with a seatbelt sign that lights up for takeoff and
    landing; VIEW (or C) swaps to the view from outside. Now and then at cruise height the
