@@ -287,7 +287,12 @@ there's something to do. A checklist in the corner shows what's next:
 7. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
    runway, takes off and the autopilot flies you to the airport you booked and lands.
    You watch from your **window seat**, with a seatbelt sign that lights up for takeoff and
-   landing; VIEW (or C) swaps to the view from outside. Now and then at cruise height the
+   landing. Look all the way round (360°) with the arrows (or W, A, D) or by dragging: your
+   own plane is hidden in this view so nothing is in the way. VIEW (or C) swaps to the view
+   from outside. Press **B** (or BATHROOM) to go to the plane's bathroom while
+   the seatbelt sign is off: flush the toilet (whoosh!), wash your hands, then go back to
+   your seat. The flight carries on meanwhile, and if the seatbelt sign comes on you're
+   asked to go back. Now and then at cruise height the
    plane hits **turbulence**: everything shakes and bumps, the seatbelt sign dings on and
    the captain asks everyone to sit down and buckle up, until the air is smooth again.
 
