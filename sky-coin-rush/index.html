@@ -309,6 +309,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
   <div class="ride-bottom">
     <div class="ride-prompt" id="ridePrompt"></div>
     <button class="ap boost" id="btn-ride-act" hidden>GO</button>
+    <button class="ap" id="btn-ride-wc" hidden>BATHROOM</button>
   </div>
 </div>
 <div id="fade"></div>
@@ -381,6 +382,8 @@ const sfx = (() => {
     chime(){ tone(784, 0.5, 'sine', 0.08); tone(622, 0.8, 'sine', 0.08, 0.35); },
     applause(){ for (let i = 0; i < 40; i++) noise(0.05, 0.05 + Math.random() * 0.08, 2600, 1400, 'bandpass', Math.random() * 1.8); },
     warn(){ tone(1250, 0.09, 'square', 0.045); },
+    flush(){ noise(1.5, 0.45, 2200, 120); noise(0.8, 0.15, 900, 300, 'bandpass', 0.6); },
+    water(){ noise(1.6, 0.18, 5000, 3500, 'bandpass'); },
     blast(v){ noise(1.1, 0.8 * v, 900, 50); tone(70, 0.7, 'sine', 0.3 * v, 0, 30); },
     hit(){ noise(0.4, 0.55, 1800, 150); tone(120, 0.45, 'sawtooth', 0.18, 0, 40); },
     splash(){ noise(0.9, 0.5, 2500, 200); },
@@ -2588,7 +2591,13 @@ function boot(hot){
   window.addEventListener('keydown', e => {
     if (e.target && e.target.tagName === 'INPUT') return;
     // riding as a passenger: the captain flies, so only the view and pause keys work
-    if (state === 'play' && F.ride && !/^(KeyC|KeyV|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
+    if (state === 'play' && F.ride){
+      if (e.code === 'KeyB'){ e.preventDefault(); toggleBathroom(); return; }
+      if (ride.bath && (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE')){ e.preventDefault(); bathAction(); return; }
+    }
+    // (the arrows, W, A and D look round from the window seat)
+    if (state === 'play' && F.ride && !/^(KeyC|KeyV|Escape|KeyP|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyD)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
+    if (state === 'play' && F.ride && e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     if (state === 'ride' && !ride.ui){
       if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE'){ e.preventDefault(); rideAction(); return; }
       if (e.code === 'Escape'){ goMenu(); return; }
@@ -3092,7 +3101,7 @@ function boot(hot){
   }
   // Dive mode: instead of splashing, the plane goes into a lake and flies under the water
   function toggleDive(){
-    if (state !== 'play' || F.crashT > 0) return;
+    if (state !== 'play' || F.crashT > 0 || F.ride) return;
     if (F.under){ toast('Pull up to the surface first!', 'info'); return; }
     F.diveMode = !F.diveMode; sfx.ap(F.diveMode);
     if (!F.diveMode) F.dolphin = false;
@@ -3410,8 +3419,11 @@ function boot(hot){
     const camK = plane.cam || 1;
     const winCam = F.ride && ride.view === 0 && F.crashT <= 0;
     if (winCam){
-      // ride mode, window seat: looking out of the side of the plane, past the wing
-      camBase.set(F.x, F.y, F.z).addScaledVector(vRight, ride.side * 1.05 * PLANE_SCALE).addScaledVector(vUp, 0.3 * PLANE_SCALE).addScaledVector(vFwd, -0.6 * PLANE_SCALE);
+      // ride mode, window seat: your own plane is hidden so you can look all the way round
+      // (arrows / W A D, or drag); it starts out looking sideways out of your window
+      ride.lookYaw += clamp((keys.r || keys.dd ? 1 : 0) - (keys.l ? 1 : 0) + stick.x, -1, 1) * 1.8 * dt;
+      ride.lookPitch = clamp(ride.lookPitch + clamp((keys.u ? 1 : 0) - (keys.d ? 1 : 0) + stick.y, -1, 1) * 1.2 * dt, -1.1, 1.5);
+      camBase.set(F.x, F.y, F.z).addScaledVector(vUp, 0.3 * PLANE_SCALE);
     } else if (camView){
       // front view: held at a set spot ahead of the nose (relative to the plane, so it
       // doesn't fall behind at speed)
@@ -3423,11 +3435,15 @@ function boot(hot){
       if (camSnap) camBase.copy(camT); else camBase.lerp(camT, 1 - Math.exp(-dt * 6));
     }
     camSnap = false;
+    planeBody.visible = !winCam;
     const cg = groundAt(camBase.x, camBase.z), camFloor = (F.under && cg < -2 ? cg : Math.max(cg, 0)) + 1.5;
     if (camBase.y < camFloor) camBase.y = camFloor;
     camera.position.copy(camBase);
     if (shake > 0){ const s = shake * shake; camera.position.x += (Math.random() - 0.5) * s * 1.6; camera.position.y += (Math.random() - 0.5) * s * 1.6; }
-    if (winCam) look.copy(camBase).addScaledVector(vRight, ride.side * 20).addScaledVector(vFwd, 5).addScaledVector(vUp, -9);
+    if (winCam){
+      const a = ride.side * (Math.PI / 2 - 0.24) + ride.lookYaw, pt = -0.41 + ride.lookPitch, cp = Math.cos(pt);
+      look.copy(camBase).addScaledVector(vFwd, Math.cos(a) * cp * 20).addScaledVector(vRight, Math.sin(a) * cp * 20).addScaledVector(vUp, Math.sin(pt) * 20);
+    }
     else if (camView) look.set(F.x, F.y, F.z).addScaledVector(camUpS, 0.8 * camK);
     else look.set(F.x, F.y, F.z).addScaledVector(vFwd, 20).addScaledVector(camUpS, 1.5);
     camera.up.copy(winCam ? vUp : camUpS);
@@ -3518,7 +3534,9 @@ function boot(hot){
         toast('Turbulence! Seatbelt sign on', 'warn');
         announce('Ladies and gentlemen, we are flying through some turbulence. Please return to your seats and fasten your seatbelts.');
       }
-      $('beltSign').classList.toggle('on', F.ground || F.autoFinal || agl < 700 || ride.turbT > 0);
+      const beltOn = F.ground || F.autoFinal || agl < 700 || ride.turbT > 0;
+      $('beltSign').classList.toggle('on', beltOn);
+      if (ride.bath && beltOn && !ride.bathWarn){ ride.bathWarn = true; sfx.chime(); toast('Seatbelt sign is on! Please go back to your seat', 'warn'); }
       if (!ride.arrived && F.ground && F.autoBrake && F.speed < 0.5){
         const f = airfieldAt(F.x, F.z);
         if (f && f.a === ride.to){ ride.arrived = true; setTimeout(rideArrived, 2200); }
@@ -3558,8 +3576,8 @@ function boot(hot){
   const CAM_NEAR = camera.near, CAM_FAR = camera.far;
   const ride = { active: false, from: null, to: null, plane: null, prevPlane: null, flight: '', row: 1, letter: 'A', side: -1,
     booked: false, bagDone: false, cleared: false, boarded: false, inCabin: false, seated: false, belted: false, arrived: false, ui: false,
-    hall: false, claimed: false, stowed: false, cabRows: 30, xrayT: 0, bagT: 0, bagA: 0, turbT: 0, nextTurb: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
-  const RH = { steps: $('rideSteps'), prompt: $('ridePrompt'), act: $('btn-ride-act') };
+    hall: false, claimed: false, stowed: false, lookYaw: 0, lookPitch: 0, cabRows: 30, xrayT: 0, bagT: 0, bagA: 0, turbT: 0, nextTurb: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
+  const RH = { steps: $('rideSteps'), prompt: $('ridePrompt'), act: $('btn-ride-act'), wc: $('btn-ride-wc') };
   const rideScene = new THREE.Scene();
   rideScene.background = new THREE.Color(0xa9d8f2);
   rideScene.fog = new THREE.Fog(0xa9d8f2, 90, 300);
@@ -3839,7 +3857,7 @@ function boot(hot){
     camBase.set(0, 3.4, 22);
     camera.near = 0.1; camera.far = 900; camera.fov = baseFov; camera.updateProjectionMatrix();
     $('hud').classList.remove('riding'); $('winFrame').hidden = true;
-    $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); renderSteps();
+    $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); RH.wc.hidden = true; ride.bath = false; renderSteps();
     state = 'ride'; show(null);
     toast('Welcome to ' + from.name + ' airport!', 'info');
   }
@@ -3933,11 +3951,11 @@ function boot(hot){
     const a = ride.from;
     plane = ride.plane; buildPlane(plane);
     resetFlight(a.x - a.fx * 112, a.z - a.fz * 112, a.hdg);
-    F.ride = true; F.dest = ride.to; ride.view = 0; ride.arrived = false; ride.turbT = 0; ride.nextTurb = rnd(20, 35);
+    F.ride = true; F.dest = ride.to; ride.view = 0; ride.arrived = false; ride.lookYaw = ride.lookPitch = 0; ride.turbT = 0; ride.bath = false; ride.nextTurb = rnd(20, 35);
     $('hud').classList.add('riding'); $('winFrame').hidden = false;
     $('rideHud').hidden = false; $('rideHud').classList.add('flying');
-    RH.steps.innerHTML = '<li class="now">Flight ' + ride.flight + ' · seat ' + ride.row + ride.letter + '</li><li>' + a.name + ' → ' + ride.to.name + '</li><li>Your captain is flying</li>';
-    txt(RH.prompt, ''); RH.act.hidden = false; txt(RH.act, 'VIEW');
+    RH.steps.innerHTML = '<li class="now">Flight ' + ride.flight + ' · seat ' + ride.row + ride.letter + '</li><li>' + a.name + ' → ' + ride.to.name + '</li><li>Your captain is flying</li><li>Look around: arrows or drag</li><li>Bathroom: B</li>';
+    txt(RH.prompt, ''); RH.act.hidden = false; txt(RH.act, 'VIEW'); RH.wc.hidden = false; txt(RH.wc, 'BATHROOM');
     updatePowers(true);
     state = 'play'; show(null); toast('Flight ' + ride.flight + ': cleared for takeoff', 'info');
   }
@@ -3947,7 +3965,7 @@ function boot(hot){
     fadeTo(startClaim);
   }
   function startClaim(){
-    F.ride = false; $('hud').classList.remove('riding'); $('winFrame').hidden = true; $('rideHud').classList.remove('flying'); hushAnnounce();
+    F.ride = false; ride.bath = false; RH.wc.hidden = true; $('hud').classList.remove('riding'); $('winFrame').hidden = true; $('rideHud').classList.remove('flying'); hushAnnounce();
     Object.assign(ride, { hall: true, claimed: false, inCabin: false, seated: false, ui: false, act: null, x: HX, z: -12, yaw: Math.PI });
     walker.visible = true; walkerBag.visible = false; carryOn.visible = true; binBag.visible = false;
     beltBags.forEach((b, k) => { b.m.visible = true; b.a = b.mine ? Math.PI / 2 : Math.PI / 2 + k / 11 * Math.PI * 2; });
@@ -3969,7 +3987,58 @@ function boot(hot){
   $('btn-ride-again').addEventListener('click', () => fadeTo(() => rideStart(ride.to)));
   $('btn-ride-menu').addEventListener('click', goMenu);
   $('btn-ride-exit').addEventListener('click', e => { e.currentTarget.blur(); goMenu(); });
-  RH.act.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.ride) toggleView(); else rideAction(); });
+  RH.act.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.ride){ if (ride.bath) bathAction(); else toggleView(); } else rideAction(); });
+  RH.wc.addEventListener('click', e => { e.currentTarget.blur(); toggleBathroom(); });
+
+  // the plane's bathroom: flush, wash your hands, back to your seat (the flight carries on)
+  const BX = 800;
+  rb(1.8, 0.05, 2.8, 0x9aa5b0, BX, 0, 0); rb(1.8, 2.2, 0.05, 0xe9eef5, BX, 1.1, -1.42);
+  rb(0.05, 2.2, 2.8, 0xe9eef5, BX - 0.92, 1.1, 0); rb(0.05, 2.2, 2.8, 0xe9eef5, BX + 0.92, 1.1, 0);
+  rb(1.8, 2.2, 0.05, 0xd9dde3, BX, 1.1, 1.42); rb(1.8, 0.05, 2.8, 0xf4f4f8, BX, 2.2, 0);
+  rb(0.6, 0.03, 0.4, new THREE.MeshBasicMaterial({ color: 0xfff8e0 }), BX, 2.17, 0);
+  add3(new THREE.CylinderGeometry(0.2, 0.25, 0.4, 16), WHITE, BX - 0.35, 0.2, -1.0);
+  add3(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 18), WHITE, BX - 0.35, 0.43, -1.0);
+  const bowlWater = add3(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 12), 0x5fb8e8, BX - 0.35, 0.45, -1.0);
+  rb(0.45, 0.5, 0.04, WHITE, BX - 0.35, 0.72, -1.3); rb(0.5, 0.4, 0.2, WHITE, BX - 0.35, 0.75, -1.33); rb(0.1, 0.06, 0.04, silverMat, BX - 0.35, 0.98, -1.22);
+  rb(0.6, 0.08, 0.45, 0xd9dde3, BX + 0.5, 0.85, -1.15); add3(new THREE.CylinderGeometry(0.18, 0.13, 0.1, 14), WHITE, BX + 0.5, 0.86, -1.12);
+  rb(0.04, 0.2, 0.04, silverMat, BX + 0.5, 1.0, -1.32); rb(0.04, 0.04, 0.15, silverMat, BX + 0.5, 1.1, -1.26);
+  const tapWater = add3(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 6), 0x9fd3f0, BX + 0.5, 0.98, -1.2); tapWater.visible = false;
+  rb(0.6, 0.6, 0.02, new THREE.MeshPhongMaterial({ color: 0xbfefff, shininess: 120, specular: 0xffffff }), BX + 0.5, 1.5, -1.39);
+  rb(0.12, 0.15, 0.08, 0xff8fb8, BX + 0.75, 0.95, -1.25);
+  { const w = new THREE.Mesh(new THREE.CircleGeometry(0.18, 16), mat(0x9fd3f0)); w.scale.y = 1.4; w.position.set(BX - 0.89, 1.4, -0.2); w.rotation.y = Math.PI / 2; rideScene.add(w); }
+  signAt(BX, 1.95, 1.39, Math.PI).add(signMesh('LAVATORY', 0.8, 0.2, '#1b2340', '#ffffff'));
+  const BATH_ACTS = ['FLUSH THE TOILET', 'WASH YOUR HANDS', 'BACK TO YOUR SEAT'];
+  function toggleBathroom(){
+    if (!F.ride || state !== 'play') return;
+    if (ride.bath){ leaveBath(); return; }
+    if (F.ground || $('beltSign').classList.contains('on')){ sfx.chime(); toast('The seatbelt sign is on. Please stay in your seat!', 'warn'); return; }
+    fadeTo(() => {
+      ride.bath = true; ride.bathStep = 0; ride.bathWarn = false; ride.flushT = ride.washT = 0;
+      $('winFrame').hidden = true; camera.near = 0.05; camera.updateProjectionMatrix();
+      txt(RH.act, BATH_ACTS[0]); txt(RH.wc, 'BACK TO SEAT'); txt(RH.prompt, 'Press SPACE or tap the button');
+      toast('You went to the bathroom', 'info');
+    });
+  }
+  function leaveBath(){
+    fadeTo(() => {
+      ride.bath = false; $('winFrame').hidden = ride.view !== 0; camera.near = 1; camera.updateProjectionMatrix();
+      txt(RH.act, 'VIEW'); txt(RH.wc, 'BATHROOM'); txt(RH.prompt, ''); tapWater.visible = false;
+      toast('Back in your seat', 'info');
+    });
+  }
+  function bathAction(){
+    if (!ride.bath) return;
+    if (ride.bathStep === 0){ ride.flushT = 1.6; sfx.flush(); toast('Whoosh!', ''); }
+    else if (ride.bathStep === 1){ ride.washT = 1.8; sfx.water(); toast('Squeaky clean hands!', ''); }
+    else { leaveBath(); return; }
+    ride.bathStep++; txt(RH.act, BATH_ACTS[ride.bathStep]);
+  }
+  function bathCam(dt){
+    if (ride.flushT > 0){ ride.flushT -= dt; bowlWater.rotation.y += dt * 12; bowlWater.scale.setScalar(0.6 + 0.4 * Math.abs(Math.sin(ride.flushT * 4))); }
+    else bowlWater.scale.setScalar(1);
+    ride.washT = Math.max(0, ride.washT - dt); tapWater.visible = ride.washT > 0;
+    camera.position.set(BX, 1.55, 1.1); camera.up.set(0, 1, 0); camera.lookAt(BX, 0.95, -1.2);
+  }
 
   function updateRide(dt){
     t += dt;
@@ -4071,6 +4140,7 @@ function boot(hot){
     if (dt > 0.05) dt = 0.05;
     if (state === 'ride'){ updateRide(dt); renderer.render(rideScene, camera); return; }
     if (state !== 'paused') updateFree(dt);
+    if (F.ride && ride.bath){ bathCam(dt); renderer.render(rideScene, camera); return; }
     renderer.render(scene, camera);
   }
 
