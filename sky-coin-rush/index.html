@@ -201,6 +201,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="ap" id="btn-map" aria-label="Choose an airport to fly to (M)">MAP</button>
       <button class="ap" id="btn-view" aria-label="Look at the front of the plane (C)">VIEW</button>
       <button class="ap" id="btn-dive" aria-label="Dive mode: fly under the water (D)">DIVE</button>
+      <button class="ap" id="btn-dolphin" aria-label="Dolphin mode: jump in and out of the water (J)">DOLPHIN</button>
       <span class="hint">Airports are everywhere: follow the arrow and the light beacons, or tap LAND (L) to fly to the nearest one and land.</span>
     </div>
   </div>
@@ -224,6 +225,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
         <span><kbd>←↑↓→</kbd> <kbd>W</kbd> <kbd>A</kbd></span><span>Fly: left and right turn, up climbs, down points the nose down (W climbs, A turns left). Keep holding up to fly a loop! On touch, drag anywhere.</span>
         <span><kbd>Space</kbd> <kbd>Shift</kbd></span><span>Boost (or hold BOOST)</span>
         <span><kbd>D</kbd></span><span>Dive mode: fly into a lake and under the water (or tap DIVE)</span>
+        <span><kbd>J</kbd></span><span>Dolphin mode: over a lake the plane jumps in and out of the water by itself (or tap DOLPHIN)</span>
         <span><kbd>S</kbd></span><span>Fire a missile at the plane in the red ring (or tap FIRE)</span>
         <span><kbd>C</kbd></span><span>Front view: see the front of your plane (or tap VIEW)</span>
         <span><kbd>G</kbd></span><span>Landing gear up or down (or tap GEAR)</span>
@@ -2597,6 +2599,7 @@ function boot(hot){
     if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
     if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
     if (e.code === 'KeyD' && state === 'play'){ e.preventDefault(); toggleDive(); }
+    if (e.code === 'KeyJ' && state === 'play'){ e.preventDefault(); toggleDolphin(); }
     if ((e.code === 'KeyC' || e.code === 'KeyV') && state === 'play'){ e.preventDefault(); toggleView(); }
     if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
     if (e.code === 'Escape' || e.code === 'KeyP'){ state === 'play' ? pause() : state === 'paused' && resume(); }
@@ -2658,6 +2661,7 @@ function boot(hot){
   $('btn-flip').addEventListener('click', e => { toggleFlip(); e.currentTarget.blur(); });
   $('btn-view').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
   $('btn-dive').addEventListener('click', e => { toggleDive(); e.currentTarget.blur(); });
+  $('btn-dolphin').addEventListener('click', e => { toggleDolphin(); e.currentTarget.blur(); });
   const fireBtn = $('btn-fire');
   const holdFire = on => e => { keys.f = on; fireBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
   fireBtn.addEventListener('pointerdown', holdFire(true));
@@ -2740,7 +2744,7 @@ function boot(hot){
     if (state === 'play' && F.flipped) parts.push('<span class="chip power boost">UPSIDE DOWN</span>');
     if (state === 'play' && F.ride && ride.turbT > 0) parts.push('<span class="chip power warn">TURBULENCE</span>');
     if (state === 'play' && F.under) parts.push('<span class="chip power">UNDERWATER<b>' + Math.round(-F.y * 3.28 / 5) * 5 + ' ft</b></span>');
-    else if (state === 'play' && F.diveMode) parts.push('<span class="chip power">DIVE MODE</span>');
+    else if (state === 'play' && F.diveMode) parts.push('<span class="chip power">' + (F.dolphin ? 'DOLPHIN MODE' : 'DIVE MODE') + '</span>');
     if (state === 'play' && F.incoming) parts.push('<span class="chip power warn">MISSILE!</span>');
     const k = parts.join('');
     if (force || k !== powKey){ powKey = k; H.powers.innerHTML = k; }
@@ -3091,17 +3095,28 @@ function boot(hot){
     if (state !== 'play' || F.crashT > 0) return;
     if (F.under){ toast('Pull up to the surface first!', 'info'); return; }
     F.diveMode = !F.diveMode; sfx.ap(F.diveMode);
+    if (!F.diveMode) F.dolphin = false;
     toast(F.diveMode ? 'Dive mode: fly into a lake!' : 'Dive mode off', '');
     if (F.diveMode) announce('We are getting ready to dive under the water. Take a deep breath!');
   }
+  // Dolphin mode: dive mode where, over a lake, the plane leaps in and out of the water by
+  // itself (you still steer left and right)
+  function toggleDolphin(){
+    if (state !== 'play' || F.crashT > 0 || F.ride) return;
+    F.dolphin = !F.dolphin; sfx.ap(F.dolphin);
+    if (F.dolphin){ F.diveMode = true; F.dolT = 0; toast('Dolphin mode: fly low over a lake!', ''); announce('Dolphin mode! We will be jumping in and out of the water.'); }
+    else toast('Dolphin mode off', '');
+  }
   function enterWater(){
     F.under = true; sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4); shake = Math.max(shake, REDUCED ? 0.1 : 0.35);
+    if (F.dolphin){ F.diveT = t; return; }
     if (t - F.diveT > 6){ score += 50; toast('Dive! +50', ''); } else toast('Dive!', '');
     F.diveT = t;
     announce('We are now under the water. Look at all the fish!');
   }
   function leaveWater(){
     F.under = false; sfx.splash(); burst(F.x, 0.3, F.z, 0xe6f4ff, 18, 1.4);
+    if (F.dolphin){ score += 10; toast('Dolphin jump! +10', ''); return; }
     toast('Splash! Back in the air', '');
   }
   function toggleAutoLand(){
@@ -3159,7 +3174,7 @@ function boot(hot){
     clearFreeItems(); clearMissiles(); hushAnnounce();
     chain = 0; mult = 1; lastCoinT = -9;   // coins, score and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
-    Object.assign(F, { x, y: restAt(x, z), z, yaw, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0, annCruise: false, annDesc: null, incoming: false, diveMode: false, under: false, diveT: -99, bubT: 0, ride: false });
+    Object.assign(F, { x, y: restAt(x, z), z, yaw, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0, annCruise: false, annDesc: null, incoming: false, diveMode: false, under: false, diveT: -99, bubT: 0, ride: false, dolphin: false, dolT: 0 });
     setLevel(yaw, 0); camUpS.set(0, 1, 0); showGear(1);
     fCX = fCZ = treeCX = treeCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
@@ -3207,6 +3222,18 @@ function boot(hot){
     if (invertY) ay = -ay;
     if (Math.abs(ax) < 0.05) ax = 0;
     if (Math.abs(ay) < 0.05) ay = 0;
+    if (F.dolphin && state === 'play' && !F.ground && !F.auto && F.crashT <= 0){
+      // dolphin mode: over a deep lake, swing between a few metres under and a few metres over
+      // the water; near the shore stay on top so you don't hit it
+      const g = groundAt(F.x, F.z), ahead = groundAt(F.x + vFwd.x * 70, F.z + vFwd.z * 70);
+      if (g < -6 && F.y < 80){
+        F.dolT += dt;
+        const top = 6, bottom = ahead < -6 ? Math.max(g + 3, -9) : 4, mid = (top + bottom) / 2, amp = (top - bottom) / 2;
+        const want = mid + amp * Math.sin(F.dolT * Math.PI * 2 / 3.2);
+        const pitchT = clamp((want - F.y) * 0.08, -0.55, 0.55);
+        ay = clamp((pitchT - F.pitch) * 4, -1, 1);
+      }
+    }
     if (F.ride && state === 'play'){
       // ride mode: the captain flies. Roll down the runway and lift off, then autopilot to the booked airport
       ax = 0; ay = F.ground && !F.autoBrake && F.speed >= VR ? 1 : 0;
@@ -3501,6 +3528,8 @@ function boot(hot){
       if (F.autoBrake && F.speed > 1) prompt = 'Landed! Braking…';
       else if (F.autoBrake) prompt = 'Hold ' + up + ' to take off again';
       else prompt = F.speed < VR ? 'Takeoff roll · ' + Math.round(F.speed * 1.944) + ' kt' : 'Climb! Hold ' + up + ' or drag ' + up.toLowerCase();
+    } else if (F.crashT <= 0 && F.dolphin && !F.under && groundAt(F.x, F.z) > -6){
+      prompt = 'Dolphin mode: fly low over a lake';
     } else if (F.crashT <= 0 && F.auto){
       prompt = F.autoFinal ? 'Auto-land: final approach' : 'Auto-land: flying to ' + F.target.name;
     } else if (F.crashT <= 0 && airfieldAt(F.x, F.z) && F.y < airfieldAt(F.x, F.z).a.elev + 80){

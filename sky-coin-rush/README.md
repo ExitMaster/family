@@ -12,6 +12,7 @@ like (all the way up into space), grabbing coins that float in the sky.
 |---|---|
 | Fly (left/right turns, up climbs, down points the nose down; hold up to loop) | `↑` `↓` `←` `→` (also `W` climbs, `A` turns left) |
 | Dive mode: fly into a lake and under the water | `D` or the **DIVE** button |
+| Dolphin mode: jump in and out of the water | `J` or the **DOLPHIN** button |
 | Fire a missile | `S` or the **FIRE** button (hold to keep firing) |
 | Boost | hold `SPACE`, `SHIFT` or the **BOOST** button |
 | Map: choose an airport to fly to | `M` or the **MAP** button |
@@ -237,6 +238,10 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   through the lake bed. Pull up to burst back out into the air. Hitting the shore under
   the water is a crash. In dive mode you can't land on lakes, so press D again to turn it
   off.
+- **Dolphin mode.** Press **J** (or DOLPHIN) and fly low over a lake: the plane leaps in
+  and out of the water all by itself, like a dolphin, a few metres under and a few metres
+  over (+10 for every jump). You still steer left and right. Near the shore it stays on
+  top of the water so you don't hit it. Press J again to stop.
 - **Missiles:** press **S** (or tap FIRE) to fire a missile from under a wing. A red
   ring marks its target: the other plane nearest the middle of your view, or if none is
   in front of you, the closest one (even behind you: the missile turns round). The
