@@ -2614,6 +2614,7 @@ function boot(hot){
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
+    if (state === 'ride' && !ride.ui && ride.room && e.code === 'KeyB'){ e.preventDefault(); fadeTo(enterHotelBath); return; }
     if (state === 'ride' && !ride.ui && ride.curb && (e.code === 'KeyR' || e.code === 'KeyT')){ e.preventDefault(); startDrive(e.code === 'KeyT'); return; }
     if (state === 'ride' && !ride.ui){
       if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE'){ e.preventDefault(); rideAction(); return; }
@@ -3063,7 +3064,73 @@ function boot(hot){
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
     roads.geometry.dispose(); roads.geometry = g;
+    buildCity(cx, cz);
   }
+  /* ---------------- City ---------------- */
+  // Buildings fill the blocks between the roads: 6 x 6 lots a block, most of them built on,
+  // from low houses to skyscrapers where the "downtown" noise is high. Never on water, on steep
+  // ground, near airports (and only low ones within 2 km, under the glide path), or on the
+  // road to the hotel. Each lot's building is the same every time (hashed). Rebuilt with the
+  // roads; you crash if you fly into one and the car can't drive through them.
+  const CITY_MAX = 4500, CC = 60, LOTS = 6;
+  const cityTex = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = '#e9e9ee'; g.fillRect(0, 0, 64, 128); g.fillStyle = '#3a4a6a';
+    for (let r = 0; r < 8; r++) for (let k = 0; k < 4; k++) g.fillRect(5 + k * 15, 6 + r * 15, 9, 9);
+    const t2 = new THREE.CanvasTexture(c); return t2;
+  })();
+  const cityGeo = new THREE.BoxGeometry(1, 1, 1); cityGeo.translate(0, 0.5, 0);
+  const city = new THREE.InstancedMesh(cityGeo, new THREE.MeshLambertMaterial({ map: cityTex }), CITY_MAX);
+  city.frustumCulled = false; free.add(city);
+  { const c3 = new THREE.Color(1, 1, 1); for (let i = 0; i < CITY_MAX; i++) city.setColorAt(i, c3); city.count = 0; }
+  const cityCells = new Map();
+  function cityAdd(b){
+    for (let i = Math.floor(b[0] / CC); i <= Math.floor(b[1] / CC); i++) for (let j = Math.floor(b[2] / CC); j <= Math.floor(b[3] / CC); j++){
+      const k = i + ',' + j; let l = cityCells.get(k); if (!l) cityCells.set(k, l = []); l.push(b);
+    }
+  }
+  function cityHit(x, y, z, r){
+    const l = cityCells.get(Math.floor(x / CC) + ',' + Math.floor(z / CC)); if (!l) return false;
+    for (const b of l) if (x > b[0] - r && x < b[1] + r && z > b[2] - r && z < b[3] + r && y < b[4] + r) return true;
+    return false;
+  }
+  function cityExcluded(x, z){
+    if (typeof routeRoad !== 'undefined' && routeRoad){
+      const dx = route.x1 - route.x0, dz = route.z1 - route.z0, l2 = dx * dx + dz * dz || 1, k = clamp(((x - route.x0) * dx + (z - route.z0) * dz) / l2, 0, 1);
+      if (Math.hypot(route.x0 + dx * k - x, route.z0 + dz * k - z) < 34) return true;
+    }
+    if (typeof hotel !== 'undefined' && hotel && Math.hypot(hotel.position.x - x, hotel.position.z - z) < 60) return true;
+    return false;
+  }
+  function buildCity(cx, cz){
+    cityCells.clear();
+    const o = new THREE.Object3D(), c3 = new THREE.Color(), lot = (ROAD_R - 30) / LOTS;
+    let n = 0;
+    for (let bi = Math.floor((cx - ROAD_SPAN) / ROAD_R); bi <= Math.floor((cx + ROAD_SPAN) / ROAD_R) && n < CITY_MAX; bi++)
+      for (let bj = Math.floor((cz - ROAD_SPAN) / ROAD_R); bj <= Math.floor((cz + ROAD_SPAN) / ROAD_R) && n < CITY_MAX; bj++)
+        for (let li = 0; li < LOTS; li++) for (let lj = 0; lj < LOTS; lj++){
+          if (n >= CITY_MAX || hash2(bi * 7 + li * 131, bj * 11 + lj * 173) > 0.75) continue;
+          const x = bi * ROAD_R + 15 + (li + 0.5) * lot, z = bj * ROAD_R + 15 + (lj + 0.5) * lot;
+          if (Math.abs(x - cx) > ROAD_SPAN || Math.abs(z - cz) > ROAD_SPAN) continue;
+          const h0 = freeH(x, z);
+          if (h0 < 1.5) continue;
+          const a = airportNear(x, z), da = a ? Math.hypot(a.x - x, a.z - z) : 1e9;
+          if (da < 750) continue;
+          if (Math.abs(freeH(x + 20, z) - freeH(x - 20, z)) > 16 || Math.abs(freeH(x, z + 20) - freeH(x, z - 20)) > 16) continue;
+          if (cityExcluded(x, z)) continue;
+          const r2 = hash2(bi * 13 + li * 17 + 5, bj * 19 + lj * 23 + 9), dens = vnoise(x / 1800 + 3, z / 1800 - 7);
+          let hgt = 9 + Math.pow(r2, 2.5) * 95 * (0.25 + dens);
+          if (da < 2000) hgt = Math.min(hgt, 22);
+          const w = 22 + hash2(li + bi * 3, lj + bj * 5) * 26, d = 22 + hash2(lj + bj * 7, li + bi * 9) * 26;
+          o.position.set(x, h0 - 4, z); o.scale.set(w, hgt + 4, d); o.updateMatrix();
+          city.setMatrixAt(n, o.matrix);
+          city.setColorAt(n, c3.setHSL(hash2(bi + li * 3, bj - lj * 5), 0.25, 0.6 + 0.3 * r2));
+          cityAdd([x - w / 2, x + w / 2, z - d / 2, z + d / 2, h0 + hgt]);
+          n++;
+        }
+    city.count = n; city.instanceMatrix.needsUpdate = true; city.instanceColor.needsUpdate = true;
+  }
+
   // is (x, z) on one of the grid roads?
   const onGridRoad = (x, z) => Math.abs(x - Math.round(x / ROAD_R) * ROAD_R) < ROAD_W / 2 || Math.abs(z - Math.round(z / ROAD_R) * ROAD_R) < ROAD_W / 2;
 
@@ -3377,6 +3444,7 @@ function boot(hot){
       F.speed = clamp(F.speed, 30, plane.boost + 40);
       if (F.under) F.speed -= (F.speed - 40) * Math.min(1, dt * 2);   // the water slows you right down
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
+      const hitBuilding = cityHit(F.x, F.y, F.z, 2.5);
       // no altitude limit: call-outs on the way up (each again after dropping well below it)
       const ms = MILESTONES[F.milestone];
       if (ms && F.y > ms[0]){ F.milestone++; if (live) toast(ms[1], ''); }
@@ -3385,7 +3453,8 @@ function boot(hot){
       if (live && !F.annCruise && F.y - top > 700){ F.annCruise = true; announce('We have reached cruising height. Sit back and enjoy the view!'); }
       const water = !F.diveMode && onWater(F.x, F.z);
       const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
-      if (touching && !water && F.gearT < 0.9 && hasGear()) crashFree(false, 'Belly landing! The gear was up');
+      if (hitBuilding) crashFree(false, 'Bonk! You hit a building');
+      else if (touching && !water && F.gearT < 0.9 && hasGear()) crashFree(false, 'Belly landing! The gear was up');
       else if (touching){
         F.ground = true; F.flipped = false; F.y = restAt(F.x, F.z); setLevel(F.yaw, 0); F.auto = false; F.autoBrake = true;
         if (t - F.lastLand > 5){
@@ -3649,8 +3718,8 @@ function boot(hot){
   const rideScene = new THREE.Scene();
   rideScene.background = new THREE.Color(0xa9d8f2);
   rideScene.fog = new THREE.Fog(0xa9d8f2, 90, 300);
-  rideScene.add(new THREE.HemisphereLight(0xffffff, 0x7a8a6a, 0.85));
-  { const d = new THREE.DirectionalLight(0xffffff, 0.7); d.position.set(30, 60, 25); rideScene.add(d); }
+  const rideHemi = new THREE.HemisphereLight(0xffffff, 0x7a8a6a, 0.85), rideSun = new THREE.DirectionalLight(0xffffff, 0.7);
+  rideSun.position.set(30, 60, 25); rideScene.add(rideHemi, rideSun);
   const CX = 400;   // the cabin is built off to one side of the terminal
   const RW = [];    // walls you can't walk through: [xmin, xmax, zmin, zmax]
   const rb = (w, h, d, c, x, y, z, parent) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof c === 'number' ? mat(c) : c); o.position.set(x, y, z); (parent || rideScene).add(o); return o; };
@@ -3886,6 +3955,8 @@ function boot(hot){
   function rideFree(x, z){
     if (ride.inCabin) return Math.abs(x - CX) < 0.62 && z < -0.3 && z > rowZ(ride.cabRows) - 0.7;
     if (ride.curb) return Math.abs(x - HX) < 18 && z > 15.6 && z < 19.4;
+    if (ride.room) return Math.abs(x - HRX) < 3.7 && Math.abs(z) < 2.7 && !(x < HRX - 0.3 && z < -0.2) && !(x < HRX - 2.8 && z < -2.0);
+    if (ride.hbath) return Math.abs(x - HBX) < 1.7 && Math.abs(z) < 1.7;
     if (ride.hall){
       if (Math.abs(x - HX) > 19.5 || z < -14.5 || z > 14.6 || Math.hypot(x - HX, z) < 5.9) return false;
       if (!ride.claimed && z > 12.5) return false;   // not without your suitcase
@@ -3902,7 +3973,8 @@ function boot(hot){
   }
   function renderSteps(){
     const seat = ride.row + ride.letter;
-    const steps = ride.hall ? [['Land at ' + ride.to.name, true], ['Pick up your suitcase at BAGGAGE CLAIM', ride.claimed], ['Walk out through the EXIT', ride.curb], ['Rent a car (R) or take a taxi (T)', false]]
+    const steps = ride.room || ride.hbath ? [['Check in at the hotel', true], ['Sleep in your bed', !!ride.slept], ['Go to the bathroom (B)', !!(ride.flushed || ride.washed || ride.showered)], ['Check out through the door', false]]
+      : ride.hall ? [['Land at ' + ride.to.name, true], ['Pick up your suitcase at BAGGAGE CLAIM', ride.claimed], ['Walk out through the EXIT', ride.curb], ['Rent a car (R) or take a taxi (T)', false]]
       : [['Book a flight at TICKETS', ride.booked], ['Drop off your suitcase at BAG DROP', ride.bagDone], ['Go through SECURITY', ride.cleared], ['Show your pass to the crew', ride.boarded],
         ['Put your carry-on in the overhead bin', ride.stowed], [ride.booked ? 'Sit down in seat ' + seat : 'Find your seat', ride.seated], ['Fasten your seatbelt', ride.belted]];
     let cur = false;
@@ -3926,7 +3998,7 @@ function boot(hot){
     camBase.set(0, 3.4, 22);
     camera.near = 0.1; camera.far = 900; camera.fov = baseFov; camera.updateProjectionMatrix();
     $('hud').classList.remove('riding'); $('winFrame').hidden = true;
-    endDrive(); ride.curb = false; ride.driveText = '';
+    endDrive(); ride.curb = false; ride.driveText = ''; ride.room = ride.hbath = false; setNight(false);
     $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); RH.wc.hidden = true; ride.bath = false; renderSteps();
     state = 'ride'; show(null);
     toast('Welcome to ' + from.name + ' airport!', 'info');
@@ -3944,6 +4016,13 @@ function boot(hot){
     else if (ride.act === 'bag') dropBag();
     else if (ride.act === 'claim') claimBag();
     else if (ride.act === 'rent') startDrive(false);
+    else if (ride.act === 'sleep') goToSleep();
+    else if (ride.act === 'hbath') fadeTo(enterHotelBath);
+    else if (ride.act === 'checkout') showArrival();
+    else if (ride.act === 'hflush'){ ride.flushT = 1.6; ride.flushed = true; sfx.flush(); toast('Whoosh!', ''); renderSteps(); }
+    else if (ride.act === 'hwash'){ ride.washT = 1.8; ride.washed = true; sfx.water(); toast('Squeaky clean hands!', ''); renderSteps(); }
+    else if (ride.act === 'shower'){ ride.showerT = 3; ride.showered = true; sfx.water(); setTimeout(() => sfx.water(), 1500); toast('Ahh, a nice warm shower!', ''); renderSteps(); }
+    else if (ride.act === 'hleave') fadeTo(leaveHotelBath);
     else if (ride.act === 'pass') fadeTo(boardPlane);
     else if (ride.act === 'stow') stowBag();
     else if (ride.act === 'sit') sitDown();
@@ -4055,6 +4134,7 @@ function boot(hot){
     $('arriveTitle').innerHTML = 'Welcome to <em>' + ride.to.name + '</em>!';
     $('arriveText').textContent = 'You flew ' + km + ' km from ' + ride.from.name + ' on the ' + ride.plane.name + ', sitting in seat ' + ride.row + ride.letter + '. Thanks for flying with us!';
     if (ride.driveText) $('arriveText').textContent += ' ' + ride.driveText;
+    if (ride.room || ride.hbath) $('arriveText').textContent += ride.slept ? ' You had a good night\'s sleep at the hotel, and checked out in the morning.' : ' You checked out of the hotel.';
     sfx.land(); show('arrive'); $('hud').hidden = true;
   }
   $('btn-ride-again').addEventListener('click', () => fadeTo(() => rideStart(ride.to)));
@@ -4161,7 +4241,7 @@ function boot(hot){
     F.drive = false; sfx.engine(false, 0); state = 'paused';
     ride.driveText = car.taxi ? 'Your taxi drove you ' + km + ' km to the hotel.' : atHotel ? 'Then you drove ' + km + ' km to the hotel in your rental car.' : 'Then you drove ' + km + ' km in your rental car.';
     toast(atHotel ? 'You made it to the hotel!' : 'Parked!', '');
-    showArrival();
+    if (atHotel) fadeTo(enterHotel); else showArrival();
   }
   $('btn-ride-act').addEventListener('click', () => { if (state === 'play' && F.drive && !car.taxi) finishDrive(false); });
   function updateCar(dt){
@@ -4178,7 +4258,8 @@ function boot(hot){
     c.yaw -= steer * clamp(Math.abs(c.speed) / 8, 0, 1) * 1.4 * dt * Math.sign(c.speed || 1);
     const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
     const road = (x, z) => onGridRoad(x, z) || onRoute(x, z);
-    if (groundAt(nx, nz) < 0.6 && !road(nx, nz)){   // no driving into lakes (bridges are fine)
+    if (cityHit(nx, c.y + 1, nz, 1.5)){ c.speed = 0; if (t - c.warnT > 3){ c.warnT = t; toast('Bonk! A building', 'warn'); } }
+    else if (groundAt(nx, nz) < 0.6 && !road(nx, nz)){   // no driving into lakes (bridges are fine)
       c.speed = 0;
       if (t - c.warnT > 3){ c.warnT = t; toast("Can't drive into the lake!", 'warn'); }
     } else { c.km += Math.hypot(nx - c.x, nz - c.z); c.x = nx; c.z = nz; }
@@ -4200,6 +4281,65 @@ function boot(hot){
     dCam.lerp(camT, 1 - Math.exp(-dt * 5));
     camera.position.copy(dCam); camera.up.set(0, 1, 0);
     camera.lookAt(c.x - Math.sin(c.yaw) * 6, c.y + 1.2, c.z - Math.cos(c.yaw) * 6);
+  }
+
+  // the hotel: your room (bed, lamp, TV, window, your suitcase) and its bathroom
+  const HRX = 1200, HBX = 1220;
+  rb(8, 0.05, 6, 0x8a4a5a, HRX, 0, 0); rb(8, 0.05, 6, 0xf4f1ea, HRX, 2.8, 0);
+  rb(8, 2.8, 0.05, 0xe9d8a6, HRX, 1.4, -3); rb(8, 2.8, 0.05, 0xe9d8a6, HRX, 1.4, 3);
+  rb(0.05, 2.8, 6, 0xe9d8a6, HRX - 4, 1.4, 0); rb(0.05, 2.8, 6, 0xe9d8a6, HRX + 4, 1.4, 0);
+  rb(2.4, 0.4, 2.6, 0x6b4a2a, HRX - 1.5, 0.2, -1.7); rb(2.3, 0.25, 2.5, WHITE, HRX - 1.5, 0.52, -1.7);
+  rb(2.32, 0.08, 1.6, 0x2a6ccc, HRX - 1.5, 0.66, -1.1); [-0.5, 0.5].forEach(x => rb(0.8, 0.18, 0.45, WHITE, HRX - 1.5 + x, 0.72, -2.7));
+  rb(2.4, 1.0, 0.1, 0x6b4a2a, HRX - 1.5, 0.9, -2.95);
+  rb(0.7, 0.6, 0.6, 0x6b4a2a, HRX - 3.3, 0.3, -2.5);
+  const lamp = rb(0.35, 0.4, 0.35, new THREE.MeshBasicMaterial({ color: 0xfff1a0 }), HRX - 3.3, 0.85, -2.5);
+  rb(0.05, 0.9, 1.6, 0x1b1b22, HRX + 3.95, 1.5, -1.0); const tv = rb(0.04, 0.8, 1.5, new THREE.MeshBasicMaterial({ color: 0x3fa9f5 }), HRX + 3.92, 1.5, -1.0);
+  const winMat = new THREE.MeshBasicMaterial({ color: 0x9fd8f5 }); rb(1.8, 1.3, 0.04, winMat, HRX + 1.6, 1.6, -2.97);
+  rb(1.9, 0.08, 0.1, WHITE, HRX + 1.6, 2.28, -2.95); rb(1.9, 0.08, 0.1, WHITE, HRX + 1.6, 0.92, -2.95);
+  const moon = rb(0.25, 0.25, 0.02, new THREE.MeshBasicMaterial({ color: 0xfff6c0 }), HRX + 2.1, 2.0, -2.94); moon.visible = false;
+  const nightStars = new THREE.Group(); for (let k = 0; k < 12; k++) rb(0.04, 0.04, 0.02, new THREE.MeshBasicMaterial({ color: 0xffffff }), HRX + 0.9 + Math.random() * 1.4, 1.1 + Math.random() * 1.0, -2.94, nightStars);
+  rideScene.add(nightStars); nightStars.visible = false;
+  rb(0.9, 2.1, 0.06, 0x8a5a32, HRX, 1.05, 2.96); signAt(HRX, 2.4, 2.9, Math.PI).add(signMesh('EXIT · CHECK OUT', 1.4, 0.25, '#3fa34d', '#ffffff'));
+  rb(0.06, 2.1, 0.9, 0xc9a07a, HRX + 3.96, 1.05, 1.6); signAt(HRX + 3.9, 2.35, 1.6, -Math.PI / 2).add(signMesh('BATHROOM', 0.9, 0.22, '#1b2340', '#ffffff'));
+  const roomBag = rb(0.36, 0.48, 0.2, 0x3fa9f5, HRX + 0.3, 0.24, -2.6); const roomPack = rb(0.42, 0.5, 0.22, 0x7a5ad8, HRX + 0.8, 0.25, -2.6);
+  rb(4, 0.05, 4, 0xd9dde3, HBX, 0, 0); rb(4, 0.05, 4, 0xf4f4f8, HBX, 2.6, 0);
+  rb(4, 2.6, 0.05, 0xbfe0ea, HBX, 1.3, -2); rb(4, 2.6, 0.05, 0xbfe0ea, HBX, 1.3, 2); rb(0.05, 2.6, 4, 0xbfe0ea, HBX - 2, 1.3, 0); rb(0.05, 2.6, 4, 0xbfe0ea, HBX + 2, 1.3, 0);
+  add3(new THREE.CylinderGeometry(0.2, 0.25, 0.4, 16), WHITE, HBX - 1.1, 0.2, -1.5); add3(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 18), WHITE, HBX - 1.1, 0.43, -1.5);
+  const hbWater = add3(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 12), 0x5fb8e8, HBX - 1.1, 0.45, -1.5); rb(0.5, 0.4, 0.2, WHITE, HBX - 1.1, 0.75, -1.85);
+  rb(0.8, 0.08, 0.5, 0xd9dde3, HBX + 0.9, 0.85, -1.7); add3(new THREE.CylinderGeometry(0.2, 0.15, 0.1, 14), WHITE, HBX + 0.9, 0.86, -1.68);
+  rb(0.04, 0.2, 0.04, silverMat, HBX + 0.9, 1.0, -1.9); const hbTap = add3(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 6), 0x9fd3f0, HBX + 0.9, 0.98, -1.78); hbTap.visible = false;
+  rb(0.8, 0.7, 0.02, new THREE.MeshPhongMaterial({ color: 0xbfefff, shininess: 120, specular: 0xffffff }), HBX + 0.9, 1.6, -1.97);
+  rb(1.2, 0.08, 1.2, WHITE, HBX + 1.35, 0.04, 0.9); rb(0.02, 2.1, 1.2, new THREE.MeshPhongMaterial({ color: 0xbfefff, transparent: true, opacity: 0.3, depthWrite: false }), HBX + 0.75, 1.05, 0.9);
+  rb(0.25, 0.05, 0.25, silverMat, HBX + 1.35, 2.2, 0.9);
+  const hbShower = add3(new THREE.CylinderGeometry(0.2, 0.4, 2.1, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0x9fd3f0, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }), HBX + 1.35, 1.1, 0.9); hbShower.visible = false;
+  rb(0.9, 2.1, 0.06, 0xc9a07a, HBX, 1.05, 1.96);
+  function setNight(on){
+    rideHemi.intensity = on ? 0.18 : 0.85; rideSun.intensity = on ? 0.05 : 0.7;
+    winMat.color.setHex(on ? 0x101a3a : 0x9fd8f5); moon.visible = nightStars.visible = on; lamp.material.color.setHex(on ? 0x555544 : 0xfff1a0);
+    tv.material.color.setHex(on ? 0x111111 : 0x3fa9f5);
+  }
+  function enterHotel(){
+    F.drive = false; endDrive(); state = 'ride'; show(null);
+    Object.assign(ride, { room: true, hbath: false, curb: false, hall: false, ui: false, act: null, slept: false, flushed: false, washed: false, showered: false, x: HRX, z: 1.4, yaw: 0 });
+    walker.visible = true; walkerBag.visible = false; carryOn.visible = false; roomBag.visible = roomPack.visible = true;
+    camBase.set(HRX, 1.95, 2.7); camera.near = 0.05; camera.far = 900; camera.updateProjectionMatrix();
+    $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); RH.wc.hidden = true; renderSteps();
+    sfx.chime(); toast('Welcome to your hotel room!', 'info');
+  }
+  function goToSleep(){
+    ride.ui = true; fadeTo(() => { setNight(true); walker.visible = false; toast('Zzz… Good night!', 'info'); });
+    setTimeout(() => fadeTo(() => {
+      setNight(false); walker.visible = true; ride.slept = true; ride.ui = false; ride.x = HRX - 0.1; ride.z = -0.3; renderSteps();
+      sfx.chime(); toast('Good morning! You slept really well', '');
+    }), 3200);
+  }
+  function enterHotelBath(){
+    Object.assign(ride, { room: false, hbath: true, x: HBX, z: 1.3, yaw: 0, flushT: 0, washT: 0, showerT: 0 });
+    camBase.set(HBX, 1.9, 1.9); toast('The hotel bathroom', 'info'); renderSteps();
+  }
+  function leaveHotelBath(){
+    Object.assign(ride, { room: true, hbath: false, x: HRX + 3.1, z: 1.6, yaw: Math.PI / 2 });
+    hbTap.visible = hbShower.visible = false; camBase.set(HRX + 3.4, 1.95, 1.6); renderSteps();
   }
 
   // the plane's bathroom: flush, wash your hands, back to your seat (the flight carries on)
@@ -4298,10 +4438,27 @@ function boot(hot){
       for (const b of beltBags){ b.a += 0.35 * dt; b.m.position.set(HX + Math.cos(b.a) * BELT_R, 0.8, Math.sin(b.a) * BELT_R); b.m.rotation.y = -b.a; }
       if (ride.claimed && !ride.curb && ride.z > 12.3 && !ride.ui) goCurb();
     }
+    if (ride.hbath){
+      if (ride.flushT > 0){ ride.flushT -= dt; hbWater.rotation.y += dt * 12; }
+      ride.washT = Math.max(0, (ride.washT || 0) - dt); hbTap.visible = ride.washT > 0;
+      ride.showerT = Math.max(0, (ride.showerT || 0) - dt); hbShower.visible = ride.showerT > 0;
+      if (hbShower.visible) hbShower.rotation.y += dt * 3;
+    }
     // what you can do here
     let act = null, hint = '';
     RH.wc.hidden = !ride.curb;
-    if (ride.curb){ hint = 'Rent a car (R) or take a taxi (T)'; act = 'rent'; }
+    if (ride.hbath){
+      hint = 'Flush the toilet, wash your hands or take a shower';
+      if (ride.z > 1.25 && Math.abs(ride.x - HBX) < 0.8) act = 'hleave';
+      else if (Math.hypot(ride.x - (HBX - 1.1), ride.z + 1.0) < 1.0) act = 'hflush';
+      else if (Math.hypot(ride.x - (HBX + 0.9), ride.z + 1.1) < 0.9) act = 'hwash';
+      else if (Math.hypot(ride.x - (HBX + 1.1), ride.z - 0.7) < 0.9) act = 'shower';
+    } else if (ride.room){
+      hint = 'Sleep in the bed, go to the bathroom (B), or check out through the door';
+      if (Math.hypot(ride.x - (HRX - 0.1), ride.z + 1.6) < 1.2) act = 'sleep';
+      else if (Math.hypot(ride.x - (HRX + 3.3), ride.z - 1.6) < 1.0) act = 'hbath';
+      else if (ride.z > 2.3) act = 'checkout';
+    } else if (ride.curb){ hint = 'Rent a car (R) or take a taxi (T)'; act = 'rent'; }
     else if (ride.hall){
       const mb = beltBags[0].m.position;
       if (!ride.claimed){ hint = 'Wait at the belt for your blue suitcase'; if (Math.hypot(mb.x - ride.x, mb.z - ride.z) < 2.6) act = 'claim'; }
@@ -4314,10 +4471,11 @@ function boot(hot){
     else if (!ride.seated){ hint = 'Sit down in seat ' + ride.row + ride.letter + ' (by the window)'; if (Math.abs(ride.z - rowZ(ride.row)) < 0.6) act = 'sit'; }
     else if (!ride.belted) act = 'belt';
     else hint = 'Get ready for takeoff…';
+    if (ride.ui) act = null;   // nothing to press while asleep or in a card
     ride.act = act;
     txt(RH.prompt, act ? 'Press SPACE or tap the button' : hint);
     RH.act.hidden = !act;
-    if (act) txt(RH.act, { book: 'BOOK A FLIGHT', bag: 'DROP OFF SUITCASE', claim: 'GRAB YOUR SUITCASE', rent: 'RENT A CAR (R)', pass: 'SHOW BOARDING PASS', stow: 'PUT BAG IN OVERHEAD BIN', sit: 'SIT IN ' + ride.row + ride.letter, belt: 'FASTEN SEATBELT' }[act]);
+    if (act) txt(RH.act, { book: 'BOOK A FLIGHT', bag: 'DROP OFF SUITCASE', claim: 'GRAB YOUR SUITCASE', rent: 'RENT A CAR (R)', sleep: 'SLEEP', hbath: 'GO TO THE BATHROOM (B)', checkout: 'CHECK OUT', hflush: 'FLUSH THE TOILET', hwash: 'WASH YOUR HANDS', shower: 'TAKE A SHOWER', hleave: 'BACK TO YOUR ROOM', pass: 'SHOW BOARDING PASS', stow: 'PUT BAG IN OVERHEAD BIN', sit: 'SIT IN ' + ride.row + ride.letter, belt: 'FASTEN SEATBELT' }[act]);
     seatMark.position.set(SEATX[LETTERS.indexOf(ride.letter)], 2.0 + Math.sin(t * 4) * 0.08, rowZ(ride.row));
     seatMark.visible = ride.inCabin && !ride.seated;
     // camera: behind you, or your view from the seat
@@ -4327,12 +4485,14 @@ function boot(hot){
       camera.position.set(sx, 1.5, sz + 0.1);
       camera.lookAt(sx * 0.6 + CX * 0.4, 1.15, sz - 9);
     } else {
-      const D = ride.inCabin ? 2.3 : 6, Hc = ride.inCabin ? 1.95 : 3.4;
+      const indoor = ride.inCabin || ride.room || ride.hbath, D = indoor ? 2.3 : 6, Hc = indoor ? 1.95 : 3.4;
       camT.set(ride.x + Math.sin(ride.yaw) * D, Hc, ride.z + Math.cos(ride.yaw) * D);
       if (ride.inCabin) camT.x = clamp(camT.x, CX - 2.6, CX + 2.6);
+      if (ride.room){ camT.x = clamp(camT.x, HRX - 3.8, HRX + 3.8); camT.z = clamp(camT.z, -2.8, 2.8); }
+      if (ride.hbath){ camT.x = clamp(camT.x, HBX - 1.85, HBX + 1.85); camT.z = clamp(camT.z, -1.85, 1.85); }
       camBase.lerp(camT, 1 - Math.exp(-dt * 8));
       camera.position.copy(camBase);
-      camera.lookAt(ride.x - Math.sin(ride.yaw) * 3, ride.inCabin ? 1.3 : 1.5, ride.z - Math.cos(ride.yaw) * 3);
+      camera.lookAt(ride.x - Math.sin(ride.yaw) * 3, indoor ? 1.3 : 1.5, ride.z - Math.cos(ride.yaw) * 3);
     }
   }
 
