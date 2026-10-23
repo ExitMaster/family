@@ -214,7 +214,10 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   belly-landing crash; low over an airport the screen warns "Gear is up! Press G".
   Auto-land puts the gear down for you. The Puffin's floats don't fold up.
 - **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
-  every direction, criss-crossed by a grid of roads every 420 m (bridges over the lakes), with clouds between about 1,200 and 4,300 ft. The sky darkens and the
+  every direction, criss-crossed by a grid of roads every 420 m (bridges over the lakes)
+  and filled with a **city**: thousands of buildings with windows between the roads, from low
+  houses to skyscrapers downtown (none on water, steep slopes or near airports, and only low
+  ones under the approach paths). Fly into one and it's a crash, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
   haze clears as you climb. **There's no altitude limit**: above about 20,000 ft the sky
   keeps darkening to black and the stars come out, and there are call-outs at 10,000 ft,
   30,000 ft (as high as a jumbo jet), 100,000 ft and 328,000 ft (space!). The sky also moves from morning to noon to golden hour to dusk as you
@@ -307,7 +310,11 @@ There, press **R** to **rent a car** and drive it yourself (arrows / WASD or dra
 the road to a **hotel** about a kilometre away (the road grid and its bridges are all
 drivable too), with its distance and direction shown (you can't drive
 into lakes; PARK stops any time), or **T** to call a **taxi**, which drives you there by
-itself. Then book another flight from there, or go back to the menu. The terminal, gate and arrivals hall
+itself. At the hotel you walk around your **room**: lie down on the bed and **sleep**
+(the lights go out and the window turns to night with stars and a moon, then it's
+morning), go to the **bathroom** through its door (or press **B**) to flush the toilet,
+wash your hands and take a shower, and **check out** through the room door. Then book
+another flight from there, or go back to the menu. The terminal, gate and arrivals hall
 are busy with other travellers walking about, queueing and sitting at the gate.
 
 ## Airports
