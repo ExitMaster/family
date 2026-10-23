@@ -297,8 +297,11 @@ there's something to do. A checklist in the corner shows what's next:
    the captain asks everyone to sit down and buckle up, until the air is smooth again.
 
 After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
-your blue suitcase to come round, grab it, and walk out through the **EXIT**. Then book
-another flight from there, or go back to the menu. The terminal, gate and arrivals hall
+your blue suitcase to come round, grab it, and walk out through the **EXIT** to the curb.
+There, press **R** to **rent a car** and drive it yourself (arrows / WASD or drag) to a
+**hotel** about a kilometre away, with its distance and direction shown (you can't drive
+into lakes; PARK stops any time), or **T** to call a **taxi**, which drives you there by
+itself. Then book another flight from there, or go back to the menu. The terminal, gate and arrivals hall
 are busy with other travellers walking about, queueing and sitting at the gate.
 
 ## Airports
