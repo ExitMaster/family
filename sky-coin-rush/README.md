@@ -6,6 +6,11 @@ like (all the way up into space), grabbing coins that float in the sky.
 
 > <https://exitmaster.github.io/family/sky-coin-rush/>
 
+**It's a web app too:** on a phone, tablet or computer you can install it and open it from
+your home screen like an app (on Android/Chrome tap **Install app** on the start card or
+"Add to Home Screen"; on iPhone/iPad tap Share, then **Add to Home Screen**). After the
+first visit it also opens without internet.
+
 ## Controls
 
 | | |
@@ -209,7 +214,7 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   belly-landing crash; low over an airport the screen warns "Gear is up! Press G".
   Auto-land puts the gear down for you. The Puffin's floats don't fold up.
 - **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
-  every direction, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
+  every direction, criss-crossed by a grid of roads every 420 m (bridges over the lakes), with clouds between about 1,200 and 4,300 ft. The sky darkens and the
   haze clears as you climb. **There's no altitude limit**: above about 20,000 ft the sky
   keeps darkening to black and the stars come out, and there are call-outs at 10,000 ft,
   30,000 ft (as high as a jumbo jet), 100,000 ft and 328,000 ft (space!). The sky also moves from morning to noon to golden hour to dusk as you
@@ -297,8 +302,12 @@ there's something to do. A checklist in the corner shows what's next:
    the captain asks everyone to sit down and buckle up, until the air is smooth again.
 
 After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
-your blue suitcase to come round, grab it, and walk out through the **EXIT**. Then book
-another flight from there, or go back to the menu. The terminal, gate and arrivals hall
+your blue suitcase to come round, grab it, and walk out through the **EXIT** to the curb.
+There, press **R** to **rent a car** and drive it yourself (arrows / WASD or drag) along
+the road to a **hotel** about a kilometre away (the road grid and its bridges are all
+drivable too), with its distance and direction shown (you can't drive
+into lakes; PARK stops any time), or **T** to call a **taxi**, which drives you there by
+itself. Then book another flight from there, or go back to the menu. The terminal, gate and arrivals hall
 are busy with other travellers walking about, queueing and sitting at the gate.
 
 ## Airports
