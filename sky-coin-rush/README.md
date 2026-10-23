@@ -27,7 +27,7 @@ control stick: push down to climb.
 
 ## Planes
 
-Pick one of the **125 planes** on the start card (your choice is remembered). The plane flying behind the menu
+Pick one of the **145 planes** on the start card (your choice is remembered). The plane flying behind the menu
 changes straight away so you can see it. Each one has its own speed (normal and boost)
 and handling (how fast it pitches, which also sets how quick a loop is, and how fast it
 turns):
@@ -159,9 +159,29 @@ turns):
 | **Sofa** | flying couch for three | 68 / 165 kt | medium |
 | **Sneaker** | giant shoe with wings | 97 / 233 kt | quick |
 | **Skateboard** | a kid on a rocket skateboard | 117 / 292 kt | very quick |
+| **Tri-Jet** | airliner with an engine in its tail, 250 passengers | 185 / 418 kt | slow to turn |
+| **Swing Wing** | twin-tail fighter, **breaks Mach 1** | 253 / 816 kt | quick |
+| **Solar Plane** | very long wings full of solar panels | 68 / 156 kt | slow to turn |
+| **Police Copter** | helicopter with flashing lights | 107 / 243 kt | quick |
+| **Pirate Ship** | flying ship with sails and a black flag: **lands on lakes** | 78 / 185 kt | slow to turn |
+| **Rowboat** | two people, oars and a little motor: **lands on lakes** | 68 / 165 kt | medium |
+| **Flying House** | a little house lifted by balloons | 58 / 136 kt | slow to turn |
+| **Umbrella** | float away under an umbrella | 58 / 146 kt | medium |
+| **Bubble** | a passenger inside a giant soap bubble | 58 / 146 kt | medium |
+| **Present** | a gift box with a big bow | 87 / 214 kt | quick |
+| **Taco** | crunchy flying taco | 87 / 214 kt | quick |
+| **Pineapple** | spiky pineapple | 87 / 214 kt | quick |
+| **Watermelon** | a slice of watermelon | 87 / 214 kt | quick |
+| **Carrot Rocket** | crunchy and fast | 156 / 389 kt | quick |
+| **Dino** | T-rex with a jetpack | 107 / 272 kt | quick |
+| **Turbo Snail** | a snail with a rocket | 175 / 486 kt | quick |
+| **Toucan** | big orange beak | 107 / 253 kt | very quick |
+| **Firefly** | glowing tail | 87 / 214 kt | very quick |
+| **Mothership** | giant UFO full of aliens, 50 passengers, **breaks Mach 1** | 194 / 778 kt | medium |
+| **Hoverboard** | a kid on a floating board | 117 / 292 kt | very quick |
 
-**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin, Submarine, Seagull, Turtle, Octopus, Bathtub, Jellyfish, Flying Fish) can land on and take off from any
-lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning, Delta Dart, Phoenix, X-Plane, Viper and Raptor) go
+**Lake planes** (Puffin, Pelican, Otter, Firebird, Ducky, Shark, Penguin, Swan, Coast Guard, Whale, Catalina, Flamingo, Goose, Dolphin, Submarine, Seagull, Turtle, Octopus, Bathtub, Jellyfish, Flying Fish, Pirate Ship, Rowboat) can land on and take off from any
+lake as well as runways. **Supersonic planes** (Thunder, Shadow, Rocket, Arrow, Comet, Retro, the seven 8-engine planes, Concorde, Blackbird, Shuttle, Lightning, Delta Dart, Phoenix, X-Plane, Viper, Raptor, Swing Wing and Mothership) go
 faster than the speed of sound when boosted: a MACH readout appears above Mach 0.7, and
 crossing Mach 1 (about 667 kt) sets off a **SONIC BOOM** (+100) with a boom, a shake and a
 white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Sleigh, Blaster and the floats/hulls of the lake planes don't fold up.
