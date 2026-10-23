@@ -1,0 +1,16 @@
+{
+  "name": "Sky Coin Rush",
+  "short_name": "Sky Coin Rush",
+  "description": "Fly anywhere in a 3D world, ride as a passenger, drive to the hotel.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1b2340",
+  "theme_color": "#2a6ccc",
+  "lang": "en",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

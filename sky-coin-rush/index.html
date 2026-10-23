@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="google" content="notranslate">
 <title>Sky Coin Rush</title>
+<meta name="theme-color" content="#2a6ccc">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sky Coin Rush">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -94,6 +102,7 @@ body{
 #fade.on{opacity:1}
 #bookDest{max-height:min(28vh,240px)}
 .bookplanes{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;max-height:min(30vh,260px);overflow-y:auto}
+.install-hint{margin:0;font-size:13px;opacity:.8;text-align:center}
 .pass{border:2px dashed var(--ink);border-radius:12px;padding:12px;display:grid;gap:10px;background:var(--paper-2);margin-bottom:14px}
 .pass small{display:block;font:600 10px/1.2 var(--hud);letter-spacing:.12em;opacity:.7}
 .pass b{font:400 18px/1.15 var(--display)}
@@ -220,6 +229,8 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       </div>
       <button class="btn" id="btn-play">Take off</button>
       <button class="btn secondary" id="btn-ride">Ride as a passenger</button>
+      <button class="btn secondary" id="btn-install" hidden>Install app</button>
+      <p class="install-hint" id="installHint" hidden>To install: tap Share, then <b>Add to Home Screen</b>.</p>
       <hr class="perf">
       <div class="keys">
         <span><kbd>←↑↓→</kbd> <kbd>W</kbd> <kbd>A</kbd></span><span>Fly: left and right turn, up climbs, down points the nose down (W climbs, A turns left). Keep holding up to fly a loop! On touch, drag anywhere.</span>
@@ -2663,6 +2674,14 @@ function boot(hot){
   $('btn-sound').addEventListener('click', () => { sfx.init(); sfx.setMuted(!sfx.muted); syncToggles(); });
   $('btn-pause').addEventListener('click', pause);
   $('btn-play').addEventListener('click', startFree);
+  // the game is also an installable web app (manifest + service worker)
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('btn-install').hidden = false; });
+  window.addEventListener('appinstalled', () => { $('btn-install').hidden = true; toast('Installed! Open Sky Coin Rush from your home screen', 'info'); });
+  $('btn-install').addEventListener('click', () => { if (!installEvt) return; installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; $('btn-install').hidden = true; }); });
+  const standalone = (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches) || navigator.standalone;
+  if (!standalone && /iPhone|iPad|iPod/.test(navigator.userAgent)) $('installHint').hidden = false;
   $('btn-ride').addEventListener('click', () => fadeTo(() => rideStart(airportOfCell(0, 0))));
   $('btn-resume').addEventListener('click', resume);
   $('btn-restart').addEventListener('click', () => F.ride ? rideTakeoff() : startFree());
@@ -3007,6 +3026,47 @@ function boot(hot){
   }
   window.addEventListener('pagehide', saveProgress);
   // the airport whose meadow the point is on (null if none), in its own coordinates
+  /* ---------------- Roads ---------------- */
+  // A grid of roads every 420 m over the whole world, laid along the terrain lattice so they
+  // follow the ground exactly; over lakes they become bridges, and they stop at airports.
+  // Rebuilt around you as you go (like the terrain, but only every 600 m).
+  const ROAD_R = FS * 14, ROAD_W = 9, ROAD_SPAN = 2400, BRIDGE_Y = 1.4;
+  const roadMat = new THREE.MeshLambertMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const roads = new THREE.Mesh(new THREE.BufferGeometry(), roadMat); roads.frustumCulled = false; free.add(roads);
+  let roadCX = NaN, roadCZ = NaN;
+  const roadY = h => h < 0.5 ? BRIDGE_Y : h + 0.3;
+  const ASPHALT = new THREE.Color(0x3a3f4a), DASH = new THREE.Color(0xffd23d);
+  // a straight strip from (x0,z0) to (x1,z1) at heights y0, y1, width w, into pos/col
+  function roadQuad(pos, col, x0, y0, z0, x1, y1, z1, w, c){
+    const dx = x1 - x0, dz = z1 - z0, l = Math.hypot(dx, dz) || 1, nx = -dz / l * w / 2, nz = dx / l * w / 2;
+    pos.push(x0 + nx, y0, z0 + nz, x1 + nx, y1, z1 + nz, x0 - nx, y0, z0 - nz, x1 + nx, y1, z1 + nz, x1 - nx, y1, z1 - nz, x0 - nx, y0, z0 - nz);   // facing up
+    for (let i = 0; i < 6; i++) col.push(c.r, c.g, c.b);
+  }
+  function roadSegment(pos, col, x0, y0, z0, x1, y1, z1){
+    roadQuad(pos, col, x0, y0, z0, x1, y1, z1, ROAD_W, ASPHALT);
+    const a = 0.3, b = 0.7;
+    roadQuad(pos, col, x0 + (x1 - x0) * a, y0 + (y1 - y0) * a + 0.05, z0 + (z1 - z0) * a, x0 + (x1 - x0) * b, y0 + (y1 - y0) * b + 0.05, z0 + (z1 - z0) * b, 0.5, DASH);
+  }
+  function buildRoads(cx, cz){
+    roadCX = cx; roadCZ = cz;
+    const pos = [], col = [];
+    const line = (fixed, alongX) => {
+      let prev = null;
+      for (let v = Math.ceil((alongX ? cx : cz) - ROAD_SPAN) / FS | 0; v * FS <= (alongX ? cx : cz) + ROAD_SPAN; v++){
+        const x = alongX ? v * FS : fixed, z = alongX ? fixed : v * FS, p = { x, z, y: roadY(freeH(x, z)) };
+        if (prev && !airfieldAt((x + prev.x) / 2, (z + prev.z) / 2)) roadSegment(pos, col, prev.x, prev.y, prev.z, x, p.y, z);
+        prev = p;
+      }
+    };
+    for (let k = Math.ceil((cx - ROAD_SPAN) / ROAD_R); k * ROAD_R <= cx + ROAD_SPAN; k++) line(k * ROAD_R, false);
+    for (let k = Math.ceil((cz - ROAD_SPAN) / ROAD_R); k * ROAD_R <= cz + ROAD_SPAN; k++) line(k * ROAD_R, true);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+    roads.geometry.dispose(); roads.geometry = g;
+  }
+  // is (x, z) on one of the grid roads?
+  const onGridRoad = (x, z) => Math.abs(x - Math.round(x / ROAD_R) * ROAD_R) < ROAD_W / 2 || Math.abs(z - Math.round(z / ROAD_R) * ROAD_R) < ROAD_W / 2;
+
   function airfieldAt(x, z){
     const a = airportNear(x, z); if (!a) return null;
     const l = apLocal(a, x, z);
@@ -3191,7 +3251,7 @@ function boot(hot){
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
     Object.assign(F, { x, y: restAt(x, z), z, yaw, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, apDist: 0, gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0, annCruise: false, annDesc: null, incoming: false, diveMode: false, under: false, diveT: -99, bubT: 0, ride: false, dolphin: false, dolT: 0 });
     setLevel(yaw, 0); camUpS.set(0, 1, 0); showGear(1);
-    fCX = fCZ = treeCX = treeCZ = NaN;
+    fCX = fCZ = treeCX = treeCZ = roadCX = roadCZ = NaN;
     fClouds.forEach(c => c.position.set(F.x + rnd(-3500, 3500), c.userData.y, F.z + rnd(-3500, 3500)));
     planeRoot.visible = true;
     camBase.set(x + Math.sin(yaw) * 16, F.y + 5, z + Math.cos(yaw) * 16);
@@ -3360,6 +3420,7 @@ function boot(hot){
     const snap = FS * (F.speed > 200 ? 4 : 2);
     const sx = Math.round(F.x / snap) * snap, sz = Math.round(F.z / snap) * snap;
     if (sx !== fCX || sz !== fCZ) buildTerrain(sx, sz);
+    if (!(Math.hypot(F.x - roadCX, F.z - roadCZ) < 600)) buildRoads(F.x, F.z);
     const tx = Math.floor(F.x / TC), tz = Math.floor(F.z / TC);
     if (tx !== treeCX || tz !== treeCZ) buildTrees(tx, tz);
     fTrunks.visible = fLeaves.visible = F.y < 2500;
@@ -4028,7 +4089,23 @@ function boot(hot){
   const worldCars = { rent: makeCar(0x3fa9f5, false), taxi: makeCar(0xffd23d, true) };
   worldCars.rent.visible = worldCars.taxi.visible = false; scene.add(worldCars.rent, worldCars.taxi);
   const dCam = new THREE.Vector3();
-  let hotel = null;
+  let hotel = null, routeRoad = null;
+  const route = { x0: 0, z0: 0, x1: 0, z1: 0 };
+  function buildRoute(x0, z0, x1, z1){
+    Object.assign(route, { x0, z0, x1, z1 });
+    const pos = [], col = [], n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 15));
+    let px = x0, pz = z0, py = roadY(groundAt(x0, z0));
+    for (let i = 1; i <= n; i++){ const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n, y = roadY(groundAt(x, z)); roadSegment(pos, col, px, py, pz, x, y, z); px = x; pz = z; py = y; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
+    routeRoad = new THREE.Mesh(g, roadMat); routeRoad.frustumCulled = false; scene.add(routeRoad);
+  }
+  function onRoute(x, z){
+    if (!routeRoad) return false;
+    const dx = route.x1 - route.x0, dz = route.z1 - route.z0, l2 = dx * dx + dz * dz || 1;
+    const k = clamp(((x - route.x0) * dx + (z - route.z0) * dz) / l2, 0, 1);
+    return Math.hypot(route.x0 + dx * k - x, route.z0 + dz * k - z) < ROAD_W / 2;
+  }
   function buildHotel(x, z, yaw){
     const g = new THREE.Group();
     const bx = (w, h, d, c, px, py, pz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(px, py, pz); g.add(m); return m; };
@@ -4056,8 +4133,10 @@ function boot(hot){
       Object.assign(car, { x: sx, z: sz, y: groundAt(sx, sz), yaw, speed: 0, taxi, km: 0, warnT: -9 });
       const hy = Math.atan2(-(sx - tx), -(sz - tz));   // the hotel's front faces where you come from
       if (hotel) endHotel();
+      endRoute();
       hotel = buildHotel(tx, tz, hy);
       car.tx = tx - Math.sin(hy) * 20; car.tz = tz - Math.cos(hy) * 20;
+      buildRoute(sx, sz, car.tx, car.tz);
       worldCars.rent.visible = !taxi; worldCars.taxi.visible = taxi;
       ride.curb = false; ride.ui = false; F.drive = true; F.ground = true; planeRoot.visible = false;
       dCam.set(sx + Math.sin(yaw) * 10, car.y + 5, sz + Math.cos(yaw) * 10);
@@ -4068,11 +4147,13 @@ function boot(hot){
       toast(taxi ? 'Taxi! To the hotel, please' : 'Here are your keys! Drive to the hotel', 'info');
     });
   }
+  function endRoute(){ if (routeRoad){ routeRoad.geometry.dispose(); scene.remove(routeRoad); routeRoad = null; } }
   function endHotel(){ hotel.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map){ o.material.map.dispose(); o.material.dispose(); } }); scene.remove(hotel); hotel = null; }
   function endDrive(){
     if (F.drive){ F.drive = false; F.ground = false; }
     worldCars.rent.visible = worldCars.taxi.visible = false; planeRoot.visible = true;
     if (hotel) endHotel();
+    endRoute();
   }
   function finishDrive(atHotel){
     if (!F.drive) return;
@@ -4096,12 +4177,13 @@ function boot(hot){
     c.speed = clamp(c.speed, -8, 34);
     c.yaw -= steer * clamp(Math.abs(c.speed) / 8, 0, 1) * 1.4 * dt * Math.sign(c.speed || 1);
     const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
-    if (groundAt(nx, nz) < 0.6){   // no driving into lakes
+    const road = (x, z) => onGridRoad(x, z) || onRoute(x, z);
+    if (groundAt(nx, nz) < 0.6 && !road(nx, nz)){   // no driving into lakes (bridges are fine)
       c.speed = 0;
       if (t - c.warnT > 3){ c.warnT = t; toast("Can't drive into the lake!", 'warn'); }
     } else { c.km += Math.hypot(nx - c.x, nz - c.z); c.x = nx; c.z = nz; }
     const field = airfieldAt(c.x, c.z);
-    c.y = onRunway(field) ? rwyTop(field.a) : groundAt(c.x, c.z);
+    c.y = onRunway(field) ? rwyTop(field.a) : road(c.x, c.z) ? roadY(groundAt(c.x, c.z)) : groundAt(c.x, c.z);
     const m = c.taxi ? worldCars.taxi : worldCars.rent, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
     m.position.set(c.x, c.y, c.z);
     m.rotation.set(0, c.yaw, 0);
