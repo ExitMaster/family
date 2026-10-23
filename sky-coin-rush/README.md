@@ -263,18 +263,23 @@ Press **Ride as a passenger** on the start card and be a passenger instead of th
 Walk with the arrows (or drag on a touch screen); press **SPACE** (or the big button) when
 there's something to do. A checklist in the corner shows what's next:
 
-1. **Book a flight at TICKETS.** You arrive by taxi outside the terminal. At the ticket
-   counter choose where to go (the nearest airports) and which passenger plane (the ones
-   with 20 or more seats), and get a **boarding pass** with your flight number, gate and
-   window seat.
+1. **Book a flight at TICKETS.** You arrive by taxi outside the terminal, with a suitcase
+   and a purple carry-on backpack. At the ticket counter choose where to go (every
+   airport for about 25 km around, with its distance and direction) and which plane (any
+   of them!), and get a **boarding pass** with your flight number, gate and window seat.
 2. **Drop off your suitcase at BAG DROP.** It gets a tag and rides away on a belt.
-3. **Go through SECURITY.** Walk through the metal detector (beep beep, all clear). It
-   won't let you through without a pass and with your bag still in your hand.
+3. **Go through SECURITY.** Walk through the metal detector (beep beep, all clear) while
+   your carry-on rides through the X-ray machine, then you pick it up again. It won't let
+   you through without a pass and with your suitcase still in your hand.
 4. **Show your pass to the crew.** Go out through GATE 1 to your plane, parked on the apron
-   with stairs up to its door.
-5. **Find your seat.** Walk down the aisle past the other passengers to your seat (gold,
-   with a red arrow over it) and sit down.
-6. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
+   with stairs up to its door. Other planes are parked at the other gates, and one taxis
+   back and forth behind yours.
+5. **Stow your carry-on.** Walk down the aisle to your row (your seat is gold, with a red
+   arrow over it) and put your backpack in the overhead bin. The cabin is as big as the
+   plane: 6 seats a row, as many rows as it needs, full of as many other passengers as it
+   carries (in a one-seat plane you're on your own).
+6. **Sit down** in your seat.
+7. **Fasten your seatbelt.** The captain welcomes you aboard, then the plane rolls down the
    runway, takes off and the autopilot flies you to the airport you booked and lands.
    You watch from your **window seat**, with a seatbelt sign that lights up for takeoff and
    landing; VIEW (or C) swaps to the view from outside. Now and then at cruise height the

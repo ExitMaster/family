@@ -3529,7 +3529,7 @@ function boot(hot){
   const CAM_NEAR = camera.near, CAM_FAR = camera.far;
   const ride = { active: false, from: null, to: null, plane: null, prevPlane: null, flight: '', row: 1, letter: 'A', side: -1,
     booked: false, bagDone: false, cleared: false, boarded: false, inCabin: false, seated: false, belted: false, arrived: false, ui: false,
-    hall: false, claimed: false, bagT: 0, bagA: 0, turbT: 0, nextTurb: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
+    hall: false, claimed: false, stowed: false, cabRows: 30, xrayT: 0, bagT: 0, bagA: 0, turbT: 0, nextTurb: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
   const RH = { steps: $('rideSteps'), prompt: $('ridePrompt'), act: $('btn-ride-act') };
   const rideScene = new THREE.Scene();
   rideScene.background = new THREE.Color(0xa9d8f2);
@@ -3646,7 +3646,7 @@ function boot(hot){
   const rowZ = r => -2.5 - (r - 1) * 1.15;
   rb(6, 0.1, 40, 0x5a5f70, 0, 0, -18, cab); rb(1.2, 0.11, 39, 0x2a4f9a, 0, 0.01, -18, cab);
   rb(0.2, 2.9, 40, 0xe9eef5, -2.95, 1.45, -18, cab); rb(0.2, 2.9, 40, 0xe9eef5, 2.95, 1.45, -18, cab);
-  rb(6, 0.2, 40, 0xf4f4f8, 0, 2.85, -18, cab); rb(6, 2.9, 0.2, 0xd9dde3, 0, 1.45, 1.6, cab); rb(6, 2.9, 0.2, 0xd9dde3, 0, 1.45, -37.8, cab);
+  rb(6, 0.2, 40, 0xf4f4f8, 0, 2.85, -18, cab); rb(6, 2.9, 0.2, 0xd9dde3, 0, 1.45, 1.6, cab); const cabBack = rb(6, 2.9, 0.2, 0xd9dde3, 0, 1.45, -37.8, cab);
   rb(0.9, 0.5, 39, 0xd9dde3, -2.4, 2.35, -18, cab); rb(0.9, 0.5, 39, 0xd9dde3, 2.4, 2.35, -18, cab);
   const cabCrew = makePerson(0x1b2a6c, 0x1b2a6c, SKIN[0], 0xffd23d); cabCrew.position.set(1.6, 0, 0.6); cabCrew.rotation.y = Math.PI * 0.8; cab.add(cabCrew);
   const dummy = new THREE.Object3D(), seatC = new THREE.Color();
@@ -3664,17 +3664,24 @@ function boot(hot){
   bodyI.count = headI.count = 0;
   const seatMark = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 10), lam(0xff4f4f)); seatMark.rotation.x = Math.PI; cab.add(seatMark);
   const seatSign = new THREE.Group(); cab.add(seatSign);
-  function fillCabin(){   // who sits where on this flight; your seat is gold
-    let n = 0;
-    for (let r = 1; r <= ROWS; r++) SEATX.forEach((x, c) => {
+  // who sits where on this flight: the cabin is as long as the plane needs (6 seats a row),
+  // as many other passengers as it carries, and your seat is gold
+  function fillCabin(){
+    const rows = ride.cabRows, free = [];
+    for (let r = 1; r <= rows; r++) SEATX.forEach((x, c) => {
       const i = (r - 1) * 6 + c, mine = r === ride.row && LETTERS[c] === ride.letter;
       cushI.setColorAt(i, seatC.setHex(mine ? 0xffc23d : 0x2a4f9a)); backI.setColorAt(i, seatC.setHex(mine ? 0xffc23d : 0x2a4f9a));
-      if (!mine && Math.random() < 0.6){
-        setI(bodyI, n, x, 0.75, rowZ(r) + 0.05); bodyI.setColorAt(n, seatC.setHex(SHIRTS[(n * 7) % SHIRTS.length]));
-        setI(headI, n, x, 1.15, rowZ(r) + 0.05); headI.setColorAt(n, seatC.setHex(SKIN[n % 4])); n++;
-      }
+      if (!mine) free.push([x, rowZ(r)]);
     });
-    bodyI.count = headI.count = n;
+    for (let k = free.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [free[k], free[j]] = [free[j], free[k]]; }
+    const n = Math.min(free.length, Math.max(0, ride.plane.pax - 1));
+    for (let k = 0; k < n; k++){
+      const [x, z] = free[k];
+      setI(bodyI, k, x, 0.75, z + 0.05); bodyI.setColorAt(k, seatC.setHex(SHIRTS[(k * 7) % SHIRTS.length]));
+      setI(headI, k, x, 1.15, z + 0.05); headI.setColorAt(k, seatC.setHex(SKIN[k % 4]));
+    }
+    bodyI.count = headI.count = n; cushI.count = backI.count = rows * 6; winI.count = rows * 2;
+    cabBack.position.z = rowZ(rows) - 1.0;
     [cushI, backI, bodyI, headI].forEach(m => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
     const sx = SEATX[LETTERS.indexOf(ride.letter)];
     seatSign.position.set(sx, 1.6, rowZ(ride.row) + 0.4);
@@ -3684,6 +3691,25 @@ function boot(hot){
   // you, with a (blue) suitcase
   const walker = makePerson(0xe8432e, 0x2a4f9a, SKIN[0], 0x5a3a1a); rideScene.add(walker);
   const walkerBag = rb(0.36, 0.48, 0.2, 0x3fa9f5, 0, -0.75, 0, walker.userData.AR);
+  // and a purple carry-on backpack: it goes through the X-ray, then into the overhead bin
+  const carryOn = rb(0.42, 0.5, 0.22, 0x7a5ad8, 0, 1.15, 0.24, walker);
+  const xrayBag = rb(0.42, 0.5, 0.22, 0x7a5ad8, 14.5, 1.5, -15.8); xrayBag.visible = false;
+  const binBag = rb(0.42, 0.5, 0.22, 0x7a5ad8, 0, 2.0, 0, cab); binBag.visible = false;
+
+  // other planes parked at the other gates, and one taxiing about behind yours
+  const TARMAC_SPOTS = [[-50, -95, Math.PI], [50, -95, Math.PI], [0, -138, -Math.PI / 2]];
+  const tarmac = TARMAC_SPOTS.map(() => { const outer = new THREE.Group(), inner = new THREE.Group(); outer.add(inner); rideScene.add(outer); return { outer, inner, wall: null, parts: null, dir: 1 }; });
+  function parkTarmac(){
+    const pool = PLANES.filter(p => (p.cam || 1) <= 1.5);
+    tarmac.forEach((tp, k) => {
+      const [x, z, ry] = TARMAC_SPOTS[k];
+      tp.parts = buildPlane(pool[Math.floor(Math.random() * pool.length)], tp.inner);
+      tp.outer.scale.setScalar(2.6); tp.outer.position.set(x, PLANE_SCALE * 2.6, z); tp.outer.rotation.y = ry; tp.dir = 1;
+      tp.outer.updateMatrixWorld(true);
+      const b = new THREE.Box3().setFromObject(tp.outer);
+      tp.wall = k < 2 ? [b.min.x, b.max.x, b.min.z, b.max.z] : null;
+    });
+  }
 
   // arrivals: a hall with a baggage carousel going round; yours is the blue one with a yellow tag
   const HX = -400, BELT_R = 4.8;
@@ -3743,7 +3769,7 @@ function boot(hot){
   }
 
   function rideFree(x, z){
-    if (ride.inCabin) return Math.abs(x - CX) < 0.62 && z < -0.3 && z > -36.5;
+    if (ride.inCabin) return Math.abs(x - CX) < 0.62 && z < -0.3 && z > rowZ(ride.cabRows) - 0.7;
     if (ride.hall){
       if (Math.abs(x - HX) > 19.5 || z < -14.5 || z > 14.6 || Math.hypot(x - HX, z) < 5.9) return false;
       if (!ride.claimed && z > 12.5) return false;   // not without your suitcase
@@ -3755,13 +3781,14 @@ function boot(hot){
     for (const w of RW) if (x > w[0] - r && x < w[1] + r && z > w[2] - r && z < w[3] + r) return false;
     if (!ride.bagDone && x > 8.4 && x < 11.6 && z > -22.7 && z < -21.3) return false;   // pass and bag drop first
     if (planeWall && x > planeWall[0] - r && x < planeWall[1] + r && z > planeWall[2] - r && z < planeWall[3] + r) return false;
+    for (const tp of tarmac){ const w = tp.wall; if (w && x > w[0] - r && x < w[1] + r && z > w[2] - r && z < w[3] + r) return false; }
     return true;
   }
   function renderSteps(){
     const seat = ride.row + ride.letter;
     const steps = ride.hall ? [['Land at ' + ride.to.name, true], ['Pick up your suitcase at BAGGAGE CLAIM', ride.claimed], ['Walk out through the EXIT', false]]
       : [['Book a flight at TICKETS', ride.booked], ['Drop off your suitcase at BAG DROP', ride.bagDone], ['Go through SECURITY', ride.cleared], ['Show your pass to the crew', ride.boarded],
-        [ride.booked ? 'Find seat ' + seat : 'Find your seat', ride.seated], ['Fasten your seatbelt', ride.belted]];
+        ['Put your carry-on in the overhead bin', ride.stowed], [ride.booked ? 'Sit down in seat ' + seat : 'Find your seat', ride.seated], ['Fasten your seatbelt', ride.belted]];
     let cur = false;
     RH.steps.innerHTML = steps.map(([txtS, d]) => '<li class="' + (d ? 'done' : (!cur && (cur = true) ? 'now' : '')) + '">' + (d ? '✓ ' : '') + txtS + '</li>').join('');
   }
@@ -3771,8 +3798,9 @@ function boot(hot){
     if (!ride.active){ ride.prevPlane = plane; ride.active = true; }
     sfx.init(); sfx.resume(); sfx.engine(false, 0); hushAnnounce(); clearMissiles();
     Object.assign(ride, { from, to: null, plane: null, booked: false, bagDone: false, cleared: false, boarded: false, inCabin: false, seated: false, belted: false, arrived: false, ui: false,
-      hall: false, claimed: false, x: 0, z: 16, yaw: 0, view: 0, act: null, flash: 0 });
-    walkerBag.visible = true; droppedBag.visible = false;
+      hall: false, claimed: false, stowed: false, x: 0, z: 16, yaw: 0, view: 0, act: null, flash: 0 });
+    walkerBag.visible = true; droppedBag.visible = false; carryOn.visible = true; xrayBag.visible = false; binBag.visible = false;
+    parkTarmac();
     F.ride = false; F.auto = false;
     apronInner.traverse(o => { if (o.geometry) o.geometry.dispose(); }); apronInner.clear();
     stairs.children.forEach(o => o.geometry.dispose()); stairs.clear(); planeWall = null; crew.visible = false;
@@ -3798,20 +3826,22 @@ function boot(hot){
     else if (ride.act === 'bag') dropBag();
     else if (ride.act === 'claim') claimBag();
     else if (ride.act === 'pass') fadeTo(boardPlane);
+    else if (ride.act === 'stow') stowBag();
     else if (ride.act === 'sit') sitDown();
     else if (ride.act === 'belt') fasten();
   }
   // the ticket counter: pick where to go and which passenger plane
   function openBooking(){
     const o = ride.from, ci = cellOf(o.x), cj = cellOf(o.z), list = [];
-    for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++){ const a = airportOfCell(i, j); if (a && a !== o) list.push(a); }
-    const dist = a => Math.hypot(a.x - o.x, a.z - o.z);
+    for (let j = cj - 8; j <= cj + 8; j++) for (let i = ci - 8; i <= ci + 8; i++){ const a = airportOfCell(i, j); if (a && a !== o) list.push(a); }
+    const dist = a => Math.hypot(a.x - o.x, a.z - o.z), DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const dir = a => DIRS[Math.round(((Math.atan2(a.x - o.x, o.z - a.z) / (Math.PI * 2)) % 1 + 1) % 1 * 8) % 8];
     list.sort((a, b) => dist(a) - dist(b));
-    const dests = list.slice(0, 6), planes = PLANES.filter(p => p.pax >= 20).sort((a, b) => b.pax - a.pax);
+    const dests = list, planes = PLANES.slice().sort((a, b) => b.pax - a.pax);
     ride.pickTo = dests[0]; ride.pickPlane = planes.find(p => p.id === 'jumbo') || planes[0];
     $('bookFrom').textContent = 'From ' + o.name;
-    $('bookDest').innerHTML = dests.map(a => '<button type="button" class="apbtn" data-key="' + a.key + '" aria-pressed="' + (a === ride.pickTo) + '"><b>' + a.name + '</b><small>' + (dist(a) / 1000).toFixed(1) + ' km away</small></button>').join('');
-    $('bookPlane').innerHTML = planes.map(p => '<button type="button" class="apbtn" data-id="' + p.id + '" aria-pressed="' + (p === ride.pickPlane) + '"><b>' + p.name + '</b><small>' + p.pax + ' seats</small></button>').join('');
+    $('bookDest').innerHTML = dests.map(a => '<button type="button" class="apbtn" data-key="' + a.key + '" aria-pressed="' + (a === ride.pickTo) + '"><b>' + a.name + '</b><small>' + (dist(a) / 1000).toFixed(1) + ' km ' + dir(a) + '</small></button>').join('');
+    $('bookPlane').innerHTML = planes.map(p => '<button type="button" class="apbtn" data-id="' + p.id + '" aria-pressed="' + (p === ride.pickPlane) + '"><b>' + p.name + '</b><small>' + p.pax + (p.pax === 1 ? ' seat' : ' seats') + '</small></button>').join('');
     ride.ui = true; show('book');
   }
   $('bookDest').addEventListener('click', e => {
@@ -3825,7 +3855,9 @@ function boot(hot){
     $('bookPlane').querySelectorAll('.apbtn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   });
   $('btn-book').addEventListener('click', () => {
-    Object.assign(ride, { to: ride.pickTo, plane: ride.pickPlane, booked: true, flight: 'SC ' + (100 + Math.floor(Math.random() * 900)), row: 4 + Math.floor(Math.random() * 20), letter: Math.random() < 0.5 ? 'A' : 'F' });
+    const rows = clamp(Math.ceil(ride.pickPlane.pax / 6), 2, ROWS);
+    Object.assign(ride, { to: ride.pickTo, plane: ride.pickPlane, booked: true, flight: 'SC ' + (100 + Math.floor(Math.random() * 900)), cabRows: rows,
+      row: rows >= 8 ? 3 + Math.floor(Math.random() * (Math.min(rows, 24) - 2)) : 1 + Math.floor(Math.random() * rows), letter: Math.random() < 0.5 ? 'A' : 'F' });
     ride.side = ride.letter === 'A' ? -1 : 1;
     plane = ride.plane; buildPlane(plane);
     parkPlane(ride.plane); crew.visible = true; fillCabin();
@@ -3851,6 +3883,11 @@ function boot(hot){
     ride.boarded = ride.inCabin = true; ride.x = CX; ride.z = -0.9; ride.yaw = 0;
     camBase.set(CX, 1.95, 1.4); sfx.chime(); renderSteps();
     toast('Crew: Welcome aboard! Seat ' + ride.row + ride.letter + ' is that way', '');
+  }
+  function stowBag(){
+    ride.stowed = true; carryOn.visible = false; sfx.gear(); renderSteps();
+    binBag.position.set(ride.side * 1.85, 2.0, rowZ(ride.row)); binBag.visible = true;
+    toast('Carry-on in the overhead bin ✓', '');
   }
   function sitDown(){
     ride.seated = true; walker.visible = false; sfx.ap(true); renderSteps();
@@ -3883,7 +3920,7 @@ function boot(hot){
   function startClaim(){
     F.ride = false; $('hud').classList.remove('riding'); $('winFrame').hidden = true; $('rideHud').classList.remove('flying'); hushAnnounce();
     Object.assign(ride, { hall: true, claimed: false, inCabin: false, seated: false, ui: false, act: null, x: HX, z: -12, yaw: Math.PI });
-    walker.visible = true; walkerBag.visible = false;
+    walker.visible = true; walkerBag.visible = false; carryOn.visible = true; binBag.visible = false;
     beltBags.forEach((b, k) => { b.m.visible = true; b.a = b.mine ? Math.PI / 2 : Math.PI / 2 + k / 11 * Math.PI * 2; });
     setSign(arrSign, 'WELCOME TO ' + ride.to.name.toUpperCase(), 12, 1.4, '#1b2340', '#ffc23d');
     setSign(claimSign, 'BAGGAGE CLAIM · ' + ride.flight, 7, 1.0, '#1b2340', '#ffffff');
@@ -3926,11 +3963,21 @@ function boot(hot){
     // walking through the metal detector
     if (!ride.inCabin && !ride.hall && ride.bagDone && !ride.cleared && oz > -22 && ride.z <= -22){
       ride.cleared = true; ride.flash = 1.4; archLight.material.color.setHex(0x3fe08a);
+      carryOn.visible = false; xrayBag.visible = true; ride.xrayT = 0;
       sfx.warn(); setTimeout(() => sfx.warn(), 180); toast('Beep! Security check: all clear ✓', ''); renderSteps();
     }
     walker.position.set(ride.x, 0, ride.z); walker.rotation.y = ride.yaw;
     animPerson(walker, go !== 0, dt);
     updateNpcs(dt);
+    if (xrayBag.visible){   // your carry-on rides through the X-ray, then you pick it up
+      ride.xrayT += dt; xrayBag.position.z = -15.8 - ride.xrayT * 2.6;
+      if (xrayBag.position.z < -21.6){ xrayBag.visible = false; carryOn.visible = true; toast('Your carry-on came through the X-ray ✓', ''); }
+    }
+    { const tp = tarmac[2];   // the taxiing plane goes back and forth behind yours
+      tp.outer.position.x += tp.dir * 5 * dt;
+      if (Math.abs(tp.outer.position.x) > 55){ tp.dir = -Math.sign(tp.outer.position.x); tp.outer.rotation.y = tp.dir > 0 ? -Math.PI / 2 : Math.PI / 2; }
+      if (tp.parts) for (const s2 of tp.parts.sp) s2.o.rotation[s2.axis] += dt * s2.rate * 0.5;
+    }
     if (droppedBag.visible){   // onto the belt and away through the flap
       ride.bagT += dt;
       if (ride.bagT < 0.6) droppedBag.position.set(-3.5, 1.45 - ride.bagT * 0.9, -6 - ride.bagT * 1.2);
@@ -3951,13 +3998,14 @@ function boot(hot){
     else if (!ride.bagDone){ hint = 'Drop off your suitcase at BAG DROP (next to TICKETS)'; if (Math.hypot(ride.x + 3.5, ride.z + 4.4) < 2.2) act = 'bag'; }
     else if (!ride.cleared) hint = 'Go through SECURITY (the gate on the right)';
     else if (!ride.boarded){ hint = 'Go out through GATE 1 to your ' + ride.plane.name; if (Math.hypot(ride.x - crewSpot.x, ride.z - crewSpot.z) < 2.6) act = 'pass'; }
-    else if (!ride.seated){ hint = 'Find your seat: row ' + ride.row + ', seat ' + ride.letter + ' (by the window)'; if (Math.abs(ride.z - rowZ(ride.row)) < 0.6) act = 'sit'; }
+    else if (!ride.stowed){ hint = 'Find row ' + ride.row + ' and put your carry-on in the overhead bin'; if (Math.abs(ride.z - rowZ(ride.row)) < 0.6) act = 'stow'; }
+    else if (!ride.seated){ hint = 'Sit down in seat ' + ride.row + ride.letter + ' (by the window)'; if (Math.abs(ride.z - rowZ(ride.row)) < 0.6) act = 'sit'; }
     else if (!ride.belted) act = 'belt';
     else hint = 'Get ready for takeoff…';
     ride.act = act;
     txt(RH.prompt, act ? 'Press SPACE or tap the button' : hint);
     RH.act.hidden = !act;
-    if (act) txt(RH.act, { book: 'BOOK A FLIGHT', bag: 'DROP OFF SUITCASE', claim: 'GRAB YOUR SUITCASE', pass: 'SHOW BOARDING PASS', sit: 'SIT IN ' + ride.row + ride.letter, belt: 'FASTEN SEATBELT' }[act]);
+    if (act) txt(RH.act, { book: 'BOOK A FLIGHT', bag: 'DROP OFF SUITCASE', claim: 'GRAB YOUR SUITCASE', pass: 'SHOW BOARDING PASS', stow: 'PUT BAG IN OVERHEAD BIN', sit: 'SIT IN ' + ride.row + ride.letter, belt: 'FASTEN SEATBELT' }[act]);
     seatMark.position.set(SEATX[LETTERS.indexOf(ride.letter)], 2.0 + Math.sin(t * 4) * 0.08, rowZ(ride.row));
     seatMark.visible = ride.inCabin && !ride.seated;
     // camera: behind you, or your view from the seat
