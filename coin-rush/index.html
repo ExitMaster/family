@@ -100,8 +100,8 @@ h2{font-family:var(--display);font-weight:500;font-size:22px;letter-spacing:.12e
 .note{font-size:12px;color:var(--mute);}
 .g-bottom{display:flex;gap:12px;align-items:stretch;padding:12px;flex-wrap:wrap;}
 .tracks{display:flex;gap:8px;flex:1;flex-wrap:nowrap;overflow-x:auto;min-width:0;scrollbar-width:thin;padding-bottom:2px;}
-.modes{display:flex;flex-direction:column;gap:6px;flex:0 0 128px;}
-.modes button{flex:1;text-align:left;background:var(--panel-2);border:1px solid transparent;padding:6px 12px;font-family:var(--display);font-size:22px;line-height:1;}
+.modes{display:flex;flex-direction:column;gap:4px;flex:0 0 128px;}
+.modes button{flex:1;text-align:left;background:var(--panel-2);border:1px solid transparent;padding:4px 12px;font-family:var(--display);font-size:20px;line-height:1;}
 .modes button small{display:block;font-family:var(--ui);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-top:2px;}
 .modes button[aria-pressed="true"]{border-color:var(--coin);color:var(--coin);}
 .trk.gp{flex:0 0 300px;background:linear-gradient(100deg,var(--panel-2) 60%,rgba(224,71,60,.25));}
@@ -250,7 +250,7 @@ body.touch .keys{display:none;}
       <section class="panel" id="shop" aria-label="Workshop"></section>
     </div>
     <footer class="g-bottom panel">
-      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 11 tracks</small></button><button type="button" data-mode="race">Race<small>vs 5 rivals</small></button></div>
+      <div class="modes" id="modeList" role="group" aria-label="Choose a mode"><button type="button" data-mode="trial">Time Trial<small>Solo · 11 tracks</small></button><button type="button" data-mode="race">Race<small>vs 5 rivals</small></button><button type="button" data-mode="offroad">Off Road<small>Dirt · jumps</small></button></div>
       <div class="tracks" id="trackList" role="group" aria-label="Choose a track"></div>
       <div class="race-col">
         <button class="race-btn" id="raceBtn" type="button">RACE</button>
@@ -318,21 +318,21 @@ const $ = s => document.querySelector(s);
 
 /* ================= Data ================= */
 const CARS = [
-  {id:'hatch', name:'Pocket Hatch', cls:'Starter', blurb:'Light, forgiving and cheap to tune. Everyone starts here.', price:0, color:0x3d9cf5, top:54, accel:19.5, grip:5.6, turn:2.25, shape:'hatch'},
-  {id:'kei', name:'Mini Kei', cls:'Kei', blurb:'A tiny box on wheels. Slow on the straights, darts through hairpins.', price:200, color:0x7fd6c2, top:51, accel:22.5, grip:6.4, turn:2.6, shape:'kei'},
-  {id:'buggy', name:'Dune Buggy', cls:'Buggy', blurb:'An open roll cage on fat tires. The grass barely slows it down.', price:350, color:0xffb000, top:57, accel:21.8, grip:6.6, turn:2.6, rough:0.9, shape:'buggy'},
-  {id:'coupe', name:'Street Coupe', cls:'Sport', blurb:'A rear-drive coupe with more power and a willing tail.', price:450, color:0xe0473c, top:63, accel:23.2, grip:6.0, turn:2.3, shape:'coupe'},
-  {id:'pickup', name:'Dune Pickup', cls:'Off-road', blurb:'Tall tires and long travel. Barely slows down when it leaves the tarmac.', price:750, color:0xd9822b, top:61.5, accel:21, grip:7.0, turn:2.2, rough:0.82, shape:'pickup'},
-  {id:'taxi', name:'City Taxi', cls:'Taxi', blurb:'Checker stripes, a roof sign and a driver who knows every shortcut.', price:900, color:0xffd21f, top:66, accel:22.5, grip:6.6, turn:2.35, shape:'taxi'},
-  {id:'rally', name:'Gravel Rally', cls:'Rally', blurb:'Stiff chassis, sticky tires, loves the tight stuff.', price:1100, color:0xf1f1ec, top:69, accel:27, grip:7.6, turn:2.5, shape:'rally'},
-  {id:'muscle', name:'Iron Muscle', cls:'Muscle', blurb:'Twin electric motors, twin stripes, and a rear end that wants to come round.', price:1600, color:0x6b3fc9, top:78, accel:28.5, grip:5.8, turn:2.15, shape:'muscle'},
-  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. In a Race it crushes any rival it hits, +15 coins each.', price:2000, color:0xd7263d, top:70.5, accel:25.5, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
-  {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:2400, color:0x1fae74, top:81, accel:30, grip:7.6, turn:2.4, shape:'gt'},
-  {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:2900, color:0xf4f4f0, top:79.5, accel:30, grip:6.0, turn:2.8, shape:'drift'},
-  {id:'jet', name:'Jet Streak', cls:'Jet', raceOnly:true, blurb:'An electric jet turbine with seats. Race mode only: take it to the Grand Prix and leave the field behind.', price:3000, color:0x2a6cff, top:200, accel:125, grip:10.5, turn:2.9, shape:'jet'},
-  {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:3400, color:0x22304f, top:85.5, accel:31.5, grip:8.0, turn:2.45, shape:'police'},
-  {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:5000, color:0xffc21f, top:96, accel:37.5, grip:8.6, turn:2.6, shape:'hyper'},
-  {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:8000, color:0x2fd1d6, top:105, accel:42, grip:10, turn:2.8, shape:'formula'},
+  {id:'hatch', name:'Pocket Hatch', cls:'Starter', blurb:'Light, forgiving and cheap to tune. Everyone starts here.', price:0, color:0x3d9cf5, top:102.6, accel:37, grip:5.6, turn:2.25, shape:'hatch'},
+  {id:'kei', name:'Mini Kei', cls:'Kei', blurb:'A tiny box on wheels. Slow on the straights, darts through hairpins.', price:20, color:0x7fd6c2, top:96.9, accel:42.8, grip:6.4, turn:2.6, shape:'kei'},
+  {id:'buggy', name:'Dune Buggy', cls:'Buggy', blurb:'An open roll cage on fat tires. The grass barely slows it down.', price:35, color:0xffb000, top:108.3, accel:41.4, grip:6.6, turn:2.6, rough:0.9, shape:'buggy'},
+  {id:'coupe', name:'Street Coupe', cls:'Sport', blurb:'A rear-drive coupe with more power and a willing tail.', price:45, color:0xe0473c, top:119.7, accel:44.1, grip:6.0, turn:2.3, shape:'coupe'},
+  {id:'pickup', name:'Dune Pickup', cls:'Off-road', blurb:'Tall tires and long travel. Barely slows down when it leaves the tarmac.', price:75, color:0xd9822b, top:116.8, accel:39.9, grip:7.0, turn:2.2, rough:0.82, shape:'pickup'},
+  {id:'taxi', name:'City Taxi', cls:'Taxi', blurb:'Checker stripes, a roof sign and a driver who knows every shortcut.', price:90, color:0xffd21f, top:125.4, accel:42.8, grip:6.6, turn:2.35, shape:'taxi'},
+  {id:'rally', name:'Gravel Rally', cls:'Rally', blurb:'Stiff chassis, sticky tires, loves the tight stuff.', price:110, color:0xf1f1ec, top:131.1, accel:51.3, grip:7.6, turn:2.5, shape:'rally'},
+  {id:'muscle', name:'Iron Muscle', cls:'Muscle', blurb:'Twin electric motors, twin stripes, and a rear end that wants to come round.', price:160, color:0x6b3fc9, top:148.2, accel:54.1, grip:5.8, turn:2.15, shape:'muscle'},
+  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. In a Race it crushes any rival it hits, +15 coins each.', price:200, color:0xd7263d, top:133.9, accel:48.4, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
+  {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:240, color:0x1fae74, top:153.9, accel:57, grip:7.6, turn:2.4, shape:'gt'},
+  {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:290, color:0xf4f4f0, top:151, accel:57, grip:6.0, turn:2.8, shape:'drift'},
+  {id:'jet', name:'Jet Streak', cls:'Jet', raceOnly:true, blurb:'An electric jet turbine with seats. Race mode only: take it to the Grand Prix and leave the field behind.', price:300, color:0x2a6cff, top:200, accel:125, grip:10.5, turn:2.9, shape:'jet'},
+  {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:340, color:0x22304f, top:162.4, accel:59.8, grip:8.0, turn:2.45, shape:'police'},
+  {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:500, color:0xffc21f, top:182.4, accel:71.2, grip:8.6, turn:2.6, shape:'hyper'},
+  {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:800, color:0x2fd1d6, top:199.5, accel:79.8, grip:10, turn:2.8, shape:'formula'},
 ];
 const UPGRADES = [
   {key:'engine', name:'Motor', desc:'+6% top speed per level'},
@@ -366,6 +366,10 @@ const TRACKS = [
    pts:[[0,0],[180,0],[280,80],[240,200],[120,240],[0,180],[-120,240],[-240,180],[-260,60],[-150,-10]]},
   {id:'candy', name:'Candy Land', laps:2, pay:1.1, theme:'candy', scale:1.3,
    pts:[[0,0],[150,-30],[250,40],[210,145],[265,235],[155,290],[60,225],[-40,280],[-155,230],[-130,130],[-195,50],[-110,-25]]},
+  {id:'mud', name:'Mud Valley', laps:2, pay:1.35, theme:'mud', scale:1.25, pace:0.85, grip:0.85, offroad:true,
+   pts:[[0,0],[-120,-40],[-230,-10],[-275,90],[-195,155],[-235,245],[-130,295],[-30,245],[60,295],[175,235],[160,130],[215,40],[110,-25]]},
+  {id:'dust', name:'Dust Bowl', laps:2, pay:1.35, theme:'dust', scale:1.3, pace:0.85, grip:0.88, offroad:true,
+   pts:[[0,0],[-150,-20],[-260,30],[-280,140],[-200,200],[-100,170],[-30,230],[90,220],[170,140],[150,40]]},
 ];
 const HALF = 15;          // half road width, meters
 const WALL = HALF + 4;    // tire wall distance from center line
@@ -381,7 +385,7 @@ const recKey = t => t.id + '@' + t.laps;
 
 /* ================= Save ================= */
 const SAVE_KEY = 'coinrush_save_v1';
-const freshSave = () => ({coins:150, owned:['hatch'], selected:'hatch', track:'pine', mode:'trial', upg:{}, best:{}, medal:{}, paint:{}, muted:false});
+const freshSave = () => ({coins:150, owned:['hatch'], selected:'hatch', track:'pine', offTrack:'mud', mode:'trial', upg:{}, best:{}, medal:{}, paint:{}, muted:false});
 let save = (() => {
   try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && typeof s.coins === 'number') return Object.assign(freshSave(), s); } catch (e) {}
   return freshSave();
@@ -445,6 +449,8 @@ const THEMES = {
   jungle:{sky:0xa6dcb4, fog:[70,380], ground:'#2f6b2a', asphalt:'#3a3d40', hemi:[0xe0ffe0,0x2e5a26,0.8], sun:[0xfff2c8,0.85], night:false, wall:'#f2d23c'},
   moon:  {sky:0x020205, fog:[220,950], ground:'#8d8f94', asphalt:'#4a4c52', hemi:[0xdfe6ff,0x3a3a40,0.55], sun:[0xffffff,1.1], night:false, wall:'#e9eef4'},
   candy: {sky:0xffd3ea, fog:[150,620], ground:'#f27cb8', asphalt:'#5a3a2a', hemi:[0xfff0fa,0xff9ac8,0.72], sun:[0xffffff,0.75], night:false, wall:'#ff4fa0'},
+  mud:   {sky:0xbcd3dc, fog:[110,500], ground:'#4f6b33', asphalt:'#6b4a2e', hemi:[0xeef4f4,0x4a5a30,0.82], sun:[0xfff0d8,0.85], night:false, dirt:true},
+  dust:  {sky:0xf3d9a6, fog:[150,620], ground:'#d9b77a', asphalt:'#a77c4a', hemi:[0xfff4dc,0xb58a50,0.85], sun:[0xffe6b8,1.0], night:false, dirt:true},
   city:  {sky:0x111430, fog:[60,380], ground:'#2b2e35', asphalt:'#3b3f46', hemi:[0x8a94d0,0x22252c,0.62], sun:[0xa8b4e0,0.3], night:true, wall:'#e0389a'},
 };
 
@@ -515,6 +521,7 @@ function buildTrack(def){
   // road
   const rTex = canvasTex(256, 256, (c, w, h) => {
     c.fillStyle = th.asphalt; c.fillRect(0,0,w,h); noise(c,w,h,5000,.25,false); noise(c,w,h,2500,.08,true);
+    if (th.dirt){ c.fillStyle = 'rgba(40,24,10,.28)'; [0.3, 0.38, 0.62, 0.7].forEach(u => c.fillRect(w*u - 5, 0, 10, h)); noise(c,w,h,1500,.18,true); return; }
     c.fillStyle = 'rgba(245,245,240,.9)'; c.fillRect(8,0,7,h); c.fillRect(w-15,0,7,h);
     c.fillStyle = th.night ? 'rgba(255,205,80,.85)' : 'rgba(245,245,240,.8)'; c.fillRect(w/2-3,0,6,h/2);
   });
@@ -522,12 +529,12 @@ function buildTrack(def){
   const road = new THREE.Mesh(ribbon(s, total, HALF, -HALF, 0.03, 10), roadMat); road.receiveShadow = true; world.add(road);
 
   // curbs
-  const cTex = canvasTex(32, 64, (c, w, h) => { c.fillStyle = '#d8322a'; c.fillRect(0,0,w,h/2); c.fillStyle = '#f3f3f3'; c.fillRect(0,h/2,w,h/2); });
+  const cTex = th.dirt ? canvasTex(32, 64, (c, w, h) => { c.fillStyle = '#7a5434'; c.fillRect(0,0,w,h); noise(c,w,h,400,.3,false); c.fillStyle = '#5e3f24'; c.fillRect(0,h/2,w,h/2); }) : canvasTex(32, 64, (c, w, h) => { c.fillStyle = '#d8322a'; c.fillRect(0,0,w,h/2); c.fillStyle = '#f3f3f3'; c.fillRect(0,h/2,w,h/2); });
   const curbMat = new THREE.MeshLambertMaterial({map:cTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3});
   [[HALF, HALF+1.3], [-HALF, -HALF-1.3]].forEach(([a, b]) => { const m = new THREE.Mesh(ribbon(s, total, a, b, 0.05, 3), curbMat); m.receiveShadow = true; world.add(m); });
 
   // tire walls
-  const wTex = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#1b1d20'; c.fillRect(0,0,w,h); c.fillStyle = th.wall || (th.night ? '#2c78d8' : '#e8e8e2'); c.fillRect(0,h*0.38,w,h*0.24); noise(c,w,h,300,.3,true); });
+  const wTex = th.dirt ? canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#d9b44a'; c.fillRect(0,0,w,h); c.strokeStyle = 'rgba(140,100,30,.6)'; c.lineWidth = 1; for (let k = 0; k < 40; k++){ const y = Math.random()*h; c.beginPath(); c.moveTo(0, y); c.lineTo(w, y + (Math.random()-.5)*6); c.stroke(); } c.fillStyle = '#6b4a2e'; c.fillRect(w*0.3, 0, 3, h); c.fillRect(w*0.7, 0, 3, h); }) : canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#1b1d20'; c.fillRect(0,0,w,h); c.fillStyle = th.wall || (th.night ? '#2c78d8' : '#e8e8e2'); c.fillRect(0,h*0.38,w,h*0.24); noise(c,w,h,300,.3,true); });
   const wallMat = new THREE.MeshLambertMaterial({map:wTex, side:THREE.DoubleSide});
   // on the Grand Prix the inner wall swings out around the pit lane and stops in front of the garages
   const tp = def.theme === 'f1' ? (i => pitTaper(s[i].dist > total/2 ? s[i].dist - total : s[i].dist)) : (() => 0);
@@ -781,6 +788,23 @@ function buildTrack(def){
     const gm = placeInst(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshLambertMaterial({color:0xffffff}), gums, (d,p) => { const k = 1.2 + rnd()*1.6; d.position.set(p[0], 0, p[1]); d.scale.set(k, k*1.1, k); d.rotation.set(0,0,0); });
     gums.forEach((p, i) => gm.setColorAt(i, new THREE.Color(pc[(i + 3)%6])));
     mountains(0xffc4e1, 540, 22, rnd);
+  } else if (def.theme === 'mud'){
+    const trees = spots(320, WALL+5, 140);
+    placeInst(new THREE.CylinderGeometry(0.25, 0.4, 2.4, 6), new THREE.MeshLambertMaterial({color:0x5b3a24}), trees, (d,p,i) => { const k = 0.8+((i*37)%10)/12; d.position.set(p[0], 1.2*k, p[1]); d.scale.set(k,k,k); d.rotation.set(0,0,0); });
+    const fol = placeInst(new THREE.ConeGeometry(2.4, 7, 7), new THREE.MeshLambertMaterial({color:0xffffff}), trees, (d,p,i) => { const k = 0.8+((i*37)%10)/12; d.position.set(p[0], (2.4+3.5)*k, p[1]); d.scale.set(k,k,k); d.rotation.y = i; });
+    const gr = [0x2f5d2a, 0x3b6b30, 0x27502a]; trees.forEach((p, i) => fol.setColorAt(i, new THREE.Color(gr[i%3])));
+    const logs = spots(40, WALL+3, 90);
+    placeInst(new THREE.CylinderGeometry(0.45, 0.45, 5, 9), new THREE.MeshLambertMaterial({color:0x6b4a2e}), logs, (d,p) => { d.position.set(p[0], 0.45, p[1]); d.rotation.set(0, rnd()*3, Math.PI/2, 'YXZ'); d.rotation.order = 'YXZ'; d.rotation.set(Math.PI/2, rnd()*3, 0); d.scale.set(1,1,1); });
+    mountains(0x557a4a, 520, 26, rnd);
+  } else if (def.theme === 'dust'){
+    const cacti = spots(90, WALL+4, 130);
+    const cm = new THREE.MeshLambertMaterial({color:0x5f7d3a});
+    placeInst(new THREE.CylinderGeometry(0.45, 0.5, 5, 7), cm, cacti, (d,p) => { d.position.set(p[0], 2.5, p[1]); d.scale.set(1,1,1); d.rotation.set(0,0,0); });
+    placeInst(new THREE.CylinderGeometry(0.3, 0.3, 2.2, 6), cm, cacti, (d,p,i) => { const sd = i % 2 ? 1 : -1; d.position.set(p[0] + sd*0.9, 3.2, p[1]); d.scale.set(1,1,1); d.rotation.set(0, 0, 0); });
+    const rocks = spots(150, WALL+5, 150);
+    const rk = placeInst(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({color:0xffffff}), rocks, (d,p) => { const k = 1 + rnd()*4; d.position.set(p[0], k*0.35, p[1]); d.scale.set(k*(0.8+rnd()*0.6), k*(0.5+rnd()*0.7), k*(0.8+rnd()*0.6)); d.rotation.set(rnd()*3, rnd()*3, rnd()*3); });
+    const or = [0xb8643c, 0xc77a4c, 0x9e5a34]; rocks.forEach((p, i) => rk.setColorAt(i, new THREE.Color(or[i%3])));
+    mesas(rnd);
   } else if (def.theme === 'snow'){
     const trees = spots(380, WALL+5, 140);
     placeInst(new THREE.CylinderGeometry(0.25, 0.4, 2.4, 6), new THREE.MeshLambertMaterial({color:0x4a3222}), trees, (d,p,i) => { const k = 0.8+((i*37)%10)/12; d.position.set(p[0], 1.2*k, p[1]); d.scale.set(k,k,k); d.rotation.set(0,0,0); });
@@ -808,8 +832,54 @@ function buildTrack(def){
       fg.attributes.position.needsUpdate = true;
     };
   }
+  if (def.offroad) buildOffroad(t, rnd);
   buildMinimap();
   return t;
+}
+/* ---- off-road: ramps that launch you, mud puddles that slow you ---- */
+const RAMP_L = 7, RAMP_H = 1.4;
+function buildOffroad(t, rnd){
+  const s = t.s, N = t.N, L = t.length, ds = L / N, K = 8;
+  const straight = i => { const a = s[(i - K + N) % N], b = s[(i + K) % N]; return Math.hypot(b.tx - a.tx, b.tz - a.tz) / (2*K*ds) < 0.004; };
+  t.jumps = [];
+  for (let i = 0; i < N && t.jumps.length < 3; i += 4){
+    const d = s[i].dist;
+    if (d < 180 || d > L - 120 || !straight(i) || !straight((i + 6) % N)) continue;
+    if (t.jumps.some(j => Math.abs(j.d0 - d) < L*0.22)) continue;
+    t.jumps.push({d0:d, d1:d + RAMP_L});
+  }
+  const shape = new THREE.Shape(); shape.moveTo(0, 0); shape.lineTo(RAMP_L, RAMP_H); shape.lineTo(RAMP_L + 1.2, RAMP_H); shape.lineTo(RAMP_L + 1.2, 0); shape.closePath();
+  const rg = new THREE.ExtrudeGeometry(shape, {depth:2*HALF - 2, bevelEnabled:false}); rg.translate(0, 0, -(HALF - 1));
+  const plank = canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#9a6a3a'; c.fillRect(0, 0, w, h); c.fillStyle = '#7a5028'; for (let y = 0; y < h; y += 8) c.fillRect(0, y, w, 2); c.fillStyle = '#ffd23f'; c.fillRect(0, 0, 6, h); });
+  const rm = new THREE.MeshLambertMaterial({map:plank});
+  t.jumps.forEach(j => { const p = trackPoint(j.d0); const m = new THREE.Mesh(rg, rm); m.position.set(p.x, 0, p.z); m.rotation.y = Math.atan2(-Math.cos(p.h), Math.sin(p.h)); m.castShadow = true; m.receiveShadow = true; world.add(m); });
+  t.puddles = [];
+  const mudM = new THREE.MeshStandardMaterial({color:0x3b2a1a, roughness:0.15, metalness:0.1, polygonOffset:true, polygonOffsetFactor:-5, polygonOffsetUnits:-5});
+  for (let k = 0, tries = 0; k < 7 && tries < 200; tries++){
+    const d = 130 + rnd()*(L - 260);
+    if (t.jumps.some(j => Math.abs(j.d0 - d) < 60) || t.puddles.some(q => Math.abs(q.d - d) < 70)) continue;
+    const lat = (rnd()*2 - 1)*(HALF - 5), r = 3.5 + rnd()*2.5, p = trackPoint(d);
+    const q = {d, x:p.x + p.nx*lat, z:p.z + p.nz*lat, r};
+    const m = new THREE.Mesh(new THREE.CircleGeometry(r, 22), mudM); m.rotation.x = -Math.PI/2; m.scale.set(1, 1.4, 1); m.rotation.z = p.h; m.position.set(q.x, 0.06, q.z); world.add(m);
+    t.puddles.push(q); k++;
+  }
+}
+function updateOffroad(dt){
+  const sp = track.s[car.idx], ad = sp.dist + (car.x - sp.x)*sp.tx + (car.z - sp.z)*sp.tz;
+  if (car.air){
+    car.y += car.vy*dt; car.vy -= 24*dt;
+    if (car.y <= 0){ const hit = -car.vy; car.y = 0; car.air = false; car.vy = 0; car.bump = Math.min(1, hit/14); for (let k = 0; k < 5; k++) addPuff(car.x + (Math.random()-.5)*2, car.z + (Math.random()-.5)*2, 0.8); beep(70, 0.18, 'triangle', 0.16); if (hit > 9) flash('BIG AIR!', 'pbc', 1); }
+  } else {
+    const j = track.jumps.find(j => ad >= j.d0 && ad <= j.d1 && Math.abs(car.lat) < HALF - 0.5);
+    if (j){ car.y = RAMP_H * Math.min(1, (ad - j.d0) / RAMP_L); car.ramp = j; }
+    else if (car.ramp && ad > car.ramp.d1 && ad < car.ramp.d1 + 40 && car.fwd > 8){
+      // left the lip of the ramp going forward: launch
+      car.air = true; car.vy = Math.min(14, car.fwd*0.24); car.y = RAMP_H; car.ramp = null;
+    } else { car.ramp = null; car.y = Math.max(0, car.y - 8*dt); }
+  }
+  // mud: heavy drag and splashes
+  car.inMud = track.puddles.some(q => Math.hypot(car.x - q.x, car.z - q.z) < q.r) && !car.air;
+  if (car.inMud){ const k = Math.max(0, 1 - 1.6*dt); car.vx *= k; car.vz *= k; if (Math.abs(car.fwd) > 5 && Math.random() < 0.5) addPuff(car.x + (Math.random()-.5)*2, car.z + (Math.random()-.5)*2, 0.7); }
 }
 function stars(rnd, n = 900){
   const sg = new THREE.BufferGeometry(), sp = new Float32Array(n*3);
@@ -1264,6 +1334,7 @@ function placeCar(i, back){
   const s = track.s[(i + track.N) % track.N];
   car.x = s.x - s.tx*back; car.z = s.z - s.tz*back; car.h = Math.atan2(s.tx, s.tz);
   car.vx = car.vz = car.fwd = car.steer = car.slip = 0; car.idx = nearest(car.x, car.z, 0, true);
+  car.y = 0; car.vy = 0; car.air = false;
 }
 function stepCar(dt, inp){
   const S = car.stats;
@@ -1283,7 +1354,8 @@ function stepCar(dt, inp){
   const bp = car.batt === undefined || car.batt >= 20 ? 1 : 0.45 + 0.55*car.batt/20;   // flat battery: limp mode
   let top = S.top * (off ? S.rough : 1) * (boosting ? 1.2 : 1) * (1 - 0.08*wear) * bp;
   if (car.pitLane) top = Math.min(top, PIT_SPEED);
-  const acc = S.accel * (boosting ? 1.55 : 1);
+  if (track.def.offroad) top *= 0.6 + 0.4*S.rough;   // dirt: off-road cars keep their pace, road cars lose some
+  const acc = S.accel * (boosting ? 1.55 : 1) * (car.air ? 0 : 1);
   if (inp.throttle > 0 && fwd > -0.5){ const r = Math.max(0, fwd) / top; fwd += acc * inp.throttle * dt * Math.max(0, 1 - r*r*r); }
   if (inp.brake > 0){
     if (fwd > 0.5) fwd -= 30 * inp.brake * dt;
@@ -1297,8 +1369,8 @@ function stepCar(dt, inp){
   car.steer += (inp.steer - car.steer) * Math.min(1, dt*7);
   const sp = Math.abs(fwd);
   const sf = Math.min(1, sp/5) * (1 - 0.42*Math.min(1, sp/(S.top*1.15)));
-  car.h += S.turn * car.steer * sf * (inp.hand ? 1.5 : 1) * (fwd < 0 ? -1 : 1) * dt;
-  const grip = S.grip * (inp.hand ? 0.17 : 1) * (off ? 0.6 : 1) * (track.def.grip || 1) * (1 - 0.45*Math.pow(wear, 1.5));
+  car.h += S.turn * car.steer * sf * (inp.hand ? 1.5 : 1) * (fwd < 0 ? -1 : 1) * (car.air ? 0 : 1) * dt;
+  const grip = S.grip * (inp.hand ? 0.17 : 1) * (off ? 0.6 : 1) * (track.def.grip || 1) * (1 - 0.45*Math.pow(wear, 1.5)) * (car.air ? 0.03 : 1);
   if (track.pit && mode === 'race') car.wear = Math.min(1, wear + Math.abs(fwd)*dt/3200 + (car.slip > 3 ? car.slip*dt*0.0025 : 0));
   const dec = Math.exp(-grip*dt); lx *= dec; lz *= dec;
   car.slip = Math.hypot(lx, lz);
@@ -1320,7 +1392,7 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 /* ================= AI rivals ================= */
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
 // scaled well past medal pace, but capped below your car's top speed and slowed when far ahead, so they stay beatable.
-const AI_SPEED = 1.5;   // rivals got the same +50% as every car
+const AI_SPEED = 1.5 * 1.9;   // rivals got the same boosts as every car (+50%, then +90%)
 const RIVALS = [
   {name:'Blaze',  pace:0.80, lane:-5,   color:0xe0473c, box:-50,  pitLap:2},
   {name:'Comet',  pace:0.83, lane:5,    color:0x2fd1d6, box:-30,  pitLap:1},
@@ -1472,14 +1544,15 @@ const race = {time:0, lap:1, lapStart:0, lapTimes:[], hit:new Set(), cps:[], pre
 let orbitA = 0.6, camShake = 0;
 
 const raceMode = () => save.mode === 'race';
-const trackDef = () => raceMode() ? TRACKS.find(t => t.race) : TRACKS.find(t => t.id === save.track);
+const offMode = () => save.mode === 'offroad';
+const trackDef = () => raceMode() ? TRACKS.find(t => t.race) : offMode() ? (TRACKS.find(t => t.id === save.offTrack && t.offroad) || TRACKS.find(t => t.offroad)) : TRACKS.find(t => t.id === save.track);
 function startRace(){
   if (!raceMode() && carById(save.selected).raceOnly){ toGarage(); return; }
   initAudio(); stopParty();
   if (!save.owned.includes(save.selected)) save.selected = 'hatch';
   const def = carById(save.selected);
   buildCar(def);
-  car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0; car.wear = 0; car.pitT = 0; car.inBox = false; car.boxWarn = false; car.crusher = def.shape === 'monster'; car.batt = 100; car.battWarn = false;
+  car.stats = statsOf(def.id); car.nitro = car.stats.nitro; car.bump = 0; car.wrongT = 0; car.wear = 0; car.pitT = 0; car.inBox = false; car.boxWarn = false; car.crusher = def.shape === 'monster'; car.batt = 100; car.battWarn = false; car.y = 0; car.vy = 0; car.air = false; car.inMud = false; car.ramp = null;
   const slot = raceMode() ? GRID[MY_SLOT] : [-14, 0];
   { const p = trackPoint(slot[0]); car.x = p.x + p.nx*slot[1]; car.z = p.z + p.nz*slot[1]; car.h = p.h; car.vx = car.vz = car.fwd = car.steer = car.slip = 0; car.idx = nearest(car.x, car.z, 0, true); }
   clearSkids();
@@ -1541,6 +1614,7 @@ function updatePit(dt){
 function updateRace(dt, inp){
   // the race clock (and the rivals) freeze while your crew works
   if (track.pit) updatePit(dt);
+  if (track.jumps) updateOffroad(dt);
   updateBattery(dt);
   if (car.fwd >= MACH - 3 && !car.supersonic){ car.supersonic = true; sonicBoom(); }
   else if (car.fwd < MACH*0.85) car.supersonic = false;
@@ -1752,8 +1826,8 @@ function renderGarage(){
   }).join('');
   const c = carById(viewCar), owned = save.owned.includes(c.id), st = statsOf(c.id), u = upgOf(c.id);
   const bars = [
-    ['Top speed', c.top/130, st.top/130, kmh(st.top) + ' km/h'],
-    ['0–100', c.accel/57, st.accel/57, (100/3.6/st.accel*1.35).toFixed(1) + ' s'],
+    ['Top speed', c.top/250, st.top/250, kmh(st.top) + ' km/h'],
+    ['0–100', c.accel/110, st.accel/110, (100/3.6/st.accel*1.35).toFixed(1) + ' s'],
     ['Grip', c.grip/12.5, st.grip/12.5, st.grip.toFixed(1)],
     ['Boost', 2/6, st.nitro/6, st.nitro.toFixed(1) + ' s'],
   ].filter(b => !(isTouch && b[0] === 'Boost'));
@@ -1777,14 +1851,14 @@ function renderGarage(){
   if (raceMode()){
     const t = trackDef(), best = save.best[recKey(t)], md = save.medal[recKey(t)];
     $('#trackList').innerHTML = `<div class="trk gp"><span class="tn">${t.name}</span><span class="ti">${t.laps} big laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · ${RIVALS.length} rivals · pays ${trackPay(t)}+ and a podium bonus</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></div>`;
-  } else $('#trackList').innerHTML = TRACKS.filter(t => !t.race).map(t => {
+  } else $('#trackList').innerHTML = TRACKS.filter(t => !t.race && !!t.offroad === offMode()).map(t => {
     const best = save.best[recKey(t)], md = save.medal[recKey(t)];
-    return `<button type="button" class="trk" data-track="${t.id}" aria-pressed="${save.track === t.id}"><span class="tn">${t.name}</span><span class="ti">${t.laps} laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · pays ${trackPay(t)}+</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></button>`;
+    return `<button type="button" class="trk" data-track="${t.id}" aria-pressed="${trackDef().id === t.id}"><span class="tn">${t.name}</span><span class="ti">${t.laps} laps · ${(trackLen(t)*t.laps/1000).toFixed(2)} km · pays ${trackPay(t)}+</span><span class="tb"><span class="medal ${md || ''}"></span>${best ? 'PB ' + fmt(best) : 'No time set'}</span></button>`;
   }).join('');
   const dc = carById(save.selected);
   const blocked = !raceMode() && dc.raceOnly;
   $('#raceBtn').disabled = blocked;
-  $('#raceSub').textContent = blocked ? `${dc.name} is Race mode only · pick Race or another car` : raceMode() ? `${dc.name} vs ${RIVALS.length} rivals · ${trackDef().name}` : `Driving ${dc.name} on ${trackDef().name}`;
+  $('#raceSub').textContent = blocked ? `${dc.name} is Race mode only · pick Race or another car` : raceMode() ? `${dc.name} vs ${RIVALS.length} rivals · ${trackDef().name}` : offMode() ? `${dc.name} off-road on ${trackDef().name}` : `Driving ${dc.name} on ${trackDef().name}`;
 }
 const lenCache = {};
 function trackLen(t){
@@ -1837,10 +1911,10 @@ $('#modeList').addEventListener('click', e => {
   buildTrack(trackDef()); showPreview(); renderGarage();
 });
 $('#trackList').addEventListener('click', e => {
-  const b = e.target.closest('[data-track]'); if (!b || b.dataset.track === save.track) return;
-  save.track = b.dataset.track; persist();
-  if (raceMode()) return;
-  buildTrack(TRACKS.find(t => t.id === save.track)); showPreview(); renderGarage();
+  const b = e.target.closest('[data-track]'); if (!b || raceMode() || b.dataset.track === trackDef().id) return;
+  if (offMode()) save.offTrack = b.dataset.track; else save.track = b.dataset.track;
+  persist();
+  buildTrack(trackDef()); showPreview(); renderGarage();
 });
 $('#raceBtn').addEventListener('click', () => { if (!save.owned.includes(viewCar)) viewCar = save.selected; startRace(); });
 $('#againBtn').addEventListener('click', startRace);
@@ -1902,7 +1976,7 @@ function carLights(m, braking){
   }
 }
 function syncCarMesh(dt, inp){
-  const m = carMesh; m.root.position.set(car.x, 0, car.z); m.root.rotation.y = car.h;
+  const m = carMesh; m.root.position.set(car.x, car.y || 0, car.z); m.root.rotation.y = car.h;
   if (m.flame){ const k = 0.7 + (inp.throttle ? 0.7 : 0) + (car.boost ? 0.9 : 0) + Math.random()*0.2; m.flame.scale.set(1.3*k, 1.3*k, 1); }
   carLights(m, inp.brake > 0 && car.fwd > 0.5 && mode === 'race');
   const spin = car.fwd * dt / m.r; m.wheels.forEach(w => w.rotation.x += spin);
@@ -1911,7 +1985,8 @@ function syncCarMesh(dt, inp){
   m.body.rotation.z += ((-car.steer * Math.min(1, sp/30) * 0.07) - m.body.rotation.z) * Math.min(1, dt*6);
   const pitch = (inp.brake && car.fwd > 1 ? 0.035 : 0) - (inp.throttle && sp < car.stats.top*0.6 ? 0.02 : 0);
   m.body.rotation.x += (pitch - m.body.rotation.x) * Math.min(1, dt*6);
-  m.body.position.y = car.off ? Math.sin(performance.now()*0.05) * 0.025 * Math.min(1, sp/10) : 0;
+  m.body.position.y = car.off || (track.def.offroad && !car.air) ? Math.sin(performance.now()*0.05) * (car.off ? 0.025 : 0.04) * Math.min(1, sp/10) : 0;
+  if (car.air) m.body.rotation.x = Math.max(-0.3, Math.min(0.3, -car.vy*0.025));
 }
 function effects(dt, inp){
   const sp = Math.abs(car.fwd), fx = Math.sin(car.h), fz = Math.cos(car.h), rx = Math.cos(car.h), rz = -Math.sin(car.h);
@@ -1934,7 +2009,7 @@ function chaseCam(dt){
   const k = 1 - Math.exp(-dt*5.5);
   camera.position.x += (car.x - fx*back - camera.position.x) * k;
   camera.position.z += (car.z - fz*back - camera.position.z) * k;
-  camera.position.y += (up - camera.position.y) * k;
+  camera.position.y += (up + (car.y || 0)*0.8 - camera.position.y) * k;
   const shake = reduceMotion ? 0 : car.bump*0.35 + (car.boost ? 0.04 : 0);
   camera.lookAt(car.x + fx*5 + (Math.random()-.5)*shake, 1.1 + ce*0.4 + (Math.random()-.5)*shake, car.z + fz*5);
   const fov = 62 + Math.min(14, sp*0.17) + (car.boost ? 6 : 0);
@@ -1971,8 +2046,9 @@ function updateHud(dt){
 }
 
 /* ================= Boot ================= */
-if (!TRACKS.find(t => t.id === save.track && !t.race)) save.track = 'pine';
-if (save.mode !== 'race') save.mode = 'trial';
+if (!TRACKS.find(t => t.id === save.track && !t.race && !t.offroad)) save.track = 'pine';
+if (!TRACKS.find(t => t.id === save.offTrack && t.offroad)) save.offTrack = 'mud';
+if (!['race', 'offroad'].includes(save.mode)) save.mode = 'trial';
 if (!save.owned.includes(save.selected)) save.selected = 'hatch';
 buildTrack(trackDef());
 car.stats = statsOf(save.selected);

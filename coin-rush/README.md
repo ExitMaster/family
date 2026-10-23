@@ -27,6 +27,11 @@ them on new cars and upgrades.
   Rivals only appear here. The quickest laps around silver-medal pace, the slowest near
   bronze, and none go faster than 90% of your car's top speed, and they ease off when far ahead, so they stay beatable. Your position
   shows next to the lap counter.
+- **Off Road** — dirt tracks: **Mud Valley** (green hills, logs) and **Dust Bowl** (desert,
+  cacti, mesas). Dirt roads with ruts, dirt berms and hay-bale walls, three **ramps** per lap
+  that launch you into the air (no steering mid-air, a bump on landing, "BIG AIR!" for the big
+  ones) and **mud puddles** that drag you down. Off-road cars (Dune Buggy, Monster Truck, Dune
+  Pickup) keep nearly all their pace on dirt; road cars lose up to about 20%.
 - **Champagne party:** win the Grand Prix and you get a 50-second celebration — two bottles
   spraying from your car, confetti over the screen, a cork pop and fizz. Tap (or press a key)
   to bring up the results while the party keeps going.
@@ -62,10 +67,10 @@ Pocket Hatch (free), Mini Kei, Dune Buggy (open roll cage, great off-road), Stre
 Dune Pickup (barely slows off-road), City Taxi (roof sign and checker stripes), Gravel Rally,
 Iron Muscle, Monster Truck (giant wheels — in a Race it crushes any rival it hits, +15 coins
 each; crushed cars pop back up after 5 s), Apex GT, Drift King (low grip, loves to slide),
-Jet Streak (3,000 coins, 720 km/h, **Race mode only** — its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
+Jet Streak (300 coins, 720 km/h, **Race mode only** — its jet flame grows when you floor it), Interceptor (flashing lightbar), Volt Hyper and Formula Zero.
 
-Every car except the Jet Streak got a +50% boost to top speed and acceleration (the Grand Prix
-rivals too).
+Every car except the Jet Streak got a +50% and then a +90% boost to top speed and acceleration
+(the Grand Prix rivals too), and every car costs 90% less than it used to.
 
 Each owned car has four upgrades, 5 levels each: **Motor** (top speed), **Power**
 (acceleration), **Tires** (grip and steering), **Boost cell** (boost length).
