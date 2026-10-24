@@ -318,21 +318,21 @@ const $ = s => document.querySelector(s);
 
 /* ================= Data ================= */
 const CARS = [
-  {id:'hatch', name:'Pocket Hatch', cls:'Starter', blurb:'Light, forgiving and cheap to tune. Everyone starts here.', price:0, color:0x3d9cf5, top:102.6, accel:37, grip:5.6, turn:2.25, shape:'hatch'},
-  {id:'kei', name:'Mini Kei', cls:'Kei', blurb:'A tiny box on wheels. Slow on the straights, darts through hairpins.', price:25, color:0x7fd6c2, top:96.9, accel:42.8, grip:6.4, turn:2.6, shape:'kei'},
-  {id:'buggy', name:'Dune Buggy', cls:'Buggy', blurb:'An open roll cage on fat tires. The grass barely slows it down.', price:45, color:0xffb000, top:108.3, accel:41.4, grip:6.6, turn:2.6, rough:0.9, shape:'buggy'},
-  {id:'coupe', name:'Street Coupe', cls:'Sport', blurb:'A rear-drive coupe with more power and a willing tail.', price:55, color:0xe0473c, top:119.7, accel:44.1, grip:6.0, turn:2.3, shape:'coupe'},
-  {id:'pickup', name:'Dune Pickup', cls:'Off-road', blurb:'Tall tires and long travel. Barely slows down when it leaves the tarmac.', price:95, color:0xd9822b, top:116.8, accel:39.9, grip:7.0, turn:2.2, rough:0.82, shape:'pickup'},
-  {id:'taxi', name:'City Taxi', cls:'Taxi', blurb:'Checker stripes, a roof sign and a driver who knows every shortcut.', price:110, color:0xffd21f, top:125.4, accel:42.8, grip:6.6, turn:2.35, shape:'taxi'},
-  {id:'rally', name:'Gravel Rally', cls:'Rally', blurb:'Stiff chassis, sticky tires, loves the tight stuff.', price:140, color:0xf1f1ec, top:131.1, accel:51.3, grip:7.6, turn:2.5, shape:'rally'},
-  {id:'muscle', name:'Iron Muscle', cls:'Muscle', blurb:'Twin electric motors, twin stripes, and a rear end that wants to come round.', price:200, color:0x6b3fc9, top:148.2, accel:54.1, grip:5.8, turn:2.15, shape:'muscle'},
-  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. In a Race it crushes any rival it hits, +15 coins each.', price:250, color:0xd7263d, top:133.9, accel:48.4, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
-  {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:300, color:0x1fae74, top:153.9, accel:57, grip:7.6, turn:2.4, shape:'gt'},
-  {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:360, color:0xf4f4f0, top:151, accel:57, grip:6.0, turn:2.8, shape:'drift'},
+  {id:'hatch', name:'Pocket Hatch', cls:'Starter', blurb:'Light, forgiving and cheap to tune. Everyone starts here.', price:0, color:0x3d9cf5, top:51.3, accel:18.5, grip:5.6, turn:2.25, shape:'hatch'},
+  {id:'kei', name:'Mini Kei', cls:'Kei', blurb:'A tiny box on wheels. Slow on the straights, darts through hairpins.', price:25, color:0x7fd6c2, top:48.5, accel:21.4, grip:6.4, turn:2.6, shape:'kei'},
+  {id:'buggy', name:'Dune Buggy', cls:'Buggy', blurb:'An open roll cage on fat tires. The grass barely slows it down.', price:45, color:0xffb000, top:54.1, accel:20.7, grip:6.6, turn:2.6, rough:0.9, shape:'buggy'},
+  {id:'coupe', name:'Street Coupe', cls:'Sport', blurb:'A rear-drive coupe with more power and a willing tail.', price:55, color:0xe0473c, top:59.9, accel:22.1, grip:6.0, turn:2.3, shape:'coupe'},
+  {id:'pickup', name:'Dune Pickup', cls:'Off-road', blurb:'Tall tires and long travel. Barely slows down when it leaves the tarmac.', price:95, color:0xd9822b, top:58.4, accel:19.9, grip:7.0, turn:2.2, rough:0.82, shape:'pickup'},
+  {id:'taxi', name:'City Taxi', cls:'Taxi', blurb:'Checker stripes, a roof sign and a driver who knows every shortcut.', price:110, color:0xffd21f, top:62.7, accel:21.4, grip:6.6, turn:2.35, shape:'taxi'},
+  {id:'rally', name:'Gravel Rally', cls:'Rally', blurb:'Stiff chassis, sticky tires, loves the tight stuff.', price:140, color:0xf1f1ec, top:65.5, accel:25.6, grip:7.6, turn:2.5, shape:'rally'},
+  {id:'muscle', name:'Iron Muscle', cls:'Muscle', blurb:'Twin electric motors, twin stripes, and a rear end that wants to come round.', price:200, color:0x6b3fc9, top:74.1, accel:27.1, grip:5.8, turn:2.15, shape:'muscle'},
+  {id:'monster', name:'Monster Truck', cls:'Monster', blurb:'Giant wheels, sky-high suspension. In a Race it crushes any rival it hits, +15 coins each.', price:250, color:0xd7263d, top:67, accel:24.2, grip:7.2, turn:2.05, rough:0.95, shape:'monster'},
+  {id:'gt', name:'Apex GT', cls:'Grand Touring', blurb:'Long, low and fast. Big wing keeps it planted.', price:300, color:0x1fae74, top:77, accel:28.5, grip:7.6, turn:2.4, shape:'gt'},
+  {id:'drift', name:'Drift King', cls:'Drift', blurb:'Light tail, quick steering. Built to go sideways.', price:360, color:0xf4f4f0, top:75.5, accel:28.5, grip:6.0, turn:2.8, shape:'drift'},
   {id:'jet', name:'Jet Streak', cls:'Jet', raceOnly:true, blurb:'An electric jet turbine with seats. Race mode only: take it to the Grand Prix and leave the field behind.', price:375, color:0x2a6cff, top:200, accel:125, grip:10.5, turn:2.9, shape:'jet'},
-  {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:425, color:0x22304f, top:162.4, accel:59.8, grip:8.0, turn:2.45, shape:'police'},
-  {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:625, color:0xffc21f, top:182.4, accel:71.2, grip:8.6, turn:2.6, shape:'hyper'},
-  {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:1000, color:0x2fd1d6, top:199.5, accel:79.8, grip:10, turn:2.8, shape:'formula'},
+  {id:'police', name:'Interceptor', cls:'Pursuit', blurb:'Retired highway patrol car. Lightbar still works.', price:425, color:0x22304f, top:81.2, accel:29.9, grip:8.0, turn:2.45, shape:'police'},
+  {id:'hyper', name:'Volt Hyper', cls:'Hypercar', blurb:'Electric torque and a top speed that bends the camera.', price:625, color:0xffc21f, top:91.2, accel:35.6, grip:8.6, turn:2.6, shape:'hyper'},
+  {id:'formula', name:'Formula Zero', cls:'Open-wheel', blurb:'Wings, slicks and nothing else. The fastest thing in the paddock.', price:1000, color:0x2fd1d6, top:99.8, accel:39.9, grip:10, turn:2.8, shape:'formula'},
 ];
 const UPGRADES = [
   {key:'engine', name:'Motor', desc:'+6% top speed per level'},
@@ -1392,7 +1392,7 @@ function resetCar(){ placeCar(car.idx, 0); flash('Back on track', ''); }
 /* ================= AI rivals ================= */
 // Rivals don't run the player physics: they ride a speed profile built from each track's curvature,
 // scaled well past medal pace, but capped below your car's top speed and slowed when far ahead, so they stay beatable.
-const AI_SPEED = 1.5 * 1.9;   // rivals got the same boosts as every car (+50%, then +90%)
+const AI_SPEED = 1.5 * 1.9 * 0.5;   // rivals follow every speed change to the cars (+50%, +90%, then -50%)
 const RIVALS = [
   {name:'Blaze',  pace:0.80, lane:-5,   color:0xe0473c, box:-50,  pitLap:2},
   {name:'Comet',  pace:0.83, lane:5,    color:0x2fd1d6, box:-30,  pitLap:1},
@@ -1826,8 +1826,8 @@ function renderGarage(){
   }).join('');
   const c = carById(viewCar), owned = save.owned.includes(c.id), st = statsOf(c.id), u = upgOf(c.id);
   const bars = [
-    ['Top speed', c.top/250, st.top/250, kmh(st.top) + ' km/h'],
-    ['0–100', c.accel/110, st.accel/110, (100/3.6/st.accel*1.35).toFixed(1) + ' s'],
+    ['Top speed', c.top/130, st.top/130, kmh(st.top) + ' km/h'],
+    ['0–100', c.accel/57, st.accel/57, (100/3.6/st.accel*1.35).toFixed(1) + ' s'],
     ['Grip', c.grip/12.5, st.grip/12.5, st.grip.toFixed(1)],
     ['Boost', 2/6, st.nitro/6, st.nitro.toFixed(1) + ' s'],
   ].filter(b => !(isTouch && b[0] === 'Boost'));
