@@ -6,6 +6,17 @@ them on new cars and upgrades.
 
 > <https://exitmaster.github.io/family/coin-rush/>
 
+## Install it as an app
+
+Coin Rush is a web app. Open <https://exitmaster.github.io/family/coin-rush/> on your phone and:
+
+- **iPhone / iPad (Safari):** Share → **Add to Home Screen**
+- **Android (Chrome):** menu ⋮ → **Install app** (or **Add to Home screen**)
+- **Computer (Chrome / Edge):** the install icon at the right of the address bar
+
+It then opens full-screen from its own icon and keeps working without internet after the first
+visit (`manifest.webmanifest`, `service-worker.js` and `icons/` in this folder).
+
 ## Controls
 
 | | |
