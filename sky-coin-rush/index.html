@@ -4352,10 +4352,10 @@ function boot(hot){
       steer = clamp((keys.r || keys.dd ? 1 : 0) - (keys.l ? 1 : 0) + stick.x, -1, 1);
       throttle = clamp((keys.u ? 1 : 0) - (keys.d || keys.f ? 1 : 0) + stick.y, -1, 1);
     }
-    // the rental car goes up to 160 km/h; the taxi takes it easy
-    c.speed += throttle * (throttle < 0 && c.speed > 0 ? 30 : c.taxi ? 9 : 20) * dt;
+    // the rental car goes up to 210 km/h; the taxi takes it easy
+    c.speed += throttle * (throttle < 0 && c.speed > 0 ? 30 : c.taxi ? 9 : 26) * dt;
     c.speed -= c.speed * (c.taxi ? 0.35 : 0.25) * dt;
-    c.speed = clamp(c.speed, -10, c.taxi ? 34 : 45);
+    c.speed = clamp(c.speed, -10, c.taxi ? 34 : 58.5);
     c.yaw -= steer * clamp(Math.abs(c.speed) / 8, 0, 1) * 1.4 * dt * Math.sign(c.speed || 1);
     const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
     const road = (x, z) => onGridRoad(x, z) || onRoute(x, z);
