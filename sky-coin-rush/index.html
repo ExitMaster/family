@@ -150,6 +150,18 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 .apbtn small{font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
 .apbtn[aria-pressed="true"]{border-color:var(--ink);background:var(--gold)}
 .apbtn:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+.apbtn:disabled{opacity:.45;cursor:not-allowed}
+.aphead{position:sticky;top:0;z-index:1;margin:4px 0 0;padding:4px 2px;background:var(--paper);font:600 12px/1.2 var(--hud);letter-spacing:.06em;text-transform:uppercase}
+.bookclass{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.bookclass .apbtn[data-cls="prestige"][aria-pressed="true"]{background:#7a1f3d;color:#fff;border-color:#ffc23d}
+.pass.prestige{box-shadow:inset 0 0 0 3px #7a1f3d}
+.pass-tag{display:inline-block;margin:0 6px 6px 0;padding:3px 8px;border-radius:6px;background:var(--ink);color:#fff;font:600 11px/1.2 var(--hud);letter-spacing:.08em}
+.pass-tag.prestige{background:#7a1f3d;color:#ffc23d}
+.stamp{margin:6px auto 12px;width:min(210px,70%);aspect-ratio:1;border:4px double #c0392b;border-radius:50%;display:grid;place-content:center;text-align:center;color:#c0392b;transform:rotate(-12deg);font:600 13px/1.3 var(--hud);letter-spacing:.06em;animation:stampIn .45s cubic-bezier(.2,1.6,.4,1) both}
+.stamp b{display:block;font:400 22px/1.1 var(--display);letter-spacing:0}
+.stamp span{font-size:30px;line-height:1.2}
+@keyframes stampIn{from{transform:rotate(-12deg) scale(2.2);opacity:0}to{transform:rotate(-12deg) scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.stamp{animation:none}}
 .planes{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:8px}
 .pl{appearance:none;border:2px solid transparent;background:var(--paper-2);border-radius:10px;padding:8px 10px;text-align:left;cursor:pointer;display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;font:inherit;color:var(--ink);min-width:0}
 .pl .sw{grid-row:span 2;width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(27,35,64,.35)}
@@ -270,6 +282,8 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <div class="aplist" id="bookDest"></div>
       <p class="label">Which plane?</p>
       <div class="bookplanes" id="bookPlane"></div>
+      <p class="label">Which class?</p>
+      <div class="bookclass" id="bookClass"></div>
       <div class="btns">
         <button class="btn" id="btn-book">Book flight</button>
         <button class="btn secondary" id="btn-book-cancel">Not now</button>
@@ -282,6 +296,16 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-body">
       <div class="pass" id="passBody"></div>
       <button class="btn" id="btn-pass-ok">Go to security</button>
+    </div>
+  </section>
+
+  <section class="card" id="card-stamp" hidden>
+    <div class="card-head"><span>Passport control</span><span id="stampFlight">SC 100</span></div>
+    <div class="card-body">
+      <h2 id="stampTitle">Welcome!</h2>
+      <div class="stamp" id="stampBody"></div>
+      <p class="lede" id="stampText"></p>
+      <button class="btn" id="btn-stamp-ok">Go to baggage claim</button>
     </div>
   </section>
 
@@ -2661,7 +2685,7 @@ function boot(hot){
 
   /* ---------------- UI wiring ---------------- */
   function show(panel){
-    ['start', 'pause', 'airports', 'book', 'pass', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
+    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
     $('overlay').hidden = !panel;
     $('hud').hidden = !(state === 'play' || state === 'paused') || !!F.drive;
     if (panel){ stick.id = null; stickEl.hidden = true; const b = $('card-' + panel).querySelector('.btn'); if (b) try { b.focus({ preventScroll: true }); } catch(e){} }
@@ -2894,6 +2918,48 @@ function boot(hot){
       if (best) return best;
     }
     return airportOfCell(0, 0);
+  }
+  // Countries: the world is split into countries about 15 km across, with borders halfway
+  // between jittered capitals. Each has a flag and its own hello, and flying from one to
+  // another is an international flight.
+  const COUNTRIES = [
+    ['Korea', '🇰🇷', 'Annyeong'], ['Japan', '🇯🇵', 'Konnichiwa'], ['France', '🇫🇷', 'Bonjour'], ['United Kingdom', '🇬🇧', 'Hello'],
+    ['Spain', '🇪🇸', 'Hola'], ['Italy', '🇮🇹', 'Ciao'], ['Germany', '🇩🇪', 'Hallo'], ['Brazil', '🇧🇷', 'Olá'],
+    ['Mexico', '🇲🇽', 'Hola'], ['Canada', '🇨🇦', 'Hello'], ['United States', '🇺🇸', 'Hi'], ['Australia', '🇦🇺', "G'day"],
+    ['New Zealand', '🇳🇿', 'Kia ora'], ['China', '🇨🇳', 'Nǐ hǎo'], ['India', '🇮🇳', 'Namaste'], ['Thailand', '🇹🇭', 'Sawasdee'],
+    ['Vietnam', '🇻🇳', 'Xin chào'], ['Egypt', '🇪🇬', 'Ahlan'], ['Kenya', '🇰🇪', 'Jambo'], ['South Africa', '🇿🇦', 'Sawubona'],
+    ['Greece', '🇬🇷', 'Yassou'], ['Turkey', '🇹🇷', 'Merhaba'], ['Norway', '🇳🇴', 'Hei'], ['Sweden', '🇸🇪', 'Hej'],
+    ['Finland', '🇫🇮', 'Moi'], ['Netherlands', '🇳🇱', 'Hallo'], ['Portugal', '🇵🇹', 'Olá'], ['Ireland', '🇮🇪', 'Dia duit'],
+    ['Iceland', '🇮🇸', 'Halló'], ['Switzerland', '🇨🇭', 'Grüezi'], ['Argentina', '🇦🇷', 'Hola'], ['Chile', '🇨🇱', 'Hola'],
+    ['Peru', '🇵🇪', 'Hola'], ['Philippines', '🇵🇭', 'Kumusta'], ['Indonesia', '🇮🇩', 'Halo'], ['Singapore', '🇸🇬', 'Hello'],
+    ['Mongolia', '🇲🇳', 'Sain baina uu'], ['Morocco', '🇲🇦', 'Salam'], ['Poland', '🇵🇱', 'Cześć'], ['Hawaii', '🌺', 'Aloha']
+  ].map(([name, flag, hello]) => ({ name, flag, hello }));
+  const CSIZE = AP_CELL * 5, regions = new Map();
+  function regionCountry(i, j){
+    const key = i + ',' + j;
+    let c = regions.get(key);
+    if (!c){
+      const n = COUNTRIES.length;
+      c = Object.assign({ key, i, j, x: (i + 0.2 + hash2(i + 57, j - 91) * 0.6) * CSIZE, z: (j + 0.2 + hash2(i - 13, j + 333) * 0.6) * CSIZE },
+        COUNTRIES[(((5 * i + 11 * j) % n) + n) % n]);   // the same country never borders itself
+      regions.set(key, c);
+    }
+    return c;
+  }
+  function countryAt(x, z){
+    const ri = Math.floor(x / CSIZE), rj = Math.floor(z / CSIZE);
+    let best = null, bd = Infinity;
+    for (let j = rj - 1; j <= rj + 1; j++) for (let i = ri - 1; i <= ri + 1; i++){
+      const c = regionCountry(i, j), d = Math.hypot(c.x - x, c.z - z);
+      if (d < bd){ bd = d; best = c; }
+    }
+    return best;
+  }
+  const countryOf = a => a.country || (a.country = countryAt(a.x, a.z));
+  // each country's international airport: the one nearest its capital
+  function hubOf(c){
+    if (c.hub === undefined){ const a = nearestAirport(c.x, c.z); c.hub = a && countryOf(a) === c ? a : null; }
+    return c.hub;
   }
   // height of the rendered surface (same triangles as the mesh's inner lattice)
   function groundAt(x, z){
@@ -3316,7 +3382,7 @@ function boot(hot){
   function demoInput(){ return { ax: 0.18, ay: vUp.y < 0.5 ? 0 : pitchToward(Math.max(groundAt(F.x, F.z), terrainAhead()) + 140) }; }
   // a fresh flight sitting on a runway at (x, z), pointing along yaw
   function resetFlight(x, z, yaw){
-    sfx.init(); sfx.resume();
+    sfx.init(); sfx.resume(); lastCountry = null;
     clearFreeItems(); clearMissiles(); hushAnnounce();
     chain = 0; mult = 1; lastCoinT = -9;   // coins, score and visited airports carry over
     boostT = shake = 0; skyDist = 0; skyPhase = -1;
@@ -3454,7 +3520,8 @@ function boot(hot){
       if (ms && F.y > ms[0]){ F.milestone++; if (live) toast(ms[1], ''); }
       if (F.milestone > 0 && F.y < MILESTONES[F.milestone - 1][0] * 0.9) F.milestone--;
       const g = groundAt(F.x, F.z), top = Math.max(g, 0);
-      if (live && !F.annCruise && F.y - top > 700){ F.annCruise = true; announce('We have reached cruising height. Sit back and enjoy the view!'); }
+      if (live && !F.annCruise && F.y - top > 700){ F.annCruise = true; announce('We have reached cruising height. Sit back and enjoy the view!');
+        if (F.ride && ride.prestige) setTimeout(() => { if (F.ride) toast('Prestige: a welcome drink 🥂 and a hot meal 🍱, and your seat lies flat', ''); }, 4000); }
       const water = !F.diveMode && onWater(F.x, F.z);
       const touching = (onAirfield(F.x, F.z) || water) && F.y <= restAt(F.x, F.z) + 0.8 && vUp.y > 0.7 && F.pitch > -0.7 && F.pitch < 0.3 && t - F.liftT > 1;
       if (hitBuilding) crashFree(false, 'Bonk! You hit a building');
@@ -3625,7 +3692,15 @@ function boot(hot){
     if (live){ dtHud = dt; updateFreeHud(); }
   }
   let dtHud = 0;
+  let borderT = 0, lastCountry = null;
   function updateFreeHud(){
+    // crossing a border: a hello from the new country
+    if ((borderT -= dtHud) <= 0){
+      borderT = 1;
+      const c = countryAt(F.x, F.z);
+      if (lastCountry && c !== lastCountry) toast('Now entering ' + c.name + ' ' + c.flag + ' · ' + c.hello + '!', 'info');
+      lastCountry = c;
+    }
     txt(H.score, Math.floor(score).toLocaleString());
     txt(H.coins, coins.toLocaleString());
     txt(H.mult, 'x' + mult); H.mult.classList.toggle('off', mult < 2);
@@ -3647,7 +3722,7 @@ function boot(hot){
     H.paxChip.hidden = !plane.pax;
     if (plane.pax) txt(H.pax, String(plane.pax));
     if (!F.ground && apDist < 2500 && F.y - Math.max(groundAt(F.x, F.z), 0) < 450 && t - F.liftT > 30 && F.annDesc !== ap.key){
-      F.annDesc = ap.key; announce('We are starting our descent into ' + ap.name + '. Cabin crew, please prepare for landing.');
+      F.annDesc = ap.key; announce('We are starting our descent into ' + ap.name + '. ' + (F.ride && ride.intl ? 'Welcome to ' + countryOf(ap).name + '. Please have your passport ready. ' : '') + 'Cabin crew, please prepare for landing.');
     }
     // a big arrow towards the chosen destination while you fly there yourself
     const guiding = !!F.dest && !F.ground && F.crashT <= 0;
@@ -3855,12 +3930,18 @@ function boot(hot){
   const seatSign = new THREE.Group(); cab.add(seatSign);
   // who sits where on this flight: the cabin is as long as the plane needs (6 seats a row),
   // as many other passengers as it carries, and your seat is gold
+  // the front rows are Prestige class: four big red seats a row instead of six
+  const presRows = rows => rows >= 6 ? 3 : 1;
+  const setSeat = (m, i, x, y, z, sx) => { dummy.position.set(x, y, z); dummy.scale.set(sx, 1, 1); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); dummy.scale.set(1, 1, 1); };
   function fillCabin(){
-    const rows = ride.cabRows, free = [];
+    const rows = ride.cabRows, free = [], pres = presRows(rows);
     for (let r = 1; r <= rows; r++) SEATX.forEach((x, c) => {
-      const i = (r - 1) * 6 + c, mine = r === ride.row && LETTERS[c] === ride.letter;
-      cushI.setColorAt(i, seatC.setHex(mine ? 0xffc23d : 0x2a4f9a)); backI.setColorAt(i, seatC.setHex(mine ? 0xffc23d : 0x2a4f9a));
-      if (!mine) free.push([x, rowZ(r)]);
+      const i = (r - 1) * 6 + c, mine = r === ride.row && LETTERS[c] === ride.letter, p = r <= pres, gone = p && (c === 1 || c === 4);
+      const sx = gone ? 0.001 : p ? 1.5 : 1, px = p && !gone ? x + (c < 3 ? (c === 0 ? 0.05 : -0.2) : (c === 5 ? -0.05 : 0.2)) : x;
+      setSeat(cushI, i, px, 0.42, rowZ(r), sx); setSeat(backI, i, px, p ? 0.95 : 0.85, rowZ(r) + 0.24, sx);
+      const col = mine ? 0xffc23d : p ? 0x7a1f3d : 0x2a4f9a;
+      cushI.setColorAt(i, seatC.setHex(col)); backI.setColorAt(i, seatC.setHex(col));
+      if (!mine && !gone) free.push([px, rowZ(r)]);
     });
     for (let k = free.length - 1; k > 0; k--){ const j = Math.floor(Math.random() * (k + 1)); [free[k], free[j]] = [free[j], free[k]]; }
     const n = Math.min(free.length, Math.max(0, ride.plane.pax - 1));
@@ -3872,7 +3953,7 @@ function boot(hot){
     bodyI.count = headI.count = n; cushI.count = backI.count = rows * 6; winI.count = rows * 2;
     cabBack.position.z = rowZ(rows) - 1.0;
     [cushI, backI, bodyI, headI].forEach(m => { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
-    const sx = SEATX[LETTERS.indexOf(ride.letter)];
+    const sx = SEATX[LETTERS.indexOf(ride.letter)] + (ride.row <= pres ? (ride.letter === 'A' ? 0.05 : -0.05) : 0);
     seatSign.position.set(sx, 1.6, rowZ(ride.row) + 0.4);
     setSign(seatSign, ride.row + ride.letter, 0.7, 0.35, '#ffc23d', '#1b2340');
   }
@@ -3979,8 +4060,8 @@ function boot(hot){
   function renderSteps(){
     const seat = ride.row + ride.letter;
     const steps = ride.room || ride.hbath ? [['Check in at the hotel', true], ['Sleep in your bed', !!ride.slept], ['Go to the bathroom (B)', !!(ride.flushed || ride.washed || ride.showered)], ['Check out through the door', false]]
-      : ride.hall ? [['Land at ' + ride.to.name, true], ['Pick up your suitcase at BAGGAGE CLAIM', ride.claimed], ['Walk out through the EXIT', ride.curb], ['Rent a car (R) or take a taxi (T)', false]]
-      : [['Book a flight at TICKETS', ride.booked], ['Drop off your suitcase at BAG DROP', ride.bagDone], ['Go through SECURITY', ride.cleared], ['Show your pass to the crew', ride.boarded],
+      : ride.hall ? [['Land at ' + ride.to.name, true]].concat(ride.intl ? [['Passport stamp: ' + countryOf(ride.to).name + ' ' + countryOf(ride.to).flag, true]] : [], [['Pick up your suitcase at BAGGAGE CLAIM', ride.claimed], ['Walk out through the EXIT', ride.curb], ['Rent a car (R) or take a taxi (T)', false]])
+      : [['Book a flight at TICKETS', ride.booked], ['Drop off your suitcase at BAG DROP', ride.bagDone], [ride.intl ? 'Go through SECURITY & PASSPORT CHECK' : 'Go through SECURITY', ride.cleared], ['Show your pass to the crew', ride.boarded],
         ['Put your carry-on in the overhead bin', ride.stowed], [ride.booked ? 'Sit down in seat ' + seat : 'Find your seat', ride.seated], ['Fasten your seatbelt', ride.belted]];
     let cur = false;
     RH.steps.innerHTML = steps.map(([txtS, d]) => '<li class="' + (d ? 'done' : (!cur && (cur = true) ? 'now' : '')) + '">' + (d ? '✓ ' : '') + txtS + '</li>').join('');
@@ -4035,18 +4116,38 @@ function boot(hot){
   }
   // the ticket counter: pick where to go and which passenger plane
   function openBooking(){
-    const o = ride.from, ci = cellOf(o.x), cj = cellOf(o.z), list = [];
-    for (let j = cj - 8; j <= cj + 8; j++) for (let i = ci - 8; i <= ci + 8; i++){ const a = airportOfCell(i, j); if (a && a !== o) list.push(a); }
+    const o = ride.from, home = countryOf(o), ci = cellOf(o.x), cj = cellOf(o.z), list = new Set();
+    for (let j = cj - 8; j <= cj + 8; j++) for (let i = ci - 8; i <= ci + 8; i++){ const a = airportOfCell(i, j); if (a && a !== o) list.add(a); }
+    // and the international airport of every country within three countries of here
+    const ri = Math.floor(o.x / CSIZE), rj = Math.floor(o.z / CSIZE);
+    for (let j = rj - 3; j <= rj + 3; j++) for (let i = ri - 3; i <= ri + 3; i++){ const h = hubOf(regionCountry(i, j)); if (h && h !== o) list.add(h); }
     const dist = a => Math.hypot(a.x - o.x, a.z - o.z), DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     const dir = a => DIRS[Math.round(((Math.atan2(a.x - o.x, o.z - a.z) / (Math.PI * 2)) % 1 + 1) % 1 * 8) % 8];
-    list.sort((a, b) => dist(a) - dist(b));
-    const dests = list, planes = PLANES.slice().sort((a, b) => b.pax - a.pax);
-    ride.pickTo = dests[0]; ride.pickPlane = planes.find(p => p.id === 'jumbo') || planes[0];
-    $('bookFrom').textContent = 'From ' + o.name;
-    $('bookDest').innerHTML = dests.map(a => '<button type="button" class="apbtn" data-key="' + a.key + '" aria-pressed="' + (a === ride.pickTo) + '"><b>' + a.name + '</b><small>' + (dist(a) / 1000).toFixed(1) + ' km ' + dir(a) + '</small></button>').join('');
+    const all = Array.from(list).sort((a, b) => dist(a) - dist(b));
+    const dom = all.filter(a => countryOf(a) === home), intl = all.filter(a => countryOf(a) !== home);
+    const planes = PLANES.slice().sort((a, b) => b.pax - a.pax);
+    ride.pickTo = dom[0] || intl[0]; ride.pickPlane = planes.find(p => p.id === 'jumbo') || planes[0]; ride.pickCls = 'economy';
+    $('bookFrom').textContent = 'From ' + o.name + ' ' + home.flag;
+    const btn = a => { const c = countryOf(a), hub = c.hub === a;
+      return '<button type="button" class="apbtn" data-key="' + a.key + '" aria-pressed="' + (a === ride.pickTo) + '"><b>' + a.name + (c === home ? '' : ', ' + c.name + ' ' + c.flag) + (hub ? ' International' : '') + '</b><small>' + (dist(a) / 1000).toFixed(1) + ' km ' + dir(a) + '</small></button>'; };
+    $('bookDest').innerHTML = (dom.length ? '<p class="aphead">Domestic · ' + home.name + ' ' + home.flag + '</p>' + dom.map(btn).join('') : '') +
+      '<p class="aphead">International ✈ · passport needed</p>' + intl.map(btn).join('');
+    renderClasses();
     $('bookPlane').innerHTML = planes.map(p => '<button type="button" class="apbtn" data-id="' + p.id + '" aria-pressed="' + (p === ride.pickPlane) + '"><b>' + p.name + '</b><small>' + p.pax + (p.pax === 1 ? ' seat' : ' seats') + '</small></button>').join('');
     ride.ui = true; show('book');
   }
+  const PRESTIGE = 20000;
+  function renderClasses(){
+    const rich = coins >= PRESTIGE;
+    if (!rich && ride.pickCls === 'prestige') ride.pickCls = 'economy';
+    $('bookClass').innerHTML = '<button type="button" class="apbtn" data-cls="economy" aria-pressed="' + (ride.pickCls === 'economy') + '"><b>Economy</b><small>Free</small></button>' +
+      '<button type="button" class="apbtn" data-cls="prestige" aria-pressed="' + (ride.pickCls === 'prestige') + '"' + (rich ? '' : ' disabled') + '><b>Prestige 🥂</b><small>' +
+      PRESTIGE.toLocaleString() + ' coins · ' + (rich ? 'you have ' : 'you only have ') + coins.toLocaleString() + '</small></button>';
+  }
+  $('bookClass').addEventListener('click', e => {
+    const b = e.target.closest('.apbtn'); if (!b || b.disabled) return;
+    ride.pickCls = b.dataset.cls; renderClasses();
+  });
   $('bookDest').addEventListener('click', e => {
     const b = e.target.closest('.apbtn'); if (!b) return;
     const [i, j] = b.dataset.key.split(',').map(Number); ride.pickTo = airportOfCell(i, j);
@@ -4058,21 +4159,31 @@ function boot(hot){
     $('bookPlane').querySelectorAll('.apbtn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   });
   $('btn-book').addEventListener('click', () => {
-    const rows = clamp(Math.ceil(ride.pickPlane.pax / 6), 2, ROWS);
-    Object.assign(ride, { to: ride.pickTo, plane: ride.pickPlane, booked: true, flight: 'SC ' + (100 + Math.floor(Math.random() * 900)), cabRows: rows,
-      row: rows >= 8 ? 3 + Math.floor(Math.random() * (Math.min(rows, 24) - 2)) : 1 + Math.floor(Math.random() * rows), letter: Math.random() < 0.5 ? 'A' : 'F' });
+    const rows = clamp(Math.ceil(ride.pickPlane.pax / 6), 2, ROWS), pres = presRows(rows), prestige = ride.pickCls === 'prestige' && coins >= PRESTIGE;
+    // Prestige sits at the front; economy behind it
+    const lo = pres + 1, row = prestige ? 1 + Math.floor(Math.random() * pres) : rows >= 8 ? lo + Math.floor(Math.random() * (Math.min(rows, 24) - lo + 1)) : lo + Math.floor(Math.random() * (rows - pres));
+    if (prestige){ coins -= PRESTIGE; saveProgress(); }
+    const intl = countryOf(ride.from) !== countryOf(ride.pickTo);
+    Object.assign(ride, { to: ride.pickTo, plane: ride.pickPlane, booked: true, flight: 'SC ' + (intl ? 1000 + Math.floor(Math.random() * 9000) : 100 + Math.floor(Math.random() * 900)), cabRows: rows,
+      prestige, intl, row, letter: Math.random() < 0.5 ? 'A' : 'F' });
     ride.side = ride.letter === 'A' ? -1 : 1;
     plane = ride.plane; buildPlane(plane);
     parkPlane(ride.plane); crew.visible = true; fillCabin();
     setSign(gateSign, 'GATE 1 · ' + ride.to.name.toUpperCase(), 7, 1.0, '#1b2340', '#ffffff');
     const cell = (k, v) => '<div><small>' + k + '</small><b>' + v + '</b></div>';
     $('passFlight').textContent = ride.flight;
-    $('passBody').innerHTML = '<div class="pass-route">' + cell('FROM', ride.from.name) + '<span>✈</span>' + cell('TO', ride.to.name) + '</div>' +
+    const fc = countryOf(ride.from), tc = countryOf(ride.to), where = (a, c) => a.name + (ride.intl ? ' ' + c.flag : '');
+    $('passBody').className = 'pass' + (ride.prestige ? ' prestige' : '');
+    $('passBody').innerHTML = (ride.intl ? '<span class="pass-tag">INTERNATIONAL · ' + fc.name.toUpperCase() + ' → ' + tc.name.toUpperCase() + '</span>' : '') +
+      (ride.prestige ? '<span class="pass-tag prestige">PRESTIGE CLASS 🥂</span>' : '') +
+      '<div class="pass-route">' + cell('FROM', where(ride.from, fc)) + '<span>✈</span>' + cell('TO', where(ride.to, tc)) + '</div>' +
       '<div class="pass-grid">' + cell('FLIGHT', ride.flight) + cell('PLANE', ride.plane.name) + cell('GATE', '1') + cell('SEAT', ride.row + ride.letter) + '</div><div class="pass-bar"></div>';
+    $('btn-pass-ok').textContent = ride.intl ? 'Go to security & passport check' : 'Go to security';
+    if (ride.prestige) toast('Prestige class! -' + PRESTIGE.toLocaleString() + ' coins 🥂', '');
     sfx.land(); show('pass'); renderSteps();
   });
   $('btn-book-cancel').addEventListener('click', () => { ride.ui = false; show(null); });
-  $('btn-pass-ok').addEventListener('click', () => { ride.ui = false; show(null); toast('Now go through SECURITY', 'info'); });
+  $('btn-pass-ok').addEventListener('click', () => { ride.ui = false; show(null); toast(ride.intl ? 'Now go through SECURITY. Have your passport ready!' : 'Now go through SECURITY', 'info'); });
   function dropBag(){
     ride.bagDone = true; ride.bagT = 0; walkerBag.visible = false;
     droppedBag.position.set(-3.5, 1.45, -6); droppedBag.visible = true; sfx.ap(true); renderSteps();
@@ -4085,7 +4196,7 @@ function boot(hot){
   function boardPlane(){
     ride.boarded = ride.inCabin = true; ride.x = CX; ride.z = -0.9; ride.yaw = 0;
     camBase.set(CX, 1.95, 1.4); sfx.chime(); renderSteps();
-    toast('Crew: Welcome aboard! Seat ' + ride.row + ride.letter + ' is that way', '');
+    toast(ride.prestige ? 'Crew: Welcome to Prestige class! Seat ' + ride.row + ride.letter + ' is right at the front 🥂' : 'Crew: Welcome aboard! Seat ' + ride.row + ride.letter + ' is that way', '');
   }
   function stowBag(){
     ride.stowed = true; carryOn.visible = false; sfx.gear(); renderSteps();
@@ -4099,7 +4210,8 @@ function boot(hot){
   function fasten(){
     ride.belted = true; sfx.gear(); renderSteps();
     toast('Click! Seatbelt fastened ✓', '');
-    announce('Ladies and gentlemen, welcome aboard flight ' + ride.flight + ' to ' + ride.to.name + '. Cabin crew, please prepare for departure.', true);
+    announce('Ladies and gentlemen, welcome aboard ' + (ride.intl ? 'international flight ' : 'flight ') + ride.flight + ' to ' + ride.to.name + (ride.intl ? ', ' + countryOf(ride.to).name : '') + '. ' +
+      (ride.prestige ? 'A warm welcome to our Prestige class guests. ' : '') + 'Cabin crew, please prepare for departure.', true);
     setTimeout(() => { if (state === 'ride' && ride.belted) fadeTo(rideTakeoff); }, 5000);
   }
   // takeoff: the normal world, on the runway of the airport you're at, and the captain flies
@@ -4125,19 +4237,35 @@ function boot(hot){
     Object.assign(ride, { hall: true, curb: false, claimed: false, inCabin: false, seated: false, ui: false, act: null, x: HX, z: -12, yaw: Math.PI });
     walker.visible = true; walkerBag.visible = false; carryOn.visible = true; binBag.visible = false;
     beltBags.forEach((b, k) => { b.m.visible = true; b.a = b.mine ? Math.PI / 2 : Math.PI / 2 + k / 11 * Math.PI * 2; });
-    setSign(arrSign, 'WELCOME TO ' + ride.to.name.toUpperCase(), 12, 1.4, '#1b2340', '#ffc23d');
+    const tc = countryOf(ride.to);
+    setSign(arrSign, (ride.intl ? tc.hello.toUpperCase() + '! ' : '') + 'WELCOME TO ' + ride.to.name.toUpperCase(), 12, 1.4, '#1b2340', '#ffc23d');
     setSign(claimSign, 'BAGGAGE CLAIM · ' + ride.flight, 7, 1.0, '#1b2340', '#ffffff');
     camBase.set(HX, 3.4, -18);
     camera.near = 0.1; camera.far = 900; camera.updateProjectionMatrix();
     state = 'ride'; show(null); renderSteps();
-    toast('Welcome to ' + ride.to.name + '! Find your suitcase', 'info');
+    if (ride.intl) showStamp();
+    else toast('Welcome to ' + ride.to.name + '! Find your suitcase', 'info');
   }
+  // your passport: a stamp for every country you've flown into, saved in the browser
+  const stamps = new Set(store.get('scr.stamps', []));
+  function showStamp(){
+    const c = countryOf(ride.to), first = !stamps.has(c.name), d = new Date();
+    stamps.add(c.name); store.set('scr.stamps', Array.from(stamps));
+    ride.ui = true;
+    $('stampFlight').textContent = ride.flight;
+    $('stampTitle').innerHTML = c.hello + '! Welcome to <em>' + c.name + '</em>';
+    $('stampBody').innerHTML = '<span>' + c.flag + '</span><b>' + c.name.toUpperCase() + '</b>ARRIVED<br>' + d.getDate() + ' ' + d.toLocaleString('en-GB', { month: 'short' }).toUpperCase() + ' ' + d.getFullYear();
+    $('stampText').textContent = 'Passport control stamped your passport' + (first ? ': a brand new country!' : '.') + ' You have ' + stamps.size + (stamps.size === 1 ? ' stamp.' : ' stamps from different countries.');
+    sfx.gear(); show('stamp');
+  }
+  $('btn-stamp-ok').addEventListener('click', () => { ride.ui = false; show(null); toast('Now find your suitcase at BAGGAGE CLAIM', 'info'); });
   function showArrival(){
     ride.ui = true;
     const km = (Math.hypot(ride.to.x - ride.from.x, ride.to.z - ride.from.z) / 1000).toFixed(1);
     $('arriveFlight').textContent = ride.flight;
     $('arriveTitle').innerHTML = 'Welcome to <em>' + ride.to.name + '</em>!';
-    $('arriveText').textContent = 'You flew ' + km + ' km from ' + ride.from.name + ' on the ' + ride.plane.name + ', sitting in seat ' + ride.row + ride.letter + '. Thanks for flying with us!';
+    const fc = countryOf(ride.from), tc = countryOf(ride.to);
+    $('arriveText').textContent = 'You flew ' + km + ' km from ' + ride.from.name + (ride.intl ? ' (' + fc.name + ' ' + fc.flag + ') to ' + ride.to.name + ' (' + tc.name + ' ' + tc.flag + ')' : '') + ' on the ' + ride.plane.name + ', sitting in ' + (ride.prestige ? 'Prestige class ' : '') + 'seat ' + ride.row + ride.letter + '. Thanks for flying with us!';
     if (ride.driveText) $('arriveText').textContent += ' ' + ride.driveText;
     if (ride.hotelText) $('arriveText').textContent += ' ' + ride.hotelText;
     if (ride.cityText) $('arriveText').textContent += ' ' + ride.cityText;
@@ -4531,7 +4659,7 @@ function boot(hot){
     if (!ride.inCabin && !ride.hall && ride.bagDone && !ride.cleared && oz > -22 && ride.z <= -22){
       ride.cleared = true; ride.flash = 1.4; archLight.material.color.setHex(0x3fe08a);
       carryOn.visible = false; xrayBag.visible = true; ride.xrayT = 0;
-      sfx.warn(); setTimeout(() => sfx.warn(), 180); toast('Beep! Security check: all clear ✓', ''); renderSteps();
+      sfx.warn(); setTimeout(() => sfx.warn(), 180); toast(ride.intl ? 'Beep! Security all clear ✓ Passport checked 🛂' : 'Beep! Security check: all clear ✓', ''); renderSteps();
     }
     walker.position.set(ride.x, 0, ride.z); walker.rotation.y = ride.yaw;
     animPerson(walker, go !== 0, dt);
