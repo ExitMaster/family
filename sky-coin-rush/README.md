@@ -281,8 +281,15 @@ there's something to do. A checklist in the corner shows what's next:
    and a purple carry-on backpack. At the ticket counter choose where to go (every
    airport for about 25 km around, with its distance and direction) and which plane (any
    of them!), and get a **boarding pass** with your flight number, gate and window seat.
+   The world is split into **countries** about 15 km across (Korea, Japan, France, Brazil,
+   Kenya and 35 more, each with its flag and its own hello), so the list has two parts:
+   **Domestic** flights inside your country, and **International** ones to other countries,
+   including the big international airport of every country up to three countries away.
+   Pick **Economy** (free) or **Prestige** class for **20,000 coins**: big red seats, four a
+   row, right at the front of the cabin, a welcome from the crew and the captain, and a
+   drink and a hot meal at cruise height.
 2. **Drop off your suitcase at BAG DROP.** It gets a tag and rides away on a belt.
-3. **Go through SECURITY.** Walk through the metal detector (beep beep, all clear) while
+3. **Go through SECURITY** (and **passport check** on an international flight). Walk through the metal detector (beep beep, all clear) while
    your carry-on rides through the X-ray machine, then you pick it up again. It won't let
    you through without a pass and with your suitcase still in your hand.
 4. **Show your pass to the crew.** Go out through GATE 1 to your plane, parked on the apron
@@ -304,6 +311,11 @@ there's something to do. A checklist in the corner shows what's next:
    asked to go back. Now and then at cruise height the
    plane hits **turbulence**: everything shakes and bumps, the seatbelt sign dings on and
    the captain asks everyone to sit down and buckle up, until the air is smooth again.
+
+After an international flight, **passport control** stamps your passport with the
+country's flag and the date (the hall's welcome sign says hello in the local language),
+and your stamps are saved, so you can collect every country. When you fly yourself, a
+message says hello whenever you cross a border.
 
 After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
 your blue suitcase to come round, grab it, and walk out through the **EXIT** to the curb.
