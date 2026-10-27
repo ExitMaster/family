@@ -291,6 +291,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <h2 id="arriveTitle">Welcome!</h2>
       <p class="lede" id="arriveText"></p>
       <div class="btns">
+        <button class="btn" id="btn-ride-city" hidden>Drive around the city</button>
         <button class="btn" id="btn-ride-again">Book another flight</button>
         <button class="btn secondary" id="btn-ride-menu">Back to menu</button>
       </div>
@@ -343,7 +344,8 @@ const pick = arr => arr[(Math.random() * arr.length) | 0];
 // PLANE_SCALE sizes the plane model; its wheels sit PLANE_SCALE below its centre.
 const PLANE_SCALE = 1.3;
 // Runways: RWY_LEN long, RWY_W wide; the plane can lift off from VR (m/s).
-const RWY_LEN = 260, RWY_W = 30, RWY_TOP = 0, VR = 30;
+const RWY_LEN = 520, RWY_W = 30, RWY_TOP = 0, VR = 30;
+const RWY_START = RWY_LEN / 2 - 18;   // where a takeoff starts: just past the threshold, from the runway's middle
 
 /* ---------------- Sound ---------------- */
 const sfx = (() => {
@@ -2610,10 +2612,12 @@ function boot(hot){
     if (state === 'play' && F.ride && !/^(KeyC|KeyV|Escape|KeyP|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyD)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
     if (state === 'play' && F.ride && e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     if (state === 'play' && F.drive){
-      if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){ e.preventDefault(); finishDrive(false); return; }
-      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
+      if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){ e.preventDefault(); driveAction(); return; }
+      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
+    if (state === 'play' && F.drive && e.code === 'KeyC' && !car.taxi){ e.preventDefault(); switchRentColor(); return; }
+    if (state === 'ride' && !ride.ui && ride.curb && e.code === 'KeyC'){ e.preventDefault(); switchRentColor(); return; }
     if (state === 'ride' && !ride.ui && ride.room && e.code === 'KeyB'){ e.preventDefault(); fadeTo(enterHotelBath); return; }
     if (state === 'ride' && !ride.ui && ride.curb && (e.code === 'KeyR' || e.code === 'KeyT')){ e.preventDefault(); startDrive(e.code === 'KeyT'); return; }
     if (state === 'ride' && !ride.ui){
@@ -3013,7 +3017,7 @@ function boot(hot){
     else if (Math.random() < 0.3) fAdd('ring', cx + dx * 250, cy, cz + dz * 250, cid, dir);
   }
 
-  const F = { x: 0, y: FREE_REST, z: 112, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0 };
+  const F = { x: 0, y: FREE_REST, z: RWY_START, yaw: 0, pitch: 0, roll: 0, speed: 0, ground: true, crashT: 0, boostHeld: false, lastLand: -99, liftT: -99, auto: false, autoFinal: false, autoBrake: false, milestone: 0, loopAcc: 0, target: null, apDist: 0, visited: new Set(['0,0']), gear: true, gearT: 1, gearWarned: false, flipped: false, dest: null, supersonic: false, vaporT: 0 };
   // Progress is never reset: coins, score and the airports you've visited carry over
   // from flight to flight and are saved in the browser.
   (function loadProgress(){
@@ -3326,7 +3330,7 @@ function boot(hot){
   }
   function startFree(){
     endRide();
-    resetFlight(0, 112, 0);
+    resetFlight(0, RWY_START, 0);
     for (let i = 0; i < 16; i++) spawnCluster();
     updatePowers(true);
     state = 'play'; show(null); toast('Cleared for takeoff', 'info');
@@ -3496,6 +3500,7 @@ function boot(hot){
     fWater.position.set(F.x, 0, F.z);
     updateAirports();
     updateAI(dt, live);
+    updateAICars(dt);
     updateMissiles(dt, live);
     updateFish(dt);
     for (const c of fClouds){
@@ -3998,7 +4003,7 @@ function boot(hot){
     camBase.set(0, 3.4, 22);
     camera.near = 0.1; camera.far = 900; camera.fov = baseFov; camera.updateProjectionMatrix();
     $('hud').classList.remove('riding'); $('winFrame').hidden = true;
-    endDrive(); ride.curb = false; ride.driveText = ''; ride.room = ride.hbath = false; setNight(false);
+    endDrive(); ride.curb = false; ride.driveText = ride.hotelText = ride.cityText = ''; ride.hotelSpot = null; ride.room = ride.hbath = false; setNight(false);
     $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); RH.wc.hidden = true; ride.bath = false; renderSteps();
     state = 'ride'; show(null);
     toast('Welcome to ' + from.name + ' airport!', 'info');
@@ -4018,7 +4023,7 @@ function boot(hot){
     else if (ride.act === 'rent') startDrive(false);
     else if (ride.act === 'sleep') goToSleep();
     else if (ride.act === 'hbath') fadeTo(enterHotelBath);
-    else if (ride.act === 'checkout') showArrival();
+    else if (ride.act === 'checkout') checkOut();
     else if (ride.act === 'hflush'){ ride.flushT = 1.6; ride.flushed = true; sfx.flush(); toast('Whoosh!', ''); renderSteps(); }
     else if (ride.act === 'hwash'){ ride.washT = 1.8; ride.washed = true; sfx.water(); toast('Squeaky clean hands!', ''); renderSteps(); }
     else if (ride.act === 'shower'){ ride.showerT = 3; ride.showered = true; sfx.water(); setTimeout(() => sfx.water(), 1500); toast('Ahh, a nice warm shower!', ''); renderSteps(); }
@@ -4101,7 +4106,7 @@ function boot(hot){
   function rideTakeoff(){
     const a = ride.from;
     plane = ride.plane; buildPlane(plane);
-    resetFlight(a.x - a.fx * 112, a.z - a.fz * 112, a.hdg);
+    resetFlight(a.x - a.fx * RWY_START, a.z - a.fz * RWY_START, a.hdg);
     F.ride = true; F.dest = ride.to; ride.view = 0; ride.arrived = false; ride.lookYaw = ride.lookPitch = 0; ride.turbT = 0; ride.bath = false; ride.nextTurb = rnd(20, 35);
     $('hud').classList.add('riding'); $('winFrame').hidden = false;
     $('rideHud').hidden = false; $('rideHud').classList.add('flying');
@@ -4134,14 +4139,18 @@ function boot(hot){
     $('arriveTitle').innerHTML = 'Welcome to <em>' + ride.to.name + '</em>!';
     $('arriveText').textContent = 'You flew ' + km + ' km from ' + ride.from.name + ' on the ' + ride.plane.name + ', sitting in seat ' + ride.row + ride.letter + '. Thanks for flying with us!';
     if (ride.driveText) $('arriveText').textContent += ' ' + ride.driveText;
-    if (ride.room || ride.hbath) $('arriveText').textContent += ride.slept ? ' You had a good night\'s sleep at the hotel, and checked out in the morning.' : ' You checked out of the hotel.';
+    if (ride.hotelText) $('arriveText').textContent += ' ' + ride.hotelText;
+    if (ride.cityText) $('arriveText').textContent += ' ' + ride.cityText;
+    // once you've left the airport, flying again means driving to one
+    $('btn-ride-city').hidden = !ride.hotelSpot; $('btn-ride-again').hidden = !!ride.hotelSpot;
+    if (ride.hotelSpot) $('arriveText').textContent += ' To fly again, drive to an airport.';
     sfx.land(); show('arrive'); $('hud').hidden = true;
   }
   $('btn-ride-again').addEventListener('click', () => fadeTo(() => rideStart(ride.to)));
   $('btn-ride-menu').addEventListener('click', goMenu);
   $('btn-ride-exit').addEventListener('click', e => { e.currentTarget.blur(); goMenu(); });
   RH.act.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.ride){ if (ride.bath) bathAction(); else toggleView(); } else rideAction(); });
-  RH.wc.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'ride' && ride.curb) startDrive(true); else toggleBathroom(); });
+  RH.wc.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.drive && !car.taxi) switchRentColor(); else if (state === 'ride' && ride.curb) startDrive(true); else toggleBathroom(); });
 
   // after the EXIT: the curb, with a rental car and a taxi waiting
   rb(40, 0.06, 10, 0x3a3f4a, HX, -0.01, 22); rb(40, 0.12, 4, 0xc9cfd8, HX, 0.02, 17.2);
@@ -4155,7 +4164,53 @@ function boot(hot){
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mat(SKIN[2])); head.position.set(-0.4, 1.5, -0.1); g.add(head);
     return g;
   }
-  const curbCar = makeCar(0x3fa9f5, false), curbTaxi = makeCar(0xffd23d, true);
+  // AI cars: traffic on the grid roads near you, keeping to their lane and turning at the
+  // crossroads; they turn back at airports and are swapped for new ones when far away
+  const AI_CARS = 16, aiCars = [], aiCarGroup = new THREE.Group(); free.add(aiCarGroup);
+  const CAR_COLS = [0xe8432e, 0x3fa9f5, 0xffffff, 0x2a2f45, 0x3fa34d, 0xffd23d, 0x7a5ad8, 0xff8a1d, 0xc9d2dc];
+  for (let i = 0; i < AI_CARS; i++){
+    const m = makeCar(CAR_COLS[i % CAR_COLS.length], i % 7 === 3); aiCarGroup.add(m);
+    aiCars.push({ m, alongX: false, line: 0, pos: 0, dir: 1, speed: 15, wait: 0, live: false });
+  }
+  function aiCarPlace(a){
+    const x = a.alongX ? a.pos : a.line, z = a.alongX ? a.line : a.pos;
+    const yaw = a.alongX ? (a.dir > 0 ? -Math.PI / 2 : Math.PI / 2) : (a.dir > 0 ? Math.PI : 0);
+    const lx = x + Math.cos(yaw) * 2.2, lz = z - Math.sin(yaw) * 2.2;   // keep to the right
+    a.x = lx; a.z = lz;
+    a.m.position.set(lx, roadY(groundAt(lx, lz)), lz); a.m.rotation.set(0, yaw, 0);
+  }
+  function aiCarSpawn(a){
+    for (let k = 0; k < 10; k++){
+      a.alongX = Math.random() < 0.5;
+      a.line = Math.round(((a.alongX ? F.z : F.x) + rnd(-900, 900)) / ROAD_R) * ROAD_R;
+      a.pos = (a.alongX ? F.x : F.z) + rnd(-900, 900);
+      a.dir = Math.random() < 0.5 ? 1 : -1; a.speed = rnd(12, 24); a.wait = 0;
+      const x = a.alongX ? a.pos : a.line, z = a.alongX ? a.line : a.pos;
+      if (!airfieldAt(x, z) && Math.hypot(x - F.x, z - F.z) > 120){ a.live = true; aiCarPlace(a); return; }
+    }
+    a.live = false;
+  }
+  function updateAICars(dt){
+    const low = F.y - Math.max(groundAt(F.x, F.z), 0) < 1500;
+    aiCarGroup.visible = low;
+    if (!low) return;
+    for (const a of aiCars){
+      if (!a.live || Math.hypot(a.x - F.x, a.z - F.z) > 1400){ aiCarSpawn(a); continue; }
+      if (a.wait > 0){ a.wait -= dt; continue; }
+      const prev = a.pos; a.pos += a.dir * a.speed * dt;
+      // at a crossroads: mostly straight on, sometimes turn left or right
+      const c0 = Math.floor(prev / ROAD_R), c1 = Math.floor(a.pos / ROAD_R);
+      if (c0 !== c1 && Math.random() < 0.4){
+        const cross = Math.max(c0, c1) * ROAD_R;
+        a.pos = a.line; a.line = cross; a.alongX = !a.alongX; a.dir = Math.random() < 0.5 ? 1 : -1;
+      }
+      const x = a.alongX ? a.pos : a.line, z = a.alongX ? a.line : a.pos;
+      if (airfieldAt(x + (a.alongX ? a.dir * 8 : 0), z + (a.alongX ? 0 : a.dir * 8))) a.dir = -a.dir;   // airports: turn back
+      aiCarPlace(a);
+    }
+  }
+  let curbCar = makeCar(0x3fa9f5, false);
+  const curbTaxi = makeCar(0xffd23d, true);
   curbCar.position.set(HX - 6, 0, 22); curbCar.rotation.y = Math.PI / 2; curbTaxi.position.set(HX + 6, 0, 22); curbTaxi.rotation.y = Math.PI / 2;
   rideScene.add(curbCar, curbTaxi);
   signAt(HX - 6, 3, 19.6, Math.PI).add(signMesh('CAR RENTAL · R', 4.4, 0.9, '#2a6ccc', '#ffffff'));
@@ -4167,6 +4222,20 @@ function boot(hot){
   // driving in the open world: your rental car (you steer) or a taxi (it drives itself) to a hotel
   const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, taxi: false, tx: 0, tz: 0, km: 0, warnT: -9 };
   const worldCars = { rent: makeCar(0x3fa9f5, false), taxi: makeCar(0xffd23d, true) };
+  // the rental car comes in lots of colours: C (or COLOR) swaps to the next one
+  const RENT_COLS = [0x3fa9f5, 0xe8432e, 0x3fa34d, 0xffd23d, 0x7a5ad8, 0xff8fb8, 0x2a2f45, 0xffffff, 0xff8a1d];
+  let rentCol = 0;
+  function recolor(old, parent){
+    const m = makeCar(RENT_COLS[rentCol], false);
+    m.position.copy(old.position); m.quaternion.copy(old.quaternion); m.visible = old.visible;
+    parent.remove(old); old.traverse(o => { if (o.geometry) o.geometry.dispose(); }); parent.add(m);
+    return m;
+  }
+  function switchRentColor(){
+    rentCol = (rentCol + 1) % RENT_COLS.length;
+    worldCars.rent = recolor(worldCars.rent, scene); curbCar = recolor(curbCar, rideScene);
+    sfx.ap(true); toast('New colour!', '');
+  }
   worldCars.rent.visible = worldCars.taxi.visible = false; scene.add(worldCars.rent, worldCars.taxi);
   const dCam = new THREE.Vector3();
   let hotel = null, routeRoad = null;
@@ -4210,23 +4279,46 @@ function boot(hot){
       }
       const yaw = Math.atan2(-(tx - sx), -(tz - sz));
       resetFlight(sx, sz, yaw);
-      Object.assign(car, { x: sx, z: sz, y: groundAt(sx, sz), yaw, speed: 0, taxi, km: 0, warnT: -9 });
+      Object.assign(car, { x: sx, z: sz, y: groundAt(sx, sz), yaw, speed: 0, taxi, free: false, km: 0, warnT: -9 });
       const hy = Math.atan2(-(sx - tx), -(sz - tz));   // the hotel's front faces where you come from
       if (hotel) endHotel();
       endRoute();
       hotel = buildHotel(tx, tz, hy);
       car.tx = tx - Math.sin(hy) * 20; car.tz = tz - Math.cos(hy) * 20;
       buildRoute(sx, sz, car.tx, car.tz);
+      ride.hotelSpot = { sx, sz, tx, tz, hy, px: car.tx, pz: car.tz };
       worldCars.rent.visible = !taxi; worldCars.taxi.visible = taxi;
       ride.curb = false; ride.ui = false; F.drive = true; F.ground = true; planeRoot.visible = false;
       dCam.set(sx + Math.sin(yaw) * 10, car.y + 5, sz + Math.cos(yaw) * 10);
       state = 'play'; show(null); $('hud').hidden = true;
       $('rideHud').hidden = false; $('rideHud').classList.add('flying'); RH.wc.hidden = true;
       RH.steps.innerHTML = '<li class="now" id="driveInfo"></li><li>' + (taxi ? 'Your taxi is taking you to the HOTEL' : 'Drive to the HOTEL: arrows / WASD or drag') + '</li>';
-      txt(RH.prompt, ''); RH.act.hidden = taxi; txt(RH.act, 'PARK');
+      txt(RH.prompt, ''); RH.act.hidden = taxi; txt(RH.act, 'PARK'); RH.wc.hidden = taxi; txt(RH.wc, 'COLOR (C)');
       toast(taxi ? 'Taxi! To the hotel, please' : 'Here are your keys! Drive to the hotel', 'info');
     });
   }
+  function startCityDrive(){
+    const h = ride.hotelSpot; if (!h) return;
+    fadeTo(() => {
+      resetFlight(h.px, h.pz, h.hy);
+      Object.assign(car, { x: h.px, z: h.pz, y: groundAt(h.px, h.pz), yaw: h.hy, speed: 0, taxi: false, free: true, km: 0, warnT: -9, tx: h.px, tz: h.pz });
+      if (hotel) endHotel();
+      endRoute(); hotel = buildHotel(h.tx, h.tz, h.hy); buildRoute(h.sx, h.sz, h.px, h.pz);
+      worldCars.rent.visible = true; worldCars.taxi.visible = false;
+      ride.room = ride.hbath = false; ride.ui = false; F.drive = true; F.ground = true; planeRoot.visible = false;
+      dCam.set(h.px + Math.sin(h.hy) * 10, car.y + 5, h.pz + Math.cos(h.hy) * 10);
+      state = 'play'; show(null); $('hud').hidden = true;
+      $('rideHud').hidden = false; $('rideHud').classList.add('flying'); RH.wc.hidden = true;
+      RH.steps.innerHTML = '<li class="now" id="driveInfo"></li><li>Drive anywhere: arrows / WASD or drag. To fly again, drive to an airport</li>';
+      txt(RH.prompt, ''); RH.act.hidden = false; txt(RH.act, 'PARK'); RH.wc.hidden = false; txt(RH.wc, 'COLOR (C)');
+      toast('Off you go! Explore the city', 'info');
+    });
+  }
+  function checkOut(){
+    ride.hotelText = ride.slept ? "You had a good night's sleep at the hotel, and checked out in the morning." : 'You checked out of the hotel.';
+    showArrival();
+  }
+  $('btn-ride-city').addEventListener('click', () => { ride.ui = false; show(null); startCityDrive(); });
   function endRoute(){ if (routeRoad){ routeRoad.geometry.dispose(); scene.remove(routeRoad); routeRoad = null; } }
   function endHotel(){ hotel.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map){ o.material.map.dispose(); o.material.dispose(); } }); scene.remove(hotel); hotel = null; }
   function endDrive(){
@@ -4239,11 +4331,19 @@ function boot(hot){
     if (!F.drive) return;
     const km = (car.km / 1000).toFixed(1);
     F.drive = false; sfx.engine(false, 0); state = 'paused';
-    ride.driveText = car.taxi ? 'Your taxi drove you ' + km + ' km to the hotel.' : atHotel ? 'Then you drove ' + km + ' km to the hotel in your rental car.' : 'Then you drove ' + km + ' km in your rental car.';
+    if (car.free) ride.cityText = 'Then you drove ' + km + ' km around the city.';
+    else ride.driveText = car.taxi ? 'Your taxi drove you ' + km + ' km to the hotel.' : atHotel ? 'Then you drove ' + km + ' km to the hotel in your rental car.' : 'Then you drove ' + km + ' km in your rental car.';
     toast(atHotel ? 'You made it to the hotel!' : 'Parked!', '');
     if (atHotel) fadeTo(enterHotel); else showArrival();
   }
-  $('btn-ride-act').addEventListener('click', () => { if (state === 'play' && F.drive && !car.taxi) finishDrive(false); });
+  $('btn-ride-act').addEventListener('click', () => { if (state === 'play' && F.drive && !car.taxi) driveAction(); });
+  // PARK, or (driving round the city) go into the airport you've driven to and book a flight there
+  function driveAction(){
+    if (car.free && ride.carAirport){
+      const a = ride.carAirport; F.drive = false; sfx.engine(false, 0);
+      fadeTo(() => rideStart(a));
+    } else finishDrive(false);
+  }
   function updateCar(dt){
     const c = car, b = Math.atan2(-(c.tx - c.x), -(c.tz - c.z)), turn = wrapA(b - c.yaw), dist = Math.hypot(c.tx - c.x, c.tz - c.z);
     let steer, throttle;
@@ -4252,13 +4352,16 @@ function boot(hot){
       steer = clamp((keys.r || keys.dd ? 1 : 0) - (keys.l ? 1 : 0) + stick.x, -1, 1);
       throttle = clamp((keys.u ? 1 : 0) - (keys.d || keys.f ? 1 : 0) + stick.y, -1, 1);
     }
-    c.speed += throttle * (throttle < 0 && c.speed > 0 ? 18 : 9) * dt;
-    c.speed -= c.speed * 0.35 * dt;
-    c.speed = clamp(c.speed, -8, 34);
+    // the rental car is quick (up to 250 km/h); the taxi takes it easy
+    c.speed += throttle * (throttle < 0 && c.speed > 0 ? 30 : c.taxi ? 9 : 34) * dt;
+    c.speed -= c.speed * (c.taxi ? 0.35 : 0.15) * dt;
+    c.speed = clamp(c.speed, -10, c.taxi ? 34 : 70);
     c.yaw -= steer * clamp(Math.abs(c.speed) / 8, 0, 1) * 1.4 * dt * Math.sign(c.speed || 1);
     const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
     const road = (x, z) => onGridRoad(x, z) || onRoute(x, z);
-    if (cityHit(nx, c.y + 1, nz, 1.5)){ c.speed = 0; if (t - c.warnT > 3){ c.warnT = t; toast('Bonk! A building', 'warn'); } }
+    const bumped = aiCars.find(a => a.live && Math.hypot(a.x - nx, a.z - nz) < 3.4);
+    if (bumped){ c.speed *= -0.3; bumped.wait = 1.5; if (t - c.warnT > 2){ c.warnT = t; sfx.hit(); toast('Bonk! Watch out for the cars', 'warn'); } }
+    else if (cityHit(nx, c.y + 1, nz, 1.5)){ c.speed = 0; if (t - c.warnT > 3){ c.warnT = t; toast('Bonk! A building', 'warn'); } }
     else if (groundAt(nx, nz) < 0.6 && !road(nx, nz)){   // no driving into lakes (bridges are fine)
       c.speed = 0;
       if (t - c.warnT > 3){ c.warnT = t; toast("Can't drive into the lake!", 'warn'); }
@@ -4271,8 +4374,14 @@ function boot(hot){
     m.rotateX(Math.atan2(groundAt(c.x + fx * 2, c.z + fz * 2) - groundAt(c.x - fx * 2, c.z - fz * 2), 4));
     F.x = c.x; F.z = c.z; F.y = c.y + 2; F.speed = Math.abs(c.speed);
     const el = document.getElementById('driveInfo');
-    if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
-    if (dist < 25 && state === 'play') finishDrive(true);
+    if (c.free){
+      const f = airfieldAt(c.x, c.z), na = f ? f.a : nearestAirport(c.x, c.z);
+      ride.carAirport = f ? f.a : null;
+      txt(RH.act, f ? 'GO INTO THE AIRPORT' : 'PARK');
+      if (el) txt(el, (f ? 'You are at ' + f.a.name + '!' : 'Nearest airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+    }
+    else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+    if (!c.free && dist < 25 && state === 'play') finishDrive(true);
   }
   function driveCam(dt){
     const c = car, D = c.taxi ? 11 : 9, Hc = c.taxi ? 5 : 3.8;
@@ -4458,7 +4567,7 @@ function boot(hot){
       if (Math.hypot(ride.x - (HRX - 0.1), ride.z + 1.6) < 1.2) act = 'sleep';
       else if (Math.hypot(ride.x - (HRX + 3.3), ride.z - 1.6) < 1.0) act = 'hbath';
       else if (ride.z > 2.3) act = 'checkout';
-    } else if (ride.curb){ hint = 'Rent a car (R) or take a taxi (T)'; act = 'rent'; }
+    } else if (ride.curb){ hint = 'Rent a car (R) or take a taxi (T) · C changes the car colour'; act = 'rent'; }
     else if (ride.hall){
       const mb = beltBags[0].m.position;
       if (!ride.claimed){ hint = 'Wait at the belt for your blue suitcase'; if (Math.hypot(mb.x - ride.x, mb.z - ride.z) < 2.6) act = 'claim'; }
