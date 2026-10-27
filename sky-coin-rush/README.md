@@ -214,7 +214,8 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
   belly-landing crash; low over an airport the screen warns "Gear is up! Press G".
   Auto-land puts the gear down for you. The Puffin's floats don't fold up.
 - **The world** never ends: rolling hills, lakes, forests and snowy mountain ranges in
-  every direction, criss-crossed by a grid of roads every 420 m (bridges over the lakes)
+  every direction, criss-crossed by a grid of roads every 420 m (bridges over the lakes) with **traffic** (cars that
+  keep to their lane and turn at the crossroads; bump one in the rental car and it's a bonk)
   and filled with a **city**: thousands of buildings with windows between the roads, from low
   houses to skyscrapers downtown (none on water, steep slopes or near airports, and only low
   ones under the approach paths). Fly into one and it's a crash, with clouds between about 1,200 and 4,300 ft. The sky darkens and the
@@ -306,14 +307,18 @@ there's something to do. A checklist in the corner shows what's next:
 
 After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
 your blue suitcase to come round, grab it, and walk out through the **EXIT** to the curb.
-There, press **R** to **rent a car** and drive it yourself (arrows / WASD or drag) along
+There, press **R** to **rent a car** (a fast one: up to 250 km/h, in any of 9 colours: press **C** or COLOR to switch, at the curb or while driving) and drive it yourself (arrows / WASD or drag) along
 the road to a **hotel** about a kilometre away (the road grid and its bridges are all
 drivable too), with its distance and direction shown (you can't drive
 into lakes; PARK stops any time), or **T** to call a **taxi**, which drives you there by
 itself. At the hotel you walk around your **room**: lie down on the bed and **sleep**
 (the lights go out and the window turns to night with stars and a moon, then it's
 morning), go to the **bathroom** through its door (or press **B**) to flush the toilet,
-wash your hands and take a shower, and **check out** through the room door. Then book
+wash your hands and take a shower, and **check out** through the room door. After checking
+out you can **drive around the city** in your rental car as long as you like (PARK when
+you're done). To fly again you have to **drive to an airport**: the panel shows the
+nearest one, and once you're on its field tap **GO INTO THE AIRPORT** (or SPACE) to walk
+into its terminal and book your next flight. Then book
 another flight from there, or go back to the menu. The terminal, gate and arrivals hall
 are busy with other travellers walking about, queueing and sitting at the gate.
 
