@@ -296,7 +296,7 @@ there's something to do. A checklist in the corner shows what's next:
    Kenya and 35 more, each with its flag and its own hello), so the list has two parts:
    **Domestic** flights inside your country, and **International** ones to other countries,
    including the big international airport of every country up to three countries away.
-   Pick **Economy** (free) or **Prestige** class for **20,000 coins**: big red seats, four a
+   Pick **Economy** (free) or **Prestige** class for **20,000 points**: big red seats, four a
    row, right at the front of the cabin, a welcome from the crew and the captain, and a
    drink and a hot meal at cruise height.
 2. **Drop off your suitcase at BAG DROP.** It gets a tag and rides away on a belt.
@@ -330,7 +330,7 @@ message says hello whenever you cross a border.
 
 After landing you walk into the **arrivals hall**: wait at the **baggage claim** belt for
 your blue suitcase to come round, grab it, and walk out through the **EXIT** to the curb.
-There, press **R** to **rent a car** (up to 210 km/h, in any of 9 colours: press **C** or COLOR to switch, at the curb or while driving; crash it into a car or a building and you pay a **1,000-coin repair fee**) and drive it yourself (arrows / WASD or drag) along
+There, press **R** to **rent a car** (up to 210 km/h, in any of 9 colours: press **C** or COLOR to switch, at the curb or while driving; crash it into a car or a building and you pay a **1,000-point repair fee**) and drive it yourself (arrows / WASD or drag) along
 the road to a **hotel** about a kilometre away (the road grid and its bridges are all
 drivable too), with its distance and direction shown (you can't drive
 into lakes; PARK stops any time), or **T** to call a **taxi**, which drives you there by

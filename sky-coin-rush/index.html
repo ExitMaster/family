@@ -4164,11 +4164,11 @@ function boot(hot){
   }
   const PRESTIGE = 20000;
   function renderClasses(){
-    const rich = coins >= PRESTIGE;
+    const rich = score >= PRESTIGE;
     if (!rich && ride.pickCls === 'prestige') ride.pickCls = 'economy';
     $('bookClass').innerHTML = '<button type="button" class="apbtn" data-cls="economy" aria-pressed="' + (ride.pickCls === 'economy') + '"><b>Economy</b><small>Free</small></button>' +
       '<button type="button" class="apbtn" data-cls="prestige" aria-pressed="' + (ride.pickCls === 'prestige') + '"' + (rich ? '' : ' disabled') + '><b>Prestige 🥂</b><small>' +
-      PRESTIGE.toLocaleString() + ' coins · ' + (rich ? 'you have ' : 'you only have ') + coins.toLocaleString() + '</small></button>';
+      PRESTIGE.toLocaleString() + ' points · ' + (rich ? 'you have ' : 'you only have ') + Math.floor(score).toLocaleString() + '</small></button>';
   }
   $('bookClass').addEventListener('click', e => {
     const b = e.target.closest('.apbtn'); if (!b || b.disabled) return;
@@ -4185,10 +4185,10 @@ function boot(hot){
     $('bookPlane').querySelectorAll('.apbtn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   });
   $('btn-book').addEventListener('click', () => {
-    const rows = clamp(Math.ceil(ride.pickPlane.pax / 6), 2, ROWS), pres = presRows(rows), prestige = ride.pickCls === 'prestige' && coins >= PRESTIGE;
+    const rows = clamp(Math.ceil(ride.pickPlane.pax / 6), 2, ROWS), pres = presRows(rows), prestige = ride.pickCls === 'prestige' && score >= PRESTIGE;
     // Prestige sits at the front; economy behind it
     const lo = pres + 1, row = prestige ? 1 + Math.floor(Math.random() * pres) : rows >= 8 ? lo + Math.floor(Math.random() * (Math.min(rows, 24) - lo + 1)) : lo + Math.floor(Math.random() * (rows - pres));
-    if (prestige){ coins -= PRESTIGE; saveProgress(); }
+    if (prestige){ score -= PRESTIGE; saveProgress(); }
     const intl = countryOf(ride.from) !== countryOf(ride.pickTo);
     Object.assign(ride, { to: ride.pickTo, plane: ride.pickPlane, booked: true, flight: 'SC ' + (intl ? 1000 + Math.floor(Math.random() * 9000) : 100 + Math.floor(Math.random() * 900)), cabRows: rows,
       prestige, intl, row, letter: Math.random() < 0.5 ? 'A' : 'F' });
@@ -4205,7 +4205,7 @@ function boot(hot){
       '<div class="pass-route">' + cell('FROM', where(ride.from, fc)) + '<span>✈</span>' + cell('TO', where(ride.to, tc)) + '</div>' +
       '<div class="pass-grid">' + cell('FLIGHT', ride.flight) + cell('PLANE', ride.plane.name) + cell('GATE', '1') + cell('SEAT', ride.row + ride.letter) + '</div><div class="pass-bar"></div>';
     $('btn-pass-ok').textContent = ride.intl ? 'Go to security & passport check' : 'Go to security';
-    if (ride.prestige) toast('Prestige class! -' + PRESTIGE.toLocaleString() + ' coins 🥂', '');
+    if (ride.prestige) toast('Prestige class! -' + PRESTIGE.toLocaleString() + ' points 🥂', '');
     sfx.land(); show('pass'); renderSteps();
   });
   $('btn-book-cancel').addEventListener('click', () => { ride.ui = false; show(null); });
@@ -4514,12 +4514,12 @@ function boot(hot){
     const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
     const road = (x, z) => onGridRoad(x, z) || onRoute(x, z);
     const bumped = aiCars.find(a => a.live && Math.hypot(a.x - nx, a.z - nz) < 3.4);
-    // crashing the rental car into a car or a building costs a 1,000-coin repair fee
+    // crashing the rental car into a car or a building costs a 1,000-point repair fee
     const crash = what => {
       if (c.taxi || Math.abs(c.speed) < 4 || t - c.crashT < 2) return false;
       c.crashT = t; c.warnT = t; sfx.hit();
-      const fee = Math.min(coins, 1000); coins -= fee; saveProgress();
-      toast('CRASH into ' + what + '! Repair fee: -' + fee.toLocaleString() + ' coins', 'warn');
+      const fee = Math.min(Math.floor(score), 1000); score -= fee; saveProgress();
+      toast('CRASH into ' + what + '! Repair fee: -' + fee.toLocaleString() + ' points', 'warn');
       return true;
     };
     if (bumped){ const hit = crash('a car'); c.speed *= -0.3; bumped.wait = 1.5; if (!hit && t - c.warnT > 2){ c.warnT = t; sfx.hit(); toast('Bonk! Watch out for the cars', 'warn'); } }
