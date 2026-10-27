@@ -271,6 +271,17 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
 - **Nothing resets:** your coins, score and the airports you've visited carry over
   from flight to flight and stay saved in the browser.
 
+## Take a cruise
+
+Press **Take a cruise** on the start card to sail on a big white **cruise ship**. It waits
+at a pier on the nearest big lake. At the cruise terminal pick one of up to five harbours
+round the lake (some are in other countries: international cruises get you a passport
+stamp) and **set sail**. The captain steers round the islands and headlands
+while you walk about the top deck (arrows / WASD or drag): jump in the **pool**, eat at the
+**buffet**, sunbathe on a deck chair, and **honk the horn** (H, or go up to the front).
+**C** swaps between the deck and a view of the whole ship; **F** (or FASTER) sails at full
+speed. At the other harbour you can book another cruise from there.
+
 ## Ride as a passenger
 
 Press **Ride as a passenger** on the start card and be a passenger instead of the pilot.

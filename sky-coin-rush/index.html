@@ -241,6 +241,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       </div>
       <button class="btn" id="btn-play">Take off</button>
       <button class="btn secondary" id="btn-ride">Ride as a passenger</button>
+      <button class="btn secondary" id="btn-cruise">Take a cruise</button>
       <button class="btn secondary" id="btn-install" hidden>Install app</button>
       <p class="install-hint" id="installHint" hidden>To install: tap Share, then <b>Add to Home Screen</b>.</p>
       <hr class="perf">
@@ -306,6 +307,19 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <div class="stamp" id="stampBody"></div>
       <p class="lede" id="stampText"></p>
       <button class="btn" id="btn-stamp-ok">Go to baggage claim</button>
+    </div>
+  </section>
+
+  <section class="card" id="card-cruise" hidden>
+    <div class="card-head"><span>Cruise terminal</span><span id="cruiseFrom">Harbour</span></div>
+    <div class="card-body">
+      <h2 id="cruiseTitle">Book a <em>cruise</em></h2>
+      <p class="lede" id="cruiseText"></p>
+      <div class="aplist" id="cruiseDest"></div>
+      <div class="btns">
+        <button class="btn" id="btn-cruise-go">Set sail</button>
+        <button class="btn secondary" id="btn-cruise-menu">Back to the menu</button>
+      </div>
     </div>
   </section>
 
@@ -424,6 +438,7 @@ const sfx = (() => {
     blast(v){ noise(1.1, 0.8 * v, 900, 50); tone(70, 0.7, 'sine', 0.3 * v, 0, 30); },
     hit(){ noise(0.4, 0.55, 1800, 150); tone(120, 0.45, 'sawtooth', 0.18, 0, 40); },
     splash(){ noise(0.9, 0.5, 2500, 200); },
+    horn(){ [98, 123].forEach(f => tone(f, 1.6, 'sawtooth', 0.12)); },
     land(){ noise(0.25, 0.35, 3000, 900, 'bandpass'); [392, 523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.08, 0.15 + i * 0.09)); },
     gear(){ noise(0.5, 0.18, 700, 200, 'bandpass'); tone(170, 0.45, 'square', 0.035, 0, 110); },
     ap(on){ tone(on ? 660 : 880, 0.12, 'sine', 0.08); tone(on ? 880 : 660, 0.14, 'sine', 0.08, 0.1); },
@@ -2640,6 +2655,16 @@ function boot(hot){
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
+    // on a cruise you walk about the top deck while the ship sails itself
+    if (state === 'play' && F.cruise){
+      if (cruise.ui) return;
+      if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE'){ e.preventDefault(); cruiseAction(); return; }
+      if (e.code === 'KeyF'){ e.preventDefault(); toggleFast(); return; }
+      if (e.code === 'KeyH'){ e.preventDefault(); honk(); return; }
+      if (e.code === 'KeyC' || e.code === 'KeyV'){ e.preventDefault(); cruiseView(); return; }
+      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
+      if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
+    }
     if (state === 'play' && F.drive && e.code === 'KeyC' && !car.taxi){ e.preventDefault(); switchRentColor(); return; }
     if (state === 'ride' && !ride.ui && ride.curb && e.code === 'KeyC'){ e.preventDefault(); switchRentColor(); return; }
     if (state === 'ride' && !ride.ui && ride.room && e.code === 'KeyB'){ e.preventDefault(); fadeTo(enterHotelBath); return; }
@@ -2685,9 +2710,9 @@ function boot(hot){
 
   /* ---------------- UI wiring ---------------- */
   function show(panel){
-    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
+    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
     $('overlay').hidden = !panel;
-    $('hud').hidden = !(state === 'play' || state === 'paused') || !!F.drive;
+    $('hud').hidden = !(state === 'play' || state === 'paused') || !!F.drive || !!F.cruise;
     if (panel){ stick.id = null; stickEl.hidden = true; const b = $('card-' + panel).querySelector('.btn'); if (b) try { b.focus({ preventScroll: true }); } catch(e){} }
   }
   function syncToggles(){
@@ -3395,14 +3420,14 @@ function boot(hot){
     camera.near = 1; camera.far = CAM_FAR; camera.updateProjectionMatrix();
   }
   function startFree(){
-    endRide();
+    endRide(); endCruise();
     resetFlight(0, RWY_START, 0);
     for (let i = 0; i < 16; i++) spawnCluster();
     updatePowers(true);
     state = 'play'; show(null); toast('Cleared for takeoff', 'info');
   }
   function goMenu(){
-    endRide();
+    endRide(); endCruise();
     camera.near = 1; camera.far = CAM_FAR; camera.updateProjectionMatrix();
     if (state === 'play' || state === 'paused') saveProgress();
     clearFreeItems(); clearMissiles(); hushAnnounce(); $('prompt').hidden = true; sfx.engine(false, 0);
@@ -3470,6 +3495,7 @@ function boot(hot){
     if (F.speed < MACH1 - 15) F.supersonic = false;
 
     if (F.drive) updateCar(dt);
+    else if (F.cruise) updateShip(dt);
     else if (F.crashT > 0){
       F.crashT -= dt;
       if (F.crashT <= 0) respawnFree();
@@ -3688,7 +3714,7 @@ function boot(hot){
 
     if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
     audioTick -= dt;
-    if (audioTick <= 0){ audioTick = 0.1; const snd = F.drive ? { mul: 0.7, vol: 0.03 } : (plane.sound || {}); sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
+    if (audioTick <= 0){ audioTick = 0.1; const snd = F.cruise ? { mul: 0.3, vol: 0.03 } : F.drive ? { mul: 0.7, vol: 0.03 } : (plane.sound || {}); sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
     if (live){ dtHud = dt; updateFreeHud(); }
   }
   let dtHud = 0;
@@ -4277,8 +4303,8 @@ function boot(hot){
   $('btn-ride-again').addEventListener('click', () => fadeTo(() => rideStart(ride.to)));
   $('btn-ride-menu').addEventListener('click', goMenu);
   $('btn-ride-exit').addEventListener('click', e => { e.currentTarget.blur(); goMenu(); });
-  RH.act.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.ride){ if (ride.bath) bathAction(); else toggleView(); } else rideAction(); });
-  RH.wc.addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.drive && !car.taxi) switchRentColor(); else if (state === 'ride' && ride.curb) startDrive(true); else toggleBathroom(); });
+  RH.act.addEventListener('click', e => { e.currentTarget.blur(); if (F.cruise){ if (!cruise.ui) cruiseAction(); return; } if (state === 'play' && F.ride){ if (ride.bath) bathAction(); else toggleView(); } else rideAction(); });
+  RH.wc.addEventListener('click', e => { e.currentTarget.blur(); if (F.cruise){ if (!cruise.ui) toggleFast(); return; } if (state === 'play' && F.drive && !car.taxi) switchRentColor(); else if (state === 'ride' && ride.curb) startDrive(true); else toggleBathroom(); });
 
   // after the EXIT: the curb, with a rental car and a taxi waiting
   rb(40, 0.06, 10, 0x3a3f4a, HX, -0.01, 22); rb(40, 0.12, 4, 0xc9cfd8, HX, 0.02, 17.2);
@@ -4528,6 +4554,280 @@ function boot(hot){
     camera.lookAt(c.x - Math.sin(c.yaw) * 6, c.y + 1.2, c.z - Math.cos(c.yaw) * 6);
   }
 
+  /* ---------------- Cruise ship ---------------- */
+  // A big white cruise ship sails across a lake from one harbour to another while you walk
+  // about its top deck: a pool to jump in, a buffet, deck chairs and the captain's horn.
+  // Ship coordinates: x across (right +), y up from the waterline, z along (bow at -z).
+  const ship = new THREE.Group(); ship.visible = false; scene.add(ship);
+  const DECK = 16.1;
+  (function buildShip(){
+    const B = (w, h, d, c, x, y, z, ry) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); if (ry) m.rotation.y = ry; ship.add(m); return m; };
+    // the hull: red below the water, white above, with a pointed bow and a navy stripe
+    B(16, 3, 84, 0xc0392b, 0, -1.5, 4); B(16, 7, 84, 0xf4f4f8, 0, 3.5, 4);
+    B(11.3, 3, 11.3, 0xc0392b, 0, -1.5, -38, Math.PI / 4); B(11.3, 7, 11.3, 0xf4f4f8, 0, 3.5, -38, Math.PI / 4);
+    B(16.1, 0.8, 84, 0x1b2a6c, 0, 6.2, 4); B(16.1, 0.5, 72, 0x2a6fb0, 0, 3.2, 6);
+    // three decks of cabins with rows of windows, and orange lifeboats
+    [[15, 8.5, 70, 8], [14, 11.5, 62, 10], [13, 14.5, 52, 12]].forEach(([w, y, d, z]) => { B(w, 3, d, 0xf4f4f8, 0, y, z); B(w + 0.1, 0.8, d - 4, 0x2a6fb0, 0, y + 0.2, z); });
+    [-15, 0, 15, 30].forEach(z => [-1, 1].forEach(sd => B(1.6, 1.4, 6, 0xff7a1a, sd * 8.2, 10.2, z)));
+    // the top deck: wooden floor, railings, the bridge, the funnel
+    B(13, 0.12, 52, 0xb08355, 0, DECK, 12);
+    [-1, 1].forEach(sd => B(0.12, 0.9, 52, 0xffffff, sd * 6.45, DECK + 0.5, 12));
+    B(13, 0.9, 0.12, 0xffffff, 0, DECK + 0.5, 37.95);
+    B(11, 2.6, 5, 0xf4f4f8, 0, DECK + 1.3, -11); B(11.1, 0.9, 5.1, 0x1b2340, 0, DECK + 1.8, -11);
+    B(3.5, 7, 5, 0xc0392b, 0, DECK + 3.5, 33); B(3.6, 1, 5.1, 0x222222, 0, DECK + 7.2, 33);
+    // the pool, deck chairs round it, and the buffet
+    B(7, 0.3, 11, 0xffffff, 0, DECK + 0.05, 8); B(6, 0.12, 10, 0x3fc1f0, 0, DECK + 0.16, 8);
+    [3, 6.5, 10, 13.5].forEach(z => [-1, 1].forEach(sd => { B(1, 0.35, 2, 0xffc23d, sd * 4.8, DECK + 0.25, z); B(1, 0.6, 0.15, 0xffc23d, sd * 4.8, DECK + 0.5, z - 1); }));
+    B(1.3, 1, 4.4, 0xf4f1ea, 5, DECK + 0.5, 22);
+    [0xe8432e, 0xffc23d, 0x3fa34d, 0xff8fb8, 0x8a5a3a].forEach((c, k) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), mat(c)); m.position.set(5, DECK + 1.15, 20.4 + k * 0.8); ship.add(m); });
+  })();
+  // other passengers: some sunbathing, some swimming, some strolling
+  const deckPeople = [];
+  [[4.8, 3, 'lie'], [-4.8, 6.5, 'lie'], [4.8, 13.5, 'lie'], [-1.5, 6, 'swim'], [1.8, 11, 'swim'], [-3, 18, 'walk'], [2.5, 28, 'walk'], [-4, 25, 'walk']].forEach(([x, z, how], k) => {
+    const p = makePerson(SHIRTS[k % SHIRTS.length], 0x2a4f9a, SKIN[k % 4], 0x3a2a1a);
+    p.position.set(x, DECK + (how === 'lie' ? 0.55 : how === 'swim' ? -1.1 : 0), z + (how === 'lie' ? 0.8 : 0));
+    if (how === 'lie') p.rotation.x = -Math.PI / 2;
+    ship.add(p); deckPeople.push({ p, how, x, z, ph: k });
+  });
+  const me = makePerson(0xe8432e, 0x2a4f9a, SKIN[0], 0x5a3a1a); ship.add(me);
+  let harbours = [];
+  const cruise = { ui: false, sailing: false, arrived: false, path: [], wp: 0, x: 0, z: 0, yaw: 0, speed: 0, fast: false, view: 1, px: 0, pz: 30, pyaw: 0, swim: false,
+    km: 0, act: null, warnT: -9, lake: null, from: null, to: null, ports: [] };
+
+  // Lakes, on a grid of 40 m cells: deep enough water for the ship, flood-filled from a shore
+  const WG = 40, WR = 125;
+  const deepCache = new Map();
+  function deepCell(i, j){
+    const k = i + ',' + j;
+    let d = deepCache.get(k);
+    if (d === undefined){ d = freeH(i * WG, j * WG) < -6; if (deepCache.size > 400000) deepCache.clear(); deepCache.set(k, d); }
+    return d;
+  }
+  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const shoreCell = (i, j) => deepCell(i, j) && N4.some(([a, b]) => !deepCell(i + a, j + b));
+  function floodLake(i0, j0){
+    const dist = new Map([[i0 + ',' + j0, 0]]), prev = new Map(), q = [[i0, j0]], shore = [];
+    for (let h = 0; h < q.length; h++){
+      const [i, j] = q[h], k = i + ',' + j, d = dist.get(k);
+      if (h && N4.some(([a, b]) => !deepCell(i + a, j + b))) shore.push({ i, j, d });
+      for (const [a, b] of N4){
+        const ni = i + a, nj = j + b, nk = ni + ',' + nj;
+        if (Math.abs(ni - i0) > WR || Math.abs(nj - j0) > WR || dist.has(nk) || !deepCell(ni, nj)) continue;
+        dist.set(nk, d + 1); prev.set(nk, k); q.push([ni, nj]);
+      }
+    }
+    return { i: i0, j: j0, dist, prev, shore };
+  }
+  const harbourName = (i, j) => AP_NAMES[(((7 * i + 13 * j) % 32) + 32) % 32] + ' Harbour';
+  // the nearest lake to (x, z) big enough for a cruise, with up to five harbours to sail to
+  function findLake(x, z, avoid){
+    const ci = Math.round(x / WG), cj = Math.round(z / WG), seen = new Set();
+    for (let r = 0; r <= 110; r += 2) for (let j = cj - r; j <= cj + r; j += 2) for (let i = ci - r; i <= ci + r; i += (Math.abs(j - cj) === r ? 2 : 2 * r || 1)){
+      if (seen.has(i + ',' + j) || !shoreCell(i, j)) continue;
+      const lake = floodLake(i, j);
+      lake.dist.forEach((d, k) => seen.add(k));
+      const far = lake.shore.filter(c => c.d >= 30 && c.d <= 150).sort((a, b) => b.d - a.d), ports = [];
+      for (const c of far){
+        if (avoid && Math.hypot(c.i - avoid.i, c.j - avoid.j) < 25) continue;
+        if (ports.every(p => Math.hypot(p.i - c.i, p.j - c.j) >= 25)) ports.push(c);
+        if (ports.length >= 5) break;
+      }
+      if (ports.length){
+        // every harbour on the lake gets its own name
+        lake.name = harbourName(i, j); lake.country = countryAt(i * WG, j * WG);
+        const used = new Set([lake.name]);
+        ports.forEach(p => {
+          p.x = p.i * WG; p.z = p.j * WG; p.country = countryAt(p.x, p.z);
+          let n = (((7 * p.i + 13 * p.j) % 32) + 32) % 32;
+          while (used.has(AP_NAMES[n] + ' Harbour')) n = (n + 1) % 32;
+          p.name = AP_NAMES[n] + ' Harbour'; used.add(p.name);
+        });
+        ports.sort((a, b) => a.d - b.d);
+        lake.ports = ports;
+        return lake;
+      }
+    }
+    return null;
+  }
+  // the route: back along the flood fill, then straightened where the water allows
+  function lakeRoute(lake, port){
+    const cells = [];
+    for (let k = port.i + ',' + port.j; k; k = lake.prev.get(k)){ const [i, j] = k.split(',').map(Number); cells.push({ x: i * WG, z: j * WG }); }
+    cells.reverse();
+    const clear = (a, b) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 20); for (let k = 1; k < n; k++) if (freeH(a.x + (b.x - a.x) * k / n, a.z + (b.z - a.z) * k / n) > -4) return false; return true; };
+    const out = [cells[0]];
+    for (let i = 0; i < cells.length - 1;){
+      let j = Math.min(cells.length - 1, i + 40);
+      while (j > i + 1 && !clear(cells[i], cells[j])) j--;
+      out.push(cells[j]); i = j;
+    }
+    return out;
+  }
+  // a wooden pier from the shore out to the ship, and a little terminal on land
+  function buildHarbour(i, j, sx, sz){
+    const g = new THREE.Group();
+    let land = null;
+    for (const [a, b] of N4) if (!deepCell(i + a, j + b)){ land = { x: (i + a) * WG, z: (j + b) * WG }; break; }
+    if (!land) land = { x: i * WG, z: j * WG };
+    const dx = sx - land.x, dz = sz - land.z, d = Math.hypot(dx, dz), ux = dx / d, uz = dz / d, len = Math.max(10, d - 9);
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(6, 1, len), mat(0x8a6a4a));
+    pier.position.set(land.x + ux * len / 2, 1.2, land.z + uz * len / 2); pier.rotation.y = Math.atan2(ux, uz); g.add(pier);
+    const gy = Math.max(groundAt(land.x - ux * 25, land.z - uz * 25), 0.5);
+    const hut = new THREE.Mesh(new THREE.BoxGeometry(26, 9, 14), mat(0xf4f1ea)); hut.position.set(land.x - ux * 25, gy + 4.5, land.z - uz * 25); hut.rotation.y = Math.atan2(ux, uz); g.add(hut);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(28, 1, 16), mat(0x2a6fb0)); roof.position.set(hut.position.x, gy + 9.5, hut.position.z); roof.rotation.y = hut.rotation.y; g.add(roof);
+    scene.add(g); harbours.push(g);
+  }
+  function clearHarbours(){ harbours.forEach(g => { g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); scene.remove(g); }); harbours = []; }
+
+  function startCruise(x, z, avoid){
+    const lake = findLake(x, z, avoid);
+    if (!lake){ toast('No lake big enough for a cruise ship near here', 'warn'); goMenu(); return; }
+    endRide(); clearHarbours();
+    // dock a couple of cells out from the shore, pointing out over the lake
+    let k = lake.i + ',' + lake.j, best = null;
+    lake.dist.forEach((d, key) => { if (d === 3 && !best) best = key; });
+    const [di, dj] = (best || k).split(',').map(Number), sx = di * WG, sz = dj * WG;
+    const yaw = Math.atan2(-(sx - lake.i * WG), -(sz - lake.j * WG));
+    resetFlight(sx, sz, yaw);
+    Object.assign(cruise, { ui: false, sailing: false, arrived: false, path: [], wp: 0, x: sx, z: sz, yaw: yaw + Math.PI / 2, speed: 0, fast: false, view: 1, px: 0, pz: 30, pyaw: 0, swim: false,
+      km: 0, lake, from: { name: lake.name, country: lake.country }, to: null, ports: lake.ports });
+    buildHarbour(lake.i, lake.j, sx, sz);
+    F.cruise = true; F.ground = true; planeRoot.visible = false; ship.visible = true;
+    camera.near = 0.3; camera.updateProjectionMatrix();
+    placeShip(0); cCam.set(sx + 120, 50, sz + 60);
+    state = 'play';
+    $('rideHud').hidden = false; $('rideHud').classList.add('flying');
+    RH.steps.innerHTML = '<li class="now" id="cruiseInfo"></li><li>Walk about the top deck: arrows / WASD or drag</li><li>Jump in the pool, eat at the buffet, honk the horn (H)</li><li>View: C · Faster: F</li>';
+    txt(RH.prompt, ''); RH.act.hidden = false; RH.wc.hidden = false; txt(RH.wc, 'FASTER ⏩'); txt(RH.act, 'VIEW'); cruise.act = null;
+    openCruiseBooking();
+  }
+  function openCruiseBooking(){
+    const c = cruise, home = c.from.country;
+    cruise.pick = c.ports[0]; cruise.ui = true;
+    $('cruiseFrom').textContent = c.from.name + ' ' + home.flag;
+    $('cruiseTitle').innerHTML = 'Book a <em>cruise</em>';
+    $('cruiseText').textContent = 'Your ship is waiting at the pier. Where would you like to sail?';
+    $('cruiseDest').hidden = false;
+    $('cruiseDest').innerHTML = c.ports.map((p, k) => '<button type="button" class="apbtn" data-k="' + k + '" aria-pressed="' + (k === 0) + '"><b>' + p.name + (p.country !== home ? ', ' + p.country.name + ' ' + p.country.flag : '') +
+      '</b><small>about ' + (p.d * WG / 1000).toFixed(1) + ' km by sea' + (p.country !== home ? ' · international' : '') + '</small></button>').join('');
+    $('btn-cruise-go').textContent = 'Set sail'; $('btn-cruise-go').hidden = false;
+    show('cruise');
+  }
+  $('cruiseDest').addEventListener('click', e => {
+    const b = e.target.closest('.apbtn'); if (!b) return;
+    cruise.pick = cruise.ports[+b.dataset.k];
+    $('cruiseDest').querySelectorAll('.apbtn').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  });
+  $('btn-cruise-go').addEventListener('click', () => {
+    const c = cruise;
+    if (c.arrived){ fadeTo(() => startCruise(c.x, c.z, c.lake && c.to ? { i: c.to.i, j: c.to.j } : null)); return; }
+    c.to = c.pick; c.path = lakeRoute(c.lake, c.to); c.path[0] = { x: c.x, z: c.z }; c.wp = 1; c.sailing = true; c.ui = false; c.view = 0;
+    show(null); sfx.horn();
+    toast('All aboard! Sailing to ' + c.to.name, 'info');
+    announce('Good day, this is your captain speaking. Welcome aboard. We are sailing to ' + c.to.name + (c.to.country !== c.from.country ? ', in ' + c.to.country.name : '') + '. The pool and the buffet are open. Enjoy the cruise!', true);
+  });
+  $('btn-cruise-menu').addEventListener('click', () => goMenu());
+  $('btn-cruise').addEventListener('click', () => fadeTo(() => { sfx.init(); sfx.resume(); startCruise(0, 0); }));
+  function endCruise(){
+    if (!F.cruise && !ship.visible) return;
+    F.cruise = false; F.ground = false; cruise.ui = false; ship.visible = false; planeRoot.visible = true; clearHarbours();
+    camera.near = 1; camera.updateProjectionMatrix();
+    $('rideHud').hidden = true; $('rideHud').classList.remove('flying');
+  }
+  function toggleFast(){ cruise.fast = !cruise.fast; txt(RH.wc, cruise.fast ? 'NORMAL SPEED' : 'FASTER ⏩'); toast(cruise.fast ? 'Full speed ahead! ⏩' : 'Back to cruising speed', ''); }
+  function cruiseView(){ cruise.view = 1 - cruise.view; toast(cruise.view ? 'View of the ship' : 'On deck', ''); }
+  function honk(){ sfx.horn(); toast('HOOOONK! 🚢', ''); }
+  function cruiseAction(){
+    const a = cruise.act;
+    if (a === 'horn') honk();
+    else if (a === 'eat'){ sfx.chime(); toast(['Yum! Pizza and ice cream 🍕🍦', 'Sushi and a smoothie 🍣🥤', 'Pancakes and strawberries 🥞🍓', 'Noodles and dumplings 🍜🥟'][Math.floor(Math.random() * 4)], ''); }
+    else if (a === 'swim'){ sfx.splash(); toast('Splash! 💦', ''); }
+    else if (a === 'relax'){ toast('Ahh, sunbathing on the deck ☀️', ''); }
+    else cruiseView();
+  }
+  function placeShip(dt){
+    const c = cruise;
+    ship.position.set(c.x, Math.sin(t * 0.7) * 0.25, c.z);
+    ship.rotation.set(0, c.yaw, 0); ship.rotateZ(Math.sin(t * 0.45) * 0.012); ship.rotateX(Math.sin(t * 0.33) * 0.006);
+  }
+  const deckFree = (x, z) => Math.abs(x) < 6 && z > -8.2 && z < 37.4 && !(Math.abs(x) < 2.4 && z > 30 && z < 36) && !(x > 4.1 && z > 19.6 && z < 24.4);
+  function updateShip(dt){
+    const c = cruise;
+    // sailing: follow the route, slowing down for the last few hundred metres
+    if (c.sailing && !c.arrived){
+      const last = c.path.length - 1;
+      let w = c.path[c.wp];
+      if (c.wp < last && Math.hypot(w.x - c.x, w.z - c.z) < 70){ c.wp++; w = c.path[c.wp]; }
+      const fin = c.path[last], left = Math.hypot(fin.x - c.x, fin.z - c.z) + (last - c.wp) * 0;
+      const top = c.fast ? 64 : 16, want = c.wp === last ? Math.min(top, Math.max(1.5, (left - 60) * 0.08)) : top;
+      c.speed += clamp(want - c.speed, -6 * dt, (c.fast ? 12 : 3) * dt);
+      const turn = wrapA(Math.atan2(-(w.x - c.x), -(w.z - c.z)) - c.yaw), rate = Math.max(c.speed, 4) / 70;
+      c.yaw += clamp(turn, -rate * dt, rate * dt);
+      if (c.wp === last && left < 70){
+        c.arrived = true; c.sailing = false; c.speed = 0; sfx.horn(); buildHarbour(c.to.i, c.to.j, c.x, c.z);
+        const tc = c.to.country, intl = tc !== c.from.country;
+        if (intl){ stamps.add(tc.name); store.set('scr.stamps', Array.from(stamps)); }
+        toast('Welcome to ' + c.to.name + '!' + (intl ? ' ' + tc.flag + ' ' + tc.hello + '!' : ''), 'info');
+        announce('We have arrived at ' + c.to.name + (intl ? ', ' + tc.name : '') + '. Thank you for sailing with us!');
+        setTimeout(() => { if (F.cruise && c.arrived && state === 'play') cruiseArrival(); }, 3500);
+      }
+    } else c.speed = Math.max(0, c.speed - 4 * dt);
+    const step = c.speed * dt;
+    c.x -= Math.sin(c.yaw) * step; c.z -= Math.cos(c.yaw) * step; c.km += step;
+    placeShip(dt);
+    // you, walking about the top deck
+    let go = 0, turnK = 0;
+    if (!c.ui){
+      turnK = clamp((keys.r || keys.dd ? 1 : 0) - (keys.l ? 1 : 0) + stick.x, -1, 1);
+      go = clamp((keys.u ? 1 : 0) - (keys.d || keys.f ? 1 : 0) + stick.y, -1, 1);
+    }
+    c.pyaw -= turnK * 2.6 * dt;
+    const sp = (c.swim ? 2.5 : 5) * go * dt, nx = c.px - Math.sin(c.pyaw) * sp, nz = c.pz - Math.cos(c.pyaw) * sp;
+    if (deckFree(nx, c.pz)) c.px = nx;
+    if (deckFree(c.px, nz)) c.pz = nz;
+    const inPool = Math.abs(c.px) < 2.9 && c.pz > 3.1 && c.pz < 12.9;
+    if (inPool && !c.swim){ sfx.splash(); toast('Splash! You jumped in the pool 💦', ''); }
+    if (!inPool && c.swim) toast('Out of the pool, dripping wet!', '');
+    c.swim = inPool;
+    me.position.set(c.px, DECK + (c.swim ? -1.1 : 0.06), c.pz); me.rotation.set(0, c.pyaw, 0);
+    animPerson(me, go !== 0, dt);
+    deckPeople.forEach(d => {
+      if (d.how === 'walk'){ d.p.position.z = d.z + Math.sin(t * 0.3 + d.ph) * 5; d.p.rotation.y = Math.cos(t * 0.3 + d.ph) > 0 ? Math.PI : 0; animPerson(d.p, true, dt); }
+      else if (d.how === 'swim') d.p.position.y = DECK - 1.1 + Math.sin(t * 2 + d.ph) * 0.1;
+    });
+    // what you can do where you're standing
+    const act = c.swim ? 'swim' : c.pz < -6.4 ? 'horn' : (c.px > 3 && Math.abs(c.pz - 22) < 3) ? 'eat' : (Math.abs(Math.abs(c.px) - 4.8) < 1.1 && c.pz > 1.5 && c.pz < 15) ? 'relax' : null;
+    if (act !== c.act){ c.act = act; txt(RH.act, { horn: 'HONK THE HORN', eat: 'EAT AT THE BUFFET', swim: 'SPLASH', relax: 'SUNBATHE' }[act] || 'VIEW'); }
+    F.x = c.x; F.z = c.z; F.y = 20; F.speed = c.speed; F.yaw = c.yaw;
+    const el = document.getElementById('cruiseInfo');
+    if (el) txt(el, c.arrived ? 'Arrived at ' + c.to.name : c.sailing ? 'To ' + c.to.name + ': ' + (Math.hypot(c.path[c.path.length - 1].x - c.x, c.path[c.path.length - 1].z - c.z) / 1000).toFixed(1) + ' km · ' + Math.round(c.speed * 1.94) + ' knots' : 'At ' + c.from.name);
+  }
+  function cruiseArrival(){
+    const c = cruise; c.ui = true;
+    $('cruiseFrom').textContent = c.to.name + ' ' + c.to.country.flag;
+    $('cruiseTitle').innerHTML = 'Welcome to <em>' + c.to.name + '</em>!';
+    $('cruiseText').textContent = 'You sailed ' + (c.km / 1000).toFixed(1) + ' km from ' + c.from.name + (c.to.country !== c.from.country ? ' (' + c.from.country.name + ') to ' + c.to.country.name + ' ' + c.to.country.flag + ', and got a passport stamp' : '') + '. Thanks for cruising with us!';
+    $('cruiseDest').hidden = true; $('btn-cruise-go').textContent = 'Book another cruise from here';
+    sfx.land(); show('cruise');
+  }
+  const cCam = new THREE.Vector3(), cLook = new THREE.Vector3(), cTmp = new THREE.Vector3();
+  function cruiseCam(dt){
+    const c = cruise;
+    if (c.view === 0 && !c.ui){
+      // just behind you on deck
+      cTmp.set(c.px + Math.sin(c.pyaw) * 4.5, DECK + 2.8, c.pz + Math.cos(c.pyaw) * 4.5); ship.localToWorld(cTmp);
+      cCam.lerp(cTmp, 1 - Math.exp(-dt * 8));
+      cLook.set(c.px - Math.sin(c.pyaw) * 3, DECK + 1.4, c.pz - Math.cos(c.pyaw) * 3); ship.localToWorld(cLook);
+    } else {
+      // the whole ship from behind and above, slowly circling while docked
+      const a = c.yaw + (c.sailing ? 0.5 : t * 0.08);
+      cTmp.set(c.x + Math.sin(a) * 120, 48, c.z + Math.cos(a) * 120);
+      cCam.lerp(cTmp, 1 - Math.exp(-dt * 2));
+      cLook.set(c.x, 12, c.z);
+    }
+    camera.position.copy(cCam); camera.up.set(0, 1, 0); camera.lookAt(cLook);
+  }
+
   // the hotel: your room (bed, lamp, TV, window, your suitcase) and its bathroom
   const HRX = 1200, HBX = 1220;
   rb(8, 0.05, 6, 0x8a4a5a, HRX, 0, 0); rb(8, 0.05, 6, 0xf4f1ea, HRX, 2.8, 0);
@@ -4761,6 +5061,7 @@ function boot(hot){
     if (state !== 'paused') updateFree(dt);
     if (F.ride && ride.bath){ bathCam(dt); renderer.render(rideScene, camera); return; }
     if (F.drive) driveCam(dt);
+    else if (F.cruise) cruiseCam(dt);
     renderer.render(scene, camera);
   }
 
