@@ -4755,7 +4755,7 @@ function boot(hot){
     buildHarbour(lake.i, lake.j, sx, sz);
     F.cruise = true; F.ground = true; planeRoot.visible = false; ship.visible = true;
     camera.near = 0.3; camera.updateProjectionMatrix();
-    placeShip(0); cCam.set(sx + 120, 50, sz + 60);
+    placeShip(0); cCam.set(sx + 120, 50, sz + 60); cMode = null;
     state = 'play';
     $('rideHud').hidden = false; $('rideHud').classList.add('flying');
     RH.steps.innerHTML = '<li class="now" id="cruiseInfo"></li><li>Walk about the top deck: arrows / WASD or drag</li><li>Jump in the pool, eat at the buffet, honk the horn (H)</li><li>View: C · Faster: F</li>';
@@ -4840,6 +4840,7 @@ function boot(hot){
     const c = cruise;
     ship.position.set(c.x, Math.sin(t * 0.7) * 0.25, c.z);
     ship.rotation.set(0, c.yaw, 0); ship.rotateZ(Math.sin(t * 0.45) * 0.012); ship.rotateX(Math.sin(t * 0.33) * 0.006);
+    ship.updateMatrixWorld(true);   // the camera works from this frame's position, not last frame's
   }
   const deckFree = (x, z) => Math.abs(x) < 6 && z > -8.2 && z < 37.4 && !(Math.abs(x) < 2.4 && z > 30 && z < 36) && !(x > 4.1 && z > 19.6 && z < 24.4) && !(Math.abs(x + 4.5) < 1.3 && z > 34.4 && z < 36.8);
   const suiteFree = (x, z) => Math.abs(x) < 6.5 && z > 30.5 && z < 39.5 && !(x < -1.8 && z > 35.6) && !(Math.hypot(x - 4.6, z - 38) < 1.6) && !(x > 4.9 && z > 31.4 && z < 34.6) && !(x < -5.5 && z < 33);
@@ -4906,24 +4907,31 @@ function boot(hot){
     $('cruiseDest').hidden = true; $('cruiseClass').hidden = true; $('btn-cruise-go').textContent = 'Book another cruise from here';
     sfx.land(); show('cruise');
   }
-  const cCam = new THREE.Vector3(), cLook = new THREE.Vector3(), cTmp = new THREE.Vector3();
+  // The camera eases towards where it wants to be, but measured from the ship (on board) or
+  // from the ship's position (outside), not in the world: easing in the world made it trail
+  // the moving ship by a different amount every frame, so the ship seemed to shake.
+  const cCam = new THREE.Vector3(), cLook = new THREE.Vector3(), cTmp = new THREE.Vector3(), cRel = new THREE.Vector3(), cShip = new THREE.Vector3();
+  let cMode = null;
   function cruiseCam(dt){
-    const c = cruise;
-    if (c.inSuite && !c.ui){
+    const c = cruise, mode = c.inSuite && !c.ui ? 'suite' : c.view === 0 && !c.ui ? 'deck' : 'out';
+    cShip.set(c.x, 0, c.z);
+    // switching views: start from where the camera is now, so there's no jump
+    if (mode !== cMode){ if (mode === 'out') cRel.copy(cCam).sub(cShip); else ship.worldToLocal(cRel.copy(cCam)); cMode = mode; }
+    if (mode === 'suite'){
       // inside the suite: behind you, but never through the walls
-      cTmp.set(clamp(c.px + Math.sin(c.pyaw) * 3.4, -6.5, 6.5), SUITE_Y + 2.3, clamp(c.pz + Math.cos(c.pyaw) * 3.4, 30.4, 39.6)); ship.localToWorld(cTmp);
-      cCam.lerp(cTmp, 1 - Math.exp(-dt * 10));
+      cTmp.set(clamp(c.px + Math.sin(c.pyaw) * 3.4, -6.5, 6.5), SUITE_Y + 2.3, clamp(c.pz + Math.cos(c.pyaw) * 3.4, 30.4, 39.6));
+      cRel.lerp(cTmp, 1 - Math.exp(-dt * 10)); ship.localToWorld(cCam.copy(cRel));
       cLook.set(c.px - Math.sin(c.pyaw) * 2, SUITE_Y + 1.0, c.pz - Math.cos(c.pyaw) * 2); ship.localToWorld(cLook);
-    } else if (c.view === 0 && !c.ui){
+    } else if (mode === 'deck'){
       // just behind you on deck
-      cTmp.set(c.px + Math.sin(c.pyaw) * 4.5, DECK + 2.8, c.pz + Math.cos(c.pyaw) * 4.5); ship.localToWorld(cTmp);
-      cCam.lerp(cTmp, 1 - Math.exp(-dt * 8));
+      cTmp.set(c.px + Math.sin(c.pyaw) * 4.5, DECK + 2.8, c.pz + Math.cos(c.pyaw) * 4.5);
+      cRel.lerp(cTmp, 1 - Math.exp(-dt * 8)); ship.localToWorld(cCam.copy(cRel));
       cLook.set(c.px - Math.sin(c.pyaw) * 3, DECK + 1.4, c.pz - Math.cos(c.pyaw) * 3); ship.localToWorld(cLook);
     } else {
       // the whole ship from behind and above, slowly circling while docked
       const a = c.yaw + (c.sailing ? 0.5 : t * 0.08);
-      cTmp.set(c.x + Math.sin(a) * 120, 48, c.z + Math.cos(a) * 120);
-      cCam.lerp(cTmp, 1 - Math.exp(-dt * 2));
+      cTmp.set(Math.sin(a) * 120, 48, Math.cos(a) * 120);
+      cRel.lerp(cTmp, 1 - Math.exp(-dt * 2)); cCam.copy(cShip).add(cRel);
       cLook.set(c.x, 12, c.z);
     }
     camera.position.copy(cCam); camera.up.set(0, 1, 0); camera.lookAt(cLook);
