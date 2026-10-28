@@ -4,7 +4,13 @@ A 3D flying game in **one HTML file** (three.js from a CDN, no build step). Take
 the home airfield and fly anywhere you like over an endless open world, as high as you
 like (all the way up into space), grabbing coins that float in the sky.
 
-> <https://exitmaster.github.io/family/sky-coin-rush/>
+> <https://exitmaster.github.io/family/sky-a-c/>
+
+Scan to play on a phone or tablet:
+
+![QR code for exitmaster.github.io/family/sky-a-c](qr.png)
+
+(The old address, `/family/sky-coin-rush/`, sends you here.)
 
 **It's a web app too:** on a phone, tablet or computer you can install it and open it from
 your home screen like an app (on Android/Chrome tap **Install app** on the start card or
@@ -271,6 +277,35 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
 - **Nothing resets:** your coins, score and the airports you've visited carry over
   from flight to flight and stay saved in the browser.
 
+## Island life
+
+Press **Island life** on the start card to visit your own little island, Animal Crossing
+style. Walk about (arrows / WASD or drag); a button shows what **SPACE** does right where you
+are:
+
+- **Shake the fruit trees** (apples, oranges, peaches, cherries): the fruit falls down for
+  you to pick up, and grows back after a minute. Now and then a present falls out, with a
+  piece of furniture inside… or a swarm of bees!
+- **Catch bugs** fluttering about the flowers: butterflies, ladybugs, honeybees and the
+  rare stag beetle.
+- **Go fishing:** stand on the beach near a fish shadow in the sea, cast, wait, and press
+  SPACE the moment it bites. Small shadows are sea bass and clownfish, medium ones squid,
+  pufferfish and octopus, and the big ones might be a **shark**.
+- **Sell** everything in your pocket (20 things fit) at **Pip's shop** for points, and
+  **buy furniture**: a bed, sofa, table, chair, lamp, plant, TV, rug, bookshelf, piano,
+  fish tank or arcade game.
+- **Decorate your house:** go inside, press DECORATE and put furniture down in front of
+  you; stand next to it to put it away again.
+- **Chat with your animal neighbours:** Mittens the cat, Biscuit the dog, Clover the
+  bunny, Bruno the bear, Lily the frog and Quackers the duck wander about, babble when
+  they talk, and sometimes give you a present.
+
+**I** (or POCKET) shows your pocket and stored furniture. Your pocket, furniture and
+house are saved in the browser.
+
+The whole game has a **cute style** too: soft cartoon shading and round trees. You can
+switch it off on the start card.
+
 ## Take a cruise
 
 Press **Take a cruise** on the start card to sail on a big white **cruise ship**. It waits
@@ -281,6 +316,11 @@ while you walk about the top deck (arrows / WASD or drag): jump in the **pool**,
 **buffet**, sunbathe on a deck chair, and **honk the horn** (H, or go up to the front).
 **C** swaps between the deck and a view of the whole ship; **F** (or FASTER) sails at full
 speed. At the other harbour you can book another cruise from there.
+
+Book the **Royal Suite** 👑 for **15,000 points** and you get your own room inside the ship,
+down the stairs in the little gold hut at the back of the top deck: a king-size bed, a
+sofa by a big window looking out over the water, a hot tub, a TV and room service. Sleep
+in the bed and you wake up the next morning nearly at the harbour.
 
 ## Ride as a passenger
 
