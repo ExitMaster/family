@@ -226,6 +226,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <button class="ap" id="btn-view" aria-label="Look at the front of the plane (C)">VIEW</button>
       <button class="ap" id="btn-dive" aria-label="Dive mode: fly under the water (D)">DIVE</button>
       <button class="ap" id="btn-dolphin" aria-label="Dolphin mode: jump in and out of the water (J)">DOLPHIN</button>
+      <button class="ap boost" id="btn-getout" aria-label="Get out and drive your car (E)" hidden>GET OUT 🚗</button>
       <span class="hint">Airports are everywhere: follow the arrow and the light beacons, or tap LAND (L) to fly to the nearest one and land.</span>
     </div>
   </div>
@@ -237,15 +238,12 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-head"><span>Flight SCR-01</span><span>Route: anywhere</span></div>
     <div class="card-body">
       <h1>Sky Coin <em>Rush</em></h1>
-      <p class="lede">Take off from the home airfield and fly anywhere you like: over hills, lakes and snowy mountains, through the clouds and as high as you like, all the way up to space. Grab the coins floating in the sky, then land back home.</p>
+      <p class="lede">One big world: hop in your car at Home Field and drive anywhere. At any airport fly your own plane, book a flight as a passenger or fly to your island; at the harbour, take a cruise. Land anywhere, get out and drive on.</p>
       <div>
         <p class="label">Choose your plane</p>
         <div class="planes" id="planes" role="group" aria-label="Choose your plane"></div>
       </div>
-      <button class="btn" id="btn-play">Take off</button>
-      <button class="btn secondary" id="btn-ride">Ride as a passenger</button>
-      <button class="btn secondary" id="btn-cruise">Take a cruise</button>
-      <button class="btn secondary" id="btn-island">Island life</button>
+      <button class="btn" id="btn-play">Play</button>
       <button class="btn secondary" id="btn-install" hidden>Install app</button>
       <p class="install-hint" id="installHint" hidden>To install: tap Share, then <b>Add to Home Screen</b>.</p>
       <hr class="perf">
@@ -261,7 +259,8 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
         <span><kbd>M</kbd></span><span>Map: choose an airport to fly to (or tap MAP)</span>
         <span><kbd>L</kbd> <kbd>Q</kbd></span><span>Auto-land: the plane flies home and lands (or tap LAND)</span>
         <span><kbd>Esc</kbd> <kbd>P</kbd></span><span>Pause</span>
-        <span><kbd>Space</kbd></span><span>Ride as a passenger: walk with the arrows (or drag), press SPACE (or the button) to book, show your pass, sit and buckle up</span>
+        <span><kbd>Space</kbd></span><span>In your car: park at an airport or the harbour to fly, travel, cruise or visit your island</span>
+        <span><kbd>E</kbd></span><span>After landing at an airport: get out and drive your car (or tap GET OUT)</span>
       </div>
       <label class="toggle"><input type="checkbox" id="invert-start"> Pilot-style controls: push down to climb</label>
       <label class="toggle"><input type="checkbox" id="cute-start"> Cute style: round and cartoony, like Animal Crossing</label>
@@ -324,7 +323,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <div class="bookclass" id="cruiseClass"></div>
       <div class="btns">
         <button class="btn" id="btn-cruise-go">Set sail</button>
-        <button class="btn secondary" id="btn-cruise-menu">Back to the menu</button>
+        <button class="btn secondary" id="btn-cruise-menu">Back to your car 🚗</button>
       </div>
     </div>
   </section>
@@ -335,6 +334,15 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <h2 id="isleTitle">Hello!</h2>
       <div id="isleBody"></div>
       <button class="btn" id="btn-isle-ok">Bye!</button>
+    </div>
+  </section>
+
+  <section class="card" id="card-go" hidden>
+    <div class="card-head"><span id="goHead">Airport</span><span id="goFlag"></span></div>
+    <div class="card-body">
+      <h2 id="goTitle"></h2>
+      <p class="lede" id="goText"></p>
+      <div class="btns" id="goBtns"></div>
     </div>
   </section>
 
@@ -2702,6 +2710,7 @@ function boot(hot){
     }
     const k = KEYMAP[e.code];
     if (k){ keys[k] = true; if (state === 'play' || state === 'ride' || state === 'island') e.preventDefault(); }
+    if (e.code === 'KeyE' && state === 'play' && canGetOut()){ e.preventDefault(); getOut(); return; }
     if ((e.code === 'KeyL' || e.code === 'KeyQ') && state === 'play'){ e.preventDefault(); toggleAutoLand(); }
     if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
     if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
@@ -2710,7 +2719,7 @@ function boot(hot){
     if ((e.code === 'KeyC' || e.code === 'KeyV') && state === 'play'){ e.preventDefault(); toggleView(); }
     if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
     if (e.code === 'Escape' || e.code === 'KeyP'){ state === 'play' ? pause() : state === 'paused' && resume(); }
-    if ((e.code === 'Enter' || e.code === 'Space') && state === 'attract' && !(e.target && e.target.tagName === 'BUTTON')){ e.preventDefault(); startFree(); }
+    if ((e.code === 'Enter' || e.code === 'Space') && state === 'attract' && !(e.target && e.target.tagName === 'BUTTON')){ e.preventDefault(); startPlay(); }
   });
   window.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; pause(); });
@@ -2737,7 +2746,7 @@ function boot(hot){
 
   /* ---------------- UI wiring ---------------- */
   function show(panel){
-    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'isle', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
+    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'isle', 'go', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
     $('overlay').hidden = !panel;
     $('hud').hidden = !(state === 'play' || state === 'paused') || !!F.drive || !!F.cruise;
     if (panel){ stick.id = null; stickEl.hidden = true; const b = $('card-' + panel).querySelector('.btn'); if (b) try { b.focus({ preventScroll: true }); } catch(e){} }
@@ -2756,7 +2765,7 @@ function boot(hot){
   $('sound-pause').addEventListener('change', e => { sfx.setMuted(!e.target.checked); syncToggles(); });
   $('btn-sound').addEventListener('click', () => { sfx.init(); sfx.setMuted(!sfx.muted); syncToggles(); });
   $('btn-pause').addEventListener('click', pause);
-  $('btn-play').addEventListener('click', startFree);
+  $('btn-play').addEventListener('click', () => startPlay());
   // the game is also an installable web app (manifest + service worker)
   if ('serviceWorker' in navigator && location.protocol !== 'file:') window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(() => {}));
   let installEvt = null;
@@ -2765,9 +2774,8 @@ function boot(hot){
   $('btn-install').addEventListener('click', () => { if (!installEvt) return; installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; $('btn-install').hidden = true; }); });
   const standalone = (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches) || navigator.standalone;
   if (!standalone && /iPhone|iPad|iPod/.test(navigator.userAgent)) $('installHint').hidden = false;
-  $('btn-ride').addEventListener('click', () => fadeTo(() => rideStart(airportOfCell(0, 0))));
   $('btn-resume').addEventListener('click', resume);
-  $('btn-restart').addEventListener('click', () => F.ride ? rideTakeoff() : startFree());
+  $('btn-restart').addEventListener('click', () => F.ride ? rideTakeoff() : startPlay());
   $('btn-menu').addEventListener('click', goMenu);
   const boostBtn = $('btn-boost');
   const holdBoost = on => e => { F.boostHeld = on; boostBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
@@ -3448,12 +3456,14 @@ function boot(hot){
     camBase.set(x + Math.sin(yaw) * 16, F.y + 5, z + Math.cos(yaw) * 16);
     camera.near = 1; camera.far = CAM_FAR; camera.updateProjectionMatrix();
   }
-  function startFree(){
-    endRide(); endCruise();
-    resetFlight(0, RWY_START, 0);
+  // fly your own plane, from the end of an airport's runway (Home Field's unless you say)
+  function startFree(a){
+    a = a || airportOfCell(0, 0);
+    endRide(); endCruise(); endDrive(); $('rideHud').hidden = true;
+    resetFlight(a.x - a.fx * RWY_START, a.z - a.fz * RWY_START, a.hdg);
     for (let i = 0; i < 16; i++) spawnCluster();
     updatePowers(true);
-    state = 'play'; show(null); toast('Cleared for takeoff', 'info');
+    state = 'play'; show(null); toast('Cleared for takeoff from ' + a.name, 'info');
   }
   function goMenu(){
     endRide(); endCruise(); endIsland();
@@ -3747,8 +3757,11 @@ function boot(hot){
     if (live){ dtHud = dt; updateFreeHud(); }
   }
   let dtHud = 0;
-  let borderT = 0, lastCountry = null;
+  let borderT = 0, lastCountry = null, getOutShown = false;
   function updateFreeHud(){
+    // landed and stopped at an airport: you can get out and drive
+    const out = canGetOut();
+    if (out !== getOutShown){ getOutShown = out; $('btn-getout').hidden = !out; if (out && t - F.lastLand < 30) toast('Landed! Press E or GET OUT to drive your car', 'info'); }
     // crossing a border: a hello from the new country
     if ((borderT -= dtHud) <= 0){
       borderT = 1;
@@ -4522,10 +4535,8 @@ function boot(hot){
   $('btn-ride-act').addEventListener('click', () => { if (state === 'play' && F.drive && !car.taxi) driveAction(); });
   // PARK, or (driving round the city) go into the airport you've driven to and book a flight there
   function driveAction(){
-    if (car.free && ride.carAirport){
-      const a = ride.carAirport; F.drive = false; sfx.engine(false, 0);
-      fadeTo(() => rideStart(a));
-    } else finishDrive(false);
+    if (car.free){ if (ride.carAirport) openWorldAirport(ride.carAirport); else if (car.atHarbour) openWorldHarbour(); }
+    else finishDrive(false);
   }
   function updateCar(dt){
     const c = car, b = Math.atan2(-(c.tx - c.x), -(c.tz - c.z)), turn = wrapA(b - c.yaw), dist = Math.hypot(c.tx - c.x, c.tz - c.z);
@@ -4566,10 +4577,12 @@ function boot(hot){
     F.x = c.x; F.z = c.z; F.y = c.y + 2; F.speed = Math.abs(c.speed);
     const el = document.getElementById('driveInfo');
     if (c.free){
-      const f = airfieldAt(c.x, c.z), na = f ? f.a : nearestAirport(c.x, c.z);
-      ride.carAirport = f ? f.a : null;
-      txt(RH.act, f ? 'GO INTO THE AIRPORT' : 'PARK');
-      if (el) txt(el, (f ? 'You are at ' + f.a.name + '!' : 'Nearest airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+      // driving round the world: airports and the harbour are where the fun starts
+      const f = airfieldAt(c.x, c.z), na = f ? f.a : nearestAirport(c.x, c.z), h = worldHarbour, hd = h && h.lx !== undefined ? Math.hypot(h.lx - c.x, h.lz - c.z) : Infinity;
+      ride.carAirport = f ? f.a : null; c.atHarbour = !f && hd < 90;
+      const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : '';
+      RH.act.hidden = !label; if (label) txt(RH.act, label);
+      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     }
     else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     if (!c.free && dist < 25 && state === 'play') finishDrive(true);
@@ -4723,6 +4736,7 @@ function boot(hot){
     const hut = new THREE.Mesh(new THREE.BoxGeometry(26, 9, 14), mat(0xf4f1ea)); hut.position.set(land.x - ux * 25, gy + 4.5, land.z - uz * 25); hut.rotation.y = Math.atan2(ux, uz); g.add(hut);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(28, 1, 16), mat(0x2a6fb0)); roof.position.set(hut.position.x, gy + 9.5, hut.position.z); roof.rotation.y = hut.rotation.y; g.add(roof);
     scene.add(g); harbours.push(g);
+    return { x: land.x - ux * 48, z: land.z - uz * 48, yaw: Math.atan2(ux, uz) };
   }
   function clearHarbours(){ harbours.forEach(g => { g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); scene.remove(g); }); harbours = []; }
 
@@ -4783,8 +4797,11 @@ function boot(hot){
     toast(c.suite ? 'Royal Suite booked! -' + SUITE_PRICE.toLocaleString() + ' points 👑 Take the stairs in the gold hut' : 'All aboard! Sailing to ' + c.to.name, 'info');
     announce('Good day, this is your captain speaking. Welcome aboard. We are sailing to ' + c.to.name + (c.to.country !== c.from.country ? ', in ' + c.to.country.name : '') + '. The pool and the buffet are open. Enjoy the cruise!', true);
   });
-  $('btn-cruise-menu').addEventListener('click', () => goMenu());
-  $('btn-cruise').addEventListener('click', () => fadeTo(() => { sfx.init(); sfx.resume(); startCruise(0, 0); }));
+  $('btn-cruise-menu').addEventListener('click', () => {
+    const c = cruise;
+    if (c.arrived && c.to) worldHarbour = { i: c.to.i, j: c.to.j, sx: c.x, sz: c.z, name: c.to.name };
+    fadeTo(() => startWorld(null, null, 0, c.arrived ? 'Back in your car at ' + c.to.name : 'Back in your car'));
+  });
   function endCruise(){
     if (!F.cruise && !ship.visible) return;
     F.cruise = false; F.ground = false; cruise.ui = false; ship.visible = false; planeRoot.visible = true; clearHarbours();
@@ -4910,6 +4927,74 @@ function boot(hot){
       cLook.set(c.x, 12, c.z);
     }
     camera.position.copy(cCam); camera.up.set(0, 1, 0); camera.lookAt(cLook);
+  }
+
+  /* ---------------- One open world ---------------- */
+  // Play puts you in your car at Home Field. Drive anywhere: at an airport you can fly your
+  // own plane, book a flight as a passenger or fly to your island; at the harbour you can take
+  // a cruise. Wherever those end, you get back in your car and drive on.
+  let worldHarbour = null, isleReturn = null;
+  const carSpot = a => ({ x: a.x + a.rx * (AP_HALF_W - 20), z: a.z + a.rz * (AP_HALF_W - 20), yaw: a.hdg });
+  function harbourNear(x, z){
+    const lake = findLake(x, z); if (!lake) return null;
+    let best = null; lake.dist.forEach((d, key) => { if (d === 3 && !best) best = key; });
+    const [di, dj] = (best || lake.i + ',' + lake.j).split(',').map(Number);
+    return { i: lake.i, j: lake.j, sx: di * WG, sz: dj * WG, name: lake.name };
+  }
+  function startPlay(){
+    fadeTo(() => { sfx.init(); sfx.resume(); const sp = carSpot(airportOfCell(0, 0)); startWorld(sp.x, sp.z, sp.yaw, 'Welcome! Drive to an airport to fly, or anywhere you like'); });
+  }
+  // x === null: park by the harbour
+  function startWorld(x, z, yaw, msg){
+    endRide(); endCruise(); endDrive();
+    if (x !== null && (!worldHarbour || Math.hypot(worldHarbour.sx - x, worldHarbour.sz - z) > 8000)) worldHarbour = harbourNear(x, z);
+    clearHarbours();
+    if (worldHarbour){ const sp = buildHarbour(worldHarbour.i, worldHarbour.j, worldHarbour.sx, worldHarbour.sz); worldHarbour.lx = sp.x; worldHarbour.lz = sp.z; if (x === null){ x = sp.x; z = sp.z; yaw = sp.yaw + Math.PI; } }
+    if (x === null){ const sp = carSpot(airportOfCell(0, 0)); x = sp.x; z = sp.z; yaw = sp.yaw; }
+    resetFlight(x, z, yaw);
+    Object.assign(car, { x, z, y: groundAt(x, z), yaw, speed: 0, taxi: false, free: true, km: 0, warnT: -9, crashT: -9, tx: x, tz: z, atHarbour: false });
+    ride.hotelSpot = null; ride.ui = false; ride.carAirport = null;
+    worldCars.rent.visible = true; worldCars.taxi.visible = false;
+    F.drive = true; F.ground = true; planeRoot.visible = false;
+    camera.near = 0.5; camera.fov = baseFov; camera.updateProjectionMatrix();
+    dCam.set(x + Math.sin(yaw) * 10, car.y + 5, z + Math.cos(yaw) * 10);
+    state = 'play'; show(null); $('hud').hidden = true;
+    $('rideHud').hidden = false; $('rideHud').classList.add('flying'); $('winFrame').hidden = true;
+    RH.steps.innerHTML = '<li class="now" id="driveInfo"></li><li>Drive to an AIRPORT to fly or travel, or to the HARBOUR for a cruise</li><li>Arrows / WASD or drag · C: car colour</li>';
+    txt(RH.prompt, ''); RH.act.hidden = true; RH.wc.hidden = false; txt(RH.wc, 'COLOR (C)');
+    toast(msg || 'Off you go!', 'info');
+  }
+  // a little card of things to do where you've parked
+  function openGo(head, flag, title, text, opts){
+    car.speed = 0; state = 'paused'; sfx.engine(false, 0);
+    $('goHead').textContent = head; $('goFlag').textContent = flag || ''; $('goTitle').innerHTML = title; $('goText').textContent = text;
+    $('goBtns').innerHTML = '';
+    opts.forEach(([label, fn, sec]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (sec ? ' secondary' : ''); b.textContent = label; b.addEventListener('click', fn); $('goBtns').append(b); });
+    show('go');
+  }
+  const keepDriving = () => { state = 'play'; show(null); };
+  function openWorldAirport(a){
+    const c = countryOf(a);
+    openGo('Airport', c.flag + ' ' + c.name, a.name + ' <em>airport</em>', 'You parked at the airport. What would you like to do?', [
+      ['Fly your ' + plane.name + ' ✈️', () => fadeTo(() => startFree(a))],
+      ['Book a flight as a passenger 🎫', () => { F.drive = false; fadeTo(() => rideStart(a)); }],
+      ['Fly to your island 🏝️', () => fadeTo(() => { isleReturn = a; endDrive(); startIsland(); })],
+      ['Keep driving 🚗', keepDriving, true]
+    ]);
+  }
+  function openWorldHarbour(){
+    const h = worldHarbour;
+    openGo('Harbour', '🚢', h.name, 'A big white cruise ship is waiting at the pier.', [
+      ['Take a cruise 🚢', () => fadeTo(() => { endDrive(); startCruise(h.lx, h.lz); })],
+      ['Keep driving 🚗', keepDriving, true]
+    ]);
+  }
+  // after landing your own plane, get out and drive from the airport
+  const canGetOut = () => state === 'play' && !F.ride && !F.drive && !F.cruise && F.ground && F.crashT <= 0 && F.speed < 5 && !!airfieldAt(F.x, F.z);
+  $('btn-getout').addEventListener('click', e => { e.currentTarget.blur(); if (canGetOut()) getOut(); });
+  function getOut(){
+    const a = airfieldAt(F.x, F.z).a, sp = carSpot(a);
+    sfx.engine(false, 0); fadeTo(() => startWorld(sp.x, sp.z, sp.yaw, 'Back in your car at ' + a.name));
   }
 
   /* ---------------- Island life ---------------- */
@@ -5112,7 +5197,6 @@ function boot(hot){
     endFish(); isle.ui = false;
     $('rideHud').hidden = true;
   }
-  $('btn-island').addEventListener('click', () => fadeTo(startIsland));
   function isleHud(){
     RH.steps.innerHTML = '<li class="now">🏝️ ' + (isle.inside ? 'Your house' : 'Your island') + ' · ' + Math.floor(score).toLocaleString() + ' points</li><li>Pocket ' + isleSave.pocket.length + '/' + POCKET +
       ' · in your house: ' + isleSave.placed.length + '</li><li>' + (isle.inside ? 'DECORATE with furniture from the shop' : 'Shake trees, catch bugs and fish, then sell them at the SHOP') + '</li><li>SPACE: do it · I: pocket</li>';
@@ -5128,6 +5212,7 @@ function boot(hot){
       return f ? { k: 'putaway', f } : { k: 'decorate' };
     }
     if (isle.fish) return { k: isle.fish.bite ? 'reel' : 'wait' };
+    if (Math.abs(X) < 1.8 && Z > 53.5) return { k: 'leave' };
     const v = villagers.find(v => near(v.x, v.z, 1.9)); if (v) return { k: 'talk', v };
     const it = ground.find(i => i.y <= 0.01 && near(i.x, i.z, 1.3)); if (it) return { k: 'pick', it };
     if (near(SHOP_DOOR.x, SHOP_DOOR.z, 1.7)) return { k: 'shop' };
@@ -5186,6 +5271,7 @@ function boot(hot){
       sfx.applause(); toast(id === 'shark' ? 'WOW! You caught a SHARK! 🦈' : id === 'bass' && sz >= 1 ? 'A sea bass? Again?! 🐟 At least it\'s big' : 'You caught a ' + ITEMS[id].n + '! ' + ITEMS[id].e, '');
     }
     else if (a.k === 'decorate') openDecorate();
+    else if (a.k === 'leave') fadeTo(() => { const ap = isleReturn || airportOfCell(0, 0), sp = carSpot(ap); endIsland(); startWorld(sp.x, sp.z, sp.yaw, 'Welcome back to ' + ap.name + '!'); });
     else if (a.k === 'putaway'){
       const f = a.f; isleSave.placed.splice(isleSave.placed.indexOf(f), 1); isleSave.storage.push(f.id); saveIsle(); buildHouse(); sfx.gear(); isleHud();
       toast(furnOf(f.id).e + ' ' + furnOf(f.id).n + ' put away', '');
@@ -5246,7 +5332,7 @@ function boot(hot){
   });
 
   const ACT_TXT = { talk: a => 'TALK TO ' + a.v.name.toUpperCase(), pick: a => 'PICK UP ' + (a.it.id.startsWith('furn:') ? '🎁' : ITEMS[a.it.id].e), shop: () => 'GO SHOPPING', enter: () => 'GO INSIDE', out: () => 'GO OUTSIDE',
-    shake: () => 'SHAKE THE TREE', catch: a => 'CATCH ' + ITEMS[a.b.kind].e, fish: () => 'GO FISHING', wait: () => 'WAIT FOR A BITE…', reel: () => 'REEL IN!', decorate: () => 'DECORATE', putaway: a => 'PUT AWAY ' + furnOf(a.f.id).e };
+    shake: () => 'SHAKE THE TREE', catch: a => 'CATCH ' + ITEMS[a.b.kind].e, fish: () => 'GO FISHING', wait: () => 'WAIT FOR A BITE…', reel: () => 'REEL IN!', decorate: () => 'DECORATE', leave: () => 'FLY BACK ✈️', putaway: a => 'PUT AWAY ' + furnOf(a.f.id).e };
   function updateIsland(dt){
     // walking
     let go = 0, turn = 0;
