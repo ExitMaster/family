@@ -321,6 +321,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <h2 id="cruiseTitle">Book a <em>cruise</em></h2>
       <p class="lede" id="cruiseText"></p>
       <div class="aplist" id="cruiseDest"></div>
+      <div class="bookclass" id="cruiseClass"></div>
       <div class="btns">
         <button class="btn" id="btn-cruise-go">Set sail</button>
         <button class="btn secondary" id="btn-cruise-menu">Back to the menu</button>
@@ -4587,7 +4588,7 @@ function boot(hot){
   // about its top deck: a pool to jump in, a buffet, deck chairs and the captain's horn.
   // Ship coordinates: x across (right +), y up from the waterline, z along (bow at -z).
   const ship = new THREE.Group(); ship.visible = false; scene.add(ship);
-  const DECK = 16.1;
+  const DECK = 16.1, SUITE_Y = 7.1, SUITE_PRICE = 15000;
   (function buildShip(){
     const B = (w, h, d, c, x, y, z, ry) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); if (ry) m.rotation.y = ry; ship.add(m); return m; };
     // the hull: red below the water, white above, with a pointed bow and a navy stripe
@@ -4595,7 +4596,7 @@ function boot(hot){
     B(11.3, 3, 11.3, 0xc0392b, 0, -1.5, -38, Math.PI / 4); B(11.3, 7, 11.3, 0xf4f4f8, 0, 3.5, -38, Math.PI / 4);
     B(16.1, 0.8, 84, 0x1b2a6c, 0, 6.2, 4); B(16.1, 0.5, 72, 0x2a6fb0, 0, 3.2, 6);
     // three decks of cabins with rows of windows, and orange lifeboats
-    [[15, 8.5, 70, 8], [14, 11.5, 62, 10], [13, 14.5, 52, 12]].forEach(([w, y, d, z]) => { B(w, 3, d, 0xf4f4f8, 0, y, z); B(w + 0.1, 0.8, d - 4, 0x2a6fb0, 0, y + 0.2, z); });
+    [[15, 8.5, 70, 8], [14, 11.5, 62, 10], [13, 14.5, 52, 12]].forEach(([w, y, d, z]) => { B(w, 3, d, 0xf4f4f8, 0, y, z); [-1, 1].forEach(sd => B(0.06, 0.8, d - 4, 0x2a6fb0, sd * (w / 2 + 0.03), y + 0.2, z)); });
     [-15, 0, 15, 30].forEach(z => [-1, 1].forEach(sd => B(1.6, 1.4, 6, 0xff7a1a, sd * 8.2, 10.2, z)));
     // the top deck: wooden floor, railings, the bridge, the funnel
     B(13, 0.12, 52, 0xb08355, 0, DECK, 12);
@@ -4607,6 +4608,24 @@ function boot(hot){
     B(7, 0.3, 11, 0xffffff, 0, DECK + 0.05, 8); B(6, 0.12, 10, 0x3fc1f0, 0, DECK + 0.16, 8);
     [3, 6.5, 10, 13.5].forEach(z => [-1, 1].forEach(sd => { B(1, 0.35, 2, 0xffc23d, sd * 4.8, DECK + 0.25, z); B(1, 0.6, 0.15, 0xffc23d, sd * 4.8, DECK + 0.5, z - 1); }));
     B(1.3, 1, 4.4, 0xf4f1ea, 5, DECK + 0.5, 22);
+    // the Royal Suite, inside the ship at the back: you get there down the stairs in the
+    // little gold hut on the top deck. Its big window looks out over the water.
+    B(1.8, 2.6, 1.8, 0xffc23d, -4.5, DECK + 1.3, 35.6); B(1, 2, 0.1, 0x8a5a3a, -4.5, DECK + 1, 34.68);
+    const S = SUITE_Y;
+    B(14, 0.1, 10, 0x7a1f3d, 0, S - 0.05, 35); B(14, 0.1, 10, 0xfff8e8, 0, S + 2.75, 35);
+    B(14, 2.8, 0.1, 0xf4e6c8, 0, S + 1.4, 39.95); B(14, 2.8, 0.1, 0xf4e6c8, 0, S + 1.4, 30.05); B(0.1, 2.8, 10, 0xf4e6c8, -6.95, S + 1.4, 35);
+    B(0.1, 0.8, 10, 0xf4e6c8, 6.95, S + 0.4, 35); B(0.1, 0.3, 10, 0xf4e6c8, 6.95, S + 2.65, 35); [30.5, 35, 39.5].forEach(z => B(0.15, 1.7, 0.2, 0xffc23d, 6.95, S + 1.65, z));
+    for (let k = 0; k < 5; k++) B(1.6, 0.25, 0.9, 0xd9b38c, -4.5, S + 0.12 + k * 0.25, 31.1 + k * 0.01);   // stairs up to the deck
+    B(3.4, 0.6, 3.8, 0x8a5a3a, -3.8, S + 0.3, 37.8); B(3.3, 0.35, 3.7, 0xffffff, -3.8, S + 0.75, 37.8); B(3.36, 0.38, 2.2, 0xffc23d, -3.8, S + 0.78, 37.2);
+    [-4.7, -2.9].forEach(x => B(1.2, 0.3, 0.6, 0xffffff, x, S + 1.05, 39.2)); B(3.4, 1.4, 0.15, 0x8a5a3a, -3.8, S + 1.0, 39.8);
+    B(0.9, 0.7, 2.6, 0x3fa9f5, 5.6, S + 0.35, 33); B(0.3, 0.8, 2.6, 0x3fa9f5, 6.05, S + 0.8, 33);   // a sofa by the window
+    B(0.1, 1.0, 1.8, 0x1b2340, -6.85, S + 1.55, 34.5); B(0.02, 0.85, 1.65, new THREE.MeshBasicMaterial({ color: 0x5fd0ff }), -6.79, S + 1.55, 34.5);
+    B(1, 1.2, 0.7, 0x2a2f45, -6.3, S + 0.6, 32.2); B(0.3, 0.3, 0.3, 0xe8432e, -6.3, S + 1.35, 32.2);
+    { const tub = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.8, 24), mat(0xffffff)); tub.position.set(4.6, S + 0.4, 38); ship.add(tub);
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.1, 24), mat(0x5fd0ff)); w.position.set(4.6, S + 0.78, 38); ship.add(w); }
+    { const ch = new THREE.Mesh(new THREE.SphereGeometry(0.3, 14, 10), new THREE.MeshBasicMaterial({ color: 0xfff1a0 })); ch.position.set(0, S + 2.45, 35); ship.add(ch); }
+    { const rug = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.03, 32), mat(0xffc23d)); rug.position.set(1, S + 0.02, 34.5); ship.add(rug); }
+    B(0.5, 0.9, 0.5, 0xffffff, 6.3, S + 0.45, 30.7); { const fl = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), mat(0xff8fb8)); fl.position.set(6.3, S + 1.15, 30.7); ship.add(fl); }
     [0xe8432e, 0xffc23d, 0x3fa34d, 0xff8fb8, 0x8a5a3a].forEach((c, k) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), mat(c)); m.position.set(5, DECK + 1.15, 20.4 + k * 0.8); ship.add(m); });
   })();
   // other passengers: some sunbathing, some swimming, some strolling
@@ -4718,7 +4737,7 @@ function boot(hot){
     const yaw = Math.atan2(-(sx - lake.i * WG), -(sz - lake.j * WG));
     resetFlight(sx, sz, yaw);
     Object.assign(cruise, { ui: false, sailing: false, arrived: false, path: [], wp: 0, x: sx, z: sz, yaw: yaw + Math.PI / 2, speed: 0, fast: false, view: 1, px: 0, pz: 30, pyaw: 0, swim: false,
-      km: 0, lake, from: { name: lake.name, country: lake.country }, to: null, ports: lake.ports });
+      km: 0, lake, from: { name: lake.name, country: lake.country }, to: null, ports: lake.ports, suite: false, inSuite: false, slept: false });
     buildHarbour(lake.i, lake.j, sx, sz);
     F.cruise = true; F.ground = true; planeRoot.visible = false; ship.visible = true;
     camera.near = 0.3; camera.updateProjectionMatrix();
@@ -4739,8 +4758,16 @@ function boot(hot){
     $('cruiseDest').innerHTML = c.ports.map((p, k) => '<button type="button" class="apbtn" data-k="' + k + '" aria-pressed="' + (k === 0) + '"><b>' + p.name + (p.country !== home ? ', ' + p.country.name + ' ' + p.country.flag : '') +
       '</b><small>about ' + (p.d * WG / 1000).toFixed(1) + ' km by sea' + (p.country !== home ? ' · international' : '') + '</small></button>').join('');
     $('btn-cruise-go').textContent = 'Set sail'; $('btn-cruise-go').hidden = false;
+    cruise.pickSuite = false; renderCabins(); $('cruiseClass').hidden = false;
     show('cruise');
   }
+  function renderCabins(){
+    const rich = score >= SUITE_PRICE;
+    if (!rich) cruise.pickSuite = false;
+    $('cruiseClass').innerHTML = '<button type="button" class="apbtn" data-suite="0" aria-pressed="' + !cruise.pickSuite + '"><b>Cabin</b><small>Free</small></button>' +
+      '<button type="button" class="apbtn" data-suite="1" data-cls="prestige" aria-pressed="' + cruise.pickSuite + '"' + (rich ? '' : ' disabled') + '><b>Royal Suite 👑</b><small>' + SUITE_PRICE.toLocaleString() + ' points · ' + (rich ? 'you have ' : 'you only have ') + Math.floor(score).toLocaleString() + '</small></button>';
+  }
+  $('cruiseClass').addEventListener('click', e => { const b = e.target.closest('.apbtn'); if (!b || b.disabled) return; cruise.pickSuite = b.dataset.suite === '1'; renderCabins(); });
   $('cruiseDest').addEventListener('click', e => {
     const b = e.target.closest('.apbtn'); if (!b) return;
     cruise.pick = cruise.ports[+b.dataset.k];
@@ -4750,8 +4777,10 @@ function boot(hot){
     const c = cruise;
     if (c.arrived){ fadeTo(() => startCruise(c.x, c.z, c.lake && c.to ? { i: c.to.i, j: c.to.j } : null)); return; }
     c.to = c.pick; c.path = lakeRoute(c.lake, c.to); c.path[0] = { x: c.x, z: c.z }; c.wp = 1; c.sailing = true; c.ui = false; c.view = 0;
+    c.suite = c.pickSuite && score >= SUITE_PRICE;
+    if (c.suite){ score -= SUITE_PRICE; saveProgress(); }
     show(null); sfx.horn();
-    toast('All aboard! Sailing to ' + c.to.name, 'info');
+    toast(c.suite ? 'Royal Suite booked! -' + SUITE_PRICE.toLocaleString() + ' points 👑 Take the stairs in the gold hut' : 'All aboard! Sailing to ' + c.to.name, 'info');
     announce('Good day, this is your captain speaking. Welcome aboard. We are sailing to ' + c.to.name + (c.to.country !== c.from.country ? ', in ' + c.to.country.name : '') + '. The pool and the buffet are open. Enjoy the cruise!', true);
   });
   $('btn-cruise-menu').addEventListener('click', () => goMenu());
@@ -4766,11 +4795,28 @@ function boot(hot){
   function cruiseView(){ cruise.view = 1 - cruise.view; toast(cruise.view ? 'View of the ship' : 'On deck', ''); }
   function honk(){ sfx.horn(); toast('HOOOONK! 🚢', ''); }
   function cruiseAction(){
-    const a = cruise.act;
+    const a = cruise.act, c = cruise;
     if (a === 'horn') honk();
     else if (a === 'eat'){ sfx.chime(); toast(['Yum! Pizza and ice cream 🍕🍦', 'Sushi and a smoothie 🍣🥤', 'Pancakes and strawberries 🥞🍓', 'Noodles and dumplings 🍜🥟'][Math.floor(Math.random() * 4)], ''); }
     else if (a === 'swim'){ sfx.splash(); toast('Splash! 💦', ''); }
     else if (a === 'relax'){ toast('Ahh, sunbathing on the deck ☀️', ''); }
+    else if (a === 'suite'){
+      if (!c.suite){ sfx.warn(); toast('This is the Royal Suite 👑 Book it next time for ' + SUITE_PRICE.toLocaleString() + ' points', 'warn'); return; }
+      fadeTo(() => { c.inSuite = true; c.px = -4.5; c.pz = 32.6; c.pyaw = Math.PI; c.view = 0; sfx.ap(true); toast('Welcome to your Royal Suite! 👑', ''); });
+    }
+    else if (a === 'deck') fadeTo(() => { c.inSuite = false; c.px = -4.5; c.pz = 33.6; c.pyaw = 0; sfx.ap(true); });
+    else if (a === 'sleep'){
+      if (!c.sailing){ toast('Have a nap… Zzz', ''); return; }
+      // a good night's sleep: wake up nearly there
+      fadeTo(() => {
+        const L = c.path.length - 1, f = c.path[L], p = c.path[Math.max(0, L - 1)], d = Math.hypot(p.x - f.x, p.z - f.z) || 1, k = Math.min(1, 320 / d);
+        if (Math.hypot(f.x - c.x, f.z - c.z) > 400){ c.x = f.x + (p.x - f.x) * k; c.z = f.z + (p.z - f.z) * k; c.wp = L; c.yaw = Math.atan2(-(f.x - c.x), -(f.z - c.z)); }
+        c.slept = true; toast('Zzz… Good morning! We\'re nearly at ' + c.to.name + ' ☀️', '');
+      });
+    }
+    else if (a === 'service'){ sfx.chime(); toast(['Room service: chocolate cake and lemonade 🍰🍋', 'Room service: a giant pizza 🍕', 'Room service: ice cream sundae 🍨', 'Room service: pancakes with syrup 🥞'][Math.floor(Math.random() * 4)], ''); }
+    else if (a === 'tub'){ sfx.water(); toast('Bubbles! Relaxing in your hot tub 🛁', ''); }
+    else if (a === 'tv'){ toast(['The TV is showing a film about pirates 🏴‍☠️', 'Cartoons on TV! 📺', 'A nature show about dolphins 🐬'][Math.floor(Math.random() * 3)], ''); }
     else cruiseView();
   }
   function placeShip(dt){
@@ -4778,7 +4824,8 @@ function boot(hot){
     ship.position.set(c.x, Math.sin(t * 0.7) * 0.25, c.z);
     ship.rotation.set(0, c.yaw, 0); ship.rotateZ(Math.sin(t * 0.45) * 0.012); ship.rotateX(Math.sin(t * 0.33) * 0.006);
   }
-  const deckFree = (x, z) => Math.abs(x) < 6 && z > -8.2 && z < 37.4 && !(Math.abs(x) < 2.4 && z > 30 && z < 36) && !(x > 4.1 && z > 19.6 && z < 24.4);
+  const deckFree = (x, z) => Math.abs(x) < 6 && z > -8.2 && z < 37.4 && !(Math.abs(x) < 2.4 && z > 30 && z < 36) && !(x > 4.1 && z > 19.6 && z < 24.4) && !(Math.abs(x + 4.5) < 1.3 && z > 34.4 && z < 36.8);
+  const suiteFree = (x, z) => Math.abs(x) < 6.5 && z > 30.5 && z < 39.5 && !(x < -1.8 && z > 35.6) && !(Math.hypot(x - 4.6, z - 38) < 1.6) && !(x > 4.9 && z > 31.4 && z < 34.6) && !(x < -5.5 && z < 33);
   function updateShip(dt){
     const c = cruise;
     // sailing: follow the route, slowing down for the last few hundred metres
@@ -4811,21 +4858,24 @@ function boot(hot){
     }
     c.pyaw -= turnK * 2.6 * dt;
     const sp = (c.swim ? 2.5 : 5) * go * dt, nx = c.px - Math.sin(c.pyaw) * sp, nz = c.pz - Math.cos(c.pyaw) * sp;
-    if (deckFree(nx, c.pz)) c.px = nx;
-    if (deckFree(c.px, nz)) c.pz = nz;
-    const inPool = Math.abs(c.px) < 2.9 && c.pz > 3.1 && c.pz < 12.9;
+    const free = c.inSuite ? suiteFree : deckFree;
+    if (free(nx, c.pz)) c.px = nx;
+    if (free(c.px, nz)) c.pz = nz;
+    const inPool = !c.inSuite && Math.abs(c.px) < 2.9 && c.pz > 3.1 && c.pz < 12.9;
     if (inPool && !c.swim){ sfx.splash(); toast('Splash! You jumped in the pool 💦', ''); }
     if (!inPool && c.swim) toast('Out of the pool, dripping wet!', '');
     c.swim = inPool;
-    me.position.set(c.px, DECK + (c.swim ? -1.1 : 0.06), c.pz); me.rotation.set(0, c.pyaw, 0);
+    me.position.set(c.px, c.inSuite ? SUITE_Y : DECK + (c.swim ? -1.1 : 0.06), c.pz); me.rotation.set(0, c.pyaw, 0);
     animPerson(me, go !== 0, dt);
     deckPeople.forEach(d => {
       if (d.how === 'walk'){ d.p.position.z = d.z + Math.sin(t * 0.3 + d.ph) * 5; d.p.rotation.y = Math.cos(t * 0.3 + d.ph) > 0 ? Math.PI : 0; animPerson(d.p, true, dt); }
       else if (d.how === 'swim') d.p.position.y = DECK - 1.1 + Math.sin(t * 2 + d.ph) * 0.1;
     });
     // what you can do where you're standing
-    const act = c.swim ? 'swim' : c.pz < -6.4 ? 'horn' : (c.px > 3 && Math.abs(c.pz - 22) < 3) ? 'eat' : (Math.abs(Math.abs(c.px) - 4.8) < 1.1 && c.pz > 1.5 && c.pz < 15) ? 'relax' : null;
-    if (act !== c.act){ c.act = act; txt(RH.act, { horn: 'HONK THE HORN', eat: 'EAT AT THE BUFFET', swim: 'SPLASH', relax: 'SUNBATHE' }[act] || 'VIEW'); }
+    const near = (x, z, r) => Math.hypot(c.px - x, c.pz - z) < r;
+    const act = c.inSuite ? (near(-4.5, 31.6, 1.5) ? 'deck' : near(-3.8, 35.4, 1.4) || (c.px < -1.2 && c.pz > 35) ? 'sleep' : near(4.6, 38, 2.4) ? 'tub' : near(-6.3, 32.2, 1.8) ? 'service' : c.px < -4.8 && c.pz > 33.2 && c.pz < 35.8 ? 'tv' : null)
+      : c.swim ? 'swim' : c.pz < -6.4 ? 'horn' : (c.px > 3 && Math.abs(c.pz - 22) < 3) ? 'eat' : near(-4.5, 33.9, 1.3) ? 'suite' : (Math.abs(Math.abs(c.px) - 4.8) < 1.1 && c.pz > 1.5 && c.pz < 15) ? 'relax' : null;
+    if (act !== c.act){ c.act = act; txt(RH.act, { horn: 'HONK THE HORN', eat: 'EAT AT THE BUFFET', swim: 'SPLASH', relax: 'SUNBATHE', suite: 'GO TO THE SUITE 👑', deck: 'UP TO THE DECK', sleep: c.sailing ? 'SLEEP TILL MORNING' : 'NAP', tub: 'HOT TUB', service: 'ROOM SERVICE', tv: 'WATCH TV' }[act] || 'VIEW'); }
     F.x = c.x; F.z = c.z; F.y = 20; F.speed = c.speed; F.yaw = c.yaw;
     const el = document.getElementById('cruiseInfo');
     if (el) txt(el, c.arrived ? 'Arrived at ' + c.to.name : c.sailing ? 'To ' + c.to.name + ': ' + (Math.hypot(c.path[c.path.length - 1].x - c.x, c.path[c.path.length - 1].z - c.z) / 1000).toFixed(1) + ' km · ' + Math.round(c.speed * 1.94) + ' knots' : 'At ' + c.from.name);
@@ -4835,13 +4885,19 @@ function boot(hot){
     $('cruiseFrom').textContent = c.to.name + ' ' + c.to.country.flag;
     $('cruiseTitle').innerHTML = 'Welcome to <em>' + c.to.name + '</em>!';
     $('cruiseText').textContent = 'You sailed ' + (c.km / 1000).toFixed(1) + ' km from ' + c.from.name + (c.to.country !== c.from.country ? ' (' + c.from.country.name + ') to ' + c.to.country.name + ' ' + c.to.country.flag + ', and got a passport stamp' : '') + '. Thanks for cruising with us!';
-    $('cruiseDest').hidden = true; $('btn-cruise-go').textContent = 'Book another cruise from here';
+    if (c.suite) $('cruiseText').textContent += ' You travelled in the Royal Suite 👑' + (c.slept ? ' and slept like a king.' : '.');
+    $('cruiseDest').hidden = true; $('cruiseClass').hidden = true; $('btn-cruise-go').textContent = 'Book another cruise from here';
     sfx.land(); show('cruise');
   }
   const cCam = new THREE.Vector3(), cLook = new THREE.Vector3(), cTmp = new THREE.Vector3();
   function cruiseCam(dt){
     const c = cruise;
-    if (c.view === 0 && !c.ui){
+    if (c.inSuite && !c.ui){
+      // inside the suite: behind you, but never through the walls
+      cTmp.set(clamp(c.px + Math.sin(c.pyaw) * 3.4, -6.5, 6.5), SUITE_Y + 2.3, clamp(c.pz + Math.cos(c.pyaw) * 3.4, 30.4, 39.6)); ship.localToWorld(cTmp);
+      cCam.lerp(cTmp, 1 - Math.exp(-dt * 10));
+      cLook.set(c.px - Math.sin(c.pyaw) * 2, SUITE_Y + 1.0, c.pz - Math.cos(c.pyaw) * 2); ship.localToWorld(cLook);
+    } else if (c.view === 0 && !c.ui){
       // just behind you on deck
       cTmp.set(c.px + Math.sin(c.pyaw) * 4.5, DECK + 2.8, c.pz + Math.cos(c.pyaw) * 4.5); ship.localToWorld(cTmp);
       cCam.lerp(cTmp, 1 - Math.exp(-dt * 8));

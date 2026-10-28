@@ -317,6 +317,11 @@ while you walk about the top deck (arrows / WASD or drag): jump in the **pool**,
 **C** swaps between the deck and a view of the whole ship; **F** (or FASTER) sails at full
 speed. At the other harbour you can book another cruise from there.
 
+Book the **Royal Suite** 👑 for **15,000 points** and you get your own room inside the ship,
+down the stairs in the little gold hut at the back of the top deck: a king-size bed, a
+sofa by a big window looking out over the water, a hot tub, a TV and room service. Sleep
+in the bed and you wake up the next morning nearly at the harbour.
+
 ## Ride as a passenger
 
 Press **Ride as a passenger** on the start card and be a passenger instead of the pilot.
