@@ -17,6 +17,22 @@ your home screen like an app (on Android/Chrome tap **Install app** on the start
 "Add to Home Screen"; on iPhone/iPad tap Share, then **Add to Home Screen**). After the
 first visit it also opens without internet.
 
+## One big world
+
+Everything happens in one open world. Press **Play** and you're in your car at Home
+Field. Drive anywhere (arrows / WASD or drag; **C** changes the car's colour).
+
+- **At any airport**, press SPACE (or AIRPORT): **fly your plane** from its runway,
+  **book a flight** as a passenger, or **fly to your island**.
+- **At the harbour** on the nearest big lake, press SPACE (or CRUISE) to **take a cruise**.
+- **After flying yourself**, land at any airport, stop, and press **E** (or GET OUT) to get
+  back in your car there.
+- **After a passenger flight**, rent a car or take a taxi from the curb and drive on.
+- **After a cruise**, get off with "Back to your car" and drive from the harbour you
+  arrived at.
+- **From your island**, walk to the end of the pier and FLY BACK to the airport you came
+  from.
+
 ## Controls
 
 | | |
@@ -279,7 +295,7 @@ white vapour cone round the plane. Bubbles, Origami, Retro, Balloon, Pizza, Slei
 
 ## Island life
 
-Press **Island life** on the start card to visit your own little island, Animal Crossing
+Fly to your own little island from any airport (FLY TO YOUR ISLAND), Animal Crossing
 style. Walk about (arrows / WASD or drag); a button shows what **SPACE** does right where you
 are:
 
@@ -308,8 +324,8 @@ switch it off on the start card.
 
 ## Take a cruise
 
-Press **Take a cruise** on the start card to sail on a big white **cruise ship**. It waits
-at a pier on the nearest big lake. At the cruise terminal pick one of up to five harbours
+Drive to the harbour and take a cruise on a big white **cruise ship**. It waits at a
+pier on the nearest big lake. At the cruise terminal pick one of up to five harbours
 round the lake (some are in other countries: international cruises get you a passport
 stamp) and **set sail**. The captain steers round the islands and headlands
 while you walk about the top deck (arrows / WASD or drag): jump in the **pool**, eat at the
@@ -324,7 +340,7 @@ in the bed and you wake up the next morning nearly at the harbour.
 
 ## Ride as a passenger
 
-Press **Ride as a passenger** on the start card and be a passenger instead of the pilot.
+At any airport choose **Book a flight as a passenger** and be a passenger instead of the pilot.
 Walk with the arrows (or drag on a touch screen); press **SPACE** (or the big button) when
 there's something to do. A checklist in the corner shows what's next:
 
