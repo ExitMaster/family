@@ -20,11 +20,14 @@ first visit it also opens without internet.
 ## One big world
 
 Everything happens in one open world. Press **Play** and you're in your car at Home
-Field. Drive anywhere (arrows / WASD or drag; **C** changes the car's colour).
+Field, always with **45,000 points** to start. Drive anywhere (arrows / WASD or drag; **C** changes the car's colour).
 
 - **At any airport**, press SPACE (or AIRPORT): **fly your plane** from its runway,
   **book a flight** as a passenger, or **fly to your island**.
 - **At the harbour** on the nearest big lake, press SPACE (or CRUISE) to **take a cruise**.
+- **At your house** (MY HOUSE, a few hundred metres from Home Field), press SPACE to go
+  inside: it's the same house as on your island, with all your furniture. After a
+  passenger flight or a cruise you can also **Go home 🏠** straight away.
 - **After flying yourself**, land at any airport, stop, and press **E** (or GET OUT) to get
   back in your car there.
 - **After a passenger flight**, rent a car or take a taxi from the curb and drive on.
@@ -32,6 +35,16 @@ Field. Drive anywhere (arrows / WASD or drag; **C** changes the car's colour).
   arrived at.
 - **From your island**, walk to the end of the pier and FLY BACK to the airport you came
   from.
+
+## Gravity
+
+- **Jump** with **J** (or JUMP) wherever you're on foot: on your island, in your house,
+  at the airport and on the cruise ship. Walk off the end of the island's pier and you
+  drop into the sea with a plop.
+- **Cars fly** over the tops of hills at speed and fall back down (bump!).
+- **Planes feel gravity:** climbing slows you down and diving speeds you up. Climb too
+  steeply and you **STALL**: the nose drops and the plane falls until it has picked up
+  speed again. (Not while the autopilot or a captain is flying.)
 
 ## Controls
 
@@ -315,6 +328,14 @@ are:
 - **Chat with your animal neighbours:** Mittens the cat, Biscuit the dog, Clover the
   bunny, Bruno the bear, Lily the frog and Quackers the duck wander about, babble when
   they talk, and sometimes give you a present.
+
+- **Swim:** walk off the beach into the sea and you swim (Shift to swim faster). Dive at
+  the bubbles in the water for sea stars, shrimp, oysters, crabs, scallops and the rare
+  lobster.
+
+The island is big (about 170 m across) with over 40 fruit trees and ten neighbours (four
+more joined: Ginger the cat, Rex the dog, Coco the bunny and Snowball the polar bear).
+Hold **Shift** to run.
 
 **I** (or POCKET) shows your pocket and stored furniture. Your pocket, furniture and
 house are saved in the browser.
