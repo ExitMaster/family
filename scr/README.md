@@ -4,13 +4,13 @@ A 3D flying game in **one HTML file** (three.js from a CDN, no build step). Take
 the home airfield and fly anywhere you like over an endless open world, as high as you
 like (all the way up into space), grabbing coins that float in the sky.
 
-> <https://exitmaster.github.io/family/sky-a-c/>
+> <https://exitmaster.github.io/family/scr/>
 
 Scan to play on a phone or tablet:
 
-![QR code for exitmaster.github.io/family/sky-a-c](qr.png)
+![QR code for exitmaster.github.io/family/scr](qr.png)
 
-(The old address, `/family/sky-coin-rush/`, sends you here.)
+(The old addresses, `/family/sky-a-c/` and `/family/sky-coin-rush/`, send you here.)
 
 **It's a web app too:** on a phone, tablet or computer you can install it and open it from
 your home screen like an app (on Android/Chrome tap **Install app** on the start card or
