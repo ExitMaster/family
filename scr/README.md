@@ -36,6 +36,24 @@ Field, always with **45,000 points** to start. Drive anywhere (arrows / WASD or 
 - **From your island**, walk to the end of the pier and FLY BACK to the airport you came
   from.
 
+## Real cars
+
+Press **V** (or CARS) while driving, or at the airport curb, to open the **garage** and
+choose from 45 real cars, each with its own shape and top speed. Your choice is saved,
+and **C** still changes its colour.
+
+- **Tesla:** Model 3, Model S Plaid, Model Y, Model X, Roadster (400 km/h) and Cybertruck.
+- **Lamborghini:** Aventador, Huracán, Revuelto, Countach and Urus.
+- **Ferrari:** F40, LaFerrari, SF90 Stradale, 488 GTB, Testarossa and Purosangue.
+- **Hypercars:** McLaren F1, Bugatti Chiron (420 km/h) and Koenigsegg Jesko (480 km/h).
+- **Others:** Porsche 911, Audi R8, Mercedes-AMG GT, BMW M3, Nissan GT-R, Toyota Supra,
+  Honda Civic Type R, Ford Mustang, Hyundai Ioniq 5, Kia EV6, Genesis G90, Rolls-Royce
+  Phantom, Mini Cooper, VW Beetle, Fiat 500, Smart ForTwo, Toyota Prius, Jeep Wrangler,
+  Land Rover Defender, Mercedes G-Class, Hummer H1, Ford F-150 pickup, VW Bus, and a
+  Formula 1 car.
+
+The traffic on the roads is made of real cars too.
+
 ## Gravity
 
 - **Jump** with **J** (or JUMP) wherever you're on foot: on your island, in your house,
