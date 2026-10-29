@@ -347,6 +347,15 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     </div>
   </section>
 
+  <section class="card" id="card-cars" hidden>
+    <div class="card-head"><span>Garage</span><span>Real cars</span></div>
+    <div class="card-body">
+      <h2>Choose a <em>car</em></h2>
+      <div class="isle-list" id="carList"></div>
+      <button class="btn" id="btn-cars-done">Done</button>
+    </div>
+  </section>
+
   <section class="card" id="card-arrive" hidden>
     <div class="card-head"><span>Arrivals</span><span id="arriveFlight">SC 100</span></div>
     <div class="card-body">
@@ -386,6 +395,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <button class="ap boost" id="btn-ride-act" hidden>GO</button>
     <button class="ap" id="btn-ride-wc" hidden>BATHROOM</button>
     <button class="ap" id="btn-ride-jump" hidden>JUMP (J)</button>
+    <button class="ap" id="btn-ride-car" hidden>CARS (V)</button>
   </div>
 </div>
 <div id="fade"></div>
@@ -2683,7 +2693,7 @@ function boot(hot){
     if (state === 'play' && F.ride && e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     if (state === 'play' && F.drive){
       if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){ e.preventDefault(); driveAction(); return; }
-      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
+      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|KeyV|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
     // island life: walk with the arrows, SPACE does whatever is in front of you, I opens your pocket
@@ -2706,6 +2716,7 @@ function boot(hot){
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
     if (state === 'play' && F.drive && e.code === 'KeyC' && !car.taxi){ e.preventDefault(); switchRentColor(); return; }
+    if (((state === 'play' && F.drive && !car.taxi) || (state === 'ride' && !ride.ui && ride.curb)) && e.code === 'KeyV'){ e.preventDefault(); openGarage(); return; }
     if (state === 'ride' && !ride.ui && ride.curb && e.code === 'KeyC'){ e.preventDefault(); switchRentColor(); return; }
     if (state === 'ride' && !ride.ui && ride.room && e.code === 'KeyB'){ e.preventDefault(); fadeTo(enterHotelBath); return; }
     if (state === 'ride' && !ride.ui && ride.curb && (e.code === 'KeyR' || e.code === 'KeyT')){ e.preventDefault(); startDrive(e.code === 'KeyT'); return; }
@@ -2752,7 +2763,7 @@ function boot(hot){
 
   /* ---------------- UI wiring ---------------- */
   function show(panel){
-    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'isle', 'go', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
+    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'isle', 'go', 'cars', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
     $('overlay').hidden = !panel;
     $('hud').hidden = !(state === 'play' || state === 'paused') || !!F.drive || !!F.cruise;
     if (panel){ stick.id = null; stickEl.hidden = true; const b = $('card-' + panel).querySelector('.btn'); if (b) try { b.focus({ preventScroll: true }); } catch(e){} }
@@ -4376,14 +4387,116 @@ function boot(hot){
 
   // after the EXIT: the curb, with a rental car and a taxi waiting
   rb(40, 0.06, 10, 0x3a3f4a, HX, -0.01, 22); rb(40, 0.12, 4, 0xc9cfd8, HX, 0.02, 17.2);
-  function makeCar(color, taxi){
-    const g = new THREE.Group();
+  // Real cars to choose from: each has its own shape, top speed (km/h) and acceleration.
+  // Shapes are built from a few boxes: L/W/H the body, cab [length, height, z] the cabin,
+  // r the wheels, up how high the body sits, and a few extras (wing, spare wheel, pickup
+  // bed, round roof, open-wheel racer, two-tone, racing stripes).
+  const CAR_MODELS = [
+    { id: 'rental', n: 'Rental car', top: 210, acc: 26 },
+    { id: 'mini', n: 'Mini Cooper', top: 225, acc: 24, L: 3.8, W: 1.8, H: 0.75, cab: [2.0, 0.75, 0.25], roofC: 0xffffff, r: 0.34 },
+    { id: 'beetle', n: 'VW Beetle', top: 135, acc: 12, L: 4.1, W: 1.8, H: 0.75, cab: [2.0, 0.6, 0.2], round: true, r: 0.36 },
+    { id: 'fiat', n: 'Fiat 500', top: 160, acc: 14, L: 3.5, W: 1.65, H: 0.8, cab: [1.9, 0.6, 0.15], round: true, r: 0.32 },
+    { id: 'smart', n: 'Smart ForTwo', top: 145, acc: 13, L: 2.7, W: 1.65, H: 0.9, cab: [1.6, 0.8, 0.2], r: 0.33, wb: 1.8 },
+    { id: 'prius', n: 'Toyota Prius', top: 180, acc: 15, L: 4.5, W: 1.8, H: 0.75, cab: [2.6, 0.7, 0.35], slope: true },
+    { id: 'tesla', n: 'Tesla Model 3', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.7, cab: [2.5, 0.65, 0.3], slope: true },
+    { id: 'teslas', n: 'Tesla Model S Plaid', top: 322, acc: 55, L: 5.0, W: 1.95, H: 0.7, cab: [2.7, 0.65, 0.35], slope: true },
+    { id: 'teslay', n: 'Tesla Model Y', top: 250, acc: 36, L: 4.75, W: 1.95, H: 0.8, cab: [2.6, 0.75, 0.3], slope: true, up: 0.1 },
+    { id: 'teslax', n: 'Tesla Model X', top: 262, acc: 42, L: 5.05, W: 2.0, H: 0.85, cab: [2.9, 0.8, 0.3], slope: true, up: 0.12 },
+    { id: 'roadster', n: 'Tesla Roadster', top: 400, acc: 60, L: 4.3, W: 2.0, H: 0.55, cab: [1.6, 0.45, 0.2], wedge: true, r: 0.35 },
+    { id: 'cyber', n: 'Tesla Cybertruck', top: 209, acc: 40, L: 5.7, W: 2.2, H: 0.95, cab: [2.6, 0.85, -0.2], up: 0.35, r: 0.48, cyber: true },
+    { id: 'mustang', n: 'Ford Mustang', top: 250, acc: 32, L: 4.8, W: 1.95, H: 0.75, cab: [1.9, 0.6, 0.6], stripes: true },
+    { id: 'p911', n: 'Porsche 911', top: 300, acc: 36, L: 4.5, W: 1.85, H: 0.65, cab: [1.9, 0.6, 0.45], slope: true, wing: 'small', r: 0.35 },
+    { id: 'f40', n: 'Ferrari F40', top: 324, acc: 40, L: 4.4, W: 2.0, H: 0.6, cab: [1.6, 0.5, 0.35], wedge: true, wing: 'big', r: 0.34 },
+    { id: 'laferrari', n: 'Ferrari LaFerrari', top: 350, acc: 48, L: 4.7, W: 2.0, H: 0.55, cab: [1.7, 0.5, 0.2], wedge: true, wing: 'small', r: 0.35 },
+    { id: 'sf90', n: 'Ferrari SF90 Stradale', top: 340, acc: 50, L: 4.7, W: 2.0, H: 0.6, cab: [1.8, 0.5, 0.25], wedge: true, r: 0.35 },
+    { id: 'f488', n: 'Ferrari 488 GTB', top: 330, acc: 44, L: 4.6, W: 1.95, H: 0.6, cab: [1.8, 0.52, 0.3], wedge: true, wing: 'small', r: 0.35 },
+    { id: 'testarossa', n: 'Ferrari Testarossa', top: 290, acc: 34, L: 4.5, W: 2.0, H: 0.65, cab: [1.8, 0.55, 0.3], wedge: true, stripesSide: true, r: 0.35 },
+    { id: 'purosangue', n: 'Ferrari Purosangue', top: 310, acc: 40, L: 5.0, W: 2.05, H: 0.8, cab: [2.4, 0.65, 0.35], slope: true, up: 0.12, r: 0.42 },
+    { id: 'lambo', n: 'Lamborghini Aventador', top: 350, acc: 44, L: 4.8, W: 2.1, H: 0.55, cab: [1.9, 0.5, 0.1], wedge: true, wing: 'small', r: 0.36 },
+    { id: 'huracan', n: 'Lamborghini Huracán', top: 325, acc: 44, L: 4.5, W: 2.0, H: 0.55, cab: [1.8, 0.5, 0.15], wedge: true, r: 0.35 },
+    { id: 'revuelto', n: 'Lamborghini Revuelto', top: 350, acc: 50, L: 4.95, W: 2.1, H: 0.55, cab: [1.9, 0.5, 0.1], wedge: true, wing: 'small', r: 0.37 },
+    { id: 'countach', n: 'Lamborghini Countach', top: 295, acc: 34, L: 4.2, W: 2.0, H: 0.55, cab: [1.8, 0.5, 0.2], wedge: true, wing: 'big', r: 0.35 },
+    { id: 'urus', n: 'Lamborghini Urus', top: 305, acc: 40, L: 5.1, W: 2.05, H: 0.85, cab: [2.5, 0.65, 0.3], slope: true, up: 0.15, r: 0.44 },
+    { id: 'mclaren', n: 'McLaren F1', top: 386, acc: 46, L: 4.3, W: 1.9, H: 0.55, cab: [1.8, 0.55, 0.0], wedge: true, r: 0.34 },
+    { id: 'chiron', n: 'Bugatti Chiron', top: 420, acc: 50, L: 4.5, W: 2.05, H: 0.6, cab: [1.8, 0.55, 0.2], wedge: true, twoTone: 0x1b2340, r: 0.36 },
+    { id: 'jesko', n: 'Koenigsegg Jesko', top: 480, acc: 52, L: 4.6, W: 2.0, H: 0.55, cab: [1.7, 0.5, 0.15], wedge: true, wing: 'big', r: 0.35 },
+    { id: 'f1', n: 'Formula 1 car', top: 360, acc: 60, open: true },
+    { id: 'jeep', n: 'Jeep Wrangler', top: 160, acc: 16, L: 4.2, W: 1.95, H: 0.95, cab: [2.2, 0.9, 0.35], up: 0.35, r: 0.48, spare: true, boxy: true },
+    { id: 'defender', n: 'Land Rover Defender', top: 190, acc: 18, L: 4.6, W: 2.0, H: 1.0, cab: [3.0, 0.95, 0.4], up: 0.3, r: 0.45, spare: true, roofC: 0xffffff, boxy: true },
+    { id: 'gclass', n: 'Mercedes G-Class', top: 210, acc: 22, L: 4.8, W: 2.0, H: 1.0, cab: [2.9, 1.0, 0.4], up: 0.3, r: 0.45, spare: true, boxy: true },
+    { id: 'hummer', n: 'Hummer H1', top: 140, acc: 14, L: 4.7, W: 2.3, H: 1.0, cab: [2.4, 0.75, 0.3], up: 0.45, r: 0.55, boxy: true },
+    { id: 'f150', n: 'Ford F-150 pickup', top: 180, acc: 20, L: 5.6, W: 2.1, H: 1.0, cab: [1.9, 0.9, -0.6], up: 0.35, r: 0.48, bed: true },
+    { id: 'vwbus', n: 'VW Bus', top: 110, acc: 9, L: 4.4, W: 1.85, H: 1.2, cab: [4.2, 0.8, 0.0], twoTone: 0xffffff, r: 0.38, boxy: true },
+    { id: 'gtr', n: 'Nissan GT-R', top: 315, acc: 42, L: 4.7, W: 1.95, H: 0.7, cab: [2.0, 0.6, 0.35], wing: 'big', r: 0.36 },
+    { id: 'supra', n: 'Toyota Supra', top: 250, acc: 32, L: 4.4, W: 1.85, H: 0.65, cab: [1.8, 0.55, 0.4], slope: true, wing: 'small', r: 0.35 },
+    { id: 'r8', n: 'Audi R8', top: 330, acc: 42, L: 4.4, W: 1.95, H: 0.6, cab: [1.8, 0.55, 0.15], wedge: true, r: 0.35 },
+    { id: 'amg', n: 'Mercedes-AMG GT', top: 318, acc: 40, L: 4.6, W: 1.95, H: 0.65, cab: [1.8, 0.55, 0.6], slope: true, r: 0.36 },
+    { id: 'm3', n: 'BMW M3', top: 290, acc: 36, L: 4.8, W: 1.9, H: 0.75, cab: [2.3, 0.65, 0.35], r: 0.37 },
+    { id: 'civic', n: 'Honda Civic Type R', top: 275, acc: 32, L: 4.6, W: 1.9, H: 0.72, cab: [2.4, 0.65, 0.4], slope: true, wing: 'big', r: 0.35 },
+    { id: 'ioniq5', n: 'Hyundai Ioniq 5', top: 185, acc: 30, L: 4.6, W: 1.9, H: 0.85, cab: [2.8, 0.75, 0.3], boxy: true, r: 0.42 },
+    { id: 'ev6', n: 'Kia EV6', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.75, cab: [2.5, 0.65, 0.35], slope: true, r: 0.4 },
+    { id: 'genesis', n: 'Genesis G90', top: 250, acc: 26, L: 5.3, W: 1.95, H: 0.8, cab: [2.7, 0.7, 0.4], roofC: 0x1b2340, r: 0.4 },
+    { id: 'rolls', n: 'Rolls-Royce Phantom', top: 250, acc: 24, L: 5.8, W: 2.05, H: 0.85, cab: [2.8, 0.75, 0.4], roofC: 0x1b2340, r: 0.42 }
+  ];
+  const carModel = id => CAR_MODELS.find(c => c.id === id) || CAR_MODELS[0];
+  function makeCar(color, taxi, model){
+    const M = model || CAR_MODELS[0], g = new THREE.Group();
     const bx = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof c === 'number' ? mat(c) : c); m.position.set(x, y, z); g.add(m); return m; };
-    bx(2.0, 0.8, 4.4, color, 0, 0.75, 0); bx(1.8, 0.7, 2.2, color, 0, 1.45, 0.2); bx(1.84, 0.48, 1.9, glassMat, 0, 1.47, 0.2); bx(1.6, 0.5, 0.05, glassMat, 0, 1.45, -0.92);
-    [[-0.95, -1.4], [0.95, -1.4], [-0.95, 1.4], [0.95, 1.4]].forEach(([x, z]) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.3, 14), mat(DARK)); w.rotation.z = Math.PI / 2; w.position.set(x, 0.38, z); g.add(w); });
-    [-0.6, 0.6].forEach(x => { bx(0.4, 0.2, 0.05, 0xfff1c0, x, 0.8, -2.21); bx(0.4, 0.2, 0.05, 0xd0202a, x, 0.8, 2.21); });
-    if (taxi){ bx(0.7, 0.3, 0.4, 0xfff1c0, 0, 1.95, 0.2); [-1.01, 1.01].forEach(x => { for (let k = 0; k < 8; k++) bx(0.03, 0.18, 0.5, k % 2 ? 0x111111 : 0xffffff, x, 0.95, -1.75 + k * 0.5); }); }
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mat(SKIN[2])); head.position.set(-0.4, 1.5, -0.1); g.add(head);
+    const wheel = (r, x, z, w) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w || 0.3, 14), mat(DARK)); m.rotation.z = Math.PI / 2; m.position.set(x, r, z); g.add(m); return m; };
+    if (M.open){
+      // a Formula 1 car: a long thin nose, the driver in the open, wings front and back, big wheels
+      bx(0.9, 0.45, 4.6, color, 0, 0.45, 0.2); bx(0.5, 0.3, 1.2, color, 0, 0.4, -2.4); bx(1.9, 0.08, 0.5, color, 0, 0.25, -3.0);
+      bx(1.4, 0.5, 1.6, color, 0, 0.55, 1.0); bx(1.4, 0.08, 0.6, color, 0, 1.15, 2.4); [-0.62, 0.62].forEach(x => bx(0.06, 0.6, 0.6, DARK, x, 0.85, 2.4));
+      [[-0.95, -1.9, 0.33], [0.95, -1.9, 0.33], [-0.95, 1.7, 0.4], [0.95, 1.7, 0.4]].forEach(([x, z, r]) => wheel(r, x, z, 0.42));
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), mat(0xffd23d)); helmet.position.set(0, 0.95, 0.1); g.add(helmet);
+      bx(0.06, 0.06, 0.7, DARK, 0, 1.12, -0.05);
+      return g;
+    }
+    const L = M.L || 4.4, W = M.W || 2.0, H = M.H || 0.8, r = M.r || 0.38, up = M.up || 0, wb = M.wb || L * 0.64, cab = M.cab || [2.2, 0.7, 0.2];
+    const y0 = r * 0.95 + up, top = y0 + H;
+    // the body (a wedge-shaped nose on supercars, sloping hatch on others)
+    bx(W, H, L, color, 0, y0 + H / 2, 0);
+    if (M.twoTone) bx(W + 0.02, H * 0.45, L + 0.02, M.twoTone, 0, y0 + H * 0.78, 0);
+    if (M.wedge){ const n = bx(W * 0.98, 0.25, L * 0.32, color, 0, top - 0.05, -L * 0.3); n.rotation.x = -0.18; }
+    // the cabin with its windows, and the roof
+    const [cl, ch, cz] = cab, cw = W * (M.boxy ? 0.96 : 0.88), cy = top + ch / 2;
+    // sports cars and sleek cars get a sloping windscreen: the cabin is a side profile
+    // (longer at the bottom than the top) pushed out across the car's width
+    const sleek = M.wedge || M.slope;
+    const trap = (len, h, topLen, shift, w, material, y) => {
+      const sh = new THREE.Shape(); sh.moveTo(-len / 2, 0); sh.lineTo(len / 2, 0); sh.lineTo(shift + topLen / 2, h); sh.lineTo(shift - topLen / 2, h); sh.lineTo(-len / 2, 0);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: w, bevelEnabled: false }); geo.translate(0, 0, -w / 2); geo.rotateY(-Math.PI / 2);
+      const m = new THREE.Mesh(geo, material); m.position.set(0, y, cz); g.add(m); return m;
+    };
+    if (sleek && !M.cyber){
+      const bl = cl * (M.wedge ? 1.45 : 1.3), tl = cl * (M.wedge ? 0.45 : 0.6), shift = cl * (M.wedge ? 0.12 : 0.08);
+      trap(bl, ch, tl, shift, cw, mat(M.twoTone || color), top);
+      trap(bl * 1.01, ch * 0.82, tl, shift, cw + 0.04, glassMat, top);
+      if (M.wedge) [-1, 1].forEach(sd => bx(0.04, H * 0.45, L * 0.18, DARK, sd * (W / 2 + 0.01), y0 + H * 0.5, L * 0.1));   // side air intakes
+    } else if (!M.cyber){
+      bx(cw, ch, cl, M.roofC && !M.twoTone ? color : (M.twoTone || color), 0, cy, cz);
+      bx(cw + 0.04, ch * 0.7, cl * (M.boxy ? 0.92 : 0.86), glassMat, 0, cy - ch * 0.05, cz);
+    }
+    if (M.roofC) bx(cw + 0.02, 0.08, cl + 0.02, M.roofC, 0, top + ch + 0.04, cz);
+
+    if (M.round){ const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(color)); dome.scale.set(cw / 2, ch * 0.9, cl * 0.62); dome.position.set(0, top + ch * 0.55, cz); g.add(dome);
+      [-1, 1].forEach(sd => { const f = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), mat(color)); f.scale.set(0.7, 0.7, 1.1); f.position.set(sd * W * 0.42, y0 + H * 0.65, -L * 0.33); g.add(f); }); }
+    if (M.stripes) [-0.25, 0.25].forEach(x => bx(0.22, 0.02, L * 0.98, 0xffffff, x, top + 0.01, 0));
+    if (M.stripesSide) [-1, 1].forEach(sd => { for (let k = 0; k < 5; k++) bx(0.03, 0.06, L * 0.3, DARK, sd * (W / 2 + 0.01), y0 + H * 0.3 + k * 0.1, L * 0.12); });
+    if (M.cyber){   // the Cybertruck's sharp triangle roof
+      const tri = new THREE.Shape(); tri.moveTo(-L / 2, 0); tri.lineTo(-L * 0.05, 0.95); tri.lineTo(L / 2, 0.25); tri.lineTo(L / 2, 0); tri.lineTo(-L / 2, 0);
+      const geo = new THREE.ExtrudeGeometry(tri, { depth: W * 0.96, bevelEnabled: false }); geo.translate(0, 0, -W * 0.48); geo.rotateY(-Math.PI / 2);
+      const roof = new THREE.Mesh(geo, mat(0xc9d2dc)); roof.position.y = top; g.add(roof);
+    }
+    if (M.wing === 'big'){ bx(W * 0.95, 0.08, 0.5, color, 0, top + 0.55, L * 0.45); [-0.6, 0.6].forEach(x => bx(0.08, 0.55, 0.3, DARK, x * W * 0.6, top + 0.28, L * 0.45)); }
+    if (M.wing === 'small') bx(W * 0.8, 0.06, 0.35, color, 0, top + 0.18, L * 0.46);
+    if (M.spare){ const sp = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.95, r * 0.95, 0.28, 14), mat(DARK)); sp.rotation.x = Math.PI / 2; sp.position.set(0, y0 + H * 0.7, L / 2 + 0.15); g.add(sp); }
+    if (M.bed){ [-1, 1].forEach(sd => bx(0.1, 0.45, L * 0.38, color, sd * (W / 2 - 0.05), top + 0.22, L * 0.28)); bx(W, 0.45, 0.1, color, 0, top + 0.22, L / 2 - 0.05); }
+    // wheels, lights, and you at the wheel
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => wheel(r, sx * (W / 2 - 0.02), sz * wb / 2, 0.32));
+    [-0.6, 0.6].forEach(x => { bx(0.38, 0.18, 0.05, 0xfff1c0, x * W / 2, y0 + H * 0.6, -L / 2 - 0.01); bx(0.38, 0.18, 0.05, 0xd0202a, x * W / 2, y0 + H * 0.6, L / 2 + 0.01); });
+    if (taxi){ bx(0.7, 0.3, 0.4, 0xfff1c0, 0, top + ch + 0.15, cz); [-W / 2 - 0.01, W / 2 + 0.01].forEach(x => { for (let k = 0; k < 8; k++) bx(0.03, 0.18, 0.5, k % 2 ? 0x111111 : 0xffffff, x, y0 + H * 0.4, -1.75 + k * 0.5); }); }
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mat(SKIN[2])); head.position.set(-W * 0.2, top + ch * 0.45, cz - cl * 0.1); g.add(head);
     return g;
   }
   // AI cars: traffic on the grid roads near you, keeping to their lane and turning at the
@@ -4391,7 +4504,8 @@ function boot(hot){
   const AI_CARS = 16, aiCars = [], aiCarGroup = new THREE.Group(); free.add(aiCarGroup);
   const CAR_COLS = [0xe8432e, 0x3fa9f5, 0xffffff, 0x2a2f45, 0x3fa34d, 0xffd23d, 0x7a5ad8, 0xff8a1d, 0xc9d2dc];
   for (let i = 0; i < AI_CARS; i++){
-    const m = makeCar(CAR_COLS[i % CAR_COLS.length], i % 7 === 3); aiCarGroup.add(m);
+    const everyday = ['rental', 'mini', 'beetle', 'fiat', 'smart', 'prius', 'tesla', 'mustang', 'jeep', 'defender', 'f150', 'vwbus', 'p911', 'rolls', 'gclass'];
+    const m = makeCar(CAR_COLS[i % CAR_COLS.length], i % 7 === 3, i % 7 === 3 ? null : carModel(everyday[(i * 5) % everyday.length])); aiCarGroup.add(m);
     aiCars.push({ m, alongX: false, line: 0, pos: 0, dir: 1, speed: 15, wait: 0, live: false });
   }
   function aiCarPlace(a){
@@ -4431,7 +4545,8 @@ function boot(hot){
       aiCarPlace(a);
     }
   }
-  let curbCar = makeCar(0x3fa9f5, false);
+  let myCar = carModel(store.get('scr.car', 'rental'));
+  let curbCar = makeCar(0x3fa9f5, false, myCar);
   const curbTaxi = makeCar(0xffd23d, true);
   curbCar.position.set(HX - 6, 0, 22); curbCar.rotation.y = Math.PI / 2; curbTaxi.position.set(HX + 6, 0, 22); curbTaxi.rotation.y = Math.PI / 2;
   rideScene.add(curbCar, curbTaxi);
@@ -4443,16 +4558,33 @@ function boot(hot){
   }
   // driving in the open world: your rental car (you steer) or a taxi (it drives itself) to a hotel
   const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, taxi: false, tx: 0, tz: 0, km: 0, warnT: -9, crashT: -9 };
-  const worldCars = { rent: makeCar(0x3fa9f5, false), taxi: makeCar(0xffd23d, true) };
+  const worldCars = { rent: makeCar(0x3fa9f5, false, myCar), taxi: makeCar(0xffd23d, true) };
   // the rental car comes in lots of colours: C (or COLOR) swaps to the next one
   const RENT_COLS = [0x3fa9f5, 0xe8432e, 0x3fa34d, 0xffd23d, 0x7a5ad8, 0xff8fb8, 0x2a2f45, 0xffffff, 0xff8a1d];
   let rentCol = 0;
   function recolor(old, parent){
-    const m = makeCar(RENT_COLS[rentCol], false);
+    const m = makeCar(RENT_COLS[rentCol], false, myCar);
     m.position.copy(old.position); m.quaternion.copy(old.quaternion); m.visible = old.visible;
     parent.remove(old); old.traverse(o => { if (o.geometry) o.geometry.dispose(); }); parent.add(m);
     return m;
   }
+  // the garage: V (or CARS) picks which car you drive
+  function openGarage(){
+    if (state === 'play'){ car.speed = 0; state = 'paused'; sfx.engine(false, 0); }
+    else if (state === 'ride') ride.ui = true;
+    $('carList').innerHTML = CAR_MODELS.map(m => '<button type="button" class="apbtn" data-car="' + m.id + '" aria-pressed="' + (m === myCar) + '"><b>' + m.n + '</b><small>' + m.top + ' km/h</small></button>').join('');
+    show('cars');
+  }
+  function closeGarage(){ if (state === 'paused') state = 'play'; ride.ui = false; show(null); }
+  $('carList').addEventListener('click', e => {
+    const b = e.target.closest('.apbtn'); if (!b) return;
+    myCar = carModel(b.dataset.car); store.set('scr.car', myCar.id);
+    worldCars.rent = recolor(worldCars.rent, scene); curbCar = recolor(curbCar, rideScene);
+    sfx.ap(true); toast('Your car: ' + myCar.n + ' · top speed ' + myCar.top + ' km/h', '');
+    closeGarage();
+  });
+  $('btn-cars-done').addEventListener('click', closeGarage);
+  $('btn-ride-car').addEventListener('click', e => { e.currentTarget.blur(); if ((state === 'play' && F.drive && !car.taxi) || (state === 'ride' && ride.curb && !ride.ui)) openGarage(); });
   function switchRentColor(){
     rentCol = (rentCol + 1) % RENT_COLS.length;
     worldCars.rent = recolor(worldCars.rent, scene); curbCar = recolor(curbCar, rideScene);
@@ -4573,9 +4705,10 @@ function boot(hot){
       throttle = clamp((keys.u ? 1 : 0) - (keys.d || keys.f ? 1 : 0) + stick.y, -1, 1);
     }
     // the rental car goes up to 210 km/h; the taxi takes it easy
-    c.speed += throttle * (throttle < 0 && c.speed > 0 ? 30 : c.taxi ? 9 : 26) * dt;
+    c.speed += throttle * (throttle < 0 && c.speed > 0 ? 30 : c.taxi ? 9 : myCar.acc) * dt;
     c.speed -= c.speed * (c.taxi ? 0.35 : 0.25) * dt;
-    c.speed = clamp(c.speed, -10, c.taxi ? 34 : 58.5);
+    // each car has its own top speed
+    c.speed = clamp(c.speed, -10, c.taxi ? 34 : myCar.top / 3.6);
     c.yaw -= steer * clamp(Math.abs(c.speed) / 8, 0, 1) * 1.4 * dt * Math.sign(c.speed || 1);
     const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
     const road = (x, z) => onGridRoad(x, z) || onRoute(x, z);
@@ -5773,7 +5906,10 @@ function boot(hot){
   }
   $('btn-ride-jump').addEventListener('click', e => { e.currentTarget.blur(); doJump(); });
   let jumpShown = false;
+  let carBtnShown = false;
   function syncJump(){
+    const carOn = (state === 'play' && !!F.drive && !car.taxi) || (state === 'ride' && !!ride.curb && !ride.ui);
+    if (carOn !== carBtnShown){ carBtnShown = carOn; $('btn-ride-car').hidden = !carOn; }
     const on = state === 'island' ? !isle.ui && !isle.swim : state === 'ride' ? !ride.ui && !ride.seated : state === 'play' && !!F.cruise && !cruise.ui;
     if (on !== jumpShown){ jumpShown = on; $('btn-ride-jump').hidden = !on; }
   }
