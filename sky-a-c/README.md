@@ -20,7 +20,7 @@ first visit it also opens without internet.
 ## One big world
 
 Everything happens in one open world. Press **Play** and you're in your car at Home
-Field. Drive anywhere (arrows / WASD or drag; **C** changes the car's colour).
+Field, always with **45,000 points** to start. Drive anywhere (arrows / WASD or drag; **C** changes the car's colour).
 
 - **At any airport**, press SPACE (or AIRPORT): **fly your plane** from its runway,
   **book a flight** as a passenger, or **fly to your island**.
@@ -315,6 +315,14 @@ are:
 - **Chat with your animal neighbours:** Mittens the cat, Biscuit the dog, Clover the
   bunny, Bruno the bear, Lily the frog and Quackers the duck wander about, babble when
   they talk, and sometimes give you a present.
+
+- **Swim:** walk off the beach into the sea and you swim (Shift to swim faster). Dive at
+  the bubbles in the water for sea stars, shrimp, oysters, crabs, scallops and the rare
+  lobster.
+
+The island is big (about 170 m across) with over 40 fruit trees and ten neighbours (four
+more joined: Ginger the cat, Rex the dog, Coco the bunny and Snowball the polar bear).
+Hold **Shift** to run.
 
 **I** (or POCKET) shows your pocket and stored furniture. Your pocket, furniture and
 house are saved in the browser.

@@ -4942,6 +4942,7 @@ function boot(hot){
   // own plane, book a flight as a passenger or fly to your island; at the harbour you can take
   // a cruise. Wherever those end, you get back in your car and drive on.
   let worldHarbour = null, isleReturn = null;
+  const START_POINTS = 45000;
   const carSpot = a => ({ x: a.x + a.rx * (AP_HALF_W - 20), z: a.z + a.rz * (AP_HALF_W - 20), yaw: a.hdg });
   function harbourNear(x, z){
     const lake = findLake(x, z); if (!lake) return null;
@@ -4950,7 +4951,8 @@ function boot(hot){
     return { i: lake.i, j: lake.j, sx: di * WG, sz: dj * WG, name: lake.name };
   }
   function startPlay(){
-    fadeTo(() => { sfx.init(); sfx.resume(); const sp = carSpot(airportOfCell(0, 0)); startWorld(sp.x, sp.z, sp.yaw, 'Welcome! Drive to an airport to fly, or anywhere you like'); });
+    score = START_POINTS; saveProgress();   // every game starts with the same points
+    fadeTo(() => { sfx.init(); sfx.resume(); const sp = carSpot(airportOfCell(0, 0)); startWorld(sp.x, sp.z, sp.yaw, 'Welcome! You have ' + START_POINTS.toLocaleString() + ' points. Drive to an airport to fly, or anywhere you like'); });
   }
   // x === null: park by the harbour
   function startWorld(x, z, yaw, msg){
@@ -5011,9 +5013,10 @@ function boot(hot){
   // animal neighbours. It has its own scene, and the camera looks down from the south.
   const isleScene = new THREE.Scene();
   isleScene.background = new THREE.Color(0x9fdcf5);
-  isleScene.fog = new THREE.Fog(0x9fdcf5, 70, 170);
+  isleScene.fog = new THREE.Fog(0x9fdcf5, 110, 280);
   { const h = new THREE.HemisphereLight(0xffffff, 0x8ab06a, CUTE ? 0.6 : 0.9), d = new THREE.DirectionalLight(0xfff4e0, CUTE ? 0.55 : 0.75); d.position.set(-20, 50, 30); isleScene.add(h, d); }
-  const IR = 42, IX = 300;   // the island's radius; the inside of your house is built off to the side
+  const IR = 84, IX = 400;   // the island's radius; the inside of your house is built off to the side
+  const BEACH = IR + 6, PIER = IR + 2;   // the beach's edge; where the pier starts
   const ib = (w, h, d, c, x, y, z, p) => rb(w, h, d, c, x, y, z, p || isleScene);
   const isph = (r, c, x, y, z, p, sx, sy, sz) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), typeof c === 'number' ? mat(c) : c); m.position.set(x, y, z); if (sx) m.scale.set(sx, sy, sz); (p || isleScene).add(m); return m; };
   const icyl = (r0, r1, h, c, x, y, z, p, seg) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg || 20), typeof c === 'number' ? mat(c) : c); m.position.set(x, y, z); (p || isleScene).add(m); return m; };
@@ -5024,7 +5027,8 @@ function boot(hot){
   const ITEMS = {
     apple: { n: 'Apple', e: '🍎', v: 100, c: 0xe8432e }, orange: { n: 'Orange', e: '🍊', v: 100, c: 0xff9a2e }, peach: { n: 'Peach', e: '🍑', v: 100, c: 0xffa8a0 }, cherry: { n: 'Cherries', e: '🍒', v: 100, c: 0xb0203a },
     butterfly: { n: 'Butterfly', e: '🦋', v: 160, c: 0xffd23d }, ladybug: { n: 'Ladybug', e: '🐞', v: 200, c: 0xe8432e }, bee: { n: 'Honeybee', e: '🐝', v: 300, c: 0xffc23d }, beetle: { n: 'Stag beetle', e: '🪲', v: 1500, c: 0x4a3020 },
-    bass: { n: 'Sea bass', e: '🐟', v: 400 }, clown: { n: 'Clownfish', e: '🐠', v: 650 }, squid: { n: 'Squid', e: '🦑', v: 500 }, puffer: { n: 'Pufferfish', e: '🐡', v: 900 }, octo: { n: 'Octopus', e: '🐙', v: 1200 }, shark: { n: 'Shark', e: '🦈', v: 8000 }
+    bass: { n: 'Sea bass', e: '🐟', v: 400 }, clown: { n: 'Clownfish', e: '🐠', v: 650 }, squid: { n: 'Squid', e: '🦑', v: 500 }, puffer: { n: 'Pufferfish', e: '🐡', v: 900 }, octo: { n: 'Octopus', e: '🐙', v: 1200 }, shark: { n: 'Shark', e: '🦈', v: 8000 },
+    seastar: { n: 'Sea star', e: '⭐', v: 500 }, shrimp: { n: 'Shrimp', e: '🦐', v: 600 }, oyster: { n: 'Oyster', e: '🦪', v: 700 }, crab: { n: 'Crab', e: '🦀', v: 900 }, scallop: { n: 'Scallop', e: '🐚', v: 1200 }, lobster: { n: 'Lobster', e: '🦞', v: 3000 }
   };
   // furniture for your house, from the shop
   const FURN = [
@@ -5061,16 +5065,16 @@ function boot(hot){
   }
 
   // the island: sea, a sandy beach, grass, flowers, the pier with your seaplane
-  { const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), mat(0x4fc3f7)); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.6; isleScene.add(sea); }
-  icyl(48, 51, 1, 0xf6e3a1, 0, -0.75, 0, null, 56);
-  icyl(IR, IR + 1.2, 1.2, 0x86d36b, 0, -0.6, 0, null, 56);
-  ib(4, 0.4, 12, WOOD, 0, -0.1, 52);
-  { const sp = new THREE.Group(); sp.position.set(3.8, 0, 56); sp.rotation.y = 0.4; isleScene.add(sp);
+  { const sea = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), mat(0x4fc3f7)); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.6; isleScene.add(sea); }
+  icyl(BEACH, BEACH + 3, 1, 0xf6e3a1, 0, -0.75, 0, null, 96);
+  icyl(IR, IR + 1.2, 1.2, 0x86d36b, 0, -0.6, 0, null, 96);
+  ib(4, 0.4, 14, WOOD, 0, -0.1, PIER + 7);
+  { const sp = new THREE.Group(); sp.position.set(3.8, 0, PIER + 12); sp.rotation.y = 0.4; isleScene.add(sp);
     ib(1.2, 1.1, 5, 0xffc23d, 0, 1.3, 0, sp); icone(0.6, 1.2, 12, 0xffc23d, 0, 1.3, -3, sp).rotation.x = -Math.PI / 2; ib(7, 0.15, 1.2, 0xe8432e, 0, 1.75, -0.5, sp); ib(2.4, 0.12, 0.7, 0xe8432e, 0, 1.6, 2.2, sp); ib(0.1, 1, 0.6, 0xe8432e, 0, 2.1, 2.3, sp);
     [-1.2, 1.2].forEach(x => { ib(0.5, 0.4, 3.5, 0xffffff, x, 0.1, 0, sp); ib(0.08, 0.9, 0.08, 0x2a2f45, x, 0.6, 0, sp); }); }
   const isleFlowers = new THREE.Group(); isleScene.add(isleFlowers);
-  for (let k = 0; k < 70; k++){
-    const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 32, x = Math.cos(a) * r, z = Math.sin(a) * r;
+  for (let k = 0; k < 280; k++){
+    const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * (IR - 10), x = Math.cos(a) * r, z = Math.sin(a) * r;
     if (Math.abs(x + 12) < 6 && Math.abs(z + 14) < 6 || Math.abs(x - 13) < 7 && Math.abs(z + 13) < 6) continue;
     icyl(0.03, 0.03, 0.4, 0x3fa34d, x, 0.2, z, isleFlowers, 5);
     isph(0.16, [0xff8fb8, 0xffd23d, 0xffffff, 0xe8432e, 0xb88cff][k % 5], x, 0.45, z, isleFlowers, 1, 0.6, 1);
@@ -5086,6 +5090,13 @@ function boot(hot){
 
   // fruit trees: shake one and its fruit falls; it grows back after a while
   const TREES = [[-28, 5], [-22, 16], [-30, -8], [22, 10], [28, -2], [18, 22], [-8, 24], [6, 28], [-20, -28], [26, -24], [-34, 18], [33, 14]];
+  // and more all over the bigger island, always in the same places
+  { let seed = 7; const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let tries = 0; TREES.length < 44 && tries < 2000; tries++){
+      const a = rand() * Math.PI * 2, r = 40 + rand() * (IR - 48), x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (Math.abs(x) < 6 && z > 30) continue;   // keep the path to the pier clear
+      if (TREES.every(([tx, tz]) => Math.hypot(tx - x, tz - z) > 9)) TREES.push([Math.round(x), Math.round(z)]);
+    } }
   const FRUITS = ['apple', 'orange', 'peach', 'cherry'];
   const trees = TREES.map(([x, z], k) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); isleScene.add(g);
@@ -5111,16 +5122,16 @@ function boot(hot){
     const g = new THREE.Group(), c = ITEMS[kind].c;
     isph(0.09, kind === 'bee' ? 0x2a2f45 : c, 0, 0, 0, g, 1, 1, 1.8);
     const wing = x => { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.28), mat2(kind === 'bee' ? 0xffffff : c)); w.position.x = x; w.rotation.x = -Math.PI / 2; g.add(w); return w; };
-    const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 28;
+    const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * (IR - 14);
     const b = { g, kind, wl: wing(-0.2), wr: wing(0.2), x: Math.cos(a) * r, z: Math.sin(a) * r, y: 1.2, tx: 0, tz: 0, ph: Math.random() * 6, flee: 0 };
     b.tx = b.x; b.tz = b.z; isleScene.add(g); bugs.push(b);
   }
-  for (let k = 0; k < 5; k++) spawnBug();
+  for (let k = 0; k < 12; k++) spawnBug();
   // fish shadows in the sea, close to the beach
   const shadowMat = new THREE.MeshBasicMaterial({ color: 0x0b2a3a, transparent: true, opacity: 0.4 });
   const shadows = [];
-  function placeShadow(sh){ sh.a = Math.random() * Math.PI * 2; sh.r = 51 + Math.random() * 4; sh.size = [0.55, 0.85, 1.3][Math.floor(Math.random() * 3)]; sh.m.scale.set(sh.size, sh.size * 1.8, 1); }
-  for (let k = 0; k < 6; k++){ const m = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), shadowMat); m.rotation.x = -Math.PI / 2; m.position.y = -0.55; isleScene.add(m); const sh = { m, a: 0, r: 52, size: 1, sp: 0.02 + Math.random() * 0.03 }; placeShadow(sh); shadows.push(sh); }
+  function placeShadow(sh){ sh.a = Math.random() * Math.PI * 2; sh.r = BEACH + 3 + Math.random() * 4; sh.size = [0.55, 0.85, 1.3][Math.floor(Math.random() * 3)]; sh.m.scale.set(sh.size, sh.size * 1.8, 1); }
+  for (let k = 0; k < 14; k++){ const m = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), shadowMat); m.rotation.x = -Math.PI / 2; m.position.y = -0.55; isleScene.add(m); const sh = { m, a: 0, r: 52, size: 1, sp: 0.02 + Math.random() * 0.03 }; placeShadow(sh); shadows.push(sh); }
   const bob = isph(0.16, 0xe8432e, 0, -0.45, 0); bob.visible = false;
   const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
   const fishLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff })); fishLine.visible = false; isleScene.add(fishLine);
@@ -5147,11 +5158,12 @@ function boot(hot){
   }
   const NEIGHBOURS = [
     ['Mittens', 'cat', 0xf4a640, 0x3fa9f5, 'meow', '🐱'], ['Biscuit', 'dog', 0xd9a066, 0xe8432e, 'woof', '🐶'], ['Clover', 'bunny', 0xf4f1ea, 0xff8fb8, 'hoppity', '🐰'],
-    ['Bruno', 'bear', 0x8a5a3a, 0x3fa34d, 'grr-ific', '🐻'], ['Lily', 'frog', 0x6fcf6a, 0xffd23d, 'ribbit', '🐸'], ['Quackers', 'duck', 0xfff2a0, 0x7a5ad8, 'quack', '🦆']
+    ['Bruno', 'bear', 0x8a5a3a, 0x3fa34d, 'grr-ific', '🐻'], ['Lily', 'frog', 0x6fcf6a, 0xffd23d, 'ribbit', '🐸'], ['Quackers', 'duck', 0xfff2a0, 0x7a5ad8, 'quack', '🦆'],
+    ['Ginger', 'cat', 0xff9a5a, 0x3fa34d, 'purrfect', '🐱'], ['Rex', 'dog', 0xb8b8c0, 0x2a4f9a, 'arf', '🐶'], ['Coco', 'bunny', 0xc68a5a, 0xffd23d, 'boing', '🐰'], ['Snowball', 'bear', 0xf4f4f8, 0xe8432e, 'brrr', '🐻‍❄️']
   ];
   const villagers = NEIGHBOURS.map(([name, kind, fur, shirt, cp, e], k) => {
     const g = makeAnimal(kind, fur, shirt), a = k / NEIGHBOURS.length * Math.PI * 2;
-    const v = { g, name, kind, cp, e, x: Math.cos(a) * 18, z: Math.sin(a) * 18 + 4, tx: 0, tz: 0, wait: Math.random() * 3, gave: false, talkT: 0 };
+    const v = { g, name, kind, cp, e, x: Math.cos(a) * (k % 2 ? 40 : 18), z: Math.sin(a) * (k % 2 ? 40 : 18) + 4, tx: 0, tz: 0, wait: Math.random() * 3, gave: false, talkT: 0 };
     v.tx = v.x; v.tz = v.z; g.position.set(v.x, 0, v.z); isleScene.add(g);
     return v;
   });
@@ -5177,12 +5189,23 @@ function boot(hot){
   // you
   const islander = makePerson(0xffd23d, 0x3fa9f5, SKIN[0], 0x5a3a1a); isleScene.add(islander);
   islander.children.forEach(o => { if (o.isMesh && o.geometry.type === 'SphereGeometry'){ if (o.geometry.parameters.radius > 0.1) o.scale.multiplyScalar(1.3); else o.position.z *= 1.3; } });   // a big cute head
-  const isle = { ui: false, inside: false, x: 0, z: 40, yaw: 0, act: null, fish: null, talking: null, cam: new THREE.Vector3(0, 14, 54), look: new THREE.Vector3() };
+  const isle = { ui: false, inside: false, x: 0, z: IR - 2, yaw: 0, act: null, fish: null, talking: null, cam: new THREE.Vector3(0, 14, IR + 12), look: new THREE.Vector3() };
 
+  // bubbles in the sea: dive there to find sea creatures
+  const SEA = BEACH + 40;   // how far out you can swim
+  const bubbles = [];
+  function placeBubble(b){ const a = Math.random() * Math.PI * 2, r = BEACH + 6 + Math.random() * 30; b.x = Math.cos(a) * r; b.z = Math.sin(a) * r; b.g.position.set(b.x, -0.6, b.z); }
+  for (let k = 0; k < 10; k++){
+    const g = new THREE.Group(); isleScene.add(g);
+    const dots = [0, 1, 2].map(i => isph(0.12 + i * 0.03, 0xffffff, (i - 1) * 0.25, 0, (i % 2) * 0.2, g));
+    const b = { g, dots, x: 0, z: 0, ph: Math.random() * 6 }; placeBubble(b); bubbles.push(b);
+  }
+  const DIVE = [['seastar', 30], ['shrimp', 22], ['oyster', 18], ['crab', 15], ['scallop', 10], ['lobster', 5]];
   const isleFree = (x, z) => {
     if (isle.inside) return Math.abs(x - IX) < 5.5 && z > -5.5 && z < 5.6;
-    if (Math.abs(x) < 1.8 && z > 44 && z < 57.5) return true;   // the pier
-    if (Math.hypot(x, z) > 46.8) return false;
+    if (Math.abs(x) < 1.8 && z > PIER && z < PIER + 13.5) return true;   // the pier
+    const r = Math.hypot(x, z);
+    if (r > BEACH - 1.2) return r < SEA;   // the sea: you swim
     if (x > -15.9 && x < -8.1 && z > -17.4 && z < -10.6) return false;
     if (x > 8.1 && x < 17.9 && z > -16.9 && z < -9.1) return false;
     return !trees.some(t => Math.hypot(t.x - x, t.z - z) < 0.9);
@@ -5190,9 +5213,9 @@ function boot(hot){
   function startIsland(){
     endRide(); endCruise();
     sfx.init(); sfx.resume(); sfx.engine(false, 0); hushAnnounce();
-    Object.assign(isle, { ui: false, inside: false, x: 0, z: 40, yaw: 0, act: null, talking: null });
+    Object.assign(isle, { ui: false, inside: false, x: 0, z: IR - 2, yaw: 0, act: null, talking: null, swim: false });
     endFish(); villagers.forEach(v => v.gave = false);
-    isle.cam.set(0, 14, 54);
+    isle.cam.set(0, 14, IR + 12);
     camera.near = 0.1; camera.far = 600; camera.fov = baseFov; camera.updateProjectionMatrix();
     $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); $('winFrame').hidden = true;
     RH.wc.hidden = false; txt(RH.wc, 'POCKET (I)'); RH.act.hidden = true; txt(RH.prompt, '');
@@ -5207,7 +5230,7 @@ function boot(hot){
   }
   function isleHud(){
     RH.steps.innerHTML = '<li class="now">🏝️ ' + (isle.inside ? 'Your house' : 'Your island') + ' · ' + Math.floor(score).toLocaleString() + ' points</li><li>Pocket ' + isleSave.pocket.length + '/' + POCKET +
-      ' · in your house: ' + isleSave.placed.length + '</li><li>' + (isle.inside ? 'DECORATE with furniture from the shop' : 'Shake trees, catch bugs and fish, then sell them at the SHOP') + '</li><li>SPACE: do it · I: pocket</li>';
+      ' · in your house: ' + isleSave.placed.length + '</li><li>' + (isle.inside ? 'DECORATE with furniture from the shop' : 'Shake trees, catch bugs and fish, then sell them at the SHOP') + '</li><li>SPACE: do it · Shift: run · I: pocket · walk into the sea to swim</li>';
   }
   const addPocket = id => { if (isleSave.pocket.length >= POCKET){ toast('Your pocket is full! Sell things at the SHOP', 'warn'); return false; } isleSave.pocket.push(id); saveIsle(); isleHud(); return true; };
 
@@ -5220,14 +5243,15 @@ function boot(hot){
       return f ? { k: 'putaway', f } : { k: 'decorate' };
     }
     if (isle.fish) return { k: isle.fish.bite ? 'reel' : 'wait' };
-    if (Math.abs(X) < 1.8 && Z > 53.5) return { k: 'leave' };
+    if (isle.swim){ const b = bubbles.find(b => near(b.x, b.z, 2.2)); return b ? { k: 'dive', b } : null; }
+    if (Math.abs(X) < 1.8 && Z > PIER + 9.5) return { k: 'leave' };
     const v = villagers.find(v => near(v.x, v.z, 1.9)); if (v) return { k: 'talk', v };
     const it = ground.find(i => i.y <= 0.01 && near(i.x, i.z, 1.3)); if (it) return { k: 'pick', it };
     if (near(SHOP_DOOR.x, SHOP_DOOR.z, 1.7)) return { k: 'shop' };
     if (near(HOUSE_DOOR.x, HOUSE_DOOR.z, 1.7)) return { k: 'enter' };
     const t = trees.find(t => near(t.x, t.z, 2.4)); if (t) return { k: 'shake', t };
     const b = bugs.find(b => near(b.x, b.z, 2.6)); if (b) return { k: 'catch', b };
-    if (Math.hypot(X, Z) > 43.5){ const sh = shadows.find(s => near(Math.cos(s.a) * s.r, Math.sin(s.a) * s.r, 9)); if (sh) return { k: 'fish', sh }; }
+    if (Math.hypot(X, Z) > IR + 1.5){ const sh = shadows.find(s => near(Math.cos(s.a) * s.r, Math.sin(s.a) * s.r, 9)); if (sh) return { k: 'fish', sh }; }
     return null;
   }
   function isleAction(){
@@ -5279,6 +5303,13 @@ function boot(hot){
       sfx.applause(); toast(id === 'shark' ? 'WOW! You caught a SHARK! 🦈' : id === 'bass' && sz >= 1 ? 'A sea bass? Again?! 🐟 At least it\'s big' : 'You caught a ' + ITEMS[id].n + '! ' + ITEMS[id].e, '');
     }
     else if (a.k === 'decorate') openDecorate();
+    else if (a.k === 'dive'){
+      let roll = Math.random() * 100, id = 'seastar';
+      for (const [k, w] of DIVE){ if ((roll -= w) < 0){ id = k; break; } }
+      sfx.splash(); placeBubble(a.b);
+      if (!addPocket(id)) return;
+      sfx.ring(); toast('You dived down and found a ' + ITEMS[id].n + '! ' + ITEMS[id].e, '');
+    }
     else if (a.k === 'leave') fadeTo(() => { const ap = isleReturn || airportOfCell(0, 0), sp = carSpot(ap); endIsland(); startWorld(sp.x, sp.z, sp.yaw, 'Welcome back to ' + ap.name + '!'); });
     else if (a.k === 'putaway'){
       const f = a.f; isleSave.placed.splice(isleSave.placed.indexOf(f), 1); isleSave.storage.push(f.id); saveIsle(); buildHouse(); sfx.gear(); isleHud();
@@ -5340,7 +5371,7 @@ function boot(hot){
   });
 
   const ACT_TXT = { talk: a => 'TALK TO ' + a.v.name.toUpperCase(), pick: a => 'PICK UP ' + (a.it.id.startsWith('furn:') ? '🎁' : ITEMS[a.it.id].e), shop: () => 'GO SHOPPING', enter: () => 'GO INSIDE', out: () => 'GO OUTSIDE',
-    shake: () => 'SHAKE THE TREE', catch: a => 'CATCH ' + ITEMS[a.b.kind].e, fish: () => 'GO FISHING', wait: () => 'WAIT FOR A BITE…', reel: () => 'REEL IN!', decorate: () => 'DECORATE', leave: () => 'FLY BACK ✈️', putaway: a => 'PUT AWAY ' + furnOf(a.f.id).e };
+    shake: () => 'SHAKE THE TREE', catch: a => 'CATCH ' + ITEMS[a.b.kind].e, fish: () => 'GO FISHING', wait: () => 'WAIT FOR A BITE…', reel: () => 'REEL IN!', decorate: () => 'DECORATE', leave: () => 'FLY BACK ✈️', dive: () => 'DIVE 🤿', putaway: a => 'PUT AWAY ' + furnOf(a.f.id).e };
   function updateIsland(dt){
     // walking
     let go = 0, turn = 0;
@@ -5351,11 +5382,20 @@ function boot(hot){
     }
     if (isle.fish && (go || Math.abs(turn) > 0.3)){ endFish(); toast('You put your fishing rod away', ''); }
     isle.yaw -= turn * 2.8 * dt;
-    const step = go * (go > 0 ? 6 : 3) * dt, nx = isle.x - Math.sin(isle.yaw) * step, nz = isle.z - Math.cos(isle.yaw) * step;
+    const run = !!keys.b && !isle.inside;   // Shift: run (or swim faster)
+    const step = go * (go > 0 ? (isle.swim ? (run ? 5 : 3.2) : run ? 11 : 6) : 2.5) * dt, nx = isle.x - Math.sin(isle.yaw) * step, nz = isle.z - Math.cos(isle.yaw) * step;
     if (isleFree(nx, isle.z)) isle.x = nx;
     if (isleFree(isle.x, nz)) isle.z = nz;
-    islander.position.set(isle.x, isle.inside || Math.hypot(isle.x, isle.z) < IR ? 0 : Math.abs(isle.x) < 1.8 && isle.z > 46 ? 0.1 : -0.25, isle.z);
-    islander.rotation.y = isle.yaw; animPerson(islander, go !== 0, dt);
+    else if (isle.swim && go > 0 && Math.hypot(isle.x, isle.z) > SEA - 3 && t - (isle.warnT || -9) > 3){ isle.warnT = t; toast("That's far enough! Swim back to the island", 'warn'); }
+    // swimming: in the sea past the beach (but not on the pier)
+    const R = Math.hypot(isle.x, isle.z), onPier = Math.abs(isle.x) < 1.8 && isle.z > PIER;
+    const swim = !isle.inside && !onPier && R > BEACH - 1.0;
+    if (swim !== !!isle.swim){ isle.swim = swim; if (swim){ sfx.splash(); toast("Splash! You're swimming 🏊 Dive at the bubbles", ''); endFish(); } else toast('Back on the beach', ''); }
+    islander.position.set(isle.x, isle.inside || R < IR ? 0 : swim ? -1.3 + Math.sin(t * 3) * 0.05 : onPier && isle.z > PIER + 2 ? 0.1 : -0.25, isle.z);
+    islander.rotation.y = isle.yaw;
+    if (swim){ const u = islander.userData; u.ph += dt * (go ? 6 : 2); u.AL.rotation.x = Math.PI + Math.sin(u.ph) * 1.2; u.AR.rotation.x = Math.PI - Math.sin(u.ph) * 1.2; u.L.rotation.x = Math.sin(u.ph * 2) * 0.4; u.R.rotation.x = -Math.sin(u.ph * 2) * 0.4; }
+    else animPerson(islander, go !== 0, dt);
+    bubbles.forEach(b => { b.ph += dt * 3; b.dots.forEach((d, i) => { d.position.y = (b.ph * 0.25 + i * 0.33) % 1 * 0.5; }); });
     // trees wobble and grow their fruit back; fruit bounces down
     trees.forEach(t => {
       if (t.wob > 0){ t.wob = Math.max(0, t.wob - dt * 1.6); t.crown.rotation.z = Math.sin(t.wob * 30) * t.wob * 0.12; }
@@ -5367,7 +5407,7 @@ function boot(hot){
       b.ph += dt * (b.kind === 'beetle' ? 30 : 18);
       const d = Math.hypot(b.tx - b.x, b.tz - b.z), sp = b.flee > 0 ? 8 : 1.6;
       b.flee -= dt;
-      if (d < 0.5){ const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 32; b.tx = Math.cos(a) * r; b.tz = Math.sin(a) * r; }
+      if (d < 0.5){ const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * (IR - 10); b.tx = Math.cos(a) * r; b.tz = Math.sin(a) * r; }
       else { b.x += (b.tx - b.x) / d * sp * dt; b.z += (b.tz - b.z) / d * sp * dt; }
       b.g.position.set(b.x, 1.1 + Math.sin(b.ph * 0.15) * 0.35, b.z); b.g.rotation.y = Math.atan2(-(b.tx - b.x), -(b.tz - b.z));
       b.wl.rotation.z = Math.sin(b.ph) * 0.9; b.wr.rotation.z = -Math.sin(b.ph) * 0.9;
@@ -5394,7 +5434,7 @@ function boot(hot){
       else if (v.wait > 0) v.wait -= dt;
       else {
         const d = Math.hypot(v.tx - v.x, v.tz - v.z);
-        if (d < 0.4){ v.wait = rnd(2, 6); const a = Math.random() * Math.PI * 2, r = 5 + Math.random() * 30; v.tx = Math.cos(a) * r; v.tz = Math.sin(a) * r; }
+        if (d < 0.4){ v.wait = rnd(2, 6); const a = Math.random() * Math.PI * 2, r = 5 + Math.random() * (IR - 12); v.tx = Math.cos(a) * r; v.tz = Math.sin(a) * r; }
         else {
           const nx3 = v.x + (v.tx - v.x) / d * 1.5 * dt, nz3 = v.z + (v.tz - v.z) / d * 1.5 * dt;
           if (isleFree(nx3, nz3) && Math.hypot(nx3 - isle.x, nz3 - isle.z) > 1.1){ v.x = nx3; v.z = nz3; moving = true; v.g.rotation.y = Math.atan2(-(v.tx - v.x), -(v.tz - v.z)); }
