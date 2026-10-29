@@ -324,6 +324,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <div class="btns">
         <button class="btn" id="btn-cruise-go">Set sail</button>
         <button class="btn secondary" id="btn-cruise-menu">Back to your car 🚗</button>
+        <button class="btn secondary" id="btn-cruise-home">Go home 🏠</button>
       </div>
     </div>
   </section>
@@ -354,6 +355,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <div class="btns">
         <button class="btn" id="btn-ride-city" hidden>Drive around the city</button>
         <button class="btn" id="btn-ride-again">Book another flight</button>
+        <button class="btn secondary" id="btn-ride-home">Go home 🏠</button>
         <button class="btn secondary" id="btn-ride-menu">Back to menu</button>
       </div>
     </div>
@@ -383,6 +385,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="ride-prompt" id="ridePrompt"></div>
     <button class="ap boost" id="btn-ride-act" hidden>GO</button>
     <button class="ap" id="btn-ride-wc" hidden>BATHROOM</button>
+    <button class="ap" id="btn-ride-jump" hidden>JUMP (J)</button>
   </div>
 </div>
 <div id="fade"></div>
@@ -2686,6 +2689,7 @@ function boot(hot){
     // island life: walk with the arrows, SPACE does whatever is in front of you, I opens your pocket
     if (state === 'island'){
       if (isle.ui){ if (e.code === 'Escape'){ e.preventDefault(); closeIsle(); } return; }
+      if (e.code === 'KeyJ'){ e.preventDefault(); doJump(); return; }
       if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE'){ e.preventDefault(); isleAction(); return; }
       if (e.code === 'KeyI'){ e.preventDefault(); openPocket(); return; }
       if (e.code === 'Escape'){ goMenu(); return; }
@@ -2696,6 +2700,7 @@ function boot(hot){
       if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE'){ e.preventDefault(); cruiseAction(); return; }
       if (e.code === 'KeyF'){ e.preventDefault(); toggleFast(); return; }
       if (e.code === 'KeyH'){ e.preventDefault(); honk(); return; }
+      if (e.code === 'KeyJ'){ e.preventDefault(); doJump(); return; }
       if (e.code === 'KeyC' || e.code === 'KeyV'){ e.preventDefault(); cruiseView(); return; }
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
@@ -2706,6 +2711,7 @@ function boot(hot){
     if (state === 'ride' && !ride.ui && ride.curb && (e.code === 'KeyR' || e.code === 'KeyT')){ e.preventDefault(); startDrive(e.code === 'KeyT'); return; }
     if (state === 'ride' && !ride.ui){
       if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE'){ e.preventDefault(); rideAction(); return; }
+      if (e.code === 'KeyJ'){ e.preventDefault(); doJump(); return; }
       if (e.code === 'Escape'){ goMenu(); return; }
     }
     const k = KEYMAP[e.code];
@@ -2868,6 +2874,7 @@ function boot(hot){
     if (state === 'play' && !F.gear) parts.push('<span class="chip power">GEAR UP</span>');
     if (state === 'play' && F.flipped) parts.push('<span class="chip power boost">UPSIDE DOWN</span>');
     if (state === 'play' && F.ride && ride.turbT > 0) parts.push('<span class="chip power warn">TURBULENCE</span>');
+    if (state === 'play' && F.stalling) parts.push('<span class="chip power warn">STALL!</span>');
     if (state === 'play' && F.under) parts.push('<span class="chip power">UNDERWATER<b>' + Math.round(-F.y * 3.28 / 5) * 5 + ' ft</b></span>');
     else if (state === 'play' && F.diveMode) parts.push('<span class="chip power">' + (F.dolphin ? 'DOLPHIN MODE' : 'DIVE MODE') + '</span>');
     if (state === 'play' && F.incoming) parts.push('<span class="chip power warn">MISSILE!</span>');
@@ -3574,9 +3581,20 @@ function boot(hot){
         if (Math.abs(F.loopAcc) >= Math.PI * 2){ F.loopAcc = 0; score += 200; toast('Loop! +200', ''); sfx.ring(); if (live) announce('The passengers loved that loop. Wheee!'); }
       } else F.loopAcc *= Math.max(0, 1 - dt * 2);
       const cruise = (boosting ? plane.boost : plane.cruise) * (1 - 0.08 * F.gearT);   // the gear down slows you a little
-      F.speed += (cruise - F.speed) * Math.min(1, dt * 0.8);
-      F.speed -= vFwd.y * 14 * dt;
-      F.speed = clamp(F.speed, 30, plane.boost + 40);
+      // gravity: climbing slows you down and diving speeds you up. Climb too steeply and the
+      // plane stalls: the nose drops and it falls until it has picked up speed again.
+      // (Not while the autopilot or a captain is flying, or just after takeoff.)
+      const pilot = !F.auto && !F.ride && t - F.liftT > 6, stall = clamp(plane.cruise * 0.62, 20, 70);
+      F.speed += (cruise - F.speed) * Math.min(1, dt * (pilot ? 0.45 : 0.8));
+      F.speed -= vFwd.y * (pilot ? 24 : 14) * dt;
+      F.speed = clamp(F.speed, pilot ? 10 : 30, plane.boost + 40);
+      F.stalling = pilot && F.speed < stall && !F.under && vUp.y > 0.3;   // not at the top of a loop
+      if (F.stalling){
+        if (!F.stallFall && live){ toast('STALL! Push the nose down to pick up speed', 'warn'); sfx.warn(); }
+        F.stallFall = Math.min(45, (F.stallFall || 0) + GRAV * 0.6 * dt);
+        F.pitch = Math.max(-1.1, F.pitch - 0.9 * dt);
+      } else if (F.stallFall) F.stallFall = Math.max(0, F.stallFall - 30 * dt);
+      if (F.stallFall) F.y -= F.stallFall * dt;
       if (F.under) F.speed -= (F.speed - 40) * Math.min(1, dt * 2);   // the water slows you right down
       F.x += vFwd.x * F.speed * dt; F.y += vFwd.y * F.speed * dt; F.z += vFwd.z * F.speed * dt;
       const hitBuilding = cityHit(F.x, F.y, F.z, 2.5);
@@ -3859,6 +3877,14 @@ function boot(hot){
   // seatbelt, and the captain flies you to the airport you booked. The walking part has its
   // own little scene (terminal, apron and cabin); the flight is the normal world.
   const CAM_NEAR = camera.near, CAM_FAR = camera.far;
+  const GRAV = 22;   // gravity, m/s² (a bit stronger than real, so jumps feel snappy)
+  // a jump: o.h is the height above the floor, o.vy the speed up; returns true on landing
+  function hop(o, dt){
+    if (!(o.h > 0 || o.vy > 0)) return false;
+    o.vy -= GRAV * dt; o.h += o.vy * dt;
+    if (o.h <= 0){ o.h = 0; o.vy = 0; return true; }
+    return false;
+  }
   const ride = { active: false, from: null, to: null, plane: null, prevPlane: null, flight: '', row: 1, letter: 'A', side: -1,
     booked: false, bagDone: false, cleared: false, boarded: false, inCabin: false, seated: false, belted: false, arrived: false, ui: false,
     hall: false, claimed: false, stowed: false, lookYaw: 0, lookPitch: 0, cabRows: 30, xrayT: 0, bagT: 0, bagA: 0, turbT: 0, nextTurb: 0, x: 0, z: 15, yaw: 0, view: 0, act: null, flash: 0, warnT: -9, pickTo: null, pickPlane: null };
@@ -4535,7 +4561,7 @@ function boot(hot){
   $('btn-ride-act').addEventListener('click', () => { if (state === 'play' && F.drive && !car.taxi) driveAction(); });
   // PARK, or (driving round the city) go into the airport you've driven to and book a flight there
   function driveAction(){
-    if (car.free){ if (ride.carAirport) openWorldAirport(ride.carAirport); else if (car.atHarbour) openWorldHarbour(); }
+    if (car.free){ if (ride.carAirport) openWorldAirport(ride.carAirport); else if (car.atHarbour) openWorldHarbour(); else if (car.atHouse) openMyHouse(); }
     else finishDrive(false);
   }
   function updateCar(dt){
@@ -4568,21 +4594,33 @@ function boot(hot){
       c.speed = 0;
       if (t - c.warnT > 3){ c.warnT = t; toast("Can't drive into the lake!", 'warn'); }
     } else { c.km += Math.hypot(nx - c.x, nz - c.z); c.x = nx; c.z = nz; }
-    const field = airfieldAt(c.x, c.z);
-    c.y = onRunway(field) ? rwyTop(field.a) : road(c.x, c.z) ? roadY(groundAt(c.x, c.z)) : groundAt(c.x, c.z);
-    const m = c.taxi ? worldCars.taxi : worldCars.rent, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
+    const field = airfieldAt(c.x, c.z), fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
+    const gy = onRunway(field) ? rwyTop(field.a) : road(c.x, c.z) ? roadY(groundAt(c.x, c.z)) : groundAt(c.x, c.z);
+    // gravity: the car follows the ground, but over the top of a hill at speed it flies off
+    // and falls back down. On the ground it rises and falls with the slope it's driving up.
+    const fly = c.y + (c.vy || 0) * dt - 0.5 * GRAV * dt * dt;
+    if (fly > gy + 0.12 && dt > 0){
+      if (!c.air && c.vy > 4 && t - (c.jumpT || -9) > 4){ c.jumpT = t; toast('Wheee! 🚗💨', ''); }
+      c.air = true; c.vy -= GRAV * dt; c.y = fly;
+    } else {
+      if (c.air && c.vy < -9){ sfx.hit(); c.speed *= 0.85; }
+      c.air = false; c.y = gy;
+      c.vy = clamp(c.speed * (groundAt(c.x, c.z) - groundAt(c.x - fx * 3 * Math.sign(c.speed || 1), c.z - fz * 3 * Math.sign(c.speed || 1))) / 3 * Math.sign(c.speed || 1), -25, 25);
+    }
+    const m = c.taxi ? worldCars.taxi : worldCars.rent;
     m.position.set(c.x, c.y, c.z);
     m.rotation.set(0, c.yaw, 0);
-    m.rotateX(Math.atan2(groundAt(c.x + fx * 2, c.z + fz * 2) - groundAt(c.x - fx * 2, c.z - fz * 2), 4));
+    m.rotateX(c.air ? Math.atan2(c.vy, Math.max(6, Math.abs(c.speed))) * 0.6 : Math.atan2(groundAt(c.x + fx * 2, c.z + fz * 2) - groundAt(c.x - fx * 2, c.z - fz * 2), 4));
     F.x = c.x; F.z = c.z; F.y = c.y + 2; F.speed = Math.abs(c.speed);
     const el = document.getElementById('driveInfo');
     if (c.free){
       // driving round the world: airports and the harbour are where the fun starts
       const f = airfieldAt(c.x, c.z), na = f ? f.a : nearestAirport(c.x, c.z), h = worldHarbour, hd = h && h.lx !== undefined ? Math.hypot(h.lx - c.x, h.lz - c.z) : Infinity;
       ride.carAirport = f ? f.a : null; c.atHarbour = !f && hd < 90;
-      const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : '';
+      c.atHouse = !f && !c.atHarbour && !!myHouse && Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) < 30;
+      const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : c.atHouse ? 'MY HOUSE 🏠 (SPACE)' : '';
       RH.act.hidden = !label; if (label) txt(RH.act, label);
-      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : c.atHouse ? 'You are home!' : (myHouse ? 'Home ' + (Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) / 1000).toFixed(1) + ' km · ' : '') + 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     }
     else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     if (!c.free && dist < 25 && state === 'play') finishDrive(true);
@@ -4883,7 +4921,8 @@ function boot(hot){
     if (inPool && !c.swim){ sfx.splash(); toast('Splash! You jumped in the pool 💦', ''); }
     if (!inPool && c.swim) toast('Out of the pool, dripping wet!', '');
     c.swim = inPool;
-    me.position.set(c.px, c.inSuite ? SUITE_Y : DECK + (c.swim ? -1.1 : 0.06), c.pz); me.rotation.set(0, c.pyaw, 0);
+    hop(c, dt);
+    me.position.set(c.px, (c.inSuite ? SUITE_Y : DECK + (c.swim ? -1.1 : 0.06)) + (c.h || 0), c.pz); me.rotation.set(0, c.pyaw, 0);
     animPerson(me, go !== 0, dt);
     deckPeople.forEach(d => {
       if (d.how === 'walk'){ d.p.position.z = d.z + Math.sin(t * 0.3 + d.ph) * 5; d.p.rotation.y = Math.cos(t * 0.3 + d.ph) > 0 ? Math.PI : 0; animPerson(d.p, true, dt); }
@@ -4959,6 +4998,7 @@ function boot(hot){
     endRide(); endCruise(); endDrive();
     if (x !== null && (!worldHarbour || Math.hypot(worldHarbour.sx - x, worldHarbour.sz - z) > 8000)) worldHarbour = harbourNear(x, z);
     clearHarbours();
+    placeMyHouse();
     if (worldHarbour){ const sp = buildHarbour(worldHarbour.i, worldHarbour.j, worldHarbour.sx, worldHarbour.sz); worldHarbour.lx = sp.x; worldHarbour.lz = sp.z; if (x === null){ x = sp.x; z = sp.z; yaw = sp.yaw + Math.PI; } }
     if (x === null){ const sp = carSpot(airportOfCell(0, 0)); x = sp.x; z = sp.z; yaw = sp.yaw; }
     resetFlight(x, z, yaw);
@@ -4974,6 +5014,39 @@ function boot(hot){
     txt(RH.prompt, ''); RH.act.hidden = true; RH.wc.hidden = false; txt(RH.wc, 'COLOR (C)');
     toast(msg || 'Off you go!', 'info');
   }
+  // your house, in the world near Home Field: inside it's the same house as on your island,
+  // with all the furniture you've put in it
+  let myHouse = null;
+  function placeMyHouse(){
+    if (myHouse) return;
+    let best = null;
+    for (let k = 0; k < 24 && !best; k++){
+      const a = k * 2.4, d = 380 + k * 25, x = Math.cos(a) * d, z = Math.sin(a) * d, g = groundAt(x, z);
+      if (g < 3 || airfieldAt(x, z) || cityHit(x, g + 2, z, 14)) continue;
+      if (Math.abs(groundAt(x + 8, z) - groundAt(x - 8, z)) + Math.abs(groundAt(x, z + 8) - groundAt(x, z - 8)) > 4) continue;
+      best = { x, z, g };
+    }
+    if (!best) best = { x: 300, z: 300, g: groundAt(300, 300) };
+    const g = new THREE.Group(); g.position.set(best.x, best.g, best.z); scene.add(g);
+    const B = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); g.add(m); return m; };
+    B(16, 0.4, 14, 0x86d36b, 0, 0.2, 2); B(10, 6, 8, 0xffe9c9, 0, 3, 0);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(8, 4.5, 4), mat(0xe8432e)); roof.position.y = 8.2; roof.rotation.y = Math.PI / 4; g.add(roof);
+    B(1.8, 3.4, 0.15, 0x8a5a3a, 0, 1.9, 4.05); [-3.2, 3.2].forEach(x => B(1.6, 1.5, 0.12, 0x9fdcf5, x, 3.4, 4.05));
+    B(0.15, 1.4, 0.15, 0x8a5a3a, 5.5, 0.9, 7); B(0.7, 0.55, 0.9, 0x3fa9f5, 5.5, 1.8, 7);
+    for (let k = -3; k <= 3; k++) if (k) B(0.15, 1, 0.15, 0xffffff, k * 2.4, 0.7, 8.8);
+    const sg = new THREE.Group(); sg.position.set(0, 6.6, 4.1); g.add(sg); sg.add(signMesh('MY HOUSE', 5, 1, '#e8432e', '#ffffff'));
+    myHouse = { g, x: best.x, z: best.z, cx: best.x, cz: best.z + 14 };
+  }
+  function openMyHouse(){
+    openGo('My house', '🏠', 'My <em>house</em>', 'Home sweet home, with all the furniture you\'ve put in it.', [
+      ['Go inside 🏠', () => fadeTo(() => startIsland(true))],
+      ['Keep driving 🚗', keepDriving, true]
+    ]);
+  }
+  function goHome(){ fadeTo(() => startIsland(true)); }
+  $('btn-ride-home').addEventListener('click', () => { ride.ui = false; show(null); goHome(); });
+  $('btn-cruise-home').addEventListener('click', () => { cruise.ui = false; show(null); goHome(); });
+  function leaveHome(){ placeMyHouse(); startWorld(myHouse.cx, myHouse.cz, Math.PI, 'Back in your car at home'); }
   // a little card of things to do where you've parked
   function openGo(head, flag, title, text, opts){
     car.speed = 0; state = 'paused'; sfx.engine(false, 0);
@@ -5210,16 +5283,19 @@ function boot(hot){
     if (x > 8.1 && x < 17.9 && z > -16.9 && z < -9.1) return false;
     return !trees.some(t => Math.hypot(t.x - x, t.z - z) < 0.9);
   };
-  function startIsland(){
-    endRide(); endCruise();
+  // home: straight into your house from the world (and back out to your car)
+  function startIsland(home){
+    endRide(); endCruise(); endDrive();
     sfx.init(); sfx.resume(); sfx.engine(false, 0); hushAnnounce();
-    Object.assign(isle, { ui: false, inside: false, x: 0, z: IR - 2, yaw: 0, act: null, talking: null, swim: false });
+    Object.assign(isle, { ui: false, inside: false, x: 0, z: IR - 2, yaw: 0, act: null, talking: null, swim: false, home: !!home, h: 0, vy: 0 });
+    if (home) Object.assign(isle, { inside: true, x: IX, z: 4 });
     endFish(); villagers.forEach(v => v.gave = false);
-    isle.cam.set(0, 14, IR + 12);
+    isle.cam.set(home ? IX : 0, home ? 10 : 14, home ? 13 : IR + 12);
     camera.near = 0.1; camera.far = 600; camera.fov = baseFov; camera.updateProjectionMatrix();
     $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); $('winFrame').hidden = true;
     RH.wc.hidden = false; txt(RH.wc, 'POCKET (I)'); RH.act.hidden = true; txt(RH.prompt, '');
     state = 'island'; show(null); isleHud();
+    if (home){ toast('Home sweet home! 🏠', 'info'); return; }
     toast('Welcome to your island! 🏝️', 'info');
     setTimeout(() => { if (state === 'island' && !isle.ui) toast(villagers[0].e + ' ' + villagers[0].name + ': Hi! Welcome home, ' + villagers[0].cp + '!', ''); sfx.babble(8); }, 1600);
   }
@@ -5265,6 +5341,7 @@ function boot(hot){
       sfx.coin(0); isleScene.remove(it.m); ground.splice(ground.indexOf(it), 1);
     }
     else if (a.k === 'shop') openShop();
+    else if (a.k === 'out' && isle.home) fadeTo(() => { endIsland(); leaveHome(); });
     else if (a.k === 'enter' || a.k === 'out') fadeTo(() => {
       isle.inside = a.k === 'enter';
       if (isle.inside){ isle.x = IX; isle.z = 4; isle.yaw = 0; isle.cam.set(IX, 10, 13); }
@@ -5390,8 +5467,14 @@ function boot(hot){
     // swimming: in the sea past the beach (but not on the pier)
     const R = Math.hypot(isle.x, isle.z), onPier = Math.abs(isle.x) < 1.8 && isle.z > PIER;
     const swim = !isle.inside && !onPier && R > BEACH - 1.0;
-    if (swim !== !!isle.swim){ isle.swim = swim; if (swim){ sfx.splash(); toast("Splash! You're swimming 🏊 Dive at the bubbles", ''); endFish(); } else toast('Back on the beach', ''); }
-    islander.position.set(isle.x, isle.inside || R < IR ? 0 : swim ? -1.3 + Math.sin(t * 3) * 0.05 : onPier && isle.z > PIER + 2 ? 0.1 : -0.25, isle.z);
+    if (swim !== !!isle.swim){
+      isle.swim = swim;
+      if (swim){ sfx.splash(); toast("Splash! You're swimming 🏊 Dive at the bubbles", ''); endFish(); if (isle.wasPier){ isle.h = 1.4; isle.vy = 2; } }   // off the pier: plop!
+      else toast('Back on the beach', '');
+    }
+    isle.wasPier = onPier;
+    if (hop(isle, dt) && !swim) sfx.ap(false);
+    islander.position.set(isle.x, (isle.inside || R < IR ? 0 : swim ? -1.3 + Math.sin(t * 3) * 0.05 : onPier && isle.z > PIER + 2 ? 0.1 : -0.25) + (isle.h || 0), isle.z);
     islander.rotation.y = isle.yaw;
     if (swim){ const u = islander.userData; u.ph += dt * (go ? 6 : 2); u.AL.rotation.x = Math.PI + Math.sin(u.ph) * 1.2; u.AR.rotation.x = Math.PI - Math.sin(u.ph) * 1.2; u.L.rotation.x = Math.sin(u.ph * 2) * 0.4; u.R.rotation.x = -Math.sin(u.ph * 2) * 0.4; }
     else animPerson(islander, go !== 0, dt);
@@ -5590,7 +5673,8 @@ function boot(hot){
       carryOn.visible = false; xrayBag.visible = true; ride.xrayT = 0;
       sfx.warn(); setTimeout(() => sfx.warn(), 180); toast(ride.intl ? 'Beep! Security all clear ✓ Passport checked 🛂' : 'Beep! Security check: all clear ✓', ''); renderSteps();
     }
-    walker.position.set(ride.x, 0, ride.z); walker.rotation.y = ride.yaw;
+    if (hop(ride, dt)) sfx.ap(false);
+    walker.position.set(ride.x, ride.h || 0, ride.z); walker.rotation.y = ride.yaw;
     animPerson(walker, go !== 0, dt);
     updateNpcs(dt);
     if (xrayBag.visible){   // your carry-on rides through the X-ray, then you pick it up
@@ -5681,11 +5765,24 @@ function boot(hot){
     if (F.ride){ ride.view = 1 - ride.view; $('winFrame').hidden = ride.view !== 0; toast(ride.view ? 'Outside view' : 'Window seat', ''); return; }
     camView = 1 - camView; camSnap = true; toast(camView ? 'Front view' : 'Chase view', '');
   }
+  // JUMP works wherever you're on foot: on your island, in the airport and on the cruise ship
+  function doJump(){
+    const o = state === 'island' ? isle : state === 'ride' ? ride : state === 'play' && F.cruise ? cruise : null;
+    if (!o || (o.h || 0) > 0 || (o === isle && isle.swim) || (o === ride && (ride.seated || ride.ui))) return;
+    o.h = 0.001; o.vy = 7.5; sfx.ap(true);
+  }
+  $('btn-ride-jump').addEventListener('click', e => { e.currentTarget.blur(); doJump(); });
+  let jumpShown = false;
+  function syncJump(){
+    const on = state === 'island' ? !isle.ui && !isle.swim : state === 'ride' ? !ride.ui && !ride.seated : state === 'play' && !!F.cruise && !cruise.ui;
+    if (on !== jumpShown){ jumpShown = on; $('btn-ride-jump').hidden = !on; }
+  }
   let last = performance.now(), audioTick = 0, saveTick = 2;
   function frame(now){
     requestAnimationFrame(frame);
     let dt = (now - last) / 1000; last = now;
     if (dt > 0.05) dt = 0.05;
+    syncJump();
     if (state === 'ride'){ updateRide(dt); renderer.render(rideScene, camera); return; }
     if (state === 'island'){ updateIsland(dt); renderer.render(isleScene, camera); return; }
     if (state !== 'paused') updateFree(dt);
