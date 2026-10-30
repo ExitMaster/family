@@ -156,6 +156,12 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 .bookclass .apbtn[data-cls="prestige"][aria-pressed="true"]{background:#7a1f3d;color:#fff;border-color:#ffc23d}
 .pass.prestige{box-shadow:inset 0 0 0 3px #7a1f3d}
 .pass-tag{display:inline-block;margin:0 6px 6px 0;padding:3px 8px;border-radius:6px;background:var(--ink);color:#fff;font:600 11px/1.2 var(--hud);letter-spacing:.08em}
+.secret-input{width:100%;box-sizing:border-box;font:400 20px/1 var(--hud);padding:14px 16px;border-radius:12px;border:2px solid var(--ink);background:#fff;color:var(--ink);margin:4px 0 6px}
+.secret-input:focus{outline:3px solid var(--teal);outline-offset:2px}
+.secret-msg{min-height:1.4em;margin:0 0 10px;font-weight:600;color:#c0392b}
+.secret-shake{animation:secretShake .4s}
+@keyframes secretShake{25%{transform:translateX(-8px)}50%{transform:translateX(8px)}75%{transform:translateX(-4px)}}
+@media (prefers-reduced-motion:reduce){.secret-shake{animation:none}}
 .isle-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin:6px 0 12px}
 .isle-say{font-size:17px;line-height:1.45;margin:0 0 14px}
 #isleBody .btn{margin-bottom:12px}
@@ -353,6 +359,22 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
       <h2>Choose a <em>car</em></h2>
       <div class="isle-list" id="carList"></div>
       <button class="btn" id="btn-cars-done">Done</button>
+    </div>
+  </section>
+
+  <section class="card" id="card-secret" hidden>
+    <div class="card-head"><span>Secret door</span><span>🔒</span></div>
+    <div class="card-body">
+      <h2>A <em>secret</em> door!</h2>
+      <p class="lede">It only opens with the password.</p>
+      <form id="secretForm" autocomplete="off">
+        <input type="password" id="secretPw" class="secret-input" placeholder="Password" aria-label="Password" autocomplete="off" spellcheck="false">
+        <p class="secret-msg" id="secretMsg" role="status"></p>
+        <div class="btns">
+          <button class="btn" type="submit" id="btn-secret-go">Open the door</button>
+          <button class="btn secondary" type="button" id="btn-secret-cancel">Go away</button>
+        </div>
+      </form>
     </div>
   </section>
 
@@ -641,6 +663,7 @@ function boot(hot){
     { id: 'dash8', name: 'Commuter', note: 'Twin-prop airliner', color: '#e8432e', cruise: 75, boost: 165, pitch: 1.1, turn: 1.0, cam: 1.45, pax: 50, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'lear', name: 'Lear', note: 'Little business jet', color: '#ffc23d', cruise: 115, boost: 260, pitch: 1.6, turn: 1.5, pax: 8, sound: { mul: 2.3, vol: 0.04 } },
     { id: 'concorde', name: 'Concorde', note: 'Supersonic airliner, Mach 1.3', color: '#1b2a6c', cruise: 150, boost: 450, pitch: 1.0, turn: 0.9, cam: 1.55, pax: 100, sound: { mul: 2.0, vol: 0.05 } },
+    { id: 'golden', shape: 'concorde', gold: true, secret: true, name: 'Golden Comet', note: 'SECRET! Solid gold, Mach 3', color: '#ffc23d', cruise: 200, boost: 1020, pitch: 1.2, turn: 1.1, cam: 1.55, pax: 100, sound: { mul: 2.2, vol: 0.05 } },
     { id: 'blackbird', name: 'Blackbird', note: 'Black spy jet, Mach 1.35', color: '#1b1b22', cruise: 160, boost: 460, pitch: 1.2, turn: 1.0, cam: 1.4, pax: 2, sound: { mul: 1.8, vol: 0.05 } },
     { id: 'osprey', name: 'Osprey', note: 'Tilt-rotor, huge propellers', color: '#6b7a5a', cruise: 70, boost: 160, pitch: 1.4, turn: 1.3, cam: 1.35, pax: 24, sound: { mul: 0.55, vol: 0.055 } },
     { id: 'chinook', name: 'Twin Rotor', note: 'Helicopter with two rotors', color: '#5a6b3a', cruise: 55, boost: 120, pitch: 1.3, turn: 1.3, cam: 1.4, pax: 33, sound: { mul: 0.5, vol: 0.055 } },
@@ -800,7 +823,7 @@ function boot(hot){
       r.position.set(0, y, z); root.add(r); sp.push({ o: r, axis: 'y', rate });
     };
     const wheelY = (r, w, c, x, y, z) => { const o = add(new THREE.CylinderGeometry(r, r, w, 16), c, x, y, z); o.rotation.z = Math.PI / 2; return o; };
-    switch (def.id){
+    switch (def.shape || def.id){
       case 'cub':
         box(1.15, 1.05, 4.0, RED, 0, 0, 0); box(1.25, 1.15, 0.7, CREAM, 0, 0, -2.2); box(0.72, 0.7, 1.5, RED, 0, 0.12, 2.6);
         box(7.4, 0.16, 1.45, CREAM, 0, -0.12, -0.55); both((x) => box(0.9, 0.2, 1.48, RED, x, -0.12, -0.55), 3.3);
@@ -2265,6 +2288,8 @@ function boot(hot){
         break;
       }
     }
+    // the secret plane is solid gold (its windows and flames stay as they are)
+    if (def.gold) root.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.material.transparent && o.material !== glassMat && !o.material.isMeshBasicMaterial){ const l = o.material.color.getHSL({}).l; o.material = mat(l < 0.3 ? 0xb8860b : 0xffc23d); } });
     root.scale.setScalar(PLANE_SCALE);
     if (mine){ spinners = sp; flames = fl; gearParts = gp; showGear(gearShown); }
     return { sp, fl, gp };
@@ -2276,7 +2301,7 @@ function boot(hot){
       o.position.y = o.userData.gy + o.userData.gh / 2 * (1 - k);
     }
   }
-  let plane = PLANES.find(pl => pl.id === store.get('scr.plane', 'cub')) || PLANES[0];
+  let plane = PLANES.find(pl => pl.id === store.get('scr.plane', 'cub') && (!pl.secret || store.get('scr.secretFound', false))) || PLANES[0];
   buildPlane(plane);
   // the white vapour cone that flashes round the plane as it breaks the sound barrier
   const vapor = new THREE.Mesh((() => { const g = new THREE.ConeGeometry(4.2, 7, 28, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 1.2); return g; })(),
@@ -2763,7 +2788,7 @@ function boot(hot){
 
   /* ---------------- UI wiring ---------------- */
   function show(panel){
-    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'isle', 'go', 'cars', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
+    ['start', 'pause', 'airports', 'book', 'pass', 'stamp', 'cruise', 'isle', 'go', 'cars', 'secret', 'arrive'].forEach(id => $('card-' + id).hidden = id !== panel);
     $('overlay').hidden = !panel;
     $('hud').hidden = !(state === 'play' || state === 'paused') || !!F.drive || !!F.cruise;
     if (panel){ stick.id = null; stickEl.hidden = true; const b = $('card-' + panel).querySelector('.btn'); if (b) try { b.focus({ preventScroll: true }); } catch(e){} }
@@ -2817,7 +2842,10 @@ function boot(hot){
   $('btn-ap-back').addEventListener('click', resume);
   syncToggles();
   const pickerEl = $('planes');
-  pickerEl.innerHTML = PLANES.map(pl => '<button type="button" class="pl" data-id="' + pl.id + '" aria-pressed="false"><span class="sw" style="background:' + pl.color + '"></span><b>' + pl.name + '</b><small>' + pl.note + '</small></button>').join('');
+  const secretOpen = () => !!store.get('scr.secretFound', false);
+  const pickerPlanes = () => PLANES.filter(pl => !pl.secret || secretOpen());
+  function renderPicker(){ pickerEl.innerHTML = pickerPlanes().map(pl => '<button type="button" class="pl" data-id="' + pl.id + '" aria-pressed="false"><span class="sw" style="background:' + pl.color + '"></span><b>' + pl.name + '</b><small>' + pl.note + '</small></button>').join(''); if (plane) pickerEl.querySelectorAll('.pl').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === plane.id))); }
+  renderPicker();
   function choosePlane(id){
     plane = PLANES.find(pl => pl.id === id) || PLANES[0];
     store.set('scr.plane', plane.id);
@@ -4437,7 +4465,8 @@ function boot(hot){
     { id: 'ioniq5', n: 'Hyundai Ioniq 5', top: 185, acc: 30, L: 4.6, W: 1.9, H: 0.85, cab: [2.8, 0.75, 0.3], boxy: true, r: 0.42 },
     { id: 'ev6', n: 'Kia EV6', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.75, cab: [2.5, 0.65, 0.35], slope: true, r: 0.4 },
     { id: 'genesis', n: 'Genesis G90', top: 250, acc: 26, L: 5.3, W: 1.95, H: 0.8, cab: [2.7, 0.7, 0.4], roofC: 0x1b2340, r: 0.4 },
-    { id: 'rolls', n: 'Rolls-Royce Phantom', top: 250, acc: 24, L: 5.8, W: 2.05, H: 0.85, cab: [2.8, 0.75, 0.4], roofC: 0x1b2340, r: 0.42 }
+    { id: 'rolls', n: 'Rolls-Royce Phantom', top: 250, acc: 24, L: 5.8, W: 2.05, H: 0.85, cab: [2.8, 0.75, 0.4], roofC: 0x1b2340, r: 0.42 },
+    { id: 'skyrocket', n: 'Sky Rocket (SECRET)', top: 650, acc: 80, L: 5.0, W: 2.1, H: 0.5, cab: [1.6, 0.45, 0.25], wedge: true, wing: 'big', twoTone: 0xffc23d, r: 0.36, secret: true }
   ];
   const carModel = id => CAR_MODELS.find(c => c.id === id) || CAR_MODELS[0];
   function makeCar(color, taxi, model){
@@ -4584,7 +4613,7 @@ function boot(hot){
   function openGarage(){
     if (state === 'play'){ car.speed = 0; state = 'paused'; sfx.engine(false, 0); }
     else if (state === 'ride') ride.ui = true;
-    $('carList').innerHTML = CAR_MODELS.map(m => '<button type="button" class="apbtn" data-car="' + m.id + '" aria-pressed="' + (m === myCar) + '"><b>' + m.n + '</b><small>' + m.top + ' km/h</small></button>').join('');
+    $('carList').innerHTML = CAR_MODELS.filter(m => !m.secret || store.get('scr.secretFound', false)).map(m => '<button type="button" class="apbtn" data-car="' + m.id + '" aria-pressed="' + (m === myCar) + '"><b>' + m.n + '</b><small>' + m.top + ' km/h</small></button>').join('');
     show('cars');
   }
   function closeGarage(){ if (state === 'paused') state = 'play'; ride.ui = false; show(null); }
@@ -4705,7 +4734,7 @@ function boot(hot){
   $('btn-ride-act').addEventListener('click', () => { if (state === 'play' && F.drive && !car.taxi) driveAction(); });
   // PARK, or (driving round the city) go into the airport you've driven to and book a flight there
   function driveAction(){
-    if (car.free){ if (ride.carAirport) openWorldAirport(ride.carAirport); else if (car.atHarbour) openWorldHarbour(); else if (car.atHouse) openMyHouse(); }
+    if (car.free){ if (ride.carAirport) openWorldAirport(ride.carAirport); else if (car.atHarbour) openWorldHarbour(); else if (car.atHouse) openMyHouse(); else if (car.atSecret){ car.speed = 0; state = 'paused'; sfx.engine(false, 0); askPassword(() => fadeTo(() => startIsland('secret')), () => { state = 'play'; }); } }
     else finishDrive(false);
   }
   function updateCar(dt){
@@ -4763,7 +4792,8 @@ function boot(hot){
       const f = airfieldAt(c.x, c.z), na = f ? f.a : nearestAirport(c.x, c.z), h = worldHarbour, hd = h && h.lx !== undefined ? Math.hypot(h.lx - c.x, h.lz - c.z) : Infinity;
       ride.carAirport = f ? f.a : null; c.atHarbour = !f && hd < 90;
       c.atHouse = !f && !c.atHarbour && !!myHouse && Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) < 30;
-      const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : c.atHouse ? 'MY HOUSE 🏠 (SPACE)' : '';
+      c.atSecret = !f && !c.atHarbour && !c.atHouse && !!myHouse && Math.hypot(myHouse.sx - c.x, myHouse.sz - c.z) < 14;
+      const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : c.atHouse ? 'MY HOUSE 🏠 (SPACE)' : c.atSecret ? 'SECRET DOOR 🔒 (SPACE)' : '';
       RH.act.hidden = !label; if (label) txt(RH.act, label);
       if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : c.atHouse ? 'You are home!' : (myHouse ? 'Home ' + (Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) / 1000).toFixed(1) + ' km · ' : '') + 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     }
@@ -5121,6 +5151,48 @@ function boot(hot){
     camera.position.copy(cCam); camera.up.set(0, 1, 0); camera.lookAt(cLook);
   }
 
+  /* ---------------- The secret door ---------------- */
+  // The password is never written down here: only a PBKDF2-SHA-256 hash of it (with a salt
+  // and many rounds, so guessing is slow). What you type is hashed the same way and the two
+  // hashes are compared.
+  const SECRET = { salt: 'dd15f396f1d7a1f27b974bb1e63679f1', rounds: 310000, hash: '965b0610ec2d2b45af9aeb3c9e345a6ba7ca419091b4535e1079704a1c5763f4' };
+  const hexBytes = h => new Uint8Array(h.match(/../g).map(b => parseInt(b, 16)));
+  async function passwordOk(pw){
+    if (!(window.crypto && crypto.subtle)) return false;
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hexBytes(SECRET.salt), iterations: SECRET.rounds, hash: 'SHA-256' }, key, 256);
+    const hex = Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
+    let diff = 0; for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ SECRET.hash.charCodeAt(i);
+    return diff === 0 && hex.length === SECRET.hash.length;
+  }
+  let secretOk = null, secretNo = null, secretTries = 0, secretWait = 0;
+  function askPassword(ok, no){
+    secretOk = ok; secretNo = no;
+    $('secretPw').value = ''; txt($('secretMsg'), ''); show('secret');
+    setTimeout(() => { try { $('secretPw').focus(); } catch(e){} }, 50);
+  }
+  function closePassword(){ show(null); const n = secretNo; secretOk = secretNo = null; if (n) n(); }
+  $('btn-secret-cancel').addEventListener('click', closePassword);
+  $('secretForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (Date.now() < secretWait){ txt($('secretMsg'), 'Too many tries. Wait a little…'); return; }
+    const pw = $('secretPw').value; $('secretPw').value = '';
+    if (pw && await passwordOk(pw)){
+      secretTries = 0; sfx.chime(); show(null);
+      const ok = secretOk; secretOk = secretNo = null; if (ok) ok();
+    } else {
+      sfx.warn(); txt($('secretMsg'), window.crypto && crypto.subtle ? 'Wrong password!' : 'This door only opens on the real website (https).');
+      const card = $('card-secret'); card.classList.remove('secret-shake'); void card.offsetWidth; card.classList.add('secret-shake');
+      if (++secretTries >= 5){ secretTries = 0; secretWait = Date.now() + 30000; }
+    }
+  });
+  // finding the room unlocks the secret car and the secret plane
+  function foundSecret(){
+    if (store.get('scr.secretFound', false)) return;
+    store.set('scr.secretFound', true); renderPicker();
+    setTimeout(() => toast('Unlocked: the Sky Rocket car 🚀 and the Golden Comet plane ✈️', ''), 1600);
+  }
+
   /* ---------------- One open world ---------------- */
   // Play puts you in your car at Home Field. Drive anywhere: at an airport you can fly your
   // own plane, book a flight as a passenger or fly to your island; at the harbour you can take
@@ -5181,6 +5253,12 @@ function boot(hot){
     for (let k = -3; k <= 3; k++) if (k) B(0.15, 1, 0.15, 0xffffff, k * 2.4, 0.7, 8.8);
     const sg = new THREE.Group(); sg.position.set(0, 6.6, 4.1); g.add(sg); sg.add(signMesh('MY HOUSE', 5, 1, '#e8432e', '#ffffff'));
     myHouse = { g, x: best.x, z: best.z, cx: best.x, cz: best.z + 14 };
+    // a rocky hill a little way off, with a door in it
+    const hx = best.x + 45, hz = best.z - 10, hg = groundAt(hx, hz), hill = new THREE.Group(); hill.position.set(hx, hg, hz); scene.add(hill);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(11, 0), mat(0x8a8f99)); rock.scale.set(1, 0.7, 1); rock.position.y = 3; hill.add(rock);
+    const dr = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.6, 0.4), mat(0x5a3a1a)); dr.position.set(0, 1.8, 8.6); hill.add(dr);
+    const kp = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.5, 0.1), mat(0x2a2f45)); kp.position.set(1.6, 1.8, 8.9); hill.add(kp);
+    myHouse.sx = hx; myHouse.sz = hz + 14;
   }
   function openMyHouse(){
     openGo('My house', '🏠', 'My <em>house</em>', 'Home sweet home, with all the furniture you\'ve put in it.', [
@@ -5398,6 +5476,28 @@ function boot(hot){
   [-3.5, 3.5].forEach(dx => ib(4.5, 0.5, 0.2, 0xfff1d6, IX + dx, 0.25, 6));
   ib(1.6, 0.06, 1, 0x8a5a3a, IX, 0.02, 5.6); ib(2, 1.2, 0.05, 0x9fdcf5, IX + 3, 2.2, -5.88);
   const houseStuff = new THREE.Group(); isleScene.add(houseStuff);
+  // a secret door in the back wall of your house, and one in a big rock on the island
+  ib(1.5, 2.6, 0.12, 0x6b4a2a, IX, 1.3, -5.86); ib(0.25, 0.35, 0.06, 0x2a2f45, IX + 0.95, 1.4, -5.84);
+  const ROCK = { x: -55, z: -45 };
+  { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(4.2, 0), mat(0x8a8f99)); r.scale.set(1.1, 0.8, 1); r.position.set(ROCK.x, 2.2, ROCK.z); isleScene.add(r);
+    ib(1.4, 2.4, 0.2, 0x5a3a1a, ROCK.x, 1.2, ROCK.z + 3.75); ib(0.25, 0.35, 0.1, 0x2a2f45, ROCK.x + 0.95, 1.3, ROCK.z + 3.85); }
+  // the secret room: gold everywhere, a treasure chest, the secret car and the secret plane
+  const SRX = 700;
+  ib(16, 0.1, 12, 0xd4a017, SRX, -0.05, 0); ib(48, 0.1, 40, 0x1b1206, SRX, -0.2, 0);
+  [[SRX, 2.5, -6, 16, 5, 0.2], [SRX - 8, 2.5, 0, 0.2, 5, 12], [SRX + 8, 2.5, 0, 0.2, 5, 12]].forEach(([x, y, z, w, h, d]) => ib(w, h, d, 0xffd23d, x, y, z));
+  [-4.5, 4.5].forEach(dx => ib(7, 0.5, 0.2, 0xffd23d, SRX + dx, 0.25, 6));
+  ib(1.6, 0.06, 1, 0x7a1f3d, SRX, 0.02, 5.6);
+  const chestLid = new THREE.Group(); chestLid.position.set(SRX, 0.9, -4.6); isleScene.add(chestLid);
+  ib(1.8, 0.9, 1.1, 0x8a5a3a, SRX, 0.45, -4.3); ib(1.84, 0.12, 1.14, 0xffc23d, SRX, 0.5, -4.3); ib(1.8, 0.35, 1.1, 0x8a5a3a, 0, 0.17, 0.55, chestLid); ib(0.2, 0.25, 0.08, 0xffc23d, 0, 0.0, 1.12, chestLid);
+  const coinsPile = new THREE.Group(); coinsPile.position.set(SRX, 0.9, -4.3); coinsPile.visible = false; isleScene.add(coinsPile);
+  for (let k = 0; k < 14; k++) isph(0.14, 0xffd23d, (k % 5 - 2) * 0.3, 0.05 + Math.floor(k / 5) * 0.1, (k % 3 - 1) * 0.25, coinsPile, 1, 0.35, 1);
+  [-5, 5].forEach(dx => icyl(1.9, 2.1, 0.4, 0xffffff, SRX + dx, 0.2, -1, null, 28));
+  const secretCarShow = makeCar(0xe8432e, false, carModel('skyrocket')); secretCarShow.position.set(SRX - 5, 0.4, -1); secretCarShow.rotation.y = 0.6; isleScene.add(secretCarShow);
+  const secretPlaneShow = new THREE.Group(), secretPlaneModel = new THREE.Group(); secretPlaneShow.position.set(SRX + 5, 1.3, -1); secretPlaneShow.rotation.y = -0.7; secretPlaneShow.scale.setScalar(0.3);
+  secretPlaneShow.add(secretPlaneModel); isleScene.add(secretPlaneShow);
+  buildPlane(PLANES.find(p => p.id === 'golden'), secretPlaneModel);
+  { const ch = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshBasicMaterial({ color: 0xfff1a0 })); ch.position.set(SRX, 4.3, 0); isleScene.add(ch); }
+  { const sg = new THREE.Group(); sg.position.set(SRX, 3.6, -5.85); isleScene.add(sg); setSign(sg, 'SECRET ROOM', 5, 0.9, '#7a1f3d', '#ffc23d'); }
   function buildHouse(){
     houseStuff.children.slice().forEach(o => { o.traverse(c => { if (c.geometry) c.geometry.dispose(); }); houseStuff.remove(o); });
     isleSave.placed.forEach(f => { const g = buildFurn(f.id); g.position.set(IX + f.x, 0, f.z); g.rotation.y = f.ry || 0; houseStuff.add(g); f.g = g; });
@@ -5420,26 +5520,31 @@ function boot(hot){
   }
   const DIVE = [['seastar', 30], ['shrimp', 22], ['oyster', 18], ['crab', 15], ['scallop', 10], ['lobster', 5]];
   const isleFree = (x, z) => {
+    if (isle.secret) return Math.abs(x - SRX) < 7.5 && z > -5.5 && z < 5.6 && !(Math.abs(x - SRX) < 1.3 && z < -3.5) && Math.hypot(x - SRX + 5, z + 1) > 2.3 && Math.hypot(x - SRX - 5, z + 1) > 2.3;
     if (isle.inside) return Math.abs(x - IX) < 5.5 && z > -5.5 && z < 5.6;
     if (Math.abs(x) < 1.8 && z > PIER && z < PIER + 13.5) return true;   // the pier
     const r = Math.hypot(x, z);
     if (r > BEACH - 1.2) return r < SEA;   // the sea: you swim
     if (x > -15.9 && x < -8.1 && z > -17.4 && z < -10.6) return false;
     if (x > 8.1 && x < 17.9 && z > -16.9 && z < -9.1) return false;
+    if (Math.hypot(x - ROCK.x, z - ROCK.z) < 4.4) return false;
     return !trees.some(t => Math.hypot(t.x - x, t.z - z) < 0.9);
   };
   // home: straight into your house from the world (and back out to your car)
   function startIsland(home){
     endRide(); endCruise(); endDrive();
     sfx.init(); sfx.resume(); sfx.engine(false, 0); hushAnnounce();
-    Object.assign(isle, { ui: false, inside: false, x: 0, z: IR - 2, yaw: 0, act: null, talking: null, swim: false, home: !!home, h: 0, vy: 0 });
-    if (home) Object.assign(isle, { inside: true, x: IX, z: 4 });
+    const secret = home === 'secret';
+    Object.assign(isle, { ui: false, inside: false, secret: false, x: 0, z: IR - 2, yaw: 0, act: null, talking: null, swim: false, home: !!home && !secret, h: 0, vy: 0 });
+    if (home && !secret) Object.assign(isle, { inside: true, x: IX, z: 4 });
+    if (secret) Object.assign(isle, { inside: true, secret: true, secretFrom: 'world', x: SRX, z: 4 });
     endFish(); villagers.forEach(v => v.gave = false);
-    isle.cam.set(home ? IX : 0, home ? 10 : 14, home ? 13 : IR + 12);
+    isle.cam.set(home ? (home === 'secret' ? SRX : IX) : 0, home ? 10 : 14, home ? 13 : IR + 12);
     camera.near = 0.1; camera.far = 600; camera.fov = baseFov; camera.updateProjectionMatrix();
     $('rideHud').hidden = false; $('rideHud').classList.remove('flying'); $('winFrame').hidden = true;
     RH.wc.hidden = false; txt(RH.wc, 'POCKET (I)'); RH.act.hidden = true; txt(RH.prompt, '');
     state = 'island'; show(null); isleHud();
+    if (secret){ toast('You found the SECRET ROOM! ✨', 'info'); foundSecret(); return; }
     if (home){ toast('Home sweet home! 🏠', 'info'); return; }
     toast('Welcome to your island! 🏝️', 'info');
     setTimeout(() => { if (state === 'island' && !isle.ui) toast(villagers[0].e + ' ' + villagers[0].name + ': Hi! Welcome home, ' + villagers[0].cp + '!', ''); sfx.babble(8); }, 1600);
@@ -5450,22 +5555,31 @@ function boot(hot){
     $('rideHud').hidden = true;
   }
   function isleHud(){
-    RH.steps.innerHTML = '<li class="now">🏝️ ' + (isle.inside ? 'Your house' : 'Your island') + ' · ' + Math.floor(score).toLocaleString() + ' points</li><li>Pocket ' + isleSave.pocket.length + '/' + POCKET +
-      ' · in your house: ' + isleSave.placed.length + '</li><li>' + (isle.inside ? 'DECORATE with furniture from the shop' : 'Shake trees, catch bugs and fish, then sell them at the SHOP') + '</li><li>SPACE: do it · Shift: run · I: pocket · walk into the sea to swim</li>';
+    RH.steps.innerHTML = '<li class="now">' + (isle.secret ? '✨ The secret room' : '🏝️ ' + (isle.inside ? 'Your house' : 'Your island')) + ' · ' + Math.floor(score).toLocaleString() + ' points</li><li>Pocket ' + isleSave.pocket.length + '/' + POCKET +
+      ' · in your house: ' + isleSave.placed.length + '</li><li>' + (isle.secret ? 'Open the TREASURE CHEST and look at the secret car and plane' : isle.inside ? 'DECORATE with furniture from the shop' : 'Shake trees, catch bugs and fish, then sell them at the SHOP') + '</li><li>SPACE: do it · Shift: run · I: pocket · walk into the sea to swim</li>';
   }
   const addPocket = id => { if (isleSave.pocket.length >= POCKET){ toast('Your pocket is full! Sell things at the SHOP', 'warn'); return false; } isleSave.pocket.push(id); saveIsle(); isleHud(); return true; };
 
   // what SPACE would do right now
   function findAct(){
     const X = isle.x, Z = isle.z, near = (x, z, r) => Math.hypot(x - X, z - Z) < r;
+    if (isle.secret){
+      if (Z > 4.4 && Math.abs(X - SRX) < 1.3) return { k: 'sexit' };
+      if (near(SRX, -3.2, 1.6)) return { k: 'chest' };
+      if (near(SRX - 5, -1, 3.2)) return { k: 'scar' };
+      if (near(SRX + 5, -1, 3.2)) return { k: 'splane' };
+      return null;
+    }
     if (isle.inside){
       if (Z > 4.4 && Math.abs(X - IX) < 1.3) return { k: 'out' };
+      if (Z < -4.4 && Math.abs(X - IX) < 1.2) return { k: 'secret' };
       const f = isleSave.placed.find(f => near(IX + f.x, f.z, 1.3));
       return f ? { k: 'putaway', f } : { k: 'decorate' };
     }
     if (isle.fish) return { k: isle.fish.bite ? 'reel' : 'wait' };
     if (isle.swim){ const b = bubbles.find(b => near(b.x, b.z, 2.2)); return b ? { k: 'dive', b } : null; }
     if (Math.abs(X) < 1.8 && Z > PIER + 9.5) return { k: 'leave' };
+    if (near(ROCK.x, ROCK.z + 5, 1.8)) return { k: 'secret' };
     const v = villagers.find(v => near(v.x, v.z, 1.9)); if (v) return { k: 'talk', v };
     const it = ground.find(i => i.y <= 0.01 && near(i.x, i.z, 1.3)); if (it) return { k: 'pick', it };
     if (near(SHOP_DOOR.x, SHOP_DOOR.z, 1.7)) return { k: 'shop' };
@@ -5486,6 +5600,26 @@ function boot(hot){
       sfx.coin(0); isleScene.remove(it.m); ground.splice(ground.indexOf(it), 1);
     }
     else if (a.k === 'shop') openShop();
+    else if (a.k === 'secret'){
+      const from = isle.inside ? 'house' : 'island';
+      isle.ui = true;
+      askPassword(() => fadeTo(() => { isle.ui = false; Object.assign(isle, { inside: true, secret: true, secretFrom: from, x: SRX, z: 4, yaw: 0 }); isle.cam.set(SRX, 10, 13); sfx.ap(true); isleHud(); toast('You found the SECRET ROOM! ✨', 'info'); foundSecret(); }), () => { isle.ui = false; });
+    }
+    else if (a.k === 'sexit') fadeTo(() => {
+      isle.secret = false;
+      if (isle.secretFrom === 'world'){ endIsland(); placeMyHouse(); startWorld(myHouse.sx, myHouse.sz + 6, Math.PI, 'Back outside the secret door'); return; }
+      if (isle.secretFrom === 'house') Object.assign(isle, { inside: true, x: IX, z: -4, yaw: Math.PI });
+      else { Object.assign(isle, { inside: false, x: ROCK.x, z: ROCK.z + 6, yaw: Math.PI }); isle.cam.set(isle.x, 12, isle.z + 14); }
+      sfx.ap(true); isleHud();
+    });
+    else if (a.k === 'chest'){
+      const day = new Date().toDateString();
+      if (store.get('scr.chestDay', '') === day){ toast('The chest is empty. More treasure tomorrow!', ''); return; }
+      store.set('scr.chestDay', day); score += 10000; saveProgress(); coinsPile.visible = true; chestLid.rotation.x = -1.2;
+      sfx.applause(); sfx.coin(6); toast('TREASURE! +10,000 points 💰', ''); isleHud();
+    }
+    else if (a.k === 'scar'){ sfx.ring(); toast('The Sky Rocket (650 km/h!) is in your garage now: press V when you drive 🚀', ''); }
+    else if (a.k === 'splane'){ sfx.ring(); toast('The Golden Comet (Mach 3!) is in your planes now: pick it on the start card ✈️', ''); }
     else if (a.k === 'out' && isle.home) fadeTo(() => { endIsland(); leaveHome(); });
     else if (a.k === 'enter' || a.k === 'out') fadeTo(() => {
       isle.inside = a.k === 'enter';
@@ -5593,7 +5727,7 @@ function boot(hot){
   });
 
   const ACT_TXT = { talk: a => 'TALK TO ' + a.v.name.toUpperCase(), pick: a => 'PICK UP ' + (a.it.id.startsWith('furn:') ? '🎁' : ITEMS[a.it.id].e), shop: () => 'GO SHOPPING', enter: () => 'GO INSIDE', out: () => 'GO OUTSIDE',
-    shake: () => 'SHAKE THE TREE', catch: a => 'CATCH ' + ITEMS[a.b.kind].e, fish: () => 'GO FISHING', wait: () => 'WAIT FOR A BITE…', reel: () => 'REEL IN!', decorate: () => 'DECORATE', leave: () => 'FLY BACK ✈️', dive: () => 'DIVE 🤿', putaway: a => 'PUT AWAY ' + furnOf(a.f.id).e };
+    shake: () => 'SHAKE THE TREE', catch: a => 'CATCH ' + ITEMS[a.b.kind].e, fish: () => 'GO FISHING', wait: () => 'WAIT FOR A BITE…', reel: () => 'REEL IN!', decorate: () => 'DECORATE', secret: () => 'SECRET DOOR 🔒', sexit: () => 'LEAVE THE SECRET ROOM', chest: () => 'OPEN THE TREASURE CHEST', scar: () => 'LOOK AT THE SECRET CAR', splane: () => 'LOOK AT THE SECRET PLANE', leave: () => 'FLY BACK ✈️', dive: () => 'DIVE 🤿', putaway: a => 'PUT AWAY ' + furnOf(a.f.id).e };
   function updateIsland(dt){
     // walking
     let go = 0, turn = 0;
@@ -5679,7 +5813,7 @@ function boot(hot){
     if (key !== (isle.actKey || '')){ isle.actKey = key; RH.act.hidden = !a; if (a) txt(RH.act, ACT_TXT[a.k](a)); }
     isle.act = a;
     // the camera looks down from the south, the way Animal Crossing does
-    if (isle.inside){ camT.set(IX + (isle.x - IX) * 0.4, 10, 12); look.set(IX + (isle.x - IX) * 0.4, 0.6, -0.2); }
+    if (isle.inside){ const RX = isle.secret ? SRX : IX; camT.set(RX + (isle.x - RX) * 0.4, 10, 12); look.set(RX + (isle.x - RX) * 0.4, 0.6, -0.2); }
     else { camT.set(isle.x, 12, isle.z + 14); look.set(isle.x, 0.8, isle.z - 1.5); }
     isle.cam.lerp(camT, 1 - Math.exp(-dt * 5));
     camera.position.copy(isle.cam); camera.up.set(0, 1, 0); camera.lookAt(look);

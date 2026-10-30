@@ -55,6 +55,21 @@ and **C** still changes its colour.
 
 The traffic on the roads is made of real cars too.
 
+## Secret doors
+
+There are three **secret doors**: in the back wall of **your house**, in a big **rock on
+your island**, and in a **rocky hill** next to your house in the world. They only open
+with the **password**. Behind every one is the same **secret room**:
+
+- a **treasure chest** with 10,000 points in it (once a day),
+- the secret **Sky Rocket** car (650 km/h), which then shows up in your garage,
+- the secret **Golden Comet** plane (solid gold, Mach 3), which then shows up in the
+  planes on the start card.
+
+The password isn't written anywhere in the game: only a salted PBKDF2-SHA-256 hash of it.
+When you type the password, it's hashed the same way and the two hashes are compared.
+After five wrong tries, the door waits 30 seconds.
+
 ## Gravity
 
 - **Jump** with **J** (or JUMP) wherever you're on foot: on your island, in your house,
