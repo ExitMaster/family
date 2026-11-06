@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>깡총데굴</title>
+<style>
+  :root {
+    --ink: #3A2E4D; --pink: #FF6F91; --mint: #4FC9A8; --sun: #FFD166;
+    --panel: rgba(58,46,77,.9); --card: #fff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #AEE7FF; }
+  body {
+    font-family: "Trebuchet MS", Verdana, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color: var(--ink); user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 8px; padding: 10px 16px; pointer-events: none;
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  #hud.hidden { display: none; }
+  .pill {
+    background: rgba(255,255,255,.9); border: 3px solid var(--ink); border-radius: 999px;
+    padding: 4px 12px; font-weight: bold; font-size: 16px; display: inline-flex;
+    align-items: center; gap: 6px; white-space: nowrap;
+  }
+  #hudLeft, #hudRight { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); }
+  #pauseBtn {
+    pointer-events: auto; font-size: 18px; padding: 4px 12px; cursor: pointer;
+    font-family: inherit; color: var(--ink);
+  }
+
+  /* ---------- Panels ---------- */
+  .panel {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(58,46,77,.55); overflow-y: auto;
+  }
+  .panel.hidden { display: none; }
+  .box {
+    background: var(--panel); color: #fff; border: 5px solid var(--ink); border-radius: 22px;
+    padding: 18px 20px; width: 100%; max-width: 620px; text-align: center;
+    box-shadow: 0 8px 0 rgba(0,0,0,.25); margin: auto;
+  }
+  .box h1 { margin: 0 0 2px; font-size: clamp(30px, 7vw, 44px); color: var(--sun); letter-spacing: 2px; }
+  .box h2 { margin: 0 0 8px; font-size: clamp(22px, 5vw, 30px); color: var(--sun); }
+  .box p { margin: 6px 0; line-height: 1.5; font-size: 15px; }
+  .sub { opacity: .85; font-size: 14px; }
+  button {
+    font-family: inherit; font-size: 18px; font-weight: bold; color: #fff; background: var(--pink);
+    border: 4px solid var(--ink); border-radius: 14px; padding: 9px 20px; cursor: pointer;
+    box-shadow: 0 5px 0 var(--ink); touch-action: manipulation;
+  }
+  button:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  button.ghost { background: #fff; color: var(--ink); }
+  button.sel { background: var(--sun); color: var(--ink); }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+  #levelGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0 6px; }
+  .lv {
+    background: #fff; color: var(--ink); border: 4px solid var(--ink); border-radius: 16px;
+    padding: 10px 6px; cursor: pointer; box-shadow: 0 5px 0 var(--ink); font-weight: bold;
+  }
+  .lv:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  .lv .num { font-size: 26px; color: var(--pink); }
+  .lv .nm { font-size: 15px; margin: 2px 0 4px; }
+  .lv .st { font-size: 18px; letter-spacing: 1px; }
+  .lv .bt { font-size: 12px; opacity: .7; min-height: 15px; }
+  .keys { font-size: 13px; line-height: 1.6; opacity: .9; margin-top: 8px; }
+  .keys b { background: rgba(255,255,255,.18); border-radius: 6px; padding: 0 5px; }
+  #resStars { font-size: 44px; letter-spacing: 6px; margin: 2px 0; }
+  #resInfo { font-size: 17px; }
+
+  /* ---------- Touch controls ---------- */
+  #touch { position: fixed; left: 0; right: 0; bottom: 0; pointer-events: none;
+    padding: 0 16px max(14px, env(safe-area-inset-bottom)); display: flex; justify-content: space-between; gap: 10px; }
+  #touch.hidden { display: none; }
+  .tgroup { display: flex; gap: 8px; pointer-events: none; align-items: flex-end; }
+  .tb {
+    pointer-events: auto; width: 64px; height: 64px; border-radius: 50%;
+    border: 4px solid var(--ink); background: rgba(255,255,255,.75); font-size: 24px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; color: var(--ink);
+    touch-action: none; box-shadow: 0 4px 0 rgba(58,46,77,.5);
+  }
+  .tb.small { font-size: 15px; }
+  .tb.on { background: var(--sun); transform: translateY(3px); box-shadow: 0 1px 0 rgba(58,46,77,.5); }
+  .tb.p1 { border-color: #c2416a; }
+  .tb.p2 { border-color: #2b8f75; }
+  @media (max-width: 700px) { .tb { width: 54px; height: 54px; font-size: 20px; } .tb.small { font-size: 13px; } .tgroup { gap: 5px; } }
+  @media (max-width: 420px) { .tb { width: 46px; height: 46px; font-size: 18px; } .tb.small { font-size: 12px; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="hudLeft">
+    <span class="pill" id="hudLevel">1</span>
+    <span class="pill" id="hudTime">0:00</span>
+  </div>
+  <div id="hudRight">
+    <span class="pill" id="hudP1"><span class="dot" style="background:#FF8FB1"></span>🥕 0</span>
+    <span class="pill" id="hudP2"><span class="dot" style="background:#7EE0C3"></span>🥕 0</span>
+    <button class="pill" id="pauseBtn" aria-label="잠깐 멈춤">⏸</button>
+  </div>
+</div>
+
+<div class="panel" id="menu">
+  <div class="box">
+    <h1>깡총데굴</h1>
+    <p class="sub">토끼옷을 입고 데굴데굴 굴러서 당근을 모으고 깃발까지!</p>
+    <div class="row">
+      <button id="p1Btn" class="sel">🐰 1명</button>
+      <button id="p2Btn" class="ghost">🐰🐰 2명</button>
+    </div>
+    <div id="levelGrid"></div>
+    <div class="keys" id="keysHelp"></div>
+  </div>
+</div>
+
+<div class="panel hidden" id="pause">
+  <div class="box">
+    <h2>잠깐 멈춤</h2>
+    <div class="row">
+      <button id="resumeBtn">계속하기</button>
+      <button id="retryBtn" class="ghost">처음부터</button>
+      <button id="toMenuBtn" class="ghost">레벨 고르기</button>
+    </div>
+    <div class="keys" id="keysHelp2"></div>
+  </div>
+</div>
+
+<div class="panel hidden" id="result">
+  <div class="box">
+    <h2 id="resTitle">도착!</h2>
+    <div id="resStars">★★★</div>
+    <div id="resInfo"></div>
+    <div class="row">
+      <button id="nextBtn">다음 레벨 ▶</button>
+      <button id="againBtn" class="ghost">다시 하기</button>
+      <button id="resMenuBtn" class="ghost">레벨 고르기</button>
+    </div>
+  </div>
+</div>
+
+<div id="touch" class="hidden"></div>
+
+<script>
+"use strict";
+// =====================================================================
+//  설정
+// =====================================================================
+const DT = 1 / 120;            // 물리 한 걸음 (초)
+const GRAV = 1500;             // 중력 (px/s²)
+const R = 20;                  // 토끼 반지름
+const ROLL_ACC = 34;           // 땅에서 굴리는 힘 (rad/s²)
+const AIR_SPIN = 22;           // 공중에서 도는 힘
+const MAX_SPIN = 16;           // 최대 회전 속도 (rad/s)
+const GROUND_PUSH = 260;       // 땅에서 살짝 미는 힘 (언덕 오르기 도움)
+const AIR_PUSH = 420;          // 공중에서 좌우로 살짝 움직이는 힘
+const JUMP_V = 680;            // 점프 속도
+const PAD_V = 1060;            // 통통 발판 속도
+const PUMP = 1900;             // 고리에 매달려 흔드는 힘
+const MAX_SWING = 760;         // 고리에서 도는 최고 속도
+const MAX_SPEED = 1100;
+const RING_LEN = R + 14;       // 고리 잡았을 때 팔 길이
+const PAIR_LEN = R * 2 + 6;    // 친구 손 잡았을 때 거리
+const GRAB_REACH_RING = R + 36;
+const GRAB_REACH_PAIR = R * 2 + 20;
+const BOTTOM = 1500;
+const SAVE_KEY = "hoproll-v1";
+
+const COLORS = [
+  { body: "#FF8FB1", belly: "#FFE3EC", dark: "#c2416a", ear: "#FFC2D4", name: "분홍" },
+  { body: "#7EE0C3", belly: "#E2FFF6", dark: "#2b8f75", ear: "#BFF5E4", name: "민트" },
+];
+
+// =====================================================================
+//  레벨
+// =====================================================================
+// G: 윗면 점들 → 바닥까지 채운 땅,  P: 사각형 발판,  W: 물 (x1~x2, 수면 y)
+function G(pts, extra) { const p = pts.slice(); p.push([pts[pts.length - 1][0], BOTTOM], [pts[0][0], BOTTOM]); return Object.assign({ pts: p, kind: "ground" }, extra); }
+function P(x, y, w, h, kind, extra) { return Object.assign({ pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], kind: kind || "plat" }, extra); }
+function Wt(x1, x2, y) { return { x1, x2, y }; }
+function WALL(x) { return x < 0 ? P(x - 800, -1600, 1020, BOTTOM + 1600, "wall") : P(x, -1600, 1000, BOTTOM + 1600, "wall"); }
+const c2 = (arr) => arr.map(([x, y]) => ({ x, y }));
+
+const LEVELS = [
+  {
+    name: "들판 산책", start: [120, 470], goal: [3300, 500],
+    polys: [WALL(-420),
+      G([[-200, 500], [600, 500], [800, 430], [1000, 430], [1150, 500], [1400, 500]]),
+      G([[1560, 500], [2300, 500]]),
+      P(1780, 390, 180, 22),
+      G([[2650, 500], [2900, 470], [3100, 500], [3500, 500]]),
+      WALL(3500)],
+    water: [Wt(1400, 1560, 540), Wt(2300, 2650, 540)],
+    rings: c2([[2420, 410], [2570, 400]]),
+    checks: c2([[1640, 500], [2220, 500]]),
+    carrots: c2([[350, 455], [450, 455], [800, 385], [900, 385], [1000, 385], [1480, 420], [1700, 455], [1870, 345],
+      [1870, 255], [2100, 455], [2420, 350], [2570, 340], [2495, 470], [2800, 440], [3000, 440], [3150, 455]]),
+    signs: [[200, 500, "◀ ▶ 데굴데굴"], [1280, 500, "점프! 물 조심"], [1690, 500, "공중에서 빙글빙글"], [2200, 500, "고리를 잡고 흔들다 놓기!"]],
+  },
+  {
+    name: "통통 절벽", start: [120, 470], goal: [3450, 260],
+    polys: [WALL(-420),
+      G([[-200, 500], [700, 500], [700, 200], [1300, 200], [1700, 500], [1900, 500]]),
+      P(540, 486, 100, 14, "pad"),
+      P(2040, 440, 120, 22),
+      G([[2500, 500], [2900, 500], [2900, 260], [3600, 260]]),
+      P(2760, 486, 100, 14, "pad"),
+      WALL(3600)],
+    water: [Wt(1900, 2500, 540)],
+    rings: c2([[2260, 380], [2400, 380]]),
+    checks: c2([[800, 200], [1800, 500], [2580, 500]]),
+    carrots: c2([[300, 455], [590, 300], [590, 200], [850, 160], [950, 160], [1050, 160], [1150, 160], [1400, 240],
+      [1500, 315], [1600, 390], [2100, 400], [2260, 320], [2400, 320], [2330, 440], [2650, 455], [2810, 250],
+      [3000, 220], [3100, 220], [3200, 220], [3300, 220]]),
+    signs: [[420, 500, "통통 발판 → 위로!"], [2000, 500, ""], [2640, 500, "또 통통!"]],
+  },
+  {
+    name: "고리 연못", start: [120, 470], goal: [3150, 500],
+    polys: [WALL(-420),
+      G([[-200, 500], [500, 500]]),
+      P(1080, 470, 200, 30),
+      G([[2200, 500], [2500, 500], [2700, 420], [2900, 420], [3000, 500], [3300, 500]]),
+      WALL(3300)],
+    water: [Wt(500, 2200, 540)],
+    rings: c2([[620, 410], [800, 380], [980, 410], [1390, 400], [1560, 370], [1730, 370], [1900, 400], [2060, 420]]),
+    checks: c2([[1180, 470], [2280, 500]]),
+    carrots: c2([[300, 455], [620, 345], [710, 470], [800, 315], [890, 470], [980, 345], [1180, 425], [1390, 335],
+      [1475, 440], [1560, 305], [1730, 305], [1815, 440], [1900, 335], [2060, 355], [2600, 400], [2800, 375], [2900, 375]]),
+    signs: [[380, 500, "놓고 → 다음 고리 잡기"]],
+  },
+  {
+    name: "흔들 발판", start: [120, 470], goal: [3280, 380],
+    polys: [WALL(-420),
+      G([[-200, 500], [400, 500]]),
+      P(540, 470, 140, 22, "plat", { mover: { ax: 110, ay: 0, sp: 0.9, ph: 0 } }),
+      P(900, 420, 130, 22, "plat", { mover: { ax: 0, ay: 100, sp: 1.1, ph: 1 } }),
+      P(1280, 430, 140, 22, "plat", { mover: { ax: 130, ay: 0, sp: 0.8, ph: 2 } }),
+      P(1600, 460, 240, 40),
+      P(1760, 446, 70, 14, "pad"),
+      P(1880, 180, 220, 22),
+      G([[2600, 500], [2800, 500], [3000, 380], [3400, 380]]),
+      WALL(3400)],
+    water: [Wt(400, 2600, 540)],
+    rings: c2([[1150, 330], [2230, 260], [2400, 300], [2550, 340]]),
+    checks: c2([[1680, 460], [2680, 500]]),
+    carrots: c2([[250, 455], [560, 400], [750, 400], [965, 290], [1150, 265], [1350, 380], [1500, 380], [1650, 415],
+      [1720, 415], [1795, 300], [1795, 200], [1940, 140], [2040, 140], [2230, 195], [2400, 235], [2475, 420],
+      [2550, 275], [2700, 455], [3100, 340], [3200, 340]]),
+    signs: [[300, 500, "움직이는 발판을 타요"]],
+  },
+];
+
+// =====================================================================
+//  저장
+// =====================================================================
+let save = { best: {} };
+try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.best) save = s; } catch (e) {}
+function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+// =====================================================================
+//  소리 (아주 짧은 삐삐)
+// =====================================================================
+let actx = null;
+function audioOn() { try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) {} }
+function beep(f1, f2, dur, type, vol) {
+  if (!actx) return;
+  try {
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || "sine"; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(vol || 0.12, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) {}
+}
+const SFX = {
+  jump: () => beep(380, 720, 0.12, "triangle", 0.1),
+  carrot: () => { beep(880, 1320, 0.08, "square", 0.05); setTimeout(() => beep(1320, 1760, 0.08, "square", 0.04), 60); },
+  splash: () => beep(300, 80, 0.3, "sawtooth", 0.06),
+  pad: () => beep(200, 900, 0.18, "triangle", 0.12),
+  grab: () => beep(600, 500, 0.05, "square", 0.04),
+  check: () => { beep(660, 660, 0.1, "triangle", 0.08); setTimeout(() => beep(990, 990, 0.14, "triangle", 0.08), 90); },
+  win: () => [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, f, 0.18, "triangle", 0.1), i * 120)),
+};
+
+// =====================================================================
+//  입력: 키보드 · 터치 · 게임패드
+// =====================================================================
+const KEYS = new Set();
+const touchIn = [{}, {}];
+const KB1 = { l: ["KeyA"], r: ["KeyD"], j: ["KeyW"], g: ["KeyS"] };
+const KB2 = { l: ["ArrowLeft"], r: ["ArrowRight"], j: ["ArrowUp"], g: ["ArrowDown"] };
+const KB_SOLO = { l: ["KeyA", "ArrowLeft"], r: ["KeyD", "ArrowRight"], j: ["KeyW", "ArrowUp", "Space"], g: ["KeyS", "ArrowDown", "ShiftLeft", "ShiftRight", "KeyJ"] };
+const GAME_KEYS = new Set([...Object.values(KB_SOLO).flat()]);
+
+addEventListener("keydown", (e) => {
+  audioOn();
+  if (GAME_KEYS.has(e.code)) e.preventDefault();
+  if (e.code === "Escape" || e.code === "KeyP") { if (state === "play") pauseGame(); else if (state === "pause") resumeGame(); return; }
+  KEYS.add(e.code);
+});
+addEventListener("keyup", (e) => KEYS.delete(e.code));
+addEventListener("blur", () => { KEYS.clear(); touchIn.forEach((t) => { t.l = t.r = t.j = t.g = false; }); });
+
+function padIn(i) {
+  const out = {};
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const list = [];
+  for (const p of pads) if (p && p.connected) list.push(p);
+  const p = list[i];
+  if (!p) return out;
+  const ax = p.axes[0] || 0, b = (n) => !!(p.buttons[n] && p.buttons[n].pressed);
+  out.l = ax < -0.4 || b(14); out.r = ax > 0.4 || b(15);
+  out.j = b(0) || b(3) || b(12);
+  out.g = b(1) || b(2) || b(4) || b(5) || b(6) || b(7) || b(13);
+  if (b(9) && state === "play" && !padPausedLatch) { padPausedLatch = true; pauseGame(); }
+  if (!b(9)) padPausedLatch = false;
+  return out;
+}
+let padPausedLatch = false;
+
+function readInput(i) {
+  const map = numPlayers === 1 ? KB_SOLO : (i === 0 ? KB1 : KB2);
+  const k = (arr) => arr.some((c) => KEYS.has(c));
+  const t = touchIn[i], g = padIn(i);
+  return {
+    l: k(map.l) || !!t.l || !!g.l, r: k(map.r) || !!t.r || !!g.r,
+    j: k(map.j) || !!t.j || !!g.j, g: k(map.g) || !!t.g || !!g.g,
+  };
+}
+
+// 터치 버튼
+const touchEl = document.getElementById("touch");
+let isTouch = matchMedia("(pointer: coarse)").matches;
+addEventListener("touchstart", () => { if (!isTouch) { isTouch = true; buildTouch(); } }, { passive: true });
+function buildTouch() {
+  touchEl.innerHTML = "";
+  const mk = (p, key, label, small) => {
+    const b = document.createElement("div");
+    b.className = "tb p" + (p + 1) + (small ? " small" : "");
+    b.textContent = label;
+    const on = (e) => { e.preventDefault(); audioOn(); touchIn[p][key] = true; b.classList.add("on"); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
+    const off = (e) => { touchIn[p][key] = false; b.classList.remove("on"); };
+    b.addEventListener("pointerdown", on);
+    b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
+    return b;
+  };
+  const grp = (...els) => { const g = document.createElement("div"); g.className = "tgroup"; els.forEach((e) => g.appendChild(e)); return g; };
+  if (numPlayers === 1) {
+    touchEl.appendChild(grp(mk(0, "l", "◀"), mk(0, "r", "▶")));
+    touchEl.appendChild(grp(mk(0, "g", "잡기", true), mk(0, "j", "점프", true)));
+  } else {
+    touchEl.appendChild(grp(mk(0, "l", "◀"), mk(0, "r", "▶"), mk(0, "g", "잡기", true), mk(0, "j", "점프", true)));
+    touchEl.appendChild(grp(mk(1, "l", "◀"), mk(1, "r", "▶"), mk(1, "g", "잡기", true), mk(1, "j", "점프", true)));
+  }
+  touchIn.forEach((t) => { t.l = t.r = t.j = t.g = false; });
+  touchEl.classList.toggle("hidden", !(isTouch && (state === "play")));
+}
+
+// =====================================================================
+//  게임 상태
+// =====================================================================
+let state = "menu";          // menu | play | pause | result
+let numPlayers = 1;
+let levelIdx = 0;
+let L = null;                // 현재 레벨 (실행용 복사본)
+let bunnies = [];
+let particles = [];
+let simTime = 0, playTime = 0;
+let cam = { x: 0, y: 300, z: 1 };
+let checkpoint = null;
+let clearT = -1;
+
+function makeBunny(i, x, y) {
+  const b = { i, col: COLORS[i], x, y, vx: 0, vy: 0, a: 0, w: 0, groundT: 9, gn: { x: 0, y: -1 },
+    grab: null, grabLen: 0, regrabT: 0, lastRing: null, lastRingT: 0, prevJ: false, jumpBuf: 0, carrots: 0, blink: 2 + Math.random() * 3, squash: 0,
+    in: { l: false, r: false, j: false, g: false }, ears: [] };
+  for (let e = 0; e < 2; e++) {
+    const pts = [];
+    for (let k = 0; k < 4; k++) pts.push({ x, y: y - R - k * 9, px: x, py: y - R - k * 9 });
+    b.ears.push(pts);
+  }
+  return b;
+}
+
+function loadLevel(idx) {
+  levelIdx = idx;
+  const src = LEVELS[idx];
+  L = {
+    src, name: src.name,
+    polys: src.polys.map((p) => ({ pts: p.pts.map(([x, y]) => ({ x, y })), kind: p.kind, mover: p.mover || null, ox: 0, oy: 0, vx: 0, vy: 0 })),
+    water: src.water, rings: src.rings,
+    checks: src.checks.map((c) => ({ x: c.x, y: c.y, on: false })),
+    carrots: src.carrots.map((c) => ({ x: c.x, y: c.y, got: -1, t: Math.random() * 6 })),
+    signs: src.signs, goal: { x: src.goal[0], y: src.goal[1] },
+  };
+  for (const p of L.polys) {
+    let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+    for (const q of p.pts) { x1 = Math.min(x1, q.x); y1 = Math.min(y1, q.y); x2 = Math.max(x2, q.x); y2 = Math.max(y2, q.y); }
+    p.bb = { x1, y1, x2, y2 };
+  }
+  checkpoint = { x: src.start[0], y: src.start[1] };
+  bunnies = [];
+  for (let i = 0; i < numPlayers; i++) bunnies.push(makeBunny(i, src.start[0] + i * 50, src.start[1]));
+  particles = [];
+  simTime = 0; playTime = 0; clearT = -1;
+  cam.x = src.start[0] + 200; cam.y = src.start[1] - 80; cam.z = 1;
+  updateMovers(0);
+}
+
+// =====================================================================
+//  물리
+// =====================================================================
+function updateMovers(t) {
+  for (const p of L.polys) {
+    if (!p.mover) continue;
+    const m = p.mover, s = Math.sin(t * m.sp + m.ph), c = Math.cos(t * m.sp + m.ph);
+    p.ox = m.ax * s; p.oy = m.ay * s;
+    p.vx = m.ax * m.sp * c; p.vy = m.ay * m.sp * c;
+  }
+}
+
+function collideCircleSeg(b, ax, ay, bx, by, poly) {
+  const ex = bx - ax, ey = by - ay, len2 = ex * ex + ey * ey;
+  let t = ((b.x - ax) * ex + (b.y - ay) * ey) / len2;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const px = ax + ex * t, py = ay + ey * t;
+  let dx = b.x - px, dy = b.y - py;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= R * R) return;
+  const d = Math.sqrt(d2) || 0.0001;
+  const nx = dx / d, ny = dy / d;
+  b.x += nx * (R - d); b.y += ny * (R - d);
+
+  // 접점 속도 (발판이 움직이면 그만큼 뺀다)
+  const rvx = b.vx - poly.vx, rvy = b.vy - poly.vy;
+  const vn = rvx * nx + rvy * ny;
+  const isPad = poly.kind === "pad" && ny < -0.7;
+  if (isPad) {
+    if (vn < PAD_V * 0.5) {
+      b.vx += nx * (PAD_V - vn); b.vy += ny * (PAD_V - vn);
+      b.squash = 1; SFX.pad(); puff(b.x, b.y + R, "#FFD166", 6);
+    }
+    return;
+  }
+  let jn = 0;
+  if (vn < 0) {
+    jn = -(1 + 0.08) * vn;
+    b.vx += nx * jn; b.vy += ny * jn;
+    if (vn < -500) b.squash = Math.min(1, -vn / 1200);
+  }
+  // 마찰: 구르기 ↔ 이동
+  const tx = -ny, ty = nx;
+  const cvx = b.vx - poly.vx + (-b.w * (-ny * R)), cvy = b.vy - poly.vy + (b.w * (-nx * R));
+  const vt = cvx * tx + cvy * ty;
+  let jt = -vt / 3;                       // 원판: 1/m + r²/I = 3
+  const maxF = 1.0 * (jn + GRAV * DT);    // 쿨롱 마찰
+  if (jt > maxF) jt = maxF; else if (jt < -maxF) jt = -maxF;
+  b.vx += tx * jt; b.vy += ty * jt;
+  b.w += (-R * jt) / (0.5 * R * R);
+
+  if (ny < 0.3) {  // 천장이 아니면 점프할 수 있는 면
+    b.groundT = 0; b.gn.x = nx; b.gn.y = ny; b.groundPoly = poly;
+  }
+}
+
+function collideWorld(b) {
+  for (const p of L.polys) {
+    const bb = p.bb;
+    if (b.x + R < bb.x1 + p.ox || b.x - R > bb.x2 + p.ox || b.y + R < bb.y1 + p.oy || b.y - R > bb.y2 + p.oy) continue;
+    const pts = p.pts, n = pts.length;
+    for (let k = 0; k < n; k++) {
+      const a = pts[k], c = pts[(k + 1) % n];
+      collideCircleSeg(b, a.x + p.ox, a.y + p.oy, c.x + p.ox, c.y + p.oy, p);
+    }
+  }
+}
+
+function collidePair(a, b) {
+  let dx = a.x - b.x, dy = a.y - b.y;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= 4 * R * R || d2 === 0) return;
+  const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, pen = 2 * R - d;
+  a.x += nx * pen / 2; a.y += ny * pen / 2; b.x -= nx * pen / 2; b.y -= ny * pen / 2;
+  const vn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+  if (vn < 0) {
+    const j = -(1 + 0.15) * vn / 2;
+    a.vx += nx * j; a.vy += ny * j; b.vx -= nx * j; b.vy -= ny * j;
+  }
+  // 친구 머리 위에 서 있을 수 있게: 위에 있는 쪽은 점프 가능
+  if (ny < -0.5) { a.groundT = 0; a.gn.x = nx; a.gn.y = ny; a.groundPoly = null; }
+  if (ny > 0.5) { b.groundT = 0; b.gn.x = -nx; b.gn.y = -ny; b.groundPoly = null; }
+}
+
+function solveGrab(b) {
+  const g = b.grab;
+  if (!g) return;
+  if (b.grabLen > g.len) b.grabLen = Math.max(g.len, b.grabLen - 500 * DT);
+  if (g.type === "ring") {
+    const dx = b.x - g.ring.x, dy = b.y - g.ring.y, d = Math.hypot(dx, dy) || 0.001;
+    const nx = dx / d, ny = dy / d;
+    b.x = g.ring.x + nx * b.grabLen; b.y = g.ring.y + ny * b.grabLen;
+    const vr = b.vx * nx + b.vy * ny;
+    b.vx -= vr * nx; b.vy -= vr * ny;
+  } else {
+    const o = g.other;
+    const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy) || 0.001;
+    const nx = dx / d, ny = dy / d, err = d - b.grabLen;
+    const wa = o.grab && o.grab.type === "ring" ? 1 : 0.5;  // 고리에 매달린 친구는 거의 고정
+    b.x -= nx * err * wa; b.y -= ny * err * wa;
+    o.x += nx * err * (1 - wa); o.y += ny * err * (1 - wa);
+    const vr = (b.vx - o.vx) * nx + (b.vy - o.vy) * ny;
+    b.vx -= nx * vr * wa; b.vy -= ny * vr * wa;
+    o.vx += nx * vr * (1 - wa); o.vy += ny * vr * (1 - wa);
+  }
+}
+
+function tryGrab(b) {
+  let best = null, bd = 1e9;
+  for (const r of L.rings) {
+    if (r === b.lastRing && b.lastRingT > 0) continue;
+    const d = Math.hypot(b.x - r.x, b.y - r.y);
+    if (d < GRAB_REACH_RING && d < bd) { bd = d; best = { type: "ring", ring: r, len: RING_LEN }; }
+  }
+  if (!best) {
+    for (const o of bunnies) {
+      if (o === b) continue;
+      const d = Math.hypot(b.x - o.x, b.y - o.y);
+      if (d < GRAB_REACH_PAIR && d < bd) { bd = d; best = { type: "pair", other: o, len: PAIR_LEN }; }
+    }
+  }
+  if (best) { b.grab = best; b.grabLen = Math.max(best.len, bd); SFX.grab(); }
+}
+
+function release(b) { b.grab = null; }
+
+// 고리에서 손을 놓을 때 누르고 있는 쪽으로 휙 — 아이들도 고리에서 고리로 넘어갈 수 있게
+function flingFromRing(b, dir, extraUp) {
+  if (dir) {
+    const sp = Math.max(520, Math.min(760, Math.hypot(b.vx, b.vy)));
+    const tx = dir * 0.74, ty = -0.67;
+    b.vx = b.vx * 0.35 + tx * sp * 0.65; b.vy = b.vy * 0.35 + ty * sp * 0.65;
+  }
+  b.vy -= extraUp;
+  b.lastRing = b.grab.ring; b.lastRingT = 0.4;   // 방금 놓은 고리는 잠깐 못 잡는다
+  release(b);
+}
+
+function respawn(b, splash) {
+  if (splash) { SFX.splash(); puff(b.x, b.y, "#5DADE2", 16, true); }
+  release(b);
+  for (const o of bunnies) if (o.grab && o.grab.other === b) release(o);
+  const off = (b.i - (bunnies.length - 1) / 2) * 44;
+  b.x = checkpoint.x + off; b.y = checkpoint.y - 40; b.vx = b.vy = 0; b.w = 0; b.a = 0;
+  b.groundT = 9;
+  for (const ear of b.ears) for (const q of ear) { q.x = q.px = b.x; q.y = q.py = b.y - R; }
+  puff(b.x, b.y, "#fff", 10);
+}
+
+function stepBunny(b) {
+  const inp = b.in;
+  const dir = (inp.r ? 1 : 0) - (inp.l ? 1 : 0);
+  const onGround = b.groundT < 0.08;
+  b.groundT += DT;
+
+  if (inp.j && !b.prevJ) b.jumpBuf = 0.12;
+  b.prevJ = inp.j;
+  if (b.jumpBuf > 0) b.jumpBuf -= DT;
+
+  if (b.grab && b.grab.type === "ring") {
+    const dx = b.x - b.grab.ring.x, dy = b.y - b.grab.ring.y, d = Math.hypot(dx, dy) || 1;
+    const tx = dy / d, ty = -dx / d;          // 고리 아래에서 오른쪽 = +x
+    const vt = b.vx * tx + b.vy * ty;
+    if (dir && vt * dir < MAX_SWING) { b.vx += tx * dir * PUMP * DT; b.vy += ty * dir * PUMP * DT; }
+    b.w += dir * AIR_SPIN * DT;
+  } else if (onGround) {
+    b.w += dir * ROLL_ACC * DT;
+    b.vx += dir * GROUND_PUSH * DT * Math.max(0, -b.gn.y);
+  } else {
+    b.w += dir * AIR_SPIN * DT;
+    b.vx += dir * AIR_PUSH * DT;
+  }
+  if (b.w > MAX_SPIN) b.w = MAX_SPIN; else if (b.w < -MAX_SPIN) b.w = -MAX_SPIN;
+  if (!dir && onGround) b.w *= 0.985;
+  b.w *= 0.998;
+
+  b.vy += GRAV * DT;
+  b.vx *= 0.9995;
+
+  // 점프
+  if (b.jumpBuf > 0) {
+    if (b.grab && b.grab.type === "ring") {
+      flingFromRing(b, dir, 160); b.jumpBuf = 0; b.regrabT = 0.15; SFX.jump();
+    } else if (b.groundT < 0.12) {
+      if (b.grab) release(b);
+      const ux = Math.sin(b.a), uy = -Math.cos(b.a);
+      let dx = ux * 0.3 + b.gn.x * 0.7, dy = uy * 0.3 + b.gn.y * 0.7;
+      let dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
+      if (dx * b.gn.x + dy * b.gn.y < 0.5) { dx = b.gn.x; dy = b.gn.y; }
+      if (b.gn.y > -0.6) dy -= 0.5;          // 벽 차기는 조금 더 위로
+      dl = Math.hypot(dx, dy); dx /= dl; dy /= dl;
+      const vn = b.vx * b.gn.x + b.vy * b.gn.y;
+      if (vn < 0) { b.vx -= vn * b.gn.x; b.vy -= vn * b.gn.y; }
+      b.vx += dx * JUMP_V; b.vy += dy * JUMP_V;
+      b.groundT = 9; b.jumpBuf = 0; b.squash = 0.6; SFX.jump();
+      puff(b.x - b.gn.x * R, b.y - b.gn.y * R, "#fff", 5);
+    }
+  }
+
+  const sp = Math.hypot(b.vx, b.vy);
+  if (sp > MAX_SPEED) { b.vx *= MAX_SPEED / sp; b.vy *= MAX_SPEED / sp; }
+
+  b.x += b.vx * DT; b.y += b.vy * DT; b.a += b.w * DT;
+  b.squash *= 0.9;
+
+  // 잡기
+  if (b.lastRingT > 0) b.lastRingT -= DT;
+  if (b.regrabT > 0) b.regrabT -= DT;
+  else if (inp.g && !b.grab) tryGrab(b);
+  if (!inp.g && b.grab) { if (b.grab.type === "ring") flingFromRing(b, dir, 0); else release(b); }
+}
+
+function stepEars(b) {
+  const ca = Math.cos(b.a), sa = Math.sin(b.a);
+  for (let e = 0; e < 2; e++) {
+    const pts = b.ears[e], side = e === 0 ? -1 : 1;
+    // 뿌리 = 머리 위 (몸과 같이 돈다)
+    const lx = side * 8, ly = -R + 5;
+    pts[0].x = b.x + lx * ca - ly * sa; pts[0].y = b.y + lx * sa + ly * ca;
+    for (let k = 1; k < pts.length; k++) {
+      const q = pts[k];
+      const vx = (q.x - q.px) * 0.86, vy = (q.y - q.py) * 0.86;
+      q.px = q.x; q.py = q.y;
+      q.x += vx; q.y += vy + 600 * DT * DT;
+      // 원래 모양으로 살짝 돌아가려는 힘 (귀가 너무 축 처지지 않게)
+      const rx = side * (8 + k * 2.5), ry = -R + 5 - k * 8;
+      const tx = b.x + rx * ca - ry * sa, ty = b.y + rx * sa + ry * ca;
+      q.x += (tx - q.x) * 0.12; q.y += (ty - q.y) * 0.12;
+    }
+    for (let it = 0; it < 2; it++) for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1], q = pts[k];
+      const dx = q.x - a.x, dy = q.y - a.y, d = Math.hypot(dx, dy) || 1, f = (d - 8) / d;
+      q.x -= dx * f; q.y -= dy * f;
+    }
+  }
+}
+
+function physicsStep() {
+  simTime += DT;
+  updateMovers(simTime);
+  for (const b of bunnies) b.in = readInputCache[b.i];
+  for (const b of bunnies) stepBunny(b);
+  for (let it = 0; it < 2; it++) {
+    for (const b of bunnies) collideWorld(b);
+    if (bunnies.length > 1) collidePair(bunnies[0], bunnies[1]);
+    for (const b of bunnies) solveGrab(b);
+  }
+  for (const b of bunnies) collideWorld(b);
+  for (const b of bunnies) stepEars(b);
+  if (clearT < 0) gameRules();
+}
+
+// =====================================================================
+//  규칙: 물 · 당근 · 체크포인트 · 도착
+// =====================================================================
+function gameRules() {
+  for (const b of bunnies) {
+    let dead = b.y > 1200;
+    for (const w of L.water) if (b.x > w.x1 && b.x < w.x2 && b.y > w.y + 4) dead = true;
+    if (dead) { respawn(b, true); continue; }
+    for (const c of L.carrots) {
+      if (c.got >= 0) continue;
+      if (Math.hypot(b.x - c.x, b.y - c.y) < R + 16) {
+        c.got = b.i; b.carrots++; SFX.carrot(); puff(c.x, c.y, "#FF9F43", 8);
+      }
+    }
+    for (const ch of L.checks) {
+      if (!ch.on && Math.abs(b.x - ch.x) < 40 && Math.abs(b.y - (ch.y - 30)) < 70) {
+        ch.on = true; checkpoint = { x: ch.x, y: ch.y - R }; SFX.check(); puff(ch.x, ch.y - 70, "#FFD166", 12);
+      }
+    }
+    if (Math.abs(b.x - L.goal.x) < 45 && b.y > L.goal.y - 130 && b.y < L.goal.y + 10) {
+      clearT = 0; SFX.win();
+      for (let k = 0; k < 60; k++) puff(L.goal.x, L.goal.y - 110, ["#FF6F91", "#FFD166", "#4FC9A8", "#5DADE2"][k % 4], 1, false, true);
+    }
+  }
+  // 2명: 너무 멀어지면 뒤처진 토끼를 앞 토끼 옆으로
+  if (bunnies.length === 2) {
+    const [a, b] = bunnies;
+    if (Math.abs(a.x - b.x) > 1100 || Math.abs(a.y - b.y) > 750) {
+      const lead = a.x > b.x ? a : b, tail = lead === a ? b : a;
+      if (lead.groundT < 0.1 && !lead.groundPoly?.mover && !lead.grab) {
+        puff(tail.x, tail.y, "#fff", 10);
+        release(tail);
+        tail.x = lead.x - 30; tail.y = lead.y - 60; tail.vx = tail.vy = 0; tail.w = 0;
+        for (const ear of tail.ears) for (const q of ear) { q.x = q.px = tail.x; q.y = q.py = tail.y - R; }
+        puff(tail.x, tail.y, "#fff", 10);
+      }
+    }
+  }
+}
+
+function puff(x, y, color, n, drip, confetti) {
+  for (let k = 0; k < n; k++) {
+    const ang = Math.random() * Math.PI * 2, sp = confetti ? 200 + Math.random() * 420 : drip ? 120 + Math.random() * 260 : 40 + Math.random() * 120;
+    particles.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - (drip || confetti ? 250 : 30),
+      life: confetti ? 1.8 : 0.7, max: confetti ? 1.8 : 0.7, color, g: drip || confetti ? 900 : 0, size: confetti ? 6 : 5 + Math.random() * 5, confetti });
+  }
+}
+
+// =====================================================================
+//  화면
+// =====================================================================
+const cv = document.getElementById("c");
+const ctx = cv.getContext("2d");
+let VW = 0, VH = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  VW = innerWidth; VH = innerHeight;
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+}
+addEventListener("resize", resize); resize();
+
+function updateCamera(dt) {
+  if (!bunnies.length) return;
+  let x1 = 1e9, x2 = -1e9, y1 = 1e9, y2 = -1e9;
+  for (const b of bunnies) { x1 = Math.min(x1, b.x); x2 = Math.max(x2, b.x); y1 = Math.min(y1, b.y); y2 = Math.max(y2, b.y); }
+  const base = Math.min(VW / (VW < VH ? 560 : 900), VH / 520);   // 세로 화면은 더 가까이
+  const fit = Math.min(VW / (x2 - x1 + 520), VH / (y2 - y1 + 380));
+  const z = Math.max(base * 0.5, Math.min(base, fit));
+  const lead = bunnies.reduce((s, b) => s + b.vx, 0) / bunnies.length;
+  const tx = (x1 + x2) / 2 + Math.max(-120, Math.min(120, lead * 0.25));
+  const ty = (y1 + y2) / 2 - 60;
+  const k = 1 - Math.exp(-dt * 5);
+  cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k; cam.z += (z - cam.z) * (1 - Math.exp(-dt * 3));
+}
+
+function W2S() {
+  const cy = isTouch && state !== "menu" ? VH * 0.4 : VH / 2;   // 화면 버튼에 가리지 않게
+  ctx.setTransform(DPR * cam.z, 0, 0, DPR * cam.z, DPR * (VW / 2 - cam.x * cam.z), DPR * (cy - cam.y * cam.z));
+}
+
+function drawBackground() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, "#8FD8FF"); g.addColorStop(1, "#FFF6DA");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  // 해
+  ctx.fillStyle = "#FFE58A"; ctx.beginPath(); ctx.arc(VW * 0.82, VH * 0.18, Math.min(VW, VH) * 0.08, 0, 7); ctx.fill();
+  // 구름
+  ctx.fillStyle = "rgba(255,255,255,.9)";
+  for (let i = 0; i < 6; i++) {
+    const span = VW + 400;
+    const x = ((i * 397 - cam.x * 0.08 + simTime * 8) % span + span) % span - 200, y = 40 + (i * 71) % (VH * 0.3);
+    for (const [ox, oy, rx, ry] of [[0, 0, 60, 20], [35, -12, 40, 22], [-30, -6, 30, 16]]) { ctx.beginPath(); ctx.ellipse(x + ox, y + oy, rx, ry, 0, 0, 7); ctx.fill(); }
+  }
+  // 먼 언덕 두 겹
+  const hill = (par, base, amp, col, freq) => {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, VH);
+    for (let x = 0; x <= VW + 20; x += 20) {
+      const wx = x + cam.x * par;
+      ctx.lineTo(x, VH * base - Math.sin(wx * freq) * amp - Math.sin(wx * freq * 2.3 + 1) * amp * 0.4);
+    }
+    ctx.lineTo(VW, VH); ctx.fill();
+  };
+  hill(0.15, 0.62, 40, "#BFE8C8", 0.004);
+  hill(0.3, 0.74, 30, "#9ED9A7", 0.006);
+}
+
+function polyPath(p) {
+  ctx.beginPath();
+  p.pts.forEach((q, k) => k ? ctx.lineTo(q.x + p.ox, q.y + p.oy) : ctx.moveTo(q.x + p.ox, q.y + p.oy));
+  ctx.closePath();
+}
+
+function drawWorld() {
+  W2S();
+  const t = simTime;
+  // 물 (땅 뒤)
+  for (const w of L.water) {
+    ctx.fillStyle = "#5DADE2";
+    ctx.beginPath(); ctx.moveTo(w.x1, BOTTOM);
+    for (let x = w.x1; x <= w.x2; x += 20) ctx.lineTo(x, w.y + Math.sin(x * 0.03 + t * 3) * 4);
+    ctx.lineTo(w.x2, w.y); ctx.lineTo(w.x2, BOTTOM); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,.35)";
+    for (let x = w.x1 + 30; x < w.x2 - 20; x += 90) ctx.fillRect(x + Math.sin(t + x) * 10, w.y + 18, 30, 4);
+  }
+  // 표지판
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const [x, y, text] of L.signs) {
+    if (!text) continue;
+    ctx.font = "bold 17px Trebuchet MS, sans-serif";
+    const w = Math.max(90, ctx.measureText(text).width + 22);
+    ctx.fillStyle = "#8D6E63"; ctx.fillRect(x - 4, y - 70, 8, 70);
+    ctx.fillStyle = "#FFF3D6"; ctx.strokeStyle = "#6D4C41"; ctx.lineWidth = 4;
+    roundRect(x - w / 2, y - 106, w, 38, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#4E342E"; ctx.fillText(text, x, y - 87);
+  }
+  // 고리
+  for (const r of L.rings) {
+    ctx.strokeStyle = "#8D6E63"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(r.x, r.y - 140); ctx.lineTo(r.x, r.y - 10); ctx.stroke();
+    ctx.fillStyle = "#6D4C41"; ctx.fillRect(r.x - 14, r.y - 146, 28, 8);
+    ctx.strokeStyle = "#E0A800"; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 10, 0, 7); ctx.stroke();
+    ctx.strokeStyle = "#FFE58A"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 10, 3.6, 5); ctx.stroke();
+  }
+  // 땅·발판
+  for (const p of L.polys) {
+    polyPath(p);
+    if (p.kind === "wall") { ctx.fillStyle = "#8C7B75"; ctx.fill(); ctx.strokeStyle = "#5D4037"; ctx.lineWidth = 4; ctx.stroke(); continue; }
+    if (p.kind === "pad") {
+      ctx.fillStyle = "#FF6F91"; ctx.fill(); ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 3; ctx.stroke();
+      const bb = p.bb; ctx.fillStyle = "#FFD166";
+      for (let x = bb.x1 + 8; x < bb.x2 - 4; x += 18) { ctx.beginPath(); ctx.arc(x + 4, bb.y1 + 7 + p.oy, 3, 0, 7); ctx.fill(); }
+      continue;
+    }
+    const isPlat = p.kind === "plat";
+    ctx.fillStyle = isPlat ? (p.mover ? "#C49A6C" : "#B98B5E") : "#A1887F"; ctx.fill();
+    ctx.strokeStyle = "#5D4037"; ctx.lineWidth = 3; ctx.stroke();
+    // 잔디 (위를 향한 면)
+    ctx.strokeStyle = "#6BBF59"; ctx.lineWidth = isPlat ? 7 : 12; ctx.lineCap = "round";
+    const n = p.pts.length;
+    for (let k = 0; k < n; k++) {
+      const a = p.pts[k], c = p.pts[(k + 1) % n];
+      const dx = c.x - a.x, dy = c.y - a.y, l = Math.hypot(dx, dy);
+      if (dx / l > 0.55) {
+        ctx.beginPath(); ctx.moveTo(a.x + p.ox, a.y + p.oy + (isPlat ? 2 : 4)); ctx.lineTo(c.x + p.ox, c.y + p.oy + (isPlat ? 2 : 4)); ctx.stroke();
+      }
+    }
+    ctx.lineCap = "butt";
+  }
+  // 체크포인트
+  for (const ch of L.checks) {
+    ctx.fillStyle = "#6D4C41"; ctx.fillRect(ch.x - 3, ch.y - 90, 6, 90);
+    ctx.fillStyle = ch.on ? "#FFD166" : "#CFD8DC";
+    const wave = Math.sin(t * 6 + ch.x) * 4;
+    ctx.beginPath(); ctx.moveTo(ch.x + 3, ch.y - 90); ctx.lineTo(ch.x + 40, ch.y - 80 + wave); ctx.lineTo(ch.x + 3, ch.y - 64); ctx.fill();
+    ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // 도착 깃발
+  const gx = L.goal.x, gy = L.goal.y;
+  ctx.fillStyle = "#3A2E4D"; ctx.fillRect(gx - 4, gy - 160, 8, 160);
+  ctx.fillStyle = "#FF6F91";
+  const gw = Math.sin(t * 5) * 6;
+  ctx.beginPath(); ctx.moveTo(gx + 4, gy - 160); ctx.quadraticCurveTo(gx + 40, gy - 150 + gw, gx + 76, gy - 140); ctx.lineTo(gx + 4, gy - 110); ctx.fill();
+  ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 3; ctx.stroke();
+  drawCarrot(gx + 32, gy - 136, 0.8, 0);
+  ctx.fillStyle = "#FFD166"; ctx.beginPath(); ctx.arc(gx, gy - 164, 8, 0, 7); ctx.fill(); ctx.stroke();
+  // 당근
+  for (const c of L.carrots) {
+    if (c.got >= 0) continue;
+    drawCarrot(c.x, c.y + Math.sin(t * 3 + c.t) * 4, 1, Math.sin(t * 2 + c.t) * 0.2);
+  }
+  // 토끼
+  for (const b of bunnies) drawArm(b);
+  for (const b of bunnies) drawBunny(b);
+  // 입자
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.color;
+    if (p.confetti) { ctx.fillRect(p.x - 3, p.y - 4, 6, 8); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + p.life / p.max), 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawCarrot(x, y, s, rot) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  ctx.fillStyle = "#57B65A";
+  for (const a of [-0.5, 0, 0.5]) { ctx.save(); ctx.rotate(a); ctx.beginPath(); ctx.ellipse(0, -16, 3.5, 9, 0, 0, 7); ctx.fill(); ctx.restore(); }
+  ctx.fillStyle = "#FF8C2B"; ctx.strokeStyle = "#B4531A"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-8, -8); ctx.quadraticCurveTo(0, -12, 8, -8); ctx.lineTo(1, 16); ctx.lineTo(-1, 16); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "#D96A1C"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-5, -2); ctx.lineTo(-1, -2); ctx.moveTo(1, 5); ctx.lineTo(4, 5); ctx.stroke();
+  ctx.restore();
+}
+
+function drawArm(b) {
+  if (!b.grab) return;
+  const tx = b.grab.type === "ring" ? b.grab.ring.x : b.grab.other.x;
+  const ty = b.grab.type === "ring" ? b.grab.ring.y : b.grab.other.y;
+  const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy) || 1;
+  const reach = b.grab.type === "ring" ? d : d - R + 4;
+  const hx = b.x + dx / d * reach, hy = b.y + dy / d * reach;
+  ctx.strokeStyle = b.col.dark; ctx.lineWidth = 9; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.strokeStyle = b.col.body; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(hx, hy); ctx.stroke();
+  ctx.fillStyle = "#FFE0BD"; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(hx, hy, 6, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.lineCap = "butt";
+}
+
+function drawBunny(b) {
+  const c = b.col;
+  // 귀
+  for (const ear of b.ears) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 15;
+    ctx.beginPath(); ear.forEach((q, k) => k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+    ctx.strokeStyle = c.body; ctx.lineWidth = 10; ctx.stroke();
+    ctx.strokeStyle = c.ear; ctx.lineWidth = 4;
+    ctx.beginPath(); ear.slice(1).forEach((q, k) => k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+  }
+  ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  // 찌그러짐 (착지·발판)
+  const sq = b.squash * 0.25;
+  ctx.rotate(b.a);
+  ctx.scale(1 + sq, 1 - sq);
+  // 발
+  ctx.fillStyle = c.body; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 3;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 9, R - 2, 8, 5, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+  // 몸 (토끼옷)
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = c.belly; ctx.beginPath(); ctx.ellipse(0, 8, 11, 9, 0, 0, 7); ctx.fill();
+  // 얼굴 구멍 (옷 속 얼굴)
+  ctx.fillStyle = "#FFE0BD"; ctx.beginPath(); ctx.ellipse(0, -5, 13, 10, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = c.dark; ctx.lineWidth = 2; ctx.stroke();
+  // 눈
+  ctx.fillStyle = "#3A2E4D"; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 2;
+  const dizzy = Math.abs(b.w) > 12;
+  if (dizzy) {
+    ctx.beginPath();
+    for (const s of [-1, 1]) { ctx.moveTo(s * 5 - 3, -9); ctx.lineTo(s * 5 + 3, -6); ctx.lineTo(s * 5 - 3, -3); }
+    ctx.stroke();
+  } else if (b.blink < 0.12) {
+    ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-3, -6); ctx.moveTo(3, -6); ctx.lineTo(8, -6); ctx.stroke();
+  } else {
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 5, -6, 2.6, 0, 7); ctx.fill(); }
+  }
+  // 볼·입
+  ctx.fillStyle = "rgba(255,111,145,.5)";
+  ctx.beginPath(); ctx.arc(-9, -1, 2.6, 0, 7); ctx.arc(9, -1, 2.6, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -1, dizzy ? 2.5 : 2.2, 0, Math.PI); ctx.stroke();
+  ctx.restore();
+  // 플레이어 표시 (2명일 때)
+  if (bunnies.length > 1) {
+    ctx.fillStyle = c.dark; ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(b.i === 0 ? "1P" : "2P", b.x, b.y - R - 48);
+  }
+}
+
+function updateParticles(dt) {
+  for (const p of particles) { p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.98; }
+  particles = particles.filter((p) => p.life > 0);
+}
+
+// =====================================================================
+//  HUD · 메뉴
+// =====================================================================
+const $ = (id) => document.getElementById(id);
+const fmt = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+
+function updateHud() {
+  $("hudLevel").textContent = (levelIdx + 1) + ". " + L.name;
+  $("hudTime").textContent = "⏱ " + fmt(playTime);
+  const total = L.carrots.length;
+  const got = bunnies.reduce((s, b) => s + b.carrots, 0);
+  if (numPlayers === 1) {
+    $("hudP1").innerHTML = `🥕 ${got} / ${total}`;
+    $("hudP2").style.display = "none";
+  } else {
+    $("hudP1").innerHTML = `<span class="dot" style="background:${COLORS[0].body}"></span>🥕 ${bunnies[0].carrots}`;
+    $("hudP2").innerHTML = `<span class="dot" style="background:${COLORS[1].body}"></span>🥕 ${bunnies[1].carrots}`;
+    $("hudP2").style.display = "";
+  }
+}
+
+const KEYS_HTML = () => numPlayers === 1
+  ? `<b>A D</b>/<b>← →</b> 굴러가기 · <b>W</b>/<b>↑</b>/<b>스페이스</b> 점프 · <b>S</b>/<b>↓</b>/<b>Shift</b> 꾹 눌러 잡기 · <b>Esc</b> 멈춤<br>게임패드도 돼요 · 휴대폰은 화면 버튼`
+  : `<b>1P</b> <b>A D</b> 굴러가기 · <b>W</b> 점프 · <b>S</b> 잡기 &nbsp; <b>2P</b> <b>← →</b> · <b>↑</b> · <b>↓</b><br>친구를 꾹 잡고 흔들다 놓으면 휙 던질 수 있어요 · 게임패드 2개도 돼요`;
+
+function starsFor(idx, carrots) {
+  const total = LEVELS[idx].carrots.length;
+  return carrots >= total ? 3 : carrots >= Math.ceil(total * 0.6) ? 2 : 1;
+}
+
+function buildMenu() {
+  $("p1Btn").className = numPlayers === 1 ? "sel" : "ghost";
+  $("p2Btn").className = numPlayers === 2 ? "sel" : "ghost";
+  const grid = $("levelGrid"); grid.innerHTML = "";
+  LEVELS.forEach((lv, i) => {
+    const best = save.best[i];
+    const el = document.createElement("div");
+    el.className = "lv";
+    const st = best ? "★".repeat(best.stars) + "☆".repeat(3 - best.stars) : "☆☆☆";
+    el.innerHTML = `<div class="num">${i + 1}</div><div class="nm">${lv.name}</div><div class="st">${st}</div><div class="bt">${best ? "⏱ " + fmt(best.time) : ""}</div>`;
+    el.addEventListener("click", () => { audioOn(); startLevel(i); });
+    grid.appendChild(el);
+  });
+  $("keysHelp").innerHTML = KEYS_HTML();
+}
+
+function show(id) { for (const p of ["menu", "pause", "result"]) $(p).classList.toggle("hidden", p !== id); }
+
+function startLevel(i) {
+  loadLevel(i);
+  state = "play";
+  show(null);
+  $("hud").classList.remove("hidden");
+  buildTouch();
+  touchEl.classList.toggle("hidden", !isTouch);
+  readInputCache = [{}, {}];
+  // 시작할 때 누르고 있던 키는 점프로 치지 않는다
+  bunnies.forEach((b) => { b.prevJ = true; });
+}
+
+function pauseGame() { if (state !== "play") return; state = "pause"; $("keysHelp2").innerHTML = KEYS_HTML(); show("pause"); touchEl.classList.add("hidden"); }
+function resumeGame() { state = "play"; show(null); touchEl.classList.toggle("hidden", !isTouch); lastT = performance.now(); }
+function toMenu() { state = "menu"; buildMenu(); show("menu"); $("hud").classList.add("hidden"); touchEl.classList.add("hidden"); loadDemo(); }
+
+function finishLevel() {
+  state = "result";
+  touchEl.classList.add("hidden");
+  const got = bunnies.reduce((s, b) => s + b.carrots, 0), total = L.carrots.length;
+  const stars = starsFor(levelIdx, got);
+  const prev = save.best[levelIdx];
+  const newBest = !prev || stars > prev.stars || (stars === prev.stars && playTime < prev.time);
+  save.best[levelIdx] = {
+    stars: Math.max(stars, prev ? prev.stars : 0),
+    time: prev ? Math.min(prev.time, playTime) : playTime,
+  };
+  writeSave();
+  $("resTitle").textContent = newBest && prev ? "도착! 새 기록!" : "도착!";
+  $("resStars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+  let info = `⏱ ${fmt(playTime)} &nbsp; 🥕 ${got} / ${total}`;
+  if (numPlayers === 2) {
+    const [a, b] = bunnies;
+    const who = a.carrots === b.carrots ? "둘이 똑같이 모았어요!" : (a.carrots > b.carrots ? "1P" : "2P") + "가 당근을 더 많이 모았어요!";
+    info += `<br><span style="color:${COLORS[0].body}">1P 🥕 ${a.carrots}</span> &nbsp; <span style="color:${COLORS[1].body}">2P 🥕 ${b.carrots}</span><br>${who}`;
+  }
+  if (stars < 3) info += `<br><span class="sub">당근을 ${stars < 2 ? Math.ceil(total * 0.6) : total}개 모으면 ★ 하나 더</span>`;
+  $("resInfo").innerHTML = info;
+  $("nextBtn").style.display = levelIdx < LEVELS.length - 1 ? "" : "none";
+  show("result");
+}
+
+$("p1Btn").onclick = () => { numPlayers = 1; buildMenu(); loadDemo(); };
+$("p2Btn").onclick = () => { numPlayers = 2; buildMenu(); loadDemo(); };
+$("pauseBtn").onclick = () => pauseGame();
+$("resumeBtn").onclick = () => resumeGame();
+$("retryBtn").onclick = () => startLevel(levelIdx);
+$("toMenuBtn").onclick = () => toMenu();
+$("nextBtn").onclick = () => startLevel(levelIdx + 1);
+$("againBtn").onclick = () => startLevel(levelIdx);
+$("resMenuBtn").onclick = () => toMenu();
+
+// 메뉴 뒤에서 토끼가 혼자 데굴데굴
+function loadDemo() { loadLevel(0); }
+let demoT = 0;
+function demoInput(i) {
+  const b = bunnies[i];
+  const goRight = Math.sin(demoT * 0.4 + i) > -0.3 && b.x < 1300;
+  return { l: !goRight && b.x > 100, r: goRight, j: Math.sin(demoT * 1.7 + i * 2) > 0.97, g: false };
+}
+
+// =====================================================================
+//  메인 루프
+// =====================================================================
+let readInputCache = [{}, {}];
+let lastT = performance.now(), acc = 0, manual = false;
+function frame(now) {
+  let dt = (now - lastT) / 1000; lastT = now;
+  if (dt > 0.1) dt = 0.1;
+  if (manual) { /* 검증 스크립트가 직접 물리를 돌리는 중 */ }
+  else if (state === "play" || state === "menu") {
+    if (state === "menu") { demoT += dt; for (let i = 0; i < bunnies.length; i++) readInputCache[i] = demoInput(i); }
+    else for (let i = 0; i < bunnies.length; i++) readInputCache[i] = readInput(i);
+    acc += dt;
+    while (acc >= DT) { physicsStep(); acc -= DT; }
+    for (const b of bunnies) { b.blink -= dt; if (b.blink < 0) b.blink = 2 + Math.random() * 3; }
+    if (state === "play") {
+      if (clearT < 0) playTime += dt;
+      else { clearT += dt; if (clearT > 1.6) finishLevel(); }
+      updateHud();
+    }
+  } else if (state === "result") {
+    acc += dt; while (acc >= DT) { simTime += DT; acc -= DT; }
+  }
+  updateParticles(dt);
+  updateCamera(dt);
+  drawBackground();
+  drawWorld();
+  requestAnimationFrame(frame);
+}
+
+buildMenu();
+loadDemo();
+requestAnimationFrame(frame);
+
+// 검증용 (게임에는 영향 없음)
+window.__hop = { get bunnies() { return bunnies; }, get L() { return L; }, get state() { return state; },
+  startLevel,
+  step: (n, inputs) => { manual = true; for (let k = 0; k < n; k++) { readInputCache = inputs; physicsStep(); } },
+  auto: () => { manual = false; }, setPlayers: (n) => { numPlayers = n; }, get playTime() { return playTime; } };
+</script>
+</body>
+</html>
