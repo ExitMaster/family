@@ -156,7 +156,13 @@
 // =====================================================================
 const DT = 1 / 120;            // 물리 한 걸음 (초)
 const GRAV = 1500;             // 중력 (px/s²)
-const R = 20;                  // 토끼 반지름
+const HH = 15, RC = 15;        // 몸: 원 3개(반지름 RC)를 몸 축 위 -HH, 0, +HH 에 — 키 60, 폭 30
+const TOP = HH + RC;           // 몸 중심에서 머리 끝까지
+const BODY_S = [HH, 0, -HH];   // 머리 · 배 · 엉덩이
+const INERTIA = ((2 * TOP) ** 2 + (2 * RC) ** 2) / 12;   // 질량 1 기준 회전 관성
+const HAND_S = 6;              // 손(어깨 사이)이 몸 축 위 어디인지
+const ARM_SEG = 11;            // 팔 마디 길이
+const UPRIGHT = 90;            // 가만히 있으면 일어서는 힘
 const ROLL_ACC = 34;           // 땅에서 굴리는 힘 (rad/s²)
 const AIR_SPIN = 22;           // 공중에서 도는 힘
 const MAX_SPIN = 16;           // 최대 회전 속도 (rad/s)
@@ -167,10 +173,10 @@ const PAD_V = 1060;            // 통통 발판 속도
 const PUMP = 1900;             // 고리에 매달려 흔드는 힘
 const MAX_SWING = 760;         // 고리에서 도는 최고 속도
 const MAX_SPEED = 1100;
-const RING_LEN = R + 14;       // 고리 잡았을 때 팔 길이
-const PAIR_LEN = R * 2 + 6;    // 친구 손 잡았을 때 거리
-const GRAB_REACH_RING = R + 36;
-const GRAB_REACH_PAIR = R * 2 + 20;
+const RING_LEN = 24;           // 고리 잡았을 때 손~고리 거리 (팔 길이)
+const PAIR_LEN = 24;           // 친구 잡았을 때
+const GRAB_REACH_RING = 50;
+const GRAB_REACH_PAIR = 40;
 const BOTTOM = 1500;
 const SAVE_KEY = "hoproll-v1";
 
@@ -203,7 +209,7 @@ const LEVELS = [
     checks: c2([[1640, 500], [2220, 500]]),
     carrots: c2([[350, 455], [450, 455], [800, 385], [900, 385], [1000, 385], [1480, 420], [1700, 455], [1870, 345],
       [1870, 255], [2100, 455], [2420, 350], [2570, 340], [2495, 470], [2800, 440], [3000, 440], [3150, 455]]),
-    signs: [[200, 500, "◀ ▶ 데굴데굴"], [1280, 500, "점프! 물 조심"], [1690, 500, "공중에서 빙글빙글"], [2200, 500, "고리를 잡고 흔들다 놓기!"]],
+    signs: [[200, 500, "◀ ▶ 데굴데굴"], [1280, 500, "점프! 물 조심"], [1690, 500, "공중에서 빙글빙글"], [2110, 500, "고리를 잡고 흔들다 놓기!"]],
   },
   {
     name: "통통 절벽", start: [120, 470], goal: [3450, 260],
@@ -380,13 +386,20 @@ let clearT = -1;
 function makeBunny(i, x, y) {
   const b = { i, col: COLORS[i], x, y, vx: 0, vy: 0, a: 0, w: 0, groundT: 9, gn: { x: 0, y: -1 },
     grab: null, grabLen: 0, regrabT: 0, lastRing: null, lastRingT: 0, prevJ: false, jumpBuf: 0, carrots: 0, blink: 2 + Math.random() * 3, squash: 0,
-    in: { l: false, r: false, j: false, g: false }, ears: [] };
-  for (let e = 0; e < 2; e++) {
-    const pts = [];
-    for (let k = 0; k < 4; k++) pts.push({ x, y: y - R - k * 9, px: x, py: y - R - k * 9 });
-    b.ears.push(pts);
-  }
+    in: { l: false, r: false, j: false, g: false }, ears: [], arms: [] };
+  resetLimbs(b);
   return b;
+}
+
+// 귀·팔 줄을 몸 위치로 다시 맞춘다 (리스폰·순간이동 때)
+function resetLimbs(b) {
+  b.ears = []; b.arms = [];
+  for (let e = 0; e < 2; e++) {
+    const ear = [], arm = [];
+    for (let k = 0; k < 4; k++) ear.push({ x: b.x, y: b.y - TOP - k * 9, px: b.x, py: b.y - TOP - k * 9 });
+    for (let k = 0; k < 3; k++) arm.push({ x: b.x, y: b.y + k * 10, px: b.x, py: b.y + k * 10 });
+    b.ears.push(ear); b.arms.push(arm);
+  }
 }
 
 function loadLevel(idx) {
@@ -426,113 +439,139 @@ function updateMovers(t) {
   }
 }
 
-function collideCircleSeg(b, ax, ay, bx, by, poly) {
+// 몸은 세로로 긴 콩 모양: 몸 축 위의 원 3개(머리·배·엉덩이)로 부딪힌다.
+// 축 방향 u = (sin a, -cos a) 가 "머리 쪽".
+const axis = (b) => [Math.sin(b.a), -Math.cos(b.a)];
+
+function collideBall(b, s, ax, ay, bx, by, poly) {
+  const [ux, uy] = axis(b);
+  const cx = b.x + ux * s, cy = b.y + uy * s;
   const ex = bx - ax, ey = by - ay, len2 = ex * ex + ey * ey;
-  let t = ((b.x - ax) * ex + (b.y - ay) * ey) / len2;
+  let t = ((cx - ax) * ex + (cy - ay) * ey) / len2;
   t = t < 0 ? 0 : t > 1 ? 1 : t;
-  const px = ax + ex * t, py = ay + ey * t;
-  let dx = b.x - px, dy = b.y - py;
+  const dx = cx - (ax + ex * t), dy = cy - (ay + ey * t);
   const d2 = dx * dx + dy * dy;
-  if (d2 >= R * R) return;
+  if (d2 >= RC * RC) return;
   const d = Math.sqrt(d2) || 0.0001;
   const nx = dx / d, ny = dy / d;
-  b.x += nx * (R - d); b.y += ny * (R - d);
+  b.x += nx * (RC - d); b.y += ny * (RC - d);
 
-  // 접점 속도 (발판이 움직이면 그만큼 뺀다)
-  const rvx = b.vx - poly.vx, rvy = b.vy - poly.vy;
-  const vn = rvx * nx + rvy * ny;
-  const isPad = poly.kind === "pad" && ny < -0.7;
-  if (isPad) {
+  if (poly.kind === "pad" && ny < -0.7) {
+    const vn = (b.vx - poly.vx) * nx + (b.vy - poly.vy) * ny;
     if (vn < PAD_V * 0.5) {
-      b.vx += nx * (PAD_V - vn); b.vy += ny * (PAD_V - vn);
-      b.squash = 1; SFX.pad(); puff(b.x, b.y + R, "#FFD166", 6);
+      b.vx += nx * (PAD_V - vn); b.vy += ny * (PAD_V - vn); b.w *= 0.6;
+      b.squash = 1; SFX.pad(); puff(cx, cy + RC, "#FFD166", 6);
     }
     return;
   }
+  // 접점까지의 팔 (몸 중심 → 닿은 곳)
+  const rx = ux * s - nx * RC, ry = uy * s - ny * RC;
+  let vpx = b.vx - b.w * ry - poly.vx, vpy = b.vy + b.w * rx - poly.vy;
+  const vn = vpx * nx + vpy * ny;
   let jn = 0;
   if (vn < 0) {
-    jn = -(1 + 0.08) * vn;
-    b.vx += nx * jn; b.vy += ny * jn;
+    const rn = rx * ny - ry * nx;
+    jn = -(1 + 0.05) * vn / (1 + rn * rn / INERTIA);
+    b.vx += nx * jn; b.vy += ny * jn; b.w += rn * jn / INERTIA;
     if (vn < -500) b.squash = Math.min(1, -vn / 1200);
   }
-  // 마찰: 구르기 ↔ 이동
+  // 마찰: 넘어지고 구르는 힘이 이동으로 바뀐다
+  vpx = b.vx - b.w * ry - poly.vx; vpy = b.vy + b.w * rx - poly.vy;
   const tx = -ny, ty = nx;
-  const cvx = b.vx - poly.vx + (-b.w * (-ny * R)), cvy = b.vy - poly.vy + (b.w * (-nx * R));
-  const vt = cvx * tx + cvy * ty;
-  let jt = -vt / 3;                       // 원판: 1/m + r²/I = 3
-  const maxF = 1.0 * (jn + GRAV * DT);    // 쿨롱 마찰
+  const vt = vpx * tx + vpy * ty, rt = rx * ty - ry * tx;
+  let jt = -vt / (1 + rt * rt / INERTIA);
+  const maxF = 0.9 * (jn + GRAV * DT);
   if (jt > maxF) jt = maxF; else if (jt < -maxF) jt = -maxF;
-  b.vx += tx * jt; b.vy += ty * jt;
-  b.w += (-R * jt) / (0.5 * R * R);
+  b.vx += tx * jt; b.vy += ty * jt; b.w += rt * jt / INERTIA;
 
-  if (ny < 0.3) {  // 천장이 아니면 점프할 수 있는 면
-    b.groundT = 0; b.gn.x = nx; b.gn.y = ny; b.groundPoly = poly;
-  }
+  if (ny < 0.3) { b.groundT = 0; b.gn.x = nx; b.gn.y = ny; b.groundPoly = poly; b.footS = s; }
 }
 
 function collideWorld(b) {
+  const E = TOP + 2;
   for (const p of L.polys) {
     const bb = p.bb;
-    if (b.x + R < bb.x1 + p.ox || b.x - R > bb.x2 + p.ox || b.y + R < bb.y1 + p.oy || b.y - R > bb.y2 + p.oy) continue;
+    if (b.x + E < bb.x1 + p.ox || b.x - E > bb.x2 + p.ox || b.y + E < bb.y1 + p.oy || b.y - E > bb.y2 + p.oy) continue;
     const pts = p.pts, n = pts.length;
-    for (let k = 0; k < n; k++) {
+    for (const s of BODY_S) for (let k = 0; k < n; k++) {
       const a = pts[k], c = pts[(k + 1) % n];
-      collideCircleSeg(b, a.x + p.ox, a.y + p.oy, c.x + p.ox, c.y + p.oy, p);
+      collideBall(b, s, a.x + p.ox, a.y + p.oy, c.x + p.ox, c.y + p.oy, p);
     }
   }
 }
 
 function collidePair(a, b) {
-  let dx = a.x - b.x, dy = a.y - b.y;
-  const d2 = dx * dx + dy * dy;
-  if (d2 >= 4 * R * R || d2 === 0) return;
-  const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, pen = 2 * R - d;
-  a.x += nx * pen / 2; a.y += ny * pen / 2; b.x -= nx * pen / 2; b.y -= ny * pen / 2;
-  const vn = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
-  if (vn < 0) {
-    const j = -(1 + 0.15) * vn / 2;
-    a.vx += nx * j; a.vy += ny * j; b.vx -= nx * j; b.vy -= ny * j;
+  if (Math.abs(a.x - b.x) > TOP * 2 + 4 || Math.abs(a.y - b.y) > TOP * 2 + 4) return;
+  const [aux, auy] = axis(a), [bux, buy] = axis(b);
+  for (const sa of BODY_S) for (const sb of BODY_S) {
+    const ax = a.x + aux * sa, ay = a.y + auy * sa, bx = b.x + bux * sb, by = b.y + buy * sb;
+    const dx = ax - bx, dy = ay - by, d2 = dx * dx + dy * dy;
+    if (d2 >= 4 * RC * RC || d2 === 0) continue;
+    const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, pen = 2 * RC - d;
+    a.x += nx * pen / 2; a.y += ny * pen / 2; b.x -= nx * pen / 2; b.y -= ny * pen / 2;
+    const rax = aux * sa - nx * RC, ray = auy * sa - ny * RC, rbx = bux * sb + nx * RC, rby = buy * sb + ny * RC;
+    const vn = (a.vx - a.w * ray - b.vx + b.w * rby) * nx + (a.vy + a.w * rax - b.vy - b.w * rbx) * ny;
+    if (vn < 0) {
+      const rna = rax * ny - ray * nx, rnb = rbx * ny - rby * nx;
+      const j = -(1 + 0.1) * vn / (2 + rna * rna / INERTIA + rnb * rnb / INERTIA);
+      a.vx += nx * j; a.vy += ny * j; a.w += rna * j / INERTIA;
+      b.vx -= nx * j; b.vy -= ny * j; b.w -= rnb * j / INERTIA;
+    }
+    // 친구 위에 올라선 쪽은 점프할 수 있다
+    if (ny < -0.5) { a.groundT = 0; a.gn.x = nx; a.gn.y = ny; a.groundPoly = null; }
+    if (ny > 0.5) { b.groundT = 0; b.gn.x = -nx; b.gn.y = -ny; b.groundPoly = null; }
   }
-  // 친구 머리 위에 서 있을 수 있게: 위에 있는 쪽은 점프 가능
-  if (ny < -0.5) { a.groundT = 0; a.gn.x = nx; a.gn.y = ny; a.groundPoly = null; }
-  if (ny > 0.5) { b.groundT = 0; b.gn.x = -nx; b.gn.y = -ny; b.groundPoly = null; }
 }
+
+// 손 = 어깨 사이 (몸 축 위 HAND_S)
+function handPos(b) { const [ux, uy] = axis(b); return [b.x + ux * HAND_S, b.y + uy * HAND_S, ux * HAND_S, uy * HAND_S]; }
 
 function solveGrab(b) {
   const g = b.grab;
   if (!g) return;
-  if (b.grabLen > g.len) b.grabLen = Math.max(g.len, b.grabLen - 500 * DT);
-  if (g.type === "ring") {
-    const dx = b.x - g.ring.x, dy = b.y - g.ring.y, d = Math.hypot(dx, dy) || 0.001;
-    const nx = dx / d, ny = dy / d;
-    b.x = g.ring.x + nx * b.grabLen; b.y = g.ring.y + ny * b.grabLen;
-    const vr = b.vx * nx + b.vy * ny;
-    b.vx -= vr * nx; b.vy -= vr * ny;
-  } else {
-    const o = g.other;
-    const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy) || 0.001;
-    const nx = dx / d, ny = dy / d, err = d - b.grabLen;
-    const wa = o.grab && o.grab.type === "ring" ? 1 : 0.5;  // 고리에 매달린 친구는 거의 고정
-    b.x -= nx * err * wa; b.y -= ny * err * wa;
-    o.x += nx * err * (1 - wa); o.y += ny * err * (1 - wa);
-    const vr = (b.vx - o.vx) * nx + (b.vy - o.vy) * ny;
-    b.vx -= nx * vr * wa; b.vy -= ny * vr * wa;
-    o.vx += nx * vr * (1 - wa); o.vy += ny * vr * (1 - wa);
+  if (b.grabLen > g.len) b.grabLen = Math.max(g.len, b.grabLen - 400 * DT);
+  const [hx, hy, rx, ry] = handPos(b);
+  let tx, ty, o = null, orx = 0, ory = 0;
+  if (g.type === "ring") { tx = g.ring.x; ty = g.ring.y; }
+  else {
+    o = g.other; const [oux, ouy] = axis(o);
+    orx = oux * g.s; ory = ouy * g.s; tx = o.x + orx; ty = o.y + ory;
   }
+  const dx = hx - tx, dy = hy - ty, d = Math.hypot(dx, dy) || 0.001;
+  if (d <= b.grabLen) return;                     // 줄처럼: 당길 때만 힘
+  const nx = dx / d, ny = dy / d, err = d - b.grabLen;
+  const fixed = !o || (o.grab && o.grab.type === "ring");
+  const wa = fixed ? 1 : 0.5;
+  b.x -= nx * err * wa; b.y -= ny * err * wa;
+  if (!fixed) { o.x += nx * err * (1 - wa); o.y += ny * err * (1 - wa); }
+  const rna = rx * ny - ry * nx;
+  let vr = (b.vx - b.w * ry) * nx + (b.vy + b.w * rx) * ny, k = 1 + rna * rna / INERTIA, rnb = 0;
+  if (!fixed) {
+    vr -= (o.vx - o.w * ory) * nx + (o.vy + o.w * orx) * ny;
+    rnb = orx * ny - ory * nx; k += 1 + rnb * rnb / INERTIA;
+  }
+  if (vr <= 0) return;
+  const j = -vr / k;
+  b.vx += nx * j; b.vy += ny * j; b.w += rna * j / INERTIA;
+  if (!fixed) { o.vx -= nx * j; o.vy -= ny * j; o.w -= rnb * j / INERTIA; }
 }
 
 function tryGrab(b) {
+  const [hx, hy] = handPos(b);
   let best = null, bd = 1e9;
   for (const r of L.rings) {
     if (r === b.lastRing && b.lastRingT > 0) continue;
-    const d = Math.hypot(b.x - r.x, b.y - r.y);
+    const d = Math.hypot(hx - r.x, hy - r.y);
     if (d < GRAB_REACH_RING && d < bd) { bd = d; best = { type: "ring", ring: r, len: RING_LEN }; }
   }
   if (!best) {
     for (const o of bunnies) {
       if (o === b) continue;
-      const d = Math.hypot(b.x - o.x, b.y - o.y);
-      if (d < GRAB_REACH_PAIR && d < bd) { bd = d; best = { type: "pair", other: o, len: PAIR_LEN }; }
+      const [oux, ouy] = axis(o);
+      for (const s of BODY_S) {
+        const d = Math.hypot(hx - (o.x + oux * s), hy - (o.y + ouy * s));
+        if (d < GRAB_REACH_PAIR && d < bd) { bd = d; best = { type: "pair", other: o, s, len: PAIR_LEN }; }
+      }
     }
   }
   if (best) { b.grab = best; b.grabLen = Math.max(best.len, bd); SFX.grab(); }
@@ -557,11 +596,13 @@ function respawn(b, splash) {
   release(b);
   for (const o of bunnies) if (o.grab && o.grab.other === b) release(o);
   const off = (b.i - (bunnies.length - 1) / 2) * 44;
-  b.x = checkpoint.x + off; b.y = checkpoint.y - 40; b.vx = b.vy = 0; b.w = 0; b.a = 0;
+  b.x = checkpoint.x + off; b.y = checkpoint.y - 6; b.vx = b.vy = 0; b.w = 0; b.a = 0;
   b.groundT = 9;
-  for (const ear of b.ears) for (const q of ear) { q.x = q.px = b.x; q.y = q.py = b.y - R; }
+  resetLimbs(b);
   puff(b.x, b.y, "#fff", 10);
 }
+
+const wrapAngle = (a) => { a = (a + Math.PI) % (2 * Math.PI); if (a < 0) a += 2 * Math.PI; return a - Math.PI; };
 
 function stepBunny(b) {
   const inp = b.in;
@@ -578,28 +619,29 @@ function stepBunny(b) {
     const tx = dy / d, ty = -dx / d;          // 고리 아래에서 오른쪽 = +x
     const vt = b.vx * tx + b.vy * ty;
     if (dir && vt * dir < MAX_SWING) { b.vx += tx * dir * PUMP * DT; b.vy += ty * dir * PUMP * DT; }
-    b.w += dir * AIR_SPIN * DT;
   } else if (onGround) {
     b.w += dir * ROLL_ACC * DT;
     b.vx += dir * GROUND_PUSH * DT * Math.max(0, -b.gn.y);
+    // 손을 놓고 있으면 오뚝이처럼 슬금슬금 일어선다
+    if (!dir) b.w -= Math.sin(wrapAngle(b.a)) * UPRIGHT * DT;
   } else {
     b.w += dir * AIR_SPIN * DT;
     b.vx += dir * AIR_PUSH * DT;
   }
   if (b.w > MAX_SPIN) b.w = MAX_SPIN; else if (b.w < -MAX_SPIN) b.w = -MAX_SPIN;
-  if (!dir && onGround) b.w *= 0.985;
+  if (!dir && onGround) b.w *= 0.97;
   b.w *= 0.998;
 
   b.vy += GRAV * DT;
   b.vx *= 0.9995;
 
-  // 점프
+  // 점프: 땅 쪽에서 밀어내되, 몸이 기운 쪽으로 조금 휜다
   if (b.jumpBuf > 0) {
     if (b.grab && b.grab.type === "ring") {
       flingFromRing(b, dir, 160); b.jumpBuf = 0; b.regrabT = 0.15; SFX.jump();
     } else if (b.groundT < 0.12) {
       if (b.grab) release(b);
-      const ux = Math.sin(b.a), uy = -Math.cos(b.a);
+      const [ux, uy] = axis(b);
       let dx = ux * 0.3 + b.gn.x * 0.7, dy = uy * 0.3 + b.gn.y * 0.7;
       let dl = Math.hypot(dx, dy) || 1; dx /= dl; dy /= dl;
       if (dx * b.gn.x + dy * b.gn.y < 0.5) { dx = b.gn.x; dy = b.gn.y; }
@@ -608,8 +650,9 @@ function stepBunny(b) {
       const vn = b.vx * b.gn.x + b.vy * b.gn.y;
       if (vn < 0) { b.vx -= vn * b.gn.x; b.vy -= vn * b.gn.y; }
       b.vx += dx * JUMP_V; b.vy += dy * JUMP_V;
+      b.w += dir * 4;                         // 누른 쪽으로 살짝 공중제비
       b.groundT = 9; b.jumpBuf = 0; b.squash = 0.6; SFX.jump();
-      puff(b.x - b.gn.x * R, b.y - b.gn.y * R, "#fff", 5);
+      puff(b.x - b.gn.x * 20, b.y - b.gn.y * 20, "#fff", 5);
     }
   }
 
@@ -626,28 +669,56 @@ function stepBunny(b) {
   if (!inp.g && b.grab) { if (b.grab.type === "ring") flingFromRing(b, dir, 0); else release(b); }
 }
 
-function stepEars(b) {
-  const ca = Math.cos(b.a), sa = Math.sin(b.a);
+// 몸 좌표(lx 오른쪽, ly 아래) → 월드
+function toWorld(b, lx, ly) { const ca = Math.cos(b.a), sa = Math.sin(b.a); return [b.x + lx * ca - ly * sa, b.y + lx * sa + ly * ca]; }
+
+function verletChain(pts, seg, grav, damp) {
+  for (let k = 1; k < pts.length; k++) {
+    const q = pts[k];
+    const vx = (q.x - q.px) * damp, vy = (q.y - q.py) * damp;
+    q.px = q.x; q.py = q.y; q.x += vx; q.y += vy + grav * DT * DT;
+  }
+}
+function chainLen(pts, seg) {
+  for (let it = 0; it < 3; it++) for (let k = 1; k < pts.length; k++) {
+    const a = pts[k - 1], q = pts[k];
+    const dx = q.x - a.x, dy = q.y - a.y, d = Math.hypot(dx, dy) || 1, f = (d - seg) / d;
+    if (k === 1) { q.x -= dx * f; q.y -= dy * f; }
+    else { a.x += dx * f * 0.5; a.y += dy * f * 0.5; q.x -= dx * f * 0.5; q.y -= dy * f * 0.5; }
+  }
+}
+
+function stepLimbs(b) {
+  // 귀: 후드 꼭대기에 달린 흐물흐물한 줄
   for (let e = 0; e < 2; e++) {
     const pts = b.ears[e], side = e === 0 ? -1 : 1;
-    // 뿌리 = 머리 위 (몸과 같이 돈다)
-    const lx = side * 8, ly = -R + 5;
-    pts[0].x = b.x + lx * ca - ly * sa; pts[0].y = b.y + lx * sa + ly * ca;
+    [pts[0].x, pts[0].y] = toWorld(b, side * 6, -TOP + 4);
+    verletChain(pts, 9, 700, 0.86);
     for (let k = 1; k < pts.length; k++) {
-      const q = pts[k];
-      const vx = (q.x - q.px) * 0.86, vy = (q.y - q.py) * 0.86;
-      q.px = q.x; q.py = q.y;
-      q.x += vx; q.y += vy + 600 * DT * DT;
-      // 원래 모양으로 살짝 돌아가려는 힘 (귀가 너무 축 처지지 않게)
-      const rx = side * (8 + k * 2.5), ry = -R + 5 - k * 8;
-      const tx = b.x + rx * ca - ry * sa, ty = b.y + rx * sa + ry * ca;
-      q.x += (tx - q.x) * 0.12; q.y += (ty - q.y) * 0.12;
+      const [tx, ty] = toWorld(b, side * (6 + k * 2.5), -TOP + 4 - k * 9);
+      pts[k].x += (tx - pts[k].x) * 0.1; pts[k].y += (ty - pts[k].y) * 0.1;
     }
-    for (let it = 0; it < 2; it++) for (let k = 1; k < pts.length; k++) {
-      const a = pts[k - 1], q = pts[k];
-      const dx = q.x - a.x, dy = q.y - a.y, d = Math.hypot(dx, dy) || 1, f = (d - 8) / d;
-      q.x -= dx * f; q.y -= dy * f;
+    chainLen(pts, 9);
+  }
+  // 팔: 어깨에서 축 늘어져 흔들, 잡고 있으면 잡은 곳으로 쭉
+  let target = null;
+  if (b.grab) {
+    if (b.grab.type === "ring") target = [b.grab.ring.x, b.grab.ring.y];
+    else { const [oux, ouy] = axis(b.grab.other); target = [b.grab.other.x + oux * b.grab.s, b.grab.other.y + ouy * b.grab.s]; }
+  }
+  for (let e = 0; e < 2; e++) {
+    const pts = b.arms[e], side = e === 0 ? -1 : 1;
+    [pts[0].x, pts[0].y] = toWorld(b, side * (RC - 3), -HAND_S);
+    verletChain(pts, ARM_SEG, 1100, 0.9);
+    if (target) {
+      const h = pts[pts.length - 1];
+      h.x += (target[0] + side * 3 - h.x) * 0.6; h.y += (target[1] - h.y) * 0.6;
+    } else if (b.in && b.in.g) {
+      // 잡으려고 팔을 앞으로 쭉 (머리 쪽)
+      const [tx, ty] = toWorld(b, side * 10, -HAND_S - 22);
+      const h = pts[pts.length - 1]; h.x += (tx - h.x) * 0.3; h.y += (ty - h.y) * 0.3;
     }
+    chainLen(pts, target ? Math.max(ARM_SEG, Math.hypot(target[0] - pts[0].x, target[1] - pts[0].y) / 2) : ARM_SEG);
   }
 }
 
@@ -662,7 +733,7 @@ function physicsStep() {
     for (const b of bunnies) solveGrab(b);
   }
   for (const b of bunnies) collideWorld(b);
-  for (const b of bunnies) stepEars(b);
+  for (const b of bunnies) stepLimbs(b);
   if (clearT < 0) gameRules();
 }
 
@@ -676,13 +747,14 @@ function gameRules() {
     if (dead) { respawn(b, true); continue; }
     for (const c of L.carrots) {
       if (c.got >= 0) continue;
-      if (Math.hypot(b.x - c.x, b.y - c.y) < R + 16) {
+      const [ux, uy] = axis(b);
+      if (BODY_S.some((s2) => Math.hypot(b.x + ux * s2 - c.x, b.y + uy * s2 - c.y) < RC + 16)) {
         c.got = b.i; b.carrots++; SFX.carrot(); puff(c.x, c.y, "#FF9F43", 8);
       }
     }
     for (const ch of L.checks) {
       if (!ch.on && Math.abs(b.x - ch.x) < 40 && Math.abs(b.y - (ch.y - 30)) < 70) {
-        ch.on = true; checkpoint = { x: ch.x, y: ch.y - R }; SFX.check(); puff(ch.x, ch.y - 70, "#FFD166", 12);
+        ch.on = true; checkpoint = { x: ch.x, y: ch.y - TOP }; SFX.check(); puff(ch.x, ch.y - 70, "#FFD166", 12);
       }
     }
     if (Math.abs(b.x - L.goal.x) < 45 && b.y > L.goal.y - 130 && b.y < L.goal.y + 10) {
@@ -698,8 +770,8 @@ function gameRules() {
       if (lead.groundT < 0.1 && !lead.groundPoly?.mover && !lead.grab) {
         puff(tail.x, tail.y, "#fff", 10);
         release(tail);
-        tail.x = lead.x - 30; tail.y = lead.y - 60; tail.vx = tail.vy = 0; tail.w = 0;
-        for (const ear of tail.ears) for (const q of ear) { q.x = q.px = tail.x; q.y = q.py = tail.y - R; }
+        tail.x = lead.x - 30; tail.y = lead.y - 70; tail.vx = tail.vy = 0; tail.w = 0;
+        tail.a = 0; resetLimbs(tail);
         puff(tail.x, tail.y, "#fff", 10);
       }
     }
@@ -731,7 +803,7 @@ function updateCamera(dt) {
   if (!bunnies.length) return;
   let x1 = 1e9, x2 = -1e9, y1 = 1e9, y2 = -1e9;
   for (const b of bunnies) { x1 = Math.min(x1, b.x); x2 = Math.max(x2, b.x); y1 = Math.min(y1, b.y); y2 = Math.max(y2, b.y); }
-  const base = Math.min(VW / (VW < VH ? 560 : 900), VH / 520);   // 세로 화면은 더 가까이
+  const base = Math.min(VW / (VW < VH ? 500 : 780), VH / 450);   // 세로 화면은 더 가까이
   const fit = Math.min(VW / (x2 - x1 + 520), VH / (y2 - y1 + 380));
   const z = Math.max(base * 0.5, Math.min(base, fit));
   const lead = bunnies.reduce((s, b) => s + b.vx, 0) / bunnies.length;
@@ -860,8 +932,7 @@ function drawWorld() {
     drawCarrot(c.x, c.y + Math.sin(t * 3 + c.t) * 4, 1, Math.sin(t * 2 + c.t) * 0.2);
   }
   // 토끼
-  for (const b of bunnies) drawArm(b);
-  for (const b of bunnies) drawBunny(b);
+  for (const b of bunnies) drawBunnyAll(b);
   // 입자
   for (const p of particles) {
     ctx.globalAlpha = Math.max(0, p.life / p.max);
@@ -888,70 +959,94 @@ function drawCarrot(x, y, s, rot) {
   ctx.restore();
 }
 
-function drawArm(b) {
-  if (!b.grab) return;
-  const tx = b.grab.type === "ring" ? b.grab.ring.x : b.grab.other.x;
-  const ty = b.grab.type === "ring" ? b.grab.ring.y : b.grab.other.y;
-  const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy) || 1;
-  const reach = b.grab.type === "ring" ? d : d - R + 4;
-  const hx = b.x + dx / d * reach, hy = b.y + dy / d * reach;
-  ctx.strokeStyle = b.col.dark; ctx.lineWidth = 9; ctx.lineCap = "round";
-  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(hx, hy); ctx.stroke();
-  ctx.strokeStyle = b.col.body; ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(hx, hy); ctx.stroke();
-  ctx.fillStyle = "#FFE0BD"; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(hx, hy, 6, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.lineCap = "butt";
+function drawArms(b) {
+  const c = b.col;
+  for (const arm of b.arms) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 10;
+    ctx.beginPath(); arm.forEach((q, k) => k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+    ctx.strokeStyle = c.body; ctx.lineWidth = 6; ctx.stroke();
+    const h = arm[arm.length - 1];
+    ctx.fillStyle = c.belly; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(h.x, h.y, 5.5, 0, 7); ctx.fill(); ctx.stroke();   // 벙어리장갑
+  }
+  ctx.lineCap = "butt"; ctx.lineJoin = "miter";
+}
+
+function capsulePath(hh, r) {
+  ctx.beginPath();
+  ctx.arc(0, -hh, r, Math.PI, 0);
+  ctx.lineTo(r, hh);
+  ctx.arc(0, hh, r, 0, Math.PI);
+  ctx.closePath();
 }
 
 function drawBunny(b) {
   const c = b.col;
-  // 귀
+  // 귀 (후드에 달린 긴 귀)
   for (const ear of b.ears) {
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 15;
+    ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 14;
     ctx.beginPath(); ear.forEach((q, k) => k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
-    ctx.strokeStyle = c.body; ctx.lineWidth = 10; ctx.stroke();
-    ctx.strokeStyle = c.ear; ctx.lineWidth = 4;
-    ctx.beginPath(); ear.slice(1).forEach((q, k) => k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+    ctx.strokeStyle = c.body; ctx.lineWidth = 9; ctx.stroke();
+    ctx.strokeStyle = c.ear; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ear.slice(1, 3).forEach((q, k) => k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
   }
   ctx.lineCap = "butt"; ctx.lineJoin = "miter";
   ctx.save();
   ctx.translate(b.x, b.y);
-  // 찌그러짐 (착지·발판)
-  const sq = b.squash * 0.25;
   ctx.rotate(b.a);
+  const sq = b.squash * 0.2;
   ctx.scale(1 + sq, 1 - sq);
-  // 발
-  ctx.fillStyle = c.body; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 3;
-  for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 9, R - 2, 8, 5, 0, 0, 7); ctx.fill(); ctx.stroke(); }
-  // 몸 (토끼옷)
-  ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = c.belly; ctx.beginPath(); ctx.ellipse(0, 8, 11, 9, 0, 0, 7); ctx.fill();
-  // 얼굴 구멍 (옷 속 얼굴)
-  ctx.fillStyle = "#FFE0BD"; ctx.beginPath(); ctx.ellipse(0, -5, 13, 10, 0, 0, 7); ctx.fill();
-  ctx.strokeStyle = c.dark; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 3;
+  // 발 (옷에 달린 동그란 발)
+  ctx.fillStyle = c.belly;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 8, HH + RC - 3, 7.5, 5, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+  // 꼬리 (옆으로 살짝 보이는 솜뭉치)
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(RC - 1, HH - 2, 5.5, 0, 7); ctx.fill(); ctx.stroke();
+  // 몸 (한 벌짜리 토끼옷)
+  ctx.fillStyle = c.body;
+  capsulePath(HH, RC); ctx.fill(); ctx.stroke();
+  // 배 무늬 + 지퍼
+  ctx.fillStyle = c.belly;
+  ctx.beginPath(); ctx.ellipse(0, HH - 3, 10, 13, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = c.dark; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(0, -HH + 11); ctx.lineTo(0, HH + 6); ctx.stroke();
+  ctx.fillStyle = "#E8C547"; ctx.beginPath(); ctx.arc(0, -HH + 13, 2, 0, 7); ctx.fill();
+  // 후드 구멍으로 보이는 얼굴
+  ctx.fillStyle = "#FFE0BD";
+  ctx.beginPath(); ctx.ellipse(0, -HH + 1, 11, 9.5, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = c.dark; ctx.lineWidth = 2.5; ctx.stroke();
+  // 앞머리
+  ctx.fillStyle = "#6B4A3A";
+  ctx.beginPath(); ctx.ellipse(-3, -HH - 6, 7, 3.2, -0.25, 0, 7); ctx.ellipse(4, -HH - 6.5, 5, 2.8, 0.3, 0, 7); ctx.fill();
   // 눈
   ctx.fillStyle = "#3A2E4D"; ctx.strokeStyle = "#3A2E4D"; ctx.lineWidth = 2;
-  const dizzy = Math.abs(b.w) > 12;
+  const ey = -HH + 1, dizzy = Math.abs(b.w) > 10;
   if (dizzy) {
     ctx.beginPath();
-    for (const s of [-1, 1]) { ctx.moveTo(s * 5 - 3, -9); ctx.lineTo(s * 5 + 3, -6); ctx.lineTo(s * 5 - 3, -3); }
+    for (const s of [-1, 1]) { ctx.moveTo(s * 4.5 - 2.5, ey - 2.5); ctx.lineTo(s * 4.5 + 2.5, ey); ctx.lineTo(s * 4.5 - 2.5, ey + 2.5); }
     ctx.stroke();
   } else if (b.blink < 0.12) {
-    ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-3, -6); ctx.moveTo(3, -6); ctx.lineTo(8, -6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-7, ey); ctx.lineTo(-2.5, ey); ctx.moveTo(2.5, ey); ctx.lineTo(7, ey); ctx.stroke();
   } else {
-    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 5, -6, 2.6, 0, 7); ctx.fill(); }
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 4.5, ey, 2.3, 0, 7); ctx.fill(); }
   }
-  // 볼·입
-  ctx.fillStyle = "rgba(255,111,145,.5)";
-  ctx.beginPath(); ctx.arc(-9, -1, 2.6, 0, 7); ctx.arc(9, -1, 2.6, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.arc(0, -1, dizzy ? 2.5 : 2.2, 0, Math.PI); ctx.stroke();
+  ctx.fillStyle = "rgba(255,111,145,.55)";
+  ctx.beginPath(); ctx.arc(-7.5, ey + 4, 2.2, 0, 7); ctx.arc(7.5, ey + 4, 2.2, 0, 7); ctx.fill();
+  ctx.beginPath();
+  if (dizzy || b.groundT > 0.3) { ctx.ellipse(0, ey + 5, 1.8, 2.2, 0, 0, 7); ctx.fill(); }   // 공중에선 "오!"
+  else { ctx.arc(0, ey + 3.5, 2, 0, Math.PI); ctx.stroke(); }
   ctx.restore();
-  // 플레이어 표시 (2명일 때)
+}
+
+function drawBunnyAll(b) {
+  drawArms(b);
+  drawBunny(b);
   if (bunnies.length > 1) {
-    ctx.fillStyle = c.dark; ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(b.i === 0 ? "1P" : "2P", b.x, b.y - R - 48);
+    ctx.fillStyle = b.col.dark; ctx.font = "bold 14px Trebuchet MS, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText(b.i === 0 ? "1P" : "2P", b.x, b.y - TOP - 40);
   }
 }
 
