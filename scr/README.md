@@ -55,20 +55,36 @@ and **C** still changes its colour.
 
 The traffic on the roads is made of real cars too.
 
+## Bombs
+
+The **fighter jets** (Thunder, Comet, Hog, Tiger, Lightning, Delta Dart, Viper, Raptor and
+Swing Wing) carry **2 bombs** on a rack under the belly. Press **X** (or the red **BOMB**
+button) to drop one: it falls under gravity and **blows up** on the ground, with a big
+blast that can take out enemy planes nearby. Land to reload.
+
+## More secrets
+
+- **The Konami code:** press **↑ ↑ ↓ ↓ ← → ← → B A** anywhere to unlock every secret and get
+  **+50,000 points**.
+- **Console cheats (F12):** open DevTools and type **`cheats.help()`** in the Console for a
+  hidden menu — `cheats.code()` (the door code), `cheats.points(n)`, `cheats.unlock()`,
+  `cheats.ufo()` and `cheats.land()`.
+- **The UFO 🛸:** a secret flying saucer with a glass dome and a spinning ring of lights.
+  It's super nimble. Unlock it with the secret room, the Konami code, or `cheats.ufo()`.
+
 ## Secret doors
 
 There are three **secret doors**: in the back wall of **your house**, in a big **rock on
-your island**, and in a **rocky hill** next to your house in the world. They only open
-with the **password**. Behind every one is the same **secret room**:
+your island**, and in a **rocky hill** next to your house in the world. They only open with a **secret code** that changes every time you load the game. Behind every one is the same **secret room**:
 
 - a **treasure chest** with 10,000 points in it (once a day),
 - the secret **Sky Rocket** car (650 km/h), which then shows up in your garage,
-- the secret **Golden Comet** plane (solid gold, Mach 1.67 on boost, easy to land, with a floating **한정우의 비행기**
-  name tag above it), which then shows up in the planes on the start card.
+- the secret **Rainbow Comet** plane (rainbow-coloured, Mach 1.67 on boost, easy to land), which then shows up in the planes on the start card.
 
-The password isn't written anywhere in the game: only a salted PBKDF2-SHA-256 hash of it.
-When you type the password, it's hashed the same way and the two hashes are compared.
-After five wrong tries, the door waits 30 seconds.
+The code **changes every time you load the game**, so you can't just remember it. To find it,
+open the browser's **DevTools** (press **F12**) and read it in the **Console** — the real
+hackers' way in. Type it at the door (upper- or lower-case both work). After five wrong tries,
+the door waits 30 seconds.
 
 ## Gravity
 

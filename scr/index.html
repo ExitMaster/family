@@ -225,6 +225,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="freebar">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
       <button class="ap fire" id="btn-fire" aria-label="Fire a missile (S)">FIRE</button>
+      <button class="ap fire" id="btn-bomb" aria-label="Drop a bomb (X)" hidden>BOMB</button>
       <button class="ap" id="btn-land" aria-label="Auto-land at the nearest airport">LAND</button>
       <button class="ap" id="btn-gear" aria-label="Landing gear up or down (G)">GEAR</button>
       <button class="ap" id="btn-flip" aria-label="Fly upside down (F)">FLIP</button>
@@ -366,7 +367,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-head"><span>Secret door</span><span>🔒</span></div>
     <div class="card-body">
       <h2>A <em>secret</em> door!</h2>
-      <p class="lede">It only opens with the password.</p>
+      <p class="lede">It only opens with the secret code. Psst… press <b>F12</b> and look in the Console.</p>
       <form id="secretForm" autocomplete="off">
         <input type="password" id="secretPw" class="secret-input" placeholder="Password" aria-label="Password" autocomplete="off" spellcheck="false">
         <p class="secret-msg" id="secretMsg" role="status"></p>
@@ -611,7 +612,7 @@ function boot(hot){
     { id: 'glider', name: 'Feather', note: 'Long wings, very quiet', color: '#e9e4d8', cruise: 45, boost: 95, pitch: 1.3, turn: 1.2, cam: 1.3, sound: { mul: 2.4, vol: 0.012 } },
     { id: 'hauler', name: 'Hauler', note: 'Big cargo, two props', color: '#6b7a3a', cruise: 60, boost: 125, pitch: 1.0, turn: 0.9, cam: 1.25, sound: { mul: 0.8, vol: 0.05 } },
     { id: 'swift', name: 'Swift', note: 'Fast jet', color: '#2a6ccc', cruise: 95, boost: 220, pitch: 1.6, turn: 1.4, sound: { mul: 2.2, vol: 0.035 } },
-    { id: 'thunder', name: 'Thunder', note: 'Fighter, Mach 1.1', color: '#4a5262', cruise: 110, boost: 380, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
+    { id: 'thunder', bombs: 2, name: 'Thunder', note: 'Fighter, Mach 1.1', color: '#4a5262', cruise: 110, boost: 380, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
     { id: 'stealth', name: 'Shadow', note: 'Stealth wing, Mach 1.1', color: '#2b2f3a', cruise: 100, boost: 375, pitch: 1.5, turn: 1.4, cam: 1.1, sound: { mul: 2.0, vol: 0.025 } },
     { id: 'jumbo', name: 'Jumbo', note: 'Huge airliner', color: '#c9d2dc', cruise: 90, boost: 200, pitch: 0.9, turn: 0.8, cam: 1.6, pax: 400, sound: { mul: 1.8, vol: 0.04 } },
     { id: 'rocket', name: 'Rocket', note: 'Space plane, Mach 1.25', color: '#f4f1ea', cruise: 120, boost: 430, pitch: 1.3, turn: 1.1, cam: 1.15, sound: { mul: 1.4, vol: 0.05 } },
@@ -627,7 +628,7 @@ function boot(hot){
     { id: 'ace', name: 'Ace', note: 'Old-time fighter', color: '#5a6b3a', cruise: 90, boost: 210, pitch: 1.9, turn: 1.7 },
     { id: 'zoom', name: 'Zoom', note: 'Flying car', color: '#e8432e', cruise: 75, boost: 180, pitch: 1.6, turn: 1.6, sound: { mul: 2.0, vol: 0.035 } },
     { id: 'arrow', name: 'Arrow', note: 'Supersonic jet, Mach 1.15', color: '#9fb6d9', cruise: 140, boost: 390, pitch: 1.0, turn: 0.9, cam: 1.4, pax: 100, sound: { mul: 2.2, vol: 0.04 } },
-    { id: 'comet', name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } },
+    { id: 'comet', bombs: 2, name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } },
     { id: 'dragon', name: 'Dragon', note: 'Breathes fire when boosting', color: '#3fa34d', cruise: 70, boost: 170, pitch: 2.0, turn: 1.8, cam: 1.15, sound: { mul: 0.5, vol: 0.04 } },
     { id: 'bee', name: 'Bee', note: 'Buzzy bumblebee', color: '#ffc23d', cruise: 50, boost: 120, pitch: 2.2, turn: 2.1, sound: { mul: 3.5, vol: 0.03 } },
     { id: 'shark', name: 'Shark', note: 'Shark jet, lands on lakes', color: '#6f7f8f', cruise: 100, boost: 260, pitch: 1.7, turn: 1.6, water: true, sound: { mul: 2.1, vol: 0.035 } },
@@ -644,10 +645,10 @@ function boot(hot){
     { id: 'racer', name: 'Racer', note: 'Gold air racer, very nimble', color: '#ffc23d', cruise: 120, boost: 280, pitch: 2.1, turn: 2.0, sound: { mul: 1.3, vol: 0.045 } },
     { id: 'ptero', name: 'Ptero', note: 'Pterodactyl dinosaur', color: '#c77a3a', cruise: 60, boost: 150, pitch: 1.7, turn: 1.7, cam: 1.2, sound: { mul: 0.45, vol: 0.03 } },
     { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, pax: 40, sound: { mul: 0.9, vol: 0.05 } },
-    { id: 'hog', name: 'Hog', note: 'Tough jet, engines on its back', color: '#6b7a5a', cruise: 85, boost: 200, pitch: 1.4, turn: 1.3, cam: 1.15, sound: { mul: 1.9, vol: 0.04 } },
+    { id: 'hog', bombs: 2, name: 'Hog', note: 'Tough jet, engines on its back', color: '#6b7a5a', cruise: 85, boost: 200, pitch: 1.4, turn: 1.3, cam: 1.15, sound: { mul: 1.9, vol: 0.04 } },
     { id: 'eagle', name: 'Eagle', note: 'Bald eagle, soars and dives', color: '#5a3a22', cruise: 70, boost: 180, pitch: 1.9, turn: 1.8, cam: 1.15, sound: { mul: 2.6, vol: 0.01 } },
     { id: 'pizza', name: 'Pizza', note: 'A flying slice of pizza', color: '#ffb347', cruise: 55, boost: 130, pitch: 1.8, turn: 1.7, fixedGear: true, sound: { mul: 1.7, vol: 0.035 } },
-    { id: 'tiger', name: 'Tiger', note: 'Striped jet with teeth', color: '#ff8a1d', cruise: 105, boost: 260, pitch: 1.9, turn: 1.7, sound: { mul: 2.3, vol: 0.04 } },
+    { id: 'tiger', bombs: 2, name: 'Tiger', note: 'Striped jet with teeth', color: '#ff8a1d', cruise: 105, boost: 260, pitch: 1.9, turn: 1.7, sound: { mul: 2.3, vol: 0.04 } },
     { id: 'sleigh', name: 'Sleigh', note: 'Pulled by flying reindeer', color: '#c0392b', cruise: 55, boost: 140, pitch: 1.5, turn: 1.5, cam: 1.35, fixedGear: true, sound: { mul: 3.0, vol: 0.02 } },
     { id: 'gyro', name: 'Gyro', note: 'Autogyro with a big rotor', color: '#ffd23d', cruise: 50, boost: 115, pitch: 1.6, turn: 1.6, cam: 1.15, sound: { mul: 1.5, vol: 0.04 } },
     { id: 'bat', name: 'Bat', note: 'Night bat, very twisty', color: '#3a2e4a', cruise: 50, boost: 125, pitch: 2.2, turn: 2.1, sound: { mul: 3.2, vol: 0.008 } },
@@ -663,7 +664,8 @@ function boot(hot){
     { id: 'dash8', name: 'Commuter', note: 'Twin-prop airliner', color: '#e8432e', cruise: 75, boost: 165, pitch: 1.1, turn: 1.0, cam: 1.45, pax: 50, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'lear', name: 'Lear', note: 'Little business jet', color: '#ffc23d', cruise: 115, boost: 260, pitch: 1.6, turn: 1.5, pax: 8, sound: { mul: 2.3, vol: 0.04 } },
     { id: 'concorde', name: 'Concorde', note: 'Supersonic airliner, Mach 1.3', color: '#1b2a6c', cruise: 150, boost: 450, pitch: 1.0, turn: 0.9, cam: 1.55, pax: 100, sound: { mul: 2.0, vol: 0.05 } },
-    { id: 'golden', shape: 'concorde', gold: true, secret: true, nameTag: '한정우의 비행기', name: 'Golden Comet', note: 'SECRET! Gold, easy to land, Mach 1.67 on boost', color: '#ffc23d', cruise: 80, boost: 573, pitch: 1.5, turn: 1.4, cam: 1.55, pax: 100, sound: { mul: 2.2, vol: 0.05 } },
+    { id: 'ufo', shape: 'ufo', secret: true, name: 'UFO', note: 'SECRET! Flying saucer, super nimble', color: '#9fe8c0', cruise: 120, boost: 520, pitch: 2.3, turn: 2.3, cam: 1.3, fixedGear: true, pax: 1, sound: { mul: 0.4, vol: 0.04 } },
+    { id: 'golden', shape: 'concorde', rainbow: true, secret: true, nameTag: '한정우의 비행기', name: 'Rainbow Comet', note: 'SECRET! Rainbow, easy to land, Mach 1.67 on boost', color: '#ff4fa3', cruise: 80, boost: 573, pitch: 1.5, turn: 1.4, cam: 1.55, pax: 100, sound: { mul: 2.2, vol: 0.05 } },
     { id: 'blackbird', name: 'Blackbird', note: 'Black spy jet, Mach 1.35', color: '#1b1b22', cruise: 160, boost: 460, pitch: 1.2, turn: 1.0, cam: 1.4, pax: 2, sound: { mul: 1.8, vol: 0.05 } },
     { id: 'osprey', name: 'Osprey', note: 'Tilt-rotor, huge propellers', color: '#6b7a5a', cruise: 70, boost: 160, pitch: 1.4, turn: 1.3, cam: 1.35, pax: 24, sound: { mul: 0.55, vol: 0.055 } },
     { id: 'chinook', name: 'Twin Rotor', note: 'Helicopter with two rotors', color: '#5a6b3a', cruise: 55, boost: 120, pitch: 1.3, turn: 1.3, cam: 1.4, pax: 33, sound: { mul: 0.5, vol: 0.055 } },
@@ -688,8 +690,8 @@ function boot(hot){
     { id: 'dolphin', name: 'Dolphin', note: 'Flying dolphin, lands on lakes', color: '#7a9ab8', cruise: 70, boost: 170, pitch: 1.9, turn: 1.8, cam: 1.15, water: true, fixedGear: true, pax: 3, sound: { mul: 3.2, vol: 0.01 } },
     { id: 'firetruck', name: 'Fire Truck', note: 'Fire engine with wings', color: '#d0202a', cruise: 55, boost: 130, pitch: 1.1, turn: 1.0, cam: 1.3, pax: 6, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'tractor', name: 'Tractor', note: 'Farm tractor with a propeller', color: '#3fa34d', cruise: 45, boost: 105, pitch: 1.3, turn: 1.3, fixedGear: true, pax: 1, sound: { mul: 0.6, vol: 0.05 } },
-    { id: 'lightning', name: 'Lightning', note: 'Stealth fighter, Mach 1.15', color: '#5a6270', cruise: 120, boost: 400, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
-    { id: 'dart', name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } },
+    { id: 'lightning', bombs: 2, name: 'Lightning', note: 'Stealth fighter, Mach 1.15', color: '#5a6270', cruise: 120, boost: 400, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'dart', bombs: 2, name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } },
     { id: 'superjumbo', name: 'Superjumbo', note: 'Double-decker, 550 passengers', color: '#2a4f9a', cruise: 90, boost: 200, pitch: 0.8, turn: 0.7, cam: 1.9, pax: 550, sound: { mul: 1.6, vol: 0.055 } },
     { id: 'cropduster', name: 'Crop Duster', note: 'Farm plane with a big engine', color: '#ffc23d', cruise: 60, boost: 140, pitch: 1.8, turn: 1.7, pax: 1, sound: { mul: 0.8, vol: 0.05 } },
     { id: 'hotdog', name: 'Hot Dog', note: 'With mustard', color: '#b0442a', cruise: 45, boost: 110, pitch: 1.6, turn: 1.6, fixedGear: true, pax: 2, sound: { mul: 1.6, vol: 0.035 } },
@@ -711,8 +713,8 @@ function boot(hot){
     { id: 'xplane', name: 'X-Plane', note: 'Rocket plane, Mach 1.4', color: '#1b1b22', cruise: 170, boost: 480, pitch: 1.1, turn: 1.0, cam: 1.4, pax: 1, sound: { mul: 1.4, vol: 0.055 } },
     { id: 'train', name: 'Flying Train', note: 'Steam engine with wings', color: '#c0302a', cruise: 50, boost: 120, pitch: 1.0, turn: 1.0, cam: 1.35, fixedGear: true, pax: 30, sound: { mul: 0.7, vol: 0.05 } },
     { id: 'beluga', name: 'Beluga', note: 'Smiling whale-shaped cargo jet', color: '#f4f1ea', cruise: 85, boost: 190, pitch: 0.9, turn: 0.8, cam: 1.7, pax: 20, sound: { mul: 1.5, vol: 0.05 } },
-    { id: 'viper', name: 'Viper', note: 'Fighter jet, Mach 1.2', color: '#8a96a3', cruise: 125, boost: 410, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
-    { id: 'raptor', name: 'Raptor', note: 'Stealth fighter, Mach 1.25', color: '#7d8a96', cruise: 130, boost: 425, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.4, vol: 0.045 } },
+    { id: 'viper', bombs: 2, name: 'Viper', note: 'Fighter jet, Mach 1.2', color: '#8a96a3', cruise: 125, boost: 410, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'raptor', bombs: 2, name: 'Raptor', note: 'Stealth fighter, Mach 1.25', color: '#7d8a96', cruise: 130, boost: 425, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.4, vol: 0.045 } },
     { id: 'pig', name: 'Flying Pig', note: 'When pigs fly!', color: '#ff9fb8', cruise: 45, boost: 110, pitch: 1.7, turn: 1.7, pax: 1, sound: { mul: 1.2, vol: 0.02 } },
     { id: 'cow', name: 'Cow', note: 'A cow with a jetpack', color: '#ffffff', cruise: 45, boost: 115, pitch: 1.5, turn: 1.5, pax: 1, sound: { mul: 2.2, vol: 0.035 } },
     { id: 'puppy', name: 'Puppy', note: 'Dog with flying goggles', color: '#c68a5a', cruise: 50, boost: 120, pitch: 1.8, turn: 1.8, pax: 1, sound: { mul: 1.6, vol: 0.035 } },
@@ -731,7 +733,7 @@ function boot(hot){
     { id: 'sneaker', name: 'Sneaker', note: 'Giant shoe with wings', color: '#d0202a', cruise: 50, boost: 120, pitch: 1.7, turn: 1.7, fixedGear: true, pax: 1, sound: { mul: 1.8, vol: 0.03 } },
     { id: 'skateboard', name: 'Skateboard', note: 'Rocket skateboard', color: '#3a2a5a', cruise: 60, boost: 150, pitch: 2.0, turn: 2.0, fixedGear: true, pax: 1, sound: { mul: 2.2, vol: 0.035 } },
     { id: 'trijet', name: 'Tri-Jet', note: 'Airliner with an engine in its tail', color: '#2a6ccc', cruise: 95, boost: 215, pitch: 0.9, turn: 0.8, cam: 1.6, pax: 250, sound: { mul: 1.7, vol: 0.05 } },
-    { id: 'swingwing', name: 'Swing Wing', note: 'Twin-tail fighter, Mach 1.2', color: '#9aa5b0', cruise: 130, boost: 420, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'swingwing', bombs: 2, name: 'Swing Wing', note: 'Twin-tail fighter, Mach 1.2', color: '#9aa5b0', cruise: 130, boost: 420, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
     { id: 'solar', name: 'Solar Plane', note: 'Long wings full of solar panels', color: '#2a4f9a', cruise: 35, boost: 80, pitch: 1.0, turn: 1.0, cam: 1.4, pax: 1, sound: { mul: 2.8, vol: 0.015 } },
     { id: 'police', name: 'Police Copter', note: 'With flashing lights', color: '#1b2a6c', cruise: 55, boost: 125, pitch: 1.5, turn: 1.6, cam: 1.2, pax: 3, sound: { mul: 0.6, vol: 0.05 } },
     { id: 'pirate', name: 'Pirate Ship', note: 'Flying ship, lands on lakes', color: '#6b4a2a', cruise: 40, boost: 95, pitch: 1.0, turn: 1.0, cam: 1.5, water: true, fixedGear: true, pax: 12, sound: { mul: 0.5, vol: 0.03 } },
@@ -776,6 +778,7 @@ function boot(hot){
   const RED = 0xe8432e, CREAM = 0xfff1d6, DARK = 0x2a2f45, WHITE = 0xf4f1ea, GRAY = 0xc9d2dc;
   // Builds a plane model into root (the player's plane by default) and returns its moving
   // parts: propellers/rotors, flames and landing gear.
+  let bombRack = [], bombsLeft = 0;   // the player's bomb rack and how many are left
   function buildPlane(def, target){
     const root = target || planeBody, mine = root === planeBody;
     root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
@@ -824,6 +827,15 @@ function boot(hot){
     };
     const wheelY = (r, w, c, x, y, z) => { const o = add(new THREE.CylinderGeometry(r, r, w, 16), c, x, y, z); o.rotation.z = Math.PI / 2; return o; };
     switch (def.shape || def.id){
+      case 'ufo': {   // a flying saucer with a glass dome and a spinning ring of lights
+        ball(2.7, mat(0xaab4bf), 0, 0, 0, 1, 0.26, 1); ball(2.0, mat(0x7f8a95), 0, -0.28, 0, 1, 0.22, 1);
+        ball(1.15, glassMat, 0, 0.5, 0, 1, 0.95, 1); box(0.5, 0.5, 0.5, 0x3fe08a, 0, -0.62, 0);
+        const ring = new THREE.Group(); root.add(ring);
+        const cols = [0xff3b30, 0xffc23d, 0x3fe08a, 0x3fa9f5, 0xb06bff, 0xff8fb8];
+        for (let i = 0; i < 6; i++){ const a = i / 6 * Math.PI * 2, l = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshBasicMaterial({ color: cols[i] })); l.position.set(Math.cos(a) * 2.45, -0.32, Math.sin(a) * 2.45); ring.add(l); }
+        sp.push({ o: ring, axis: 'y', rate: 1.6 });
+        break;
+      }
       case 'cub':
         box(1.15, 1.05, 4.0, RED, 0, 0, 0); box(1.25, 1.15, 0.7, CREAM, 0, 0, -2.2); box(0.72, 0.7, 1.5, RED, 0, 0.12, 2.6);
         box(7.4, 0.16, 1.45, CREAM, 0, -0.12, -0.55); both((x) => box(0.9, 0.2, 1.48, RED, x, -0.12, -0.55), 3.3);
@@ -2289,10 +2301,32 @@ function boot(hot){
       }
     }
     // the secret plane is solid gold (its windows and flames stay as they are)
-    if (def.gold) root.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.material.transparent && o.material !== glassMat && !o.material.isMeshBasicMaterial){ const l = o.material.color.getHSL({}).l; o.material = mat(l < 0.3 ? 0xb8860b : 0xffc23d); } });
+    if (def.rainbow){
+      const rc = new THREE.Color(), rv = new THREE.Vector3();   // a smooth rainbow down the body: red nose to violet tail
+      root.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.material.transparent && o.material !== glassMat && !o.material.isMeshBasicMaterial){
+        o.updateMatrix(); const g = o.geometry, pos = g.attributes.position, col = new Float32Array(pos.count * 3);
+        for (let i = 0; i < pos.count; i++){ rv.fromBufferAttribute(pos, i).applyMatrix4(o.matrix); const hue = Math.max(0, Math.min(1, (rv.z + 6.5) / 12)) * 0.82; rc.setHSL(hue, 0.92, 0.55); col[i * 3] = rc.r; col[i * 3 + 1] = rc.g; col[i * 3 + 2] = rc.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        o.material = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON, side: o.material.side });
+      } });
+    }
     // a name tag floating above the plane, like a player's name in a game: it always turns
     // to face you and is drawn on top of everything
     if (def.nameTag) root.add(nameTag(def.nameTag, 0, 5.5, 0));
+    // a rack of bombs under the belly of the fighter jets
+    if (def.bombs){
+      const rack = [], n = def.bombs;
+      for (let i = 0; i < n; i++){
+        const bg = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2, 10), mat(0x3a4250)); body.rotation.x = Math.PI / 2; bg.add(body);
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 10), mat(0x454d5c)); tip.rotation.x = Math.PI / 2; tip.position.z = -0.82; bg.add(tip);
+        [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([fx, fy]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.28, 0.3), mat(0x2a2f45)); f.position.set(fx * 0.22, fy * 0.22, 0.62); if (fx) f.rotation.z = Math.PI / 2; bg.add(f); });
+        const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.5), mat(DARK)); r.position.y = 0.3; bg.add(r);   // the pylon it hangs from
+        bg.position.set(n > 1 ? (i / (n - 1) - 0.5) * 2.6 : 0, -0.85, 0.2); bg.userData.bomb = true;
+        root.add(bg); rack.push(bg);
+      }
+      if (mine){ bombRack = rack; bombsLeft = rack.length; }
+    } else if (mine){ bombRack = []; bombsLeft = 0; }
     root.scale.setScalar(PLANE_SCALE);
     if (mine){ spinners = sp; flames = fl; gearParts = gp; showGear(gearShown); }
     return { sp, fl, gp };
@@ -2479,7 +2513,37 @@ function boot(hot){
     aiPlanes.forEach(a => { if (a.angryT > 0){ a.angryT = 0; a.speed = a.def.cruise; aiWaypoint(a); } });
     enemyMsl.forEach(m => { m.life = 0; m.g.visible = false; });
   }
-  function clearMissiles(){ calmAI(); missiles.forEach(m => { m.life = 0; m.g.visible = false; }); }
+  function clearMissiles(){ calmAI(); missiles.forEach(m => { m.life = 0; m.g.visible = false; }); clearBombs(); }
+  // bombs: the fighter jets drop them, they fall under gravity and blow up on the ground
+  const activeBombs = [];
+  function clearBombs(){ activeBombs.forEach(b => { b.life = 0; if (b.g){ scene.remove(b.g); b.g = null; } }); activeBombs.length = 0; }
+  function dropBomb(){
+    if (!plane.bombs || F.ground || F.crashT > 0 || !planeRoot.visible || fireT > 0) return;
+    const bg = bombRack.find(b => b.parent === planeBody);
+    if (!bg){ toast('Out of bombs! Land to reload', 'warn'); return; }
+    const wp = new THREE.Vector3(); bg.getWorldPosition(wp);
+    bg.parent.remove(bg); scene.add(bg); bg.position.copy(wp); bg.rotation.set(F.pitch, F.yaw, 0); bg.scale.setScalar(PLANE_SCALE);
+    activeBombs.push({ g: bg, x: wp.x, y: wp.y, z: wp.z, vx: vFwd.x * F.speed, vy: vFwd.y * F.speed - 2, vz: vFwd.z * F.speed, spin: 0, life: 12 });
+    bombsLeft = Math.max(0, bombsLeft - 1); fireT = 0.3; sfx.gear();
+    toast(bombsLeft ? 'Bomb away! ' + bombsLeft + ' left' : 'Bomb away! Last one', '');
+  }
+  function updateBombs(dt){
+    for (const b of activeBombs){
+      if (b.life <= 0) continue;
+      b.life -= dt; b.vy -= GRAV * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.spin += dt * 2;
+      const g = groundAt(b.x, b.z), floor = Math.max(g, 0);
+      if (b.y <= floor + 0.5 || b.life <= 0){
+        explode(b.x, Math.max(b.y, floor), b.z, true);
+        aiPlanes.forEach(a => { if (a.def && a.live && Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 28) hitPlane(a, true); });
+        if (Math.hypot(b.x - F.x, b.z - F.z) < 22 && Math.abs(b.y - F.y) < 22 && !F.ground) crashFree(false, 'Caught in your own blast!');
+        b.life = 0; scene.remove(b.g); b.g = null; continue;
+      }
+      b.g.position.set(b.x, b.y, b.z);
+      b.g.rotation.set(Math.atan2(b.vy, Math.hypot(b.vx, b.vz)) - Math.PI / 2, Math.atan2(-b.vx, -b.vz), 0);   // nose follows the arc down
+    }
+  }
   function fireEnemy(a){
     const m = enemyMsl.find(m => m.life <= 0);
     if (!m) return;
@@ -2760,6 +2824,7 @@ function boot(hot){
     if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
     if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
     if (e.code === 'KeyD' && state === 'play'){ e.preventDefault(); toggleDive(); }
+    if (e.code === 'KeyX' && state === 'play' && !F.ride && !F.drive && !F.cruise){ e.preventDefault(); dropBomb(); }
     if (e.code === 'KeyJ' && state === 'play'){ e.preventDefault(); toggleDolphin(); }
     if ((e.code === 'KeyC' || e.code === 'KeyV') && state === 'play'){ e.preventDefault(); toggleView(); }
     if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
@@ -2832,6 +2897,7 @@ function boot(hot){
   $('btn-view').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
   $('btn-dive').addEventListener('click', e => { toggleDive(); e.currentTarget.blur(); });
   $('btn-dolphin').addEventListener('click', e => { toggleDolphin(); e.currentTarget.blur(); });
+  $('btn-bomb').addEventListener('click', e => { e.currentTarget.blur(); dropBomb(); });
   const fireBtn = $('btn-fire');
   const holdFire = on => e => { keys.f = on; fireBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
   fireBtn.addEventListener('pointerdown', holdFire(true));
@@ -3701,6 +3767,7 @@ function boot(hot){
     updateAI(dt, live);
     updateAICars(dt);
     updateMissiles(dt, live);
+    updateBombs(dt);
     updateFish(dt);
     for (const c of fClouds){
       const p = c.position;
@@ -3825,7 +3892,11 @@ function boot(hot){
   }
   let dtHud = 0;
   let borderT = 0, lastCountry = null, getOutShown = false;
+  let bombBtnShown = false;
   function updateFreeHud(){
+    // the BOMB button only shows on a fighter jet, in the air
+    const bombOn = !!plane.bombs && !F.ride && !F.drive && !F.cruise;
+    if (bombOn !== bombBtnShown){ bombBtnShown = bombOn; $('btn-bomb').hidden = !bombOn; }
     // landed and stopped at an airport: you can get out and drive
     const out = canGetOut();
     if (out !== getOutShown){ getOutShown = out; $('btn-getout').hidden = !out; if (out && t - F.lastLand < 30) toast('Landed! Press E or GET OUT to drive your car', 'info'); }
@@ -4818,9 +4889,9 @@ function boot(hot){
       c.atSecret = !f && !c.atHarbour && !c.atHouse && !!myHouse && Math.hypot(myHouse.sx - c.x, myHouse.sz - c.z) < 14;
       const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : c.atHouse ? 'MY HOUSE 🏠 (SPACE)' : c.atSecret ? 'SECRET DOOR 🔒 (SPACE)' : '';
       RH.act.hidden = !label; if (label) txt(RH.act, label);
-      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : c.atHouse ? 'You are home!' : (myHouse ? 'Home ' + (Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) / 1000).toFixed(1) + ' km · ' : '') + 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : c.atHouse ? 'You are home!' : (myHouse ? 'Home ' + (Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) / 1000).toFixed(1) + ' km · ' : '') + 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + 'IAS ' + String(Math.round(Math.abs(c.speed) * 1.944)).padStart(3, '0') + ' kt · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     }
-    else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+    else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + 'IAS ' + String(Math.round(Math.abs(c.speed) * 1.944)).padStart(3, '0') + ' kt · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     if (!c.free && dist < 25 && state === 'play') finishDrive(true);
   }
   function driveCam(dt){
@@ -5175,22 +5246,45 @@ function boot(hot){
   }
 
   /* ---------------- The secret door ---------------- */
-  // The password is never written down here: only a PBKDF2-SHA-256 hash of it (with a salt
-  // and many rounds, so guessing is slow). What you type is hashed the same way and the two
-  // hashes are compared.
-  const SECRET = { salt: 'dd15f396f1d7a1f27b974bb1e63679f1', rounds: 310000, hash: '965b0610ec2d2b45af9aeb3c9e345a6ba7ca419091b4535e1079704a1c5763f4' };
-  const hexBytes = h => new Uint8Array(h.match(/../g).map(b => parseInt(b, 16)));
-  async function passwordOk(pw){
-    if (!(window.crypto && crypto.subtle)) return false;
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hexBytes(SECRET.salt), iterations: SECRET.rounds, hash: 'SHA-256' }, key, 256);
-    const hex = Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
-    let diff = 0; for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ SECRET.hash.charCodeAt(i);
-    return diff === 0 && hex.length === SECRET.hash.length;
+  // The code changes every time the game loads, so you can't just remember it. To find it,
+  // open the browser's DevTools (press F12) and read it in the Console: the real hackers' way in.
+  const SECRET_CODE = (() => { const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', n = 4; let c = ''; for (let i = 0; i < n; i++) c += abc[Math.floor(Math.random() * abc.length)]; return c; })();
+  function logSecretCode(){
+    try {
+      console.log('%c🔒 SECRET DOOR CODE: %c ' + SECRET_CODE + ' ', 'color:#ffc23d;font:bold 15px sans-serif', 'color:#1b2340;background:#ffc23d;font:bold 18px monospace;padding:2px 6px;border-radius:4px');
+      console.log('%cType it at the secret door. It changes every time you load the game.', 'color:#8a93a6');
+    } catch (e){}
   }
+  logSecretCode();
+  function passwordOk(pw){ return typeof pw === 'string' && pw.trim().toUpperCase() === SECRET_CODE; }
+
+  // more secret stuff: the Konami code, and a hidden cheat menu for F12 explorers
+  function unlockSecrets(msg){ const was = store.get('scr.secretFound', false); store.set('scr.secretFound', true); renderPicker(); if (msg) toast(msg, ''); return was; }
+  const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+  let konamiPos = 0;
+  window.addEventListener('keydown', e => {
+    konamiPos = e.code === KONAMI[konamiPos] ? konamiPos + 1 : (e.code === KONAMI[0] ? 1 : 0);
+    if (konamiPos === KONAMI.length){ konamiPos = 0; score += 50000; saveProgress(); unlockSecrets('KONAMI CODE! +50,000 points and every secret unlocked! 🎉'); sfx.applause(); }
+  });
+  window.cheats = {
+    help(){ console.log('%c👾 Sky Coin Rush cheats', 'color:#ffc23d;font:bold 15px sans-serif');
+      ['cheats.code()        — the secret door code (changes each load)',
+       'cheats.points(n)     — add n points',
+       'cheats.unlock()      — unlock the secret room, car, plane and UFO',
+       'cheats.ufo()         — unlock and fly the UFO 🛸',
+       'cheats.land()        — auto-land right now',
+       '…or try the Konami code: ↑ ↑ ↓ ↓ ← → ← → B A'].forEach(l => console.log('%c  ' + l, 'color:#8a93a6;font:13px monospace'));
+      return '🔒'; },
+    code(){ return SECRET_CODE; },
+    points(n){ n = Math.floor(+n) || 0; score = Math.max(0, score + n); saveProgress(); return 'You now have ' + Math.floor(score).toLocaleString() + ' points.'; },
+    unlock(){ unlockSecrets('Secrets unlocked from the console! ✨'); return 'The secret car, plane and UFO are unlocked.'; },
+    ufo(){ unlockSecrets(); const u = PLANES.find(p => p.id === 'ufo'); if (state === 'attract'){ choosePlane('ufo'); } else { plane = u; buildPlane(plane); store.set('scr.plane', 'ufo'); } return 'The UFO is yours. 🛸 Take off!'; },
+    land(){ if (state === 'play' && !F.ground && !F.ride && !F.drive){ toggleAutoLand(); return 'Auto-landing…'; } return 'You can only auto-land while flying.'; }
+  };
+  console.log('%c👾 Psst… type %ccheats.help()%c for secret commands.', 'color:#3fe08a;font:13px sans-serif', 'color:#1b2340;background:#3fe08a;font:bold 13px monospace;padding:1px 6px;border-radius:3px', 'color:#3fe08a');
   let secretOk = null, secretNo = null, secretTries = 0, secretWait = 0;
   function askPassword(ok, no){
-    secretOk = ok; secretNo = no;
+    secretOk = ok; secretNo = no; logSecretCode();
     $('secretPw').value = ''; txt($('secretMsg'), ''); show('secret');
     setTimeout(() => { try { $('secretPw').focus(); } catch(e){} }, 50);
   }
@@ -5204,7 +5298,7 @@ function boot(hot){
       secretTries = 0; sfx.chime(); show(null);
       const ok = secretOk; secretOk = secretNo = null; if (ok) ok();
     } else {
-      sfx.warn(); txt($('secretMsg'), window.crypto && crypto.subtle ? 'Wrong password!' : 'This door only opens on the real website (https).');
+      sfx.warn(); txt($('secretMsg'), 'Wrong code! Open DevTools (F12) and read the code in the Console.');
       const card = $('card-secret'); card.classList.remove('secret-shake'); void card.offsetWidth; card.classList.add('secret-shake');
       if (++secretTries >= 5){ secretTries = 0; secretWait = Date.now() + 30000; }
     }
@@ -5213,7 +5307,7 @@ function boot(hot){
   function foundSecret(){
     if (store.get('scr.secretFound', false)) return;
     store.set('scr.secretFound', true); renderPicker();
-    setTimeout(() => toast('Unlocked: the Sky Rocket car 🚀 and the Golden Comet plane ✈️', ''), 1600);
+    setTimeout(() => toast('Unlocked: the Sky Rocket car 🚀 and the Rainbow Comet plane ✈️', ''), 1600);
   }
 
   /* ---------------- One open world ---------------- */
@@ -5642,7 +5736,7 @@ function boot(hot){
       sfx.applause(); sfx.coin(6); toast('TREASURE! +10,000 points 💰', ''); isleHud();
     }
     else if (a.k === 'scar'){ sfx.ring(); toast('The Sky Rocket (650 km/h!) is in your garage now: press V when you drive 🚀', ''); }
-    else if (a.k === 'splane'){ sfx.ring(); toast('The Golden Comet (Mach 3!) is in your planes now: pick it on the start card ✈️', ''); }
+    else if (a.k === 'splane'){ sfx.ring(); toast('The Rainbow Comet (Mach 1.67!) is in your planes now: pick it on the start card ✈️', ''); }
     else if (a.k === 'out' && isle.home) fadeTo(() => { endIsland(); leaveHome(); });
     else if (a.k === 'enter' || a.k === 'out') fadeTo(() => {
       isle.inside = a.k === 'enter';
