@@ -367,7 +367,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="card-head"><span>Secret door</span><span>🔒</span></div>
     <div class="card-body">
       <h2>A <em>secret</em> door!</h2>
-      <p class="lede">It only opens with the password.</p>
+      <p class="lede">It only opens with the secret code. Psst… press <b>F12</b> and look in the Console.</p>
       <form id="secretForm" autocomplete="off">
         <input type="password" id="secretPw" class="secret-input" placeholder="Password" aria-label="Password" autocomplete="off" spellcheck="false">
         <p class="secret-msg" id="secretMsg" role="status"></p>
@@ -5236,22 +5236,20 @@ function boot(hot){
   }
 
   /* ---------------- The secret door ---------------- */
-  // The password is never written down here: only a PBKDF2-SHA-256 hash of it (with a salt
-  // and many rounds, so guessing is slow). What you type is hashed the same way and the two
-  // hashes are compared.
-  const SECRET = { salt: 'dd15f396f1d7a1f27b974bb1e63679f1', rounds: 310000, hash: '965b0610ec2d2b45af9aeb3c9e345a6ba7ca419091b4535e1079704a1c5763f4' };
-  const hexBytes = h => new Uint8Array(h.match(/../g).map(b => parseInt(b, 16)));
-  async function passwordOk(pw){
-    if (!(window.crypto && crypto.subtle)) return false;
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hexBytes(SECRET.salt), iterations: SECRET.rounds, hash: 'SHA-256' }, key, 256);
-    const hex = Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
-    let diff = 0; for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ SECRET.hash.charCodeAt(i);
-    return diff === 0 && hex.length === SECRET.hash.length;
+  // The code changes every time the game loads, so you can't just remember it. To find it,
+  // open the browser's DevTools (press F12) and read it in the Console: the real hackers' way in.
+  const SECRET_CODE = (() => { const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', n = 4; let c = ''; for (let i = 0; i < n; i++) c += abc[Math.floor(Math.random() * abc.length)]; return c; })();
+  function logSecretCode(){
+    try {
+      console.log('%c🔒 SECRET DOOR CODE: %c ' + SECRET_CODE + ' ', 'color:#ffc23d;font:bold 15px sans-serif', 'color:#1b2340;background:#ffc23d;font:bold 18px monospace;padding:2px 6px;border-radius:4px');
+      console.log('%cType it at the secret door. It changes every time you load the game.', 'color:#8a93a6');
+    } catch (e){}
   }
+  logSecretCode();
+  function passwordOk(pw){ return typeof pw === 'string' && pw.trim().toUpperCase() === SECRET_CODE; }
   let secretOk = null, secretNo = null, secretTries = 0, secretWait = 0;
   function askPassword(ok, no){
-    secretOk = ok; secretNo = no;
+    secretOk = ok; secretNo = no; logSecretCode();
     $('secretPw').value = ''; txt($('secretMsg'), ''); show('secret');
     setTimeout(() => { try { $('secretPw').focus(); } catch(e){} }, 50);
   }
@@ -5265,7 +5263,7 @@ function boot(hot){
       secretTries = 0; sfx.chime(); show(null);
       const ok = secretOk; secretOk = secretNo = null; if (ok) ok();
     } else {
-      sfx.warn(); txt($('secretMsg'), window.crypto && crypto.subtle ? 'Wrong password!' : 'This door only opens on the real website (https).');
+      sfx.warn(); txt($('secretMsg'), 'Wrong code! Open DevTools (F12) and read the code in the Console.');
       const card = $('card-secret'); card.classList.remove('secret-shake'); void card.offsetWidth; card.classList.add('secret-shake');
       if (++secretTries >= 5){ secretTries = 0; secretWait = Date.now() + 30000; }
     }

@@ -65,16 +65,16 @@ blast that can take out enemy planes nearby. Land to reload.
 ## Secret doors
 
 There are three **secret doors**: in the back wall of **your house**, in a big **rock on
-your island**, and in a **rocky hill** next to your house in the world. They only open
-with the **password**. Behind every one is the same **secret room**:
+your island**, and in a **rocky hill** next to your house in the world. They only open with a **secret code** that changes every time you load the game. Behind every one is the same **secret room**:
 
 - a **treasure chest** with 10,000 points in it (once a day),
 - the secret **Sky Rocket** car (650 km/h), which then shows up in your garage,
 - the secret **Rainbow Comet** plane (rainbow-coloured, Mach 1.67 on boost, easy to land), which then shows up in the planes on the start card.
 
-The password isn't written anywhere in the game: only a salted PBKDF2-SHA-256 hash of it.
-When you type the password, it's hashed the same way and the two hashes are compared.
-After five wrong tries, the door waits 30 seconds.
+The code **changes every time you load the game**, so you can't just remember it. To find it,
+open the browser's **DevTools** (press **F12**) and read it in the **Console** — the real
+hackers' way in. Type it at the door (upper- or lower-case both work). After five wrong tries,
+the door waits 30 seconds.
 
 ## Gravity
 
