@@ -2290,11 +2290,9 @@ function boot(hot){
     }
     // the secret plane is solid gold (its windows and flames stay as they are)
     if (def.gold) root.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.material.transparent && o.material !== glassMat && !o.material.isMeshBasicMaterial){ const l = o.material.color.getHSL({}).l; o.material = mat(l < 0.3 ? 0xb8860b : 0xffc23d); } });
-    // a painted name on each side of the fuselage, facing outward
-    if (def.nameTag){
-      [[0.64, -Math.PI / 2], [-0.64, Math.PI / 2]].forEach(([sx, ry]) => { const lbl = signMesh(def.nameTag, 2.6, 0.5, '#7a1f3d', '#ffe9a8'); lbl.position.set(sx, 0.12, 0.6); lbl.rotation.y = ry; root.add(lbl); });
-      const top = signMesh(def.nameTag, 2.6, 0.5, '#7a1f3d', '#ffe9a8'); top.position.set(0, 0.66, 0.6); top.rotation.set(-Math.PI / 2, 0, Math.PI / 2); root.add(top);
-    }
+    // a name tag floating above the plane, like a player's name in a game: it always turns
+    // to face you and is drawn on top of everything
+    if (def.nameTag) root.add(nameTag(def.nameTag, 0, 4.2, 0));
     root.scale.setScalar(PLANE_SCALE);
     if (mine){ spinners = sp; flames = fl; gearParts = gp; showGear(gearShown); }
     return { sp, fl, gp };
@@ -3949,6 +3947,19 @@ function boot(hot){
     while (g.measureText(text).width > c.width * 0.92 && fs > 10){ fs -= 2; g.font = 'bold ' + fs + 'px sans-serif'; }
     g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, c.width / 2, c.height / 2 + 2);
     return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide }));
+  }
+  function nameTag(text, x, y, z){
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+    const g = c.getContext('2d'); g.font = 'bold 72px sans-serif';
+    const w = Math.min(500, g.measureText(text).width + 70), x0 = (512 - w) / 2;
+    g.fillStyle = 'rgba(27,35,64,0.82)'; g.beginPath();
+    if (g.roundRect) g.roundRect(x0, 14, w, 100, 50); else g.rect(x0, 14, w, 100);
+    g.fill(); g.lineWidth = 6; g.strokeStyle = '#ffc23d'; g.stroke();
+    g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 68);
+    // sizeAttenuation off: the tag stays the same size on screen however far away it is
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true, sizeAttenuation: false }));
+    tag.scale.set(0.2, 0.05, 1); tag.position.set(x, y, z); tag.renderOrder = 10;
+    return tag;
   }
   function setSign(holder, text, w, h, bg, fg){
     holder.children.forEach(o => { o.geometry.dispose(); o.material.map.dispose(); o.material.dispose(); });
