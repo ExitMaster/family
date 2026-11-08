@@ -3958,7 +3958,7 @@ function boot(hot){
     g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 68);
     // sizeAttenuation off: the tag stays the same size on screen however far away it is
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true, sizeAttenuation: false }));
-    tag.scale.set(0.44, 0.11, 1); tag.position.set(x, y, z); tag.renderOrder = 10;
+    tag.scale.set(0.34, 0.085, 1); tag.position.set(x, y, z); tag.renderOrder = 10;
     return tag;
   }
   function setSign(holder, text, w, h, bg, fg){
