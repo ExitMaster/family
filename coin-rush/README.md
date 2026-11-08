@@ -8,7 +8,10 @@ them on new cars and upgrades.
 
 ## Install it as an app
 
-Coin Rush is a web app. Open <https://exitmaster.github.io/family/coin-rush/> on your phone and:
+<img src="qr.png" alt="QR code for exitmaster.github.io/family/coin-rush" width="260">
+
+Scan the QR code (or tap **📱 App** in the garage to show it on screen), or open
+<https://exitmaster.github.io/family/coin-rush/> on your phone, and:
 
 - **iPhone / iPad (Safari):** Share → **Add to Home Screen**
 - **Android (Chrome):** menu ⋮ → **Install app** (or **Add to Home screen**)
