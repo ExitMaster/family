@@ -2292,7 +2292,7 @@ function boot(hot){
     if (def.gold) root.traverse(o => { if (o.isMesh && o.material && o.material.color && !o.material.transparent && o.material !== glassMat && !o.material.isMeshBasicMaterial){ const l = o.material.color.getHSL({}).l; o.material = mat(l < 0.3 ? 0xb8860b : 0xffc23d); } });
     // a name tag floating above the plane, like a player's name in a game: it always turns
     // to face you and is drawn on top of everything
-    if (def.nameTag) root.add(nameTag(def.nameTag, 0, 4.2, 0));
+    if (def.nameTag) root.add(nameTag(def.nameTag, 0, 5.5, 0));
     root.scale.setScalar(PLANE_SCALE);
     if (mine){ spinners = sp; flames = fl; gearParts = gp; showGear(gearShown); }
     return { sp, fl, gp };
@@ -3958,7 +3958,7 @@ function boot(hot){
     g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 68);
     // sizeAttenuation off: the tag stays the same size on screen however far away it is
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true, sizeAttenuation: false }));
-    tag.scale.set(0.2, 0.05, 1); tag.position.set(x, y, z); tag.renderOrder = 10;
+    tag.scale.set(0.44, 0.11, 1); tag.position.set(x, y, z); tag.renderOrder = 10;
     return tag;
   }
   function setSign(holder, text, w, h, bg, fg){
