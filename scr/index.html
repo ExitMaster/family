@@ -3581,6 +3581,13 @@ function boot(hot){
       announce('We just broke the sound barrier! Hold on to your drinks!');
     }
     if (F.speed < MACH1 - 15) F.supersonic = false;
+    // the Golden Comet's own call-out when it hits its top speed, Mach 1.67
+    if (live && plane.id === 'golden' && !F.toppedOut && F.speed >= 573 && !F.ground){
+      F.toppedOut = true; sfx.boom(); shake = REDUCED ? 0.2 : 0.8;
+      toast('YOU HAVE REACHED MACH 1.SIX SEVEN!!!!', '');
+      announce('You have reached Mach one point six seven! Wheeee!');
+    }
+    if (F.speed < 573 - 15) F.toppedOut = false;
 
     if (F.drive) updateCar(dt);
     else if (F.cruise) updateShip(dt);
