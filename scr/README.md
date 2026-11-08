@@ -55,6 +55,13 @@ and **C** still changes its colour.
 
 The traffic on the roads is made of real cars too.
 
+## Bombs
+
+The **fighter jets** (Thunder, Comet, Hog, Tiger, Lightning, Delta Dart, Viper, Raptor and
+Swing Wing) carry **2 bombs** on a rack under the belly. Press **X** (or the red **BOMB**
+button) to drop one: it falls under gravity and **blows up** on the ground, with a big
+blast that can take out enemy planes nearby. Land to reload.
+
 ## Secret doors
 
 There are three **secret doors**: in the back wall of **your house**, in a big **rock on

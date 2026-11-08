@@ -225,6 +225,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <div class="freebar">
       <button class="ap boost" id="btn-boost" aria-label="Boost (hold)">BOOST</button>
       <button class="ap fire" id="btn-fire" aria-label="Fire a missile (S)">FIRE</button>
+      <button class="ap fire" id="btn-bomb" aria-label="Drop a bomb (X)" hidden>BOMB</button>
       <button class="ap" id="btn-land" aria-label="Auto-land at the nearest airport">LAND</button>
       <button class="ap" id="btn-gear" aria-label="Landing gear up or down (G)">GEAR</button>
       <button class="ap" id="btn-flip" aria-label="Fly upside down (F)">FLIP</button>
@@ -611,7 +612,7 @@ function boot(hot){
     { id: 'glider', name: 'Feather', note: 'Long wings, very quiet', color: '#e9e4d8', cruise: 45, boost: 95, pitch: 1.3, turn: 1.2, cam: 1.3, sound: { mul: 2.4, vol: 0.012 } },
     { id: 'hauler', name: 'Hauler', note: 'Big cargo, two props', color: '#6b7a3a', cruise: 60, boost: 125, pitch: 1.0, turn: 0.9, cam: 1.25, sound: { mul: 0.8, vol: 0.05 } },
     { id: 'swift', name: 'Swift', note: 'Fast jet', color: '#2a6ccc', cruise: 95, boost: 220, pitch: 1.6, turn: 1.4, sound: { mul: 2.2, vol: 0.035 } },
-    { id: 'thunder', name: 'Thunder', note: 'Fighter, Mach 1.1', color: '#4a5262', cruise: 110, boost: 380, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
+    { id: 'thunder', bombs: 2, name: 'Thunder', note: 'Fighter, Mach 1.1', color: '#4a5262', cruise: 110, boost: 380, pitch: 1.9, turn: 1.6, sound: { mul: 2.6, vol: 0.04 } },
     { id: 'stealth', name: 'Shadow', note: 'Stealth wing, Mach 1.1', color: '#2b2f3a', cruise: 100, boost: 375, pitch: 1.5, turn: 1.4, cam: 1.1, sound: { mul: 2.0, vol: 0.025 } },
     { id: 'jumbo', name: 'Jumbo', note: 'Huge airliner', color: '#c9d2dc', cruise: 90, boost: 200, pitch: 0.9, turn: 0.8, cam: 1.6, pax: 400, sound: { mul: 1.8, vol: 0.04 } },
     { id: 'rocket', name: 'Rocket', note: 'Space plane, Mach 1.25', color: '#f4f1ea', cruise: 120, boost: 430, pitch: 1.3, turn: 1.1, cam: 1.15, sound: { mul: 1.4, vol: 0.05 } },
@@ -627,7 +628,7 @@ function boot(hot){
     { id: 'ace', name: 'Ace', note: 'Old-time fighter', color: '#5a6b3a', cruise: 90, boost: 210, pitch: 1.9, turn: 1.7 },
     { id: 'zoom', name: 'Zoom', note: 'Flying car', color: '#e8432e', cruise: 75, boost: 180, pitch: 1.6, turn: 1.6, sound: { mul: 2.0, vol: 0.035 } },
     { id: 'arrow', name: 'Arrow', note: 'Supersonic jet, Mach 1.15', color: '#9fb6d9', cruise: 140, boost: 390, pitch: 1.0, turn: 0.9, cam: 1.4, pax: 100, sound: { mul: 2.2, vol: 0.04 } },
-    { id: 'comet', name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } },
+    { id: 'comet', bombs: 2, name: 'Comet', note: 'Starfighter, Mach 1.2', color: '#ff8a3d', cruise: 130, boost: 410, pitch: 2.0, turn: 1.8, cam: 1.1, sound: { mul: 2.8, vol: 0.04 } },
     { id: 'dragon', name: 'Dragon', note: 'Breathes fire when boosting', color: '#3fa34d', cruise: 70, boost: 170, pitch: 2.0, turn: 1.8, cam: 1.15, sound: { mul: 0.5, vol: 0.04 } },
     { id: 'bee', name: 'Bee', note: 'Buzzy bumblebee', color: '#ffc23d', cruise: 50, boost: 120, pitch: 2.2, turn: 2.1, sound: { mul: 3.5, vol: 0.03 } },
     { id: 'shark', name: 'Shark', note: 'Shark jet, lands on lakes', color: '#6f7f8f', cruise: 100, boost: 260, pitch: 1.7, turn: 1.6, water: true, sound: { mul: 2.1, vol: 0.035 } },
@@ -644,10 +645,10 @@ function boot(hot){
     { id: 'racer', name: 'Racer', note: 'Gold air racer, very nimble', color: '#ffc23d', cruise: 120, boost: 280, pitch: 2.1, turn: 2.0, sound: { mul: 1.3, vol: 0.045 } },
     { id: 'ptero', name: 'Ptero', note: 'Pterodactyl dinosaur', color: '#c77a3a', cruise: 60, boost: 150, pitch: 1.7, turn: 1.7, cam: 1.2, sound: { mul: 0.45, vol: 0.03 } },
     { id: 'bus', name: 'Bus', note: 'School bus with wings', color: '#ffb000', cruise: 60, boost: 140, pitch: 1.0, turn: 0.9, cam: 1.3, pax: 40, sound: { mul: 0.9, vol: 0.05 } },
-    { id: 'hog', name: 'Hog', note: 'Tough jet, engines on its back', color: '#6b7a5a', cruise: 85, boost: 200, pitch: 1.4, turn: 1.3, cam: 1.15, sound: { mul: 1.9, vol: 0.04 } },
+    { id: 'hog', bombs: 2, name: 'Hog', note: 'Tough jet, engines on its back', color: '#6b7a5a', cruise: 85, boost: 200, pitch: 1.4, turn: 1.3, cam: 1.15, sound: { mul: 1.9, vol: 0.04 } },
     { id: 'eagle', name: 'Eagle', note: 'Bald eagle, soars and dives', color: '#5a3a22', cruise: 70, boost: 180, pitch: 1.9, turn: 1.8, cam: 1.15, sound: { mul: 2.6, vol: 0.01 } },
     { id: 'pizza', name: 'Pizza', note: 'A flying slice of pizza', color: '#ffb347', cruise: 55, boost: 130, pitch: 1.8, turn: 1.7, fixedGear: true, sound: { mul: 1.7, vol: 0.035 } },
-    { id: 'tiger', name: 'Tiger', note: 'Striped jet with teeth', color: '#ff8a1d', cruise: 105, boost: 260, pitch: 1.9, turn: 1.7, sound: { mul: 2.3, vol: 0.04 } },
+    { id: 'tiger', bombs: 2, name: 'Tiger', note: 'Striped jet with teeth', color: '#ff8a1d', cruise: 105, boost: 260, pitch: 1.9, turn: 1.7, sound: { mul: 2.3, vol: 0.04 } },
     { id: 'sleigh', name: 'Sleigh', note: 'Pulled by flying reindeer', color: '#c0392b', cruise: 55, boost: 140, pitch: 1.5, turn: 1.5, cam: 1.35, fixedGear: true, sound: { mul: 3.0, vol: 0.02 } },
     { id: 'gyro', name: 'Gyro', note: 'Autogyro with a big rotor', color: '#ffd23d', cruise: 50, boost: 115, pitch: 1.6, turn: 1.6, cam: 1.15, sound: { mul: 1.5, vol: 0.04 } },
     { id: 'bat', name: 'Bat', note: 'Night bat, very twisty', color: '#3a2e4a', cruise: 50, boost: 125, pitch: 2.2, turn: 2.1, sound: { mul: 3.2, vol: 0.008 } },
@@ -688,8 +689,8 @@ function boot(hot){
     { id: 'dolphin', name: 'Dolphin', note: 'Flying dolphin, lands on lakes', color: '#7a9ab8', cruise: 70, boost: 170, pitch: 1.9, turn: 1.8, cam: 1.15, water: true, fixedGear: true, pax: 3, sound: { mul: 3.2, vol: 0.01 } },
     { id: 'firetruck', name: 'Fire Truck', note: 'Fire engine with wings', color: '#d0202a', cruise: 55, boost: 130, pitch: 1.1, turn: 1.0, cam: 1.3, pax: 6, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'tractor', name: 'Tractor', note: 'Farm tractor with a propeller', color: '#3fa34d', cruise: 45, boost: 105, pitch: 1.3, turn: 1.3, fixedGear: true, pax: 1, sound: { mul: 0.6, vol: 0.05 } },
-    { id: 'lightning', name: 'Lightning', note: 'Stealth fighter, Mach 1.15', color: '#5a6270', cruise: 120, boost: 400, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
-    { id: 'dart', name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } },
+    { id: 'lightning', bombs: 2, name: 'Lightning', note: 'Stealth fighter, Mach 1.15', color: '#5a6270', cruise: 120, boost: 400, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'dart', bombs: 2, name: 'Delta Dart', note: 'Delta-wing jet, Mach 1.2', color: '#c9d2dc', cruise: 125, boost: 420, pitch: 1.8, turn: 1.6, cam: 1.1, pax: 1, sound: { mul: 2.6, vol: 0.045 } },
     { id: 'superjumbo', name: 'Superjumbo', note: 'Double-decker, 550 passengers', color: '#2a4f9a', cruise: 90, boost: 200, pitch: 0.8, turn: 0.7, cam: 1.9, pax: 550, sound: { mul: 1.6, vol: 0.055 } },
     { id: 'cropduster', name: 'Crop Duster', note: 'Farm plane with a big engine', color: '#ffc23d', cruise: 60, boost: 140, pitch: 1.8, turn: 1.7, pax: 1, sound: { mul: 0.8, vol: 0.05 } },
     { id: 'hotdog', name: 'Hot Dog', note: 'With mustard', color: '#b0442a', cruise: 45, boost: 110, pitch: 1.6, turn: 1.6, fixedGear: true, pax: 2, sound: { mul: 1.6, vol: 0.035 } },
@@ -711,8 +712,8 @@ function boot(hot){
     { id: 'xplane', name: 'X-Plane', note: 'Rocket plane, Mach 1.4', color: '#1b1b22', cruise: 170, boost: 480, pitch: 1.1, turn: 1.0, cam: 1.4, pax: 1, sound: { mul: 1.4, vol: 0.055 } },
     { id: 'train', name: 'Flying Train', note: 'Steam engine with wings', color: '#c0302a', cruise: 50, boost: 120, pitch: 1.0, turn: 1.0, cam: 1.35, fixedGear: true, pax: 30, sound: { mul: 0.7, vol: 0.05 } },
     { id: 'beluga', name: 'Beluga', note: 'Smiling whale-shaped cargo jet', color: '#f4f1ea', cruise: 85, boost: 190, pitch: 0.9, turn: 0.8, cam: 1.7, pax: 20, sound: { mul: 1.5, vol: 0.05 } },
-    { id: 'viper', name: 'Viper', note: 'Fighter jet, Mach 1.2', color: '#8a96a3', cruise: 125, boost: 410, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
-    { id: 'raptor', name: 'Raptor', note: 'Stealth fighter, Mach 1.25', color: '#7d8a96', cruise: 130, boost: 425, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.4, vol: 0.045 } },
+    { id: 'viper', bombs: 2, name: 'Viper', note: 'Fighter jet, Mach 1.2', color: '#8a96a3', cruise: 125, boost: 410, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'raptor', bombs: 2, name: 'Raptor', note: 'Stealth fighter, Mach 1.25', color: '#7d8a96', cruise: 130, boost: 425, pitch: 2.0, turn: 1.8, pax: 1, sound: { mul: 2.4, vol: 0.045 } },
     { id: 'pig', name: 'Flying Pig', note: 'When pigs fly!', color: '#ff9fb8', cruise: 45, boost: 110, pitch: 1.7, turn: 1.7, pax: 1, sound: { mul: 1.2, vol: 0.02 } },
     { id: 'cow', name: 'Cow', note: 'A cow with a jetpack', color: '#ffffff', cruise: 45, boost: 115, pitch: 1.5, turn: 1.5, pax: 1, sound: { mul: 2.2, vol: 0.035 } },
     { id: 'puppy', name: 'Puppy', note: 'Dog with flying goggles', color: '#c68a5a', cruise: 50, boost: 120, pitch: 1.8, turn: 1.8, pax: 1, sound: { mul: 1.6, vol: 0.035 } },
@@ -731,7 +732,7 @@ function boot(hot){
     { id: 'sneaker', name: 'Sneaker', note: 'Giant shoe with wings', color: '#d0202a', cruise: 50, boost: 120, pitch: 1.7, turn: 1.7, fixedGear: true, pax: 1, sound: { mul: 1.8, vol: 0.03 } },
     { id: 'skateboard', name: 'Skateboard', note: 'Rocket skateboard', color: '#3a2a5a', cruise: 60, boost: 150, pitch: 2.0, turn: 2.0, fixedGear: true, pax: 1, sound: { mul: 2.2, vol: 0.035 } },
     { id: 'trijet', name: 'Tri-Jet', note: 'Airliner with an engine in its tail', color: '#2a6ccc', cruise: 95, boost: 215, pitch: 0.9, turn: 0.8, cam: 1.6, pax: 250, sound: { mul: 1.7, vol: 0.05 } },
-    { id: 'swingwing', name: 'Swing Wing', note: 'Twin-tail fighter, Mach 1.2', color: '#9aa5b0', cruise: 130, boost: 420, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
+    { id: 'swingwing', bombs: 2, name: 'Swing Wing', note: 'Twin-tail fighter, Mach 1.2', color: '#9aa5b0', cruise: 130, boost: 420, pitch: 1.9, turn: 1.7, pax: 1, sound: { mul: 2.5, vol: 0.045 } },
     { id: 'solar', name: 'Solar Plane', note: 'Long wings full of solar panels', color: '#2a4f9a', cruise: 35, boost: 80, pitch: 1.0, turn: 1.0, cam: 1.4, pax: 1, sound: { mul: 2.8, vol: 0.015 } },
     { id: 'police', name: 'Police Copter', note: 'With flashing lights', color: '#1b2a6c', cruise: 55, boost: 125, pitch: 1.5, turn: 1.6, cam: 1.2, pax: 3, sound: { mul: 0.6, vol: 0.05 } },
     { id: 'pirate', name: 'Pirate Ship', note: 'Flying ship, lands on lakes', color: '#6b4a2a', cruise: 40, boost: 95, pitch: 1.0, turn: 1.0, cam: 1.5, water: true, fixedGear: true, pax: 12, sound: { mul: 0.5, vol: 0.03 } },
@@ -776,6 +777,7 @@ function boot(hot){
   const RED = 0xe8432e, CREAM = 0xfff1d6, DARK = 0x2a2f45, WHITE = 0xf4f1ea, GRAY = 0xc9d2dc;
   // Builds a plane model into root (the player's plane by default) and returns its moving
   // parts: propellers/rotors, flames and landing gear.
+  let bombRack = [], bombsLeft = 0;   // the player's bomb rack and how many are left
   function buildPlane(def, target){
     const root = target || planeBody, mine = root === planeBody;
     root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
@@ -2301,6 +2303,20 @@ function boot(hot){
     // a name tag floating above the plane, like a player's name in a game: it always turns
     // to face you and is drawn on top of everything
     if (def.nameTag) root.add(nameTag(def.nameTag, 0, 5.5, 0));
+    // a rack of bombs under the belly of the fighter jets
+    if (def.bombs){
+      const rack = [], n = def.bombs;
+      for (let i = 0; i < n; i++){
+        const bg = new THREE.Group();
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2, 10), mat(0x3a4250)); body.rotation.x = Math.PI / 2; bg.add(body);
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 10), mat(0x454d5c)); tip.rotation.x = Math.PI / 2; tip.position.z = -0.82; bg.add(tip);
+        [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(([fx, fy]) => { const f = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.28, 0.3), mat(0x2a2f45)); f.position.set(fx * 0.22, fy * 0.22, 0.62); if (fx) f.rotation.z = Math.PI / 2; bg.add(f); });
+        const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, 0.5), mat(DARK)); r.position.y = 0.3; bg.add(r);   // the pylon it hangs from
+        bg.position.set(n > 1 ? (i / (n - 1) - 0.5) * 2.6 : 0, -0.85, 0.2); bg.userData.bomb = true;
+        root.add(bg); rack.push(bg);
+      }
+      if (mine){ bombRack = rack; bombsLeft = rack.length; }
+    } else if (mine){ bombRack = []; bombsLeft = 0; }
     root.scale.setScalar(PLANE_SCALE);
     if (mine){ spinners = sp; flames = fl; gearParts = gp; showGear(gearShown); }
     return { sp, fl, gp };
@@ -2487,7 +2503,37 @@ function boot(hot){
     aiPlanes.forEach(a => { if (a.angryT > 0){ a.angryT = 0; a.speed = a.def.cruise; aiWaypoint(a); } });
     enemyMsl.forEach(m => { m.life = 0; m.g.visible = false; });
   }
-  function clearMissiles(){ calmAI(); missiles.forEach(m => { m.life = 0; m.g.visible = false; }); }
+  function clearMissiles(){ calmAI(); missiles.forEach(m => { m.life = 0; m.g.visible = false; }); clearBombs(); }
+  // bombs: the fighter jets drop them, they fall under gravity and blow up on the ground
+  const activeBombs = [];
+  function clearBombs(){ activeBombs.forEach(b => { b.life = 0; if (b.g){ scene.remove(b.g); b.g = null; } }); activeBombs.length = 0; }
+  function dropBomb(){
+    if (!plane.bombs || F.ground || F.crashT > 0 || !planeRoot.visible || fireT > 0) return;
+    const bg = bombRack.find(b => b.parent === planeBody);
+    if (!bg){ toast('Out of bombs! Land to reload', 'warn'); return; }
+    const wp = new THREE.Vector3(); bg.getWorldPosition(wp);
+    bg.parent.remove(bg); scene.add(bg); bg.position.copy(wp); bg.rotation.set(F.pitch, F.yaw, 0); bg.scale.setScalar(PLANE_SCALE);
+    activeBombs.push({ g: bg, x: wp.x, y: wp.y, z: wp.z, vx: vFwd.x * F.speed, vy: vFwd.y * F.speed - 2, vz: vFwd.z * F.speed, spin: 0, life: 12 });
+    bombsLeft = Math.max(0, bombsLeft - 1); fireT = 0.3; sfx.gear();
+    toast(bombsLeft ? 'Bomb away! ' + bombsLeft + ' left' : 'Bomb away! Last one', '');
+  }
+  function updateBombs(dt){
+    for (const b of activeBombs){
+      if (b.life <= 0) continue;
+      b.life -= dt; b.vy -= GRAV * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      b.spin += dt * 2;
+      const g = groundAt(b.x, b.z), floor = Math.max(g, 0);
+      if (b.y <= floor + 0.5 || b.life <= 0){
+        explode(b.x, Math.max(b.y, floor), b.z, true);
+        aiPlanes.forEach(a => { if (a.def && a.live && Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 28) hitPlane(a, true); });
+        if (Math.hypot(b.x - F.x, b.z - F.z) < 22 && Math.abs(b.y - F.y) < 22 && !F.ground) crashFree(false, 'Caught in your own blast!');
+        b.life = 0; scene.remove(b.g); b.g = null; continue;
+      }
+      b.g.position.set(b.x, b.y, b.z);
+      b.g.rotation.set(Math.atan2(b.vy, Math.hypot(b.vx, b.vz)) - Math.PI / 2, Math.atan2(-b.vx, -b.vz), 0);   // nose follows the arc down
+    }
+  }
   function fireEnemy(a){
     const m = enemyMsl.find(m => m.life <= 0);
     if (!m) return;
@@ -2768,6 +2814,7 @@ function boot(hot){
     if (e.code === 'KeyG' && state === 'play'){ e.preventDefault(); toggleGear(); }
     if (e.code === 'KeyF' && state === 'play'){ e.preventDefault(); toggleFlip(); }
     if (e.code === 'KeyD' && state === 'play'){ e.preventDefault(); toggleDive(); }
+    if (e.code === 'KeyX' && state === 'play' && !F.ride && !F.drive && !F.cruise){ e.preventDefault(); dropBomb(); }
     if (e.code === 'KeyJ' && state === 'play'){ e.preventDefault(); toggleDolphin(); }
     if ((e.code === 'KeyC' || e.code === 'KeyV') && state === 'play'){ e.preventDefault(); toggleView(); }
     if (e.code === 'KeyM'){ if (state === 'play') openAirports(); else if (state === 'paused' && !$('card-airports').hidden) resume(); }
@@ -2840,6 +2887,7 @@ function boot(hot){
   $('btn-view').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
   $('btn-dive').addEventListener('click', e => { toggleDive(); e.currentTarget.blur(); });
   $('btn-dolphin').addEventListener('click', e => { toggleDolphin(); e.currentTarget.blur(); });
+  $('btn-bomb').addEventListener('click', e => { e.currentTarget.blur(); dropBomb(); });
   const fireBtn = $('btn-fire');
   const holdFire = on => e => { keys.f = on; fireBtn.classList.toggle('held', on); if (on) e.preventDefault(); };
   fireBtn.addEventListener('pointerdown', holdFire(true));
@@ -3709,6 +3757,7 @@ function boot(hot){
     updateAI(dt, live);
     updateAICars(dt);
     updateMissiles(dt, live);
+    updateBombs(dt);
     updateFish(dt);
     for (const c of fClouds){
       const p = c.position;
@@ -3833,7 +3882,11 @@ function boot(hot){
   }
   let dtHud = 0;
   let borderT = 0, lastCountry = null, getOutShown = false;
+  let bombBtnShown = false;
   function updateFreeHud(){
+    // the BOMB button only shows on a fighter jet, in the air
+    const bombOn = !!plane.bombs && !F.ride && !F.drive && !F.cruise;
+    if (bombOn !== bombBtnShown){ bombBtnShown = bombOn; $('btn-bomb').hidden = !bombOn; }
     // landed and stopped at an airport: you can get out and drive
     const out = canGetOut();
     if (out !== getOutShown){ getOutShown = out; $('btn-getout').hidden = !out; if (out && t - F.lastLand < 30) toast('Landed! Press E or GET OUT to drive your car', 'info'); }
@@ -4826,9 +4879,9 @@ function boot(hot){
       c.atSecret = !f && !c.atHarbour && !c.atHouse && !!myHouse && Math.hypot(myHouse.sx - c.x, myHouse.sz - c.z) < 14;
       const label = f ? 'AIRPORT ✈ (SPACE)' : c.atHarbour ? 'CRUISE 🚢 (SPACE)' : c.atHouse ? 'MY HOUSE 🏠 (SPACE)' : c.atSecret ? 'SECRET DOOR 🔒 (SPACE)' : '';
       RH.act.hidden = !label; if (label) txt(RH.act, label);
-      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : c.atHouse ? 'You are home!' : (myHouse ? 'Home ' + (Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) / 1000).toFixed(1) + ' km · ' : '') + 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+      if (el) txt(el, (f ? 'You are at ' + f.a.name + ' airport!' : c.atHarbour ? 'You are at ' + h.name + '!' : c.atHouse ? 'You are home!' : (myHouse ? 'Home ' + (Math.hypot(myHouse.cx - c.x, myHouse.cz - c.z) / 1000).toFixed(1) + ' km · ' : '') + 'Airport: ' + na.name + ' ' + (Math.hypot(na.x - c.x, na.z - c.z) / 1000).toFixed(1) + ' km' + (hd < 1e6 ? ' · Harbour ' + (hd / 1000).toFixed(1) + ' km' : '')) + ' · ' + 'IAS ' + String(Math.round(Math.abs(c.speed) * 1.944)).padStart(3, '0') + ' kt · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     }
-    else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
+    else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + 'IAS ' + String(Math.round(Math.abs(c.speed) * 1.944)).padStart(3, '0') + ' kt · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     if (!c.free && dist < 25 && state === 'play') finishDrive(true);
   }
   function driveCam(dt){
