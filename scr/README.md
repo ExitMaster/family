@@ -62,6 +62,16 @@ Swing Wing) carry **2 bombs** on a rack under the belly. Press **X** (or the red
 button) to drop one: it falls under gravity and **blows up** on the ground, with a big
 blast that can take out enemy planes nearby. Land to reload.
 
+## More secrets
+
+- **The Konami code:** press **↑ ↑ ↓ ↓ ← → ← → B A** anywhere to unlock every secret and get
+  **+50,000 points**.
+- **Console cheats (F12):** open DevTools and type **`cheats.help()`** in the Console for a
+  hidden menu — `cheats.code()` (the door code), `cheats.points(n)`, `cheats.unlock()`,
+  `cheats.ufo()` and `cheats.land()`.
+- **The UFO 🛸:** a secret flying saucer with a glass dome and a spinning ring of lights.
+  It's super nimble. Unlock it with the secret room, the Konami code, or `cheats.ufo()`.
+
 ## Secret doors
 
 There are three **secret doors**: in the back wall of **your house**, in a big **rock on

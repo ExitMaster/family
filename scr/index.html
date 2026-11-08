@@ -664,6 +664,7 @@ function boot(hot){
     { id: 'dash8', name: 'Commuter', note: 'Twin-prop airliner', color: '#e8432e', cruise: 75, boost: 165, pitch: 1.1, turn: 1.0, cam: 1.45, pax: 50, sound: { mul: 0.9, vol: 0.05 } },
     { id: 'lear', name: 'Lear', note: 'Little business jet', color: '#ffc23d', cruise: 115, boost: 260, pitch: 1.6, turn: 1.5, pax: 8, sound: { mul: 2.3, vol: 0.04 } },
     { id: 'concorde', name: 'Concorde', note: 'Supersonic airliner, Mach 1.3', color: '#1b2a6c', cruise: 150, boost: 450, pitch: 1.0, turn: 0.9, cam: 1.55, pax: 100, sound: { mul: 2.0, vol: 0.05 } },
+    { id: 'ufo', shape: 'ufo', secret: true, name: 'UFO', note: 'SECRET! Flying saucer, super nimble', color: '#9fe8c0', cruise: 120, boost: 520, pitch: 2.3, turn: 2.3, cam: 1.3, fixedGear: true, pax: 1, sound: { mul: 0.4, vol: 0.04 } },
     { id: 'golden', shape: 'concorde', rainbow: true, secret: true, nameTag: '한정우의 비행기', name: 'Rainbow Comet', note: 'SECRET! Rainbow, easy to land, Mach 1.67 on boost', color: '#ff4fa3', cruise: 80, boost: 573, pitch: 1.5, turn: 1.4, cam: 1.55, pax: 100, sound: { mul: 2.2, vol: 0.05 } },
     { id: 'blackbird', name: 'Blackbird', note: 'Black spy jet, Mach 1.35', color: '#1b1b22', cruise: 160, boost: 460, pitch: 1.2, turn: 1.0, cam: 1.4, pax: 2, sound: { mul: 1.8, vol: 0.05 } },
     { id: 'osprey', name: 'Osprey', note: 'Tilt-rotor, huge propellers', color: '#6b7a5a', cruise: 70, boost: 160, pitch: 1.4, turn: 1.3, cam: 1.35, pax: 24, sound: { mul: 0.55, vol: 0.055 } },
@@ -826,6 +827,15 @@ function boot(hot){
     };
     const wheelY = (r, w, c, x, y, z) => { const o = add(new THREE.CylinderGeometry(r, r, w, 16), c, x, y, z); o.rotation.z = Math.PI / 2; return o; };
     switch (def.shape || def.id){
+      case 'ufo': {   // a flying saucer with a glass dome and a spinning ring of lights
+        ball(2.7, mat(0xaab4bf), 0, 0, 0, 1, 0.26, 1); ball(2.0, mat(0x7f8a95), 0, -0.28, 0, 1, 0.22, 1);
+        ball(1.15, glassMat, 0, 0.5, 0, 1, 0.95, 1); box(0.5, 0.5, 0.5, 0x3fe08a, 0, -0.62, 0);
+        const ring = new THREE.Group(); root.add(ring);
+        const cols = [0xff3b30, 0xffc23d, 0x3fe08a, 0x3fa9f5, 0xb06bff, 0xff8fb8];
+        for (let i = 0; i < 6; i++){ const a = i / 6 * Math.PI * 2, l = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), new THREE.MeshBasicMaterial({ color: cols[i] })); l.position.set(Math.cos(a) * 2.45, -0.32, Math.sin(a) * 2.45); ring.add(l); }
+        sp.push({ o: ring, axis: 'y', rate: 1.6 });
+        break;
+      }
       case 'cub':
         box(1.15, 1.05, 4.0, RED, 0, 0, 0); box(1.25, 1.15, 0.7, CREAM, 0, 0, -2.2); box(0.72, 0.7, 1.5, RED, 0, 0.12, 2.6);
         box(7.4, 0.16, 1.45, CREAM, 0, -0.12, -0.55); both((x) => box(0.9, 0.2, 1.48, RED, x, -0.12, -0.55), 3.3);
@@ -5247,6 +5257,31 @@ function boot(hot){
   }
   logSecretCode();
   function passwordOk(pw){ return typeof pw === 'string' && pw.trim().toUpperCase() === SECRET_CODE; }
+
+  // more secret stuff: the Konami code, and a hidden cheat menu for F12 explorers
+  function unlockSecrets(msg){ const was = store.get('scr.secretFound', false); store.set('scr.secretFound', true); renderPicker(); if (msg) toast(msg, ''); return was; }
+  const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+  let konamiPos = 0;
+  window.addEventListener('keydown', e => {
+    konamiPos = e.code === KONAMI[konamiPos] ? konamiPos + 1 : (e.code === KONAMI[0] ? 1 : 0);
+    if (konamiPos === KONAMI.length){ konamiPos = 0; score += 50000; saveProgress(); unlockSecrets('KONAMI CODE! +50,000 points and every secret unlocked! 🎉'); sfx.applause(); }
+  });
+  window.cheats = {
+    help(){ console.log('%c👾 Sky Coin Rush cheats', 'color:#ffc23d;font:bold 15px sans-serif');
+      ['cheats.code()        — the secret door code (changes each load)',
+       'cheats.points(n)     — add n points',
+       'cheats.unlock()      — unlock the secret room, car, plane and UFO',
+       'cheats.ufo()         — unlock and fly the UFO 🛸',
+       'cheats.land()        — auto-land right now',
+       '…or try the Konami code: ↑ ↑ ↓ ↓ ← → ← → B A'].forEach(l => console.log('%c  ' + l, 'color:#8a93a6;font:13px monospace'));
+      return '🔒'; },
+    code(){ return SECRET_CODE; },
+    points(n){ n = Math.floor(+n) || 0; score = Math.max(0, score + n); saveProgress(); return 'You now have ' + Math.floor(score).toLocaleString() + ' points.'; },
+    unlock(){ unlockSecrets('Secrets unlocked from the console! ✨'); return 'The secret car, plane and UFO are unlocked.'; },
+    ufo(){ unlockSecrets(); const u = PLANES.find(p => p.id === 'ufo'); if (state === 'attract'){ choosePlane('ufo'); } else { plane = u; buildPlane(plane); store.set('scr.plane', 'ufo'); } return 'The UFO is yours. 🛸 Take off!'; },
+    land(){ if (state === 'play' && !F.ground && !F.ride && !F.drive){ toggleAutoLand(); return 'Auto-landing…'; } return 'You can only auto-land while flying.'; }
+  };
+  console.log('%c👾 Psst… type %ccheats.help()%c for secret commands.', 'color:#3fe08a;font:13px sans-serif', 'color:#1b2340;background:#3fe08a;font:bold 13px monospace;padding:1px 6px;border-radius:3px', 'color:#3fe08a');
   let secretOk = null, secretNo = null, secretTries = 0, secretWait = 0;
   function askPassword(ok, no){
     secretOk = ok; secretNo = no; logSecretCode();
