@@ -63,7 +63,7 @@ with the **password**. Behind every one is the same **secret room**:
 
 - a **treasure chest** with 10,000 points in it (once a day),
 - the secret **Sky Rocket** car (650 km/h), which then shows up in your garage,
-- the secret **Golden Comet** plane (solid gold, Mach 3, with a floating **한우구이**
+- the secret **Golden Comet** plane (solid gold, Mach 1.67 on boost, easy to land, with a floating **한정우의 비행기**
   name tag above it), which then shows up in the planes on the start card.
 
 The password isn't written anywhere in the game: only a salted PBKDF2-SHA-256 hash of it.
