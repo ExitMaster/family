@@ -328,7 +328,7 @@ const CATS = [
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-GAMES.forEach(g => g.slug = slug(g.name));
+GAMES.forEach(g => g.slug = (g.url && g.url.match(/^([a-z0-9-]+)\/$/)?.[1]) || slug(g.name));
 const store = {
   get(k,d=0){ try{ const v=localStorage.getItem("unimai:"+k); return v==null?d:JSON.parse(v);}catch{ return d; } },
   set(k,v){ try{ localStorage.setItem("unimai:"+k, JSON.stringify(v)); }catch{} }
