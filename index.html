@@ -1,1699 +1,438 @@
-<!DOCTYPE html>
-<html lang="ko">
+<!doctype html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>카피바라 숙제 탐험대</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>unimai – Free Online Games</title>
+<meta name="description" content="Play free online games instantly on unimai.net – no downloads, no sign-up. Puzzle, arcade, action, sports and more.">
+<meta name="theme-color" content="#4fd1e0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='16' fill='%23ff4f8b'/><text x='32' y='45' font-size='38' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' fill='white'>u</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin:0; padding:0; height:100%; overscroll-behavior:none; }
-@keyframes capyBob { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-0.07em) rotate(0.3deg)} }
-@keyframes capyFloat { 0%,100%{transform:translateY(0) rotate(-1.6deg)} 50%{transform:translateY(-0.12em) rotate(1.6deg)} }
-@keyframes capyNap { 0%,100%{transform:scale(1.0,1.0)} 50%{transform:scale(1.02,0.98)} }
-@keyframes capySpark { 0%,100%{opacity:.35; transform:scale(.85)} 50%{opacity:1; transform:scale(1.15)} }
-@keyframes capyPop { 0%{transform:scale(0.6); opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1); opacity:1} }
-@keyframes confettiFall { 0%{transform:translateY(-30px) rotate(0deg); opacity:1} 100%{transform:translateY(420px) rotate(420deg); opacity:0} }
-@keyframes lilyDrift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-@keyframes tapPop { 0%{transform:scale(1)} 50%{transform:scale(0.93)} 100%{transform:scale(1)} }
-.tapbtn:active { animation: tapPop 0.25s ease; }
-::-webkit-scrollbar { width:0; height:0; }
+:root{
+  --bg1:#62dbe8; --bg2:#3cc7d9;
+  --cell:94px; --gap:16px; --radius:16px;
+  --ink:#0d2b3e; --white:#fff;
+  --font:"Fredoka", ui-rounded, "Segoe UI", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:var(--font); color:var(--ink);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #8cf0f7 0%, transparent 60%),
+    radial-gradient(900px 700px at 110% 20%, #43c3e6 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg1), var(--bg2));
+  background-attachment:fixed;
+  min-height:100vh;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+
+/* ---------- grid ---------- */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, var(--cell));
+  grid-auto-rows:var(--cell);
+  grid-auto-flow:dense;
+  gap:var(--gap);
+  justify-content:center;
+  padding:var(--gap);
+}
+.s{grid-column:span 1;grid-row:span 1}
+.m{grid-column:span 2;grid-row:span 2}
+.l{grid-column:span 3;grid-row:span 3}
+.w{grid-column:span 2;grid-row:span 1}
+
+/* ---------- brand tile ---------- */
+.brand{
+  grid-column:1 / span 2; grid-row:1;
+  background:#fff; border-radius:var(--radius);
+  box-shadow:0 6px 12px rgba(0,40,60,.18);
+  display:flex; flex-direction:column; justify-content:space-between;
+  padding:10px 12px 10px;
+  position:relative; z-index:2;
+}
+.logo{font-weight:700;font-size:34px;line-height:1;letter-spacing:-.5px;display:flex;gap:1px;padding-top:2px}
+.logo span:nth-child(1){color:#ff4f8b}
+.logo span:nth-child(2){color:#ff9f1c}
+.logo span:nth-child(3){color:#2ec4b6}
+.logo span:nth-child(4){color:#3a86ff}
+.logo span:nth-child(5){color:#8338ec}
+.logo span:nth-child(6){color:#ff4f8b}
+.brand-actions{display:flex;gap:8px}
+.icon-btn{
+  flex:1; height:34px; border:0; border-radius:10px;
+  background:#eef7fb; color:#2a5470; font-size:17px;
+  display:grid; place-items:center; transition:background .15s, transform .15s;
+}
+.icon-btn:hover{background:#dff0f8;transform:translateY(-1px)}
+.icon-btn svg{width:20px;height:20px}
+
+/* ---------- game tile ---------- */
+.tile{
+  position:relative; border-radius:var(--radius); overflow:hidden;
+  box-shadow:0 6px 12px rgba(0,40,60,.18);
+  transition:transform .18s cubic-bezier(.3,.7,.4,1.4), box-shadow .18s;
+  background:#fff; isolation:isolate; outline:none;
+}
+.tile:hover,.tile:focus-visible{transform:scale(1.04) translateY(-2px);box-shadow:0 12px 24px rgba(0,40,60,.28);z-index:3}
+.tile:focus-visible{box-shadow:0 0 0 4px #fff, 0 12px 24px rgba(0,40,60,.28)}
+.art{
+  position:absolute; inset:0;
+  background:linear-gradient(var(--a,135deg), var(--c1), var(--c2));
+  display:grid; place-items:center;
+}
+.art::before{ /* soft highlight */
+  content:""; position:absolute; width:120%; aspect-ratio:1; left:-40%; top:-60%;
+  background:radial-gradient(circle, rgba(255,255,255,.45), transparent 60%);
+}
+.art::after{ /* dots pattern */
+  content:""; position:absolute; inset:0; opacity:.18;
+  background-image:radial-gradient(rgba(255,255,255,.9) 1.5px, transparent 1.6px);
+  background-size:14px 14px;
+  mask-image:linear-gradient(180deg, transparent 40%, #000);
+}
+.emo{
+  position:relative; z-index:1; line-height:1;
+  font-size:calc(var(--cell) * .52);
+  filter:drop-shadow(0 4px 4px rgba(0,0,0,.25));
+  transition:transform .25s cubic-bezier(.3,.7,.4,1.6);
+}
+.m .emo{font-size:calc(var(--cell) * 1.05)}
+.l .emo{font-size:calc(var(--cell) * 1.6)}
+.tile:hover .emo{transform:scale(1.08) rotate(-4deg)}
+.big-title{
+  position:absolute; z-index:2; top:10px; left:10px; right:10px;
+  text-align:center; font-weight:700; color:#fff; line-height:.95;
+  font-size:calc(var(--cell) * .34); letter-spacing:.5px; text-transform:uppercase;
+  -webkit-text-stroke:2px rgba(0,0,0,.35); paint-order:stroke fill;
+  text-shadow:0 3px 0 rgba(0,0,0,.25);
+}
+.m .big-title{font-size:calc(var(--cell) * .24);top:8px}
+.tag{
+  position:absolute; z-index:2; left:50%; bottom:14px; transform:translateX(-50%) rotate(-3deg);
+  width:max-content; max-width:92%; text-align:center;
+  background:#ffd60a; color:#7a2e00; font-weight:700; font-size:calc(var(--cell) * .145); white-space:nowrap;
+  padding:6px 12px; border-radius:999px; box-shadow:0 4px 0 rgba(0,0,0,.25);
+}
+.tile:hover .tag{opacity:0}
+.label{
+  position:absolute; z-index:3; left:0; right:0; bottom:0;
+  padding:18px 8px 7px; color:#fff; font-weight:600; font-size:14px; text-align:center;
+  background:linear-gradient(transparent, rgba(0,0,0,.65));
+  transform:translateY(100%); transition:transform .18s ease;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.tile:hover .label,.tile:focus-visible .label{transform:none}
+.badge{
+  position:absolute; z-index:3; top:6px; left:6px;
+  font-size:10px; font-weight:700; letter-spacing:.5px;
+  padding:3px 6px; border-radius:6px; color:#fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.2);
+}
+.badge.new{background:#ff4f8b}
+.badge.hot{background:#ff7a00}
+.badge.play{background:#22b573}
+.m .badge,.l .badge{top:auto;bottom:8px;left:8px}
+.tile:hover .badge{opacity:0}
+
+/* ---------- category tiles ---------- */
+.cat{
+  grid-column:span 2; grid-row:span 1;
+  display:flex; align-items:center; gap:10px; padding:0 14px;
+  background:#fff; border-radius:var(--radius); border:0; text-align:left;
+  box-shadow:0 6px 12px rgba(0,40,60,.18);
+  font-size:17px; font-weight:600; color:var(--ink);
+  transition:transform .15s, box-shadow .15s;
+}
+.cat:hover{transform:translateY(-3px);box-shadow:0 12px 20px rgba(0,40,60,.25)}
+.cat .ci{
+  width:58px; height:58px; border-radius:12px; flex:none;
+  display:grid; place-items:center; font-size:32px;
+  background:linear-gradient(135deg,var(--c1),var(--c2));
+}
+.cat.active{outline:3px solid #ff4f8b}
+.cats{padding-top:8px}
+.section-title{
+  grid-column:1 / -1; grid-row:span 1; align-self:end;
+  color:#fff; font-size:26px; font-weight:700; margin:0; padding:0 4px 6px;
+  text-shadow:0 2px 0 rgba(0,40,60,.25);
+}
+
+/* ---------- search / filter bar ---------- */
+.topbar{
+  position:fixed; z-index:20; top:14px; left:50%; transform:translate(-50%,-140%);
+  width:min(560px, calc(100vw - 32px));
+  background:#fff; border-radius:16px; box-shadow:0 14px 34px rgba(0,30,50,.3);
+  display:flex; align-items:center; gap:8px; padding:8px 8px 8px 14px;
+  transition:transform .25s cubic-bezier(.3,.7,.4,1.2);
+}
+.topbar.open{transform:translate(-50%,0)}
+.topbar input{
+  flex:1; border:0; outline:0; font:600 18px var(--font); color:var(--ink); min-width:0; background:transparent;
+}
+.topbar .count{font-size:13px;color:#5e7d91;white-space:nowrap}
+.topbar button{border:0;background:#eef7fb;border-radius:10px;width:36px;height:36px;font-size:16px;color:#2a5470}
+.empty{grid-column:1 / -1; grid-row:span 2; text-align:center; color:#fff; font-size:22px; font-weight:600; align-self:center}
+.hidden{display:none !important}
+
+footer{
+  text-align:center; color:#fff; padding:24px 16px 40px; font-size:14px; opacity:.9;
+}
+footer a{text-decoration:underline}
+
+/* ---------- player modal ---------- */
+.player{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+  background:rgba(6,30,45,.6); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  padding:16px; animation:fade .2s ease;
+}
+.player[hidden]{display:none}
+@keyframes fade{from{opacity:0}}
+.panel{
+  width:min(1000px,100%); height:min(100%, 860px);
+  background:#14243a; border-radius:20px; overflow:hidden;
+  display:flex; flex-direction:column; box-shadow:0 30px 60px rgba(0,0,0,.4);
+  animation:pop .25s cubic-bezier(.3,.7,.4,1.3);
+}
+@keyframes pop{from{transform:scale(.92);opacity:0}}
+.panel header{
+  display:flex; align-items:center; gap:12px; padding:10px 12px 10px 16px;
+  background:#1b2f4a; color:#fff;
+}
+.panel header .pe{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,var(--c1),var(--c2))}
+.panel header h2{margin:0;font-size:20px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel header button{border:0;background:#2a4365;color:#fff;width:40px;height:40px;border-radius:10px;font-size:18px}
+.panel header button:hover{background:#355280}
+.stage{
+  flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+  padding:12px; position:relative;
+  background:radial-gradient(circle at 50% 30%, #23426a, #0f1c2e 70%);
+}
+.stage canvas{display:block;border-radius:14px;touch-action:none;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:100%;max-height:100%}
+.stage iframe{width:100%;height:100%;border:0;border-radius:12px;background:#000}
+.hint{position:absolute;bottom:6px;left:0;right:0;text-align:center;color:#9fb6cf;font-size:13px;pointer-events:none}
+
+.soon{color:#fff;text-align:center;max-width:460px}
+.soon .big{font-size:96px;line-height:1}
+.soon h3{font-size:30px;margin:12px 0 6px}
+.soon p{color:#b8cce0;margin:0 0 18px}
+.soon .picks{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.soon .picks a{
+  display:flex;align-items:center;gap:8px;background:#2a4365;padding:10px 14px;border-radius:12px;font-weight:600;
+}
+.soon .picks a:hover{background:#355280}
+
+/* DOM-based games */
+.memory{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:min(440px,100%);}
+.card{aspect-ratio:1;perspective:600px;border:0;padding:0;background:none}
+.card .in{position:relative;width:100%;height:100%;transition:transform .35s;transform-style:preserve-3d}
+.card.up .in,.card.done .in{transform:rotateY(180deg)}
+.card .f,.card .b{position:absolute;inset:0;border-radius:14px;display:grid;place-items:center;backface-visibility:hidden}
+.card .f{background:linear-gradient(135deg,#ff4f8b,#8338ec);box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.card .f::after{content:"?";color:rgba(255,255,255,.7);font-size:34px;font-weight:700}
+.card .b{background:#fff;transform:rotateY(180deg);font-size:clamp(28px,8vw,48px)}
+.card.done .b{background:#d9ffe9}
+.ghud{color:#fff;display:flex;gap:18px;justify-content:center;font-size:18px;font-weight:600;margin-bottom:12px}
+.gwrap{display:flex;flex-direction:column;align-items:center;width:100%}
+.gbtn{margin-top:14px;border:0;border-radius:12px;padding:10px 18px;background:#ff4f8b;color:#fff;font-size:17px;font-weight:600}
+.ttt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(360px,100%)}
+.ttt button{aspect-ratio:1;border:0;border-radius:16px;background:#fff;font:700 clamp(40px,12vw,72px) var(--font);color:#ff4f8b;box-shadow:0 5px 0 rgba(0,0,0,.25)}
+.ttt button.o{color:#3a86ff}
+.ttt button.win{background:#ffe066}
+.ttt button:disabled{cursor:default}
+
+/* ---------- responsive ---------- */
+@media (max-width:1100px){ :root{--cell:84px;--gap:14px} }
+@media (max-width:540px){
+  :root{--gap:10px;--radius:14px;--cell:calc((100vw - 32px - 3 * var(--gap)) / 4)}
+  .grid{grid-template-columns:repeat(4, var(--cell));padding:16px}
+  .logo{font-size:28px}
+  .brand{padding:8px 10px}
+  .icon-btn{height:30px}
+  .cat{font-size:15px;padding:0 10px;gap:8px}
+  .cat .ci{width:46px;height:46px;font-size:26px}
+  .label{font-size:12px}
+  .player{padding:0}
+  .panel{border-radius:0;height:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
 </style>
 </head>
 <body>
-<div id="app"></div>
+
+<div class="topbar" id="topbar" role="search">
+  <span aria-hidden="true">🔎</span>
+  <input id="q" type="search" placeholder="What do you want to play?" autocomplete="off" aria-label="Search games">
+  <span class="count" id="count"></span>
+  <button id="qclose" aria-label="Close search">✕</button>
+</div>
+
+<main class="grid" id="grid">
+  <div class="brand">
+    <a href="#" class="logo" aria-label="unimai home"><span>u</span><span>n</span><span>i</span><span>m</span><span>a</span><span>i</span></a>
+    <div class="brand-actions">
+      <button class="icon-btn" id="home" aria-label="Home"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 11.5h3V21h5.5v-6h3v6H19v-9.5h3z"/></svg></button>
+      <button class="icon-btn" id="search" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button>
+    </div>
+  </div>
+</main>
+<section class="grid cats" id="cats" aria-labelledby="cats-title"></section>
+
+<footer>
+  © <span id="yr"></span> unimai.net · Free games, no downloads ·
+  <a href="mailto:hello@unimai.net">Contact</a>
+</footer>
+
+<div class="player" id="player" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="ptitle">
+    <header>
+      <div class="pe" id="pemo"></div>
+      <h2 id="ptitle"></h2>
+      <button id="restart" aria-label="Restart">↻</button>
+      <button id="fs" aria-label="Fullscreen">⛶</button>
+      <button id="pclose" aria-label="Close">✕</button>
+    </header>
+    <div class="stage" id="stage"></div>
+  </div>
+</div>
+
 <script>
-// ── Color utilities ──────────────────────────────────────────
-function _mix(hex, amt, toWhite) {
-  try {
-    const h = hex.replace('#','');
-    const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
-    const f = c => { const v = toWhite ? Math.round(c+(255-c)*amt) : Math.round(c*(1-amt)); return Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0'); };
-    return '#'+f(r)+f(g)+f(b);
-  } catch(e) { return hex; }
-}
-const lighten = (h,a) => _mix(h,a,true);
-const darken  = (h,a) => _mix(h,a,false);
+/* =====================================================================
+   GAME CATALOG
+   Each entry:  name, emoji, c1/c2 (tile gradient), size (s|m|l), cat
+   Optional:    play: id of a built-in game below
+                url:  any embeddable HTML5 game URL (opens in an iframe)
+                badge: "new" | "hot"
+   Entries without play/url show a "coming soon" screen.
+   ===================================================================== */
+const GAMES = [
+  {name:"Sky Coin Rush", emoji:"🪙", c1:"#ff8787", c2:"#c92a2a", size:"l", cat:"action",    tag:"Most famous on unimai game hub!", url:"scr/"},
+  {name:"Coin Rush Racing", emoji:"🏎️", c1:"#ffe066", c2:"#f08c00", size:"m", cat:"arcade",    url:"coin-rush/", badge:"hot"},
+  {name:"Aura Obby 3D", emoji:"🐌", c1:"#74c0fc", c2:"#1c7ed6", size:"m", cat:"adventure", url:"obby/", badge:"new"},
+  {name:"Jetpack Jump", emoji:"🚀", c1:"#8ce99a", c2:"#2b8a3e", size:"m", cat:"arcade",    url:"jump/"},
+  {name:"토끼 점프", emoji:"🐰", c1:"#ffdeeb", c2:"#f06595", size:"m", cat:"casual",    url:"bunny/"},
+  {name:"깡총데굴", emoji:"⚽", c1:"#b197fc", c2:"#5f3dc4", size:"m", cat:"arcade",    url:"hoproll/"},
+];
 
-// ── Capybara renderer (parametric SVG) ───────────────────────
-//  MOODS의 face/pose 힌트를 실제 그림 파라미터로 옮긴 사양표.
-//  눈(eye)·입(mouth)·볼(blush)·자세(pose)·부가연출(extra)을 조합해
-//  한 마리의 공통 카피바라에서 표정/포즈 변형을 만든다.
-const MOOD_ART = {
-  '평온':  {eye:'happy',     mouth:'smile_s',    blush:.35, pose:'calm'},
-  '행복':  {eye:'happy',     mouth:'smile_open', blush:.6,  pose:'bounce'},
-  '졸림':  {eye:'closed',    mouth:'small',      blush:.30, pose:'lean',     extra:'zzz'},
-  '신남':  {eye:'star',      mouth:'open_big',   blush:.5,  pose:'jump',     extra:'spark'},
-  '놀람':  {eye:'wide',      mouth:'o',          blush:.30, pose:'jolt'},
-  '부끄럼':{eye:'happy',     mouth:'small',      blush:.85, pose:'duck'},
-  '먹는중':{eye:'happy',     mouth:'chew',       blush:.45, pose:'calm'},
-  '뿌듯':  {eye:'confident', mouth:'smile_s',    blush:.40, pose:'proud',    extra:'spark'},
-  '토라짐':{eye:'side',      mouth:'pout',       blush:.30, pose:'turn',     extra:'angry'},
-  '장난':  {eye:'wink',      mouth:'tongue',     blush:.40, pose:'mischief'},
-  '도도':  {eye:'half',      mouth:'smile_s',    blush:.25, pose:'chinup'},
-  '두근':  {eye:'sparkle',   mouth:'small',      blush:.70, pose:'calm',     extra:'heart'},
-  '안심':  {eye:'closed',    mouth:'smile_s',    blush:.35, pose:'relax',    extra:'sigh'},
-  '_default':{eye:'round',   mouth:'smile_s',    blush:.40, pose:'calm'}
+const CATS = [
+  {id:"arcade",    name:"Arcade",    emoji:"🕹️", c1:"#b44cff", c2:"#5a1fd1"},
+  {id:"action",    name:"Action",    emoji:"💥", c1:"#ff9f1c", c2:"#e63946"},
+  {id:"casual",    name:"Casual",    emoji:"🍭", c1:"#ff8fab", c2:"#7b2cbf"},
+  {id:"adventure", name:"Adventure", emoji:"🗺️", c1:"#80ed99", c2:"#38a3a5"},
+];
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+GAMES.forEach(g => g.slug = slug(g.name));
+const store = {
+  get(k,d=0){ try{ const v=localStorage.getItem("unimai:"+k); return v==null?d:JSON.parse(v);}catch{ return d; } },
+  set(k,v){ try{ localStorage.setItem("unimai:"+k, JSON.stringify(v)); }catch{} }
 };
-// 개성 → 평상시(이벤트가 없을 때) 기본 표정·눈 크기. 개성별 '생김새'가 도감/연못에서 드러난다.
-const PERSONALITY_REST = {'느긋':'평온','장난꾸러기':'장난','새침':'도도','호기심':'두근','겁쟁이':'부끄럼'};
-const PERSONALITY_EYE  = {'호기심':1.18,'겁쟁이':1.12,'장난꾸러기':1.06};
-const POSE_TF = {calm:'',bounce:'',jump:'',jolt:'',lean:'rotate(-7 50 70)',duck:'translate(0 4)',proud:'translate(0 -2)',turn:'translate(100 0) scale(-1 1)',mischief:'rotate(5 50 70)',chinup:'rotate(-4 50 66)',relax:'rotate(4 50 70)'};
-const EXTRA_ART = {
-  zzz:  '<text x="71" y="27" font-size="15">💤</text>',
-  spark:'<text x="14" y="27" font-size="13">✨</text>',
-  heart:'<text x="59" y="15" font-size="15">💗</text>',
-  angry:'<text x="69" y="25" font-size="14">💢</text>',
-  sigh: '<text x="69" y="73" font-size="12">💨</text>'
-};
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-function capy({size=90, color='#c79a68', accessory='', idle='bob', status='healthy', rarity='일반', mood=null, personality=null, decor=null, img=null}) {
-  const animMap = { bob:'capyBob 2.8s ease-in-out infinite', float:'capyFloat 4.2s ease-in-out infinite', nap:'capyNap 3.4s ease-in-out infinite', none:'none' };
-  const sm = { healthy:{f:'none',o:1,e:''}, weak:{f:'saturate(0.7) brightness(0.99)',o:0.95,e:'😟'}, leaving:{f:'grayscale(0.45) brightness(0.98)',o:0.9,e:'😢'}, gone:{f:'grayscale(0.9) brightness(1.02)',o:0.4,e:'💨'}, locked:{f:'grayscale(1) brightness(0.5) contrast(0.7)',o:0.85,e:''} }[status] || {f:'none',o:1,e:''};
-  const base = status==='locked' ? '#9aa0a6' : color;
-  const ink='#3a2a1d';
-  const oc=darken(base,0.46), earIn=darken(base,0.20), muz=lighten(base,0.12), nz=darken(base,0.50), nzd=darken(base,0.62), foot=darken(base,0.07);
-  const anim = status==='gone' ? 'none' : (animMap[idle]||animMap.bob);
-  const isGlasses = accessory==='👓';
-  const acc = status==='locked' ? '' : accessory;
-  const sparkle = (rarity==='영웅'||rarity==='전설') && status!=='locked';
-
-  // 표정 사양 결정: 위기 상태 > 명시 mood > 낮잠 > 개성 평상시 > 기본
-  let art;
-  if(status==='gone')         art={eye:'closed',  mouth:'small', blush:.15, pose:'relax'};
-  else if(status==='leaving') art={eye:'sad',     mouth:'frown', blush:.20, pose:'duck'};
-  else if(status==='weak')    art={eye:'worried', mouth:'frown', blush:.25, pose:'calm'};
-  else { const m = mood || (idle==='nap'?'졸림':null) || PERSONALITY_REST[personality]; art = MOOD_ART[m] || MOOD_ART._default; }
-  const sc = PERSONALITY_EYE[personality] || 1;
-  const pose = POSE_TF[art.pose] || '';
-
-  function eye(type, cx, cy, side){
-    const hl = `<circle cx="${cx-1.6}" cy="${cy-2}" r="1.5" fill="#fff" opacity="0.92"/>`;
-    switch(type){
-      case 'round':   return `<ellipse cx="${cx}" cy="${cy}" rx="${5*sc}" ry="${6.2*sc}" fill="${ink}"/>${hl}`;
-      case 'wide':    return `<ellipse cx="${cx}" cy="${cy}" rx="${6.2*sc}" ry="${7.2*sc}" fill="#fff" stroke="${ink}" stroke-width="1.4"/><circle cx="${cx}" cy="${cy+0.5}" r="${3*sc}" fill="${ink}"/>${hl}`;
-      case 'happy':   return `<path d="M ${cx-5.5} ${cy+1.8} Q ${cx} ${cy-5} ${cx+5.5} ${cy+1.8}" fill="none" stroke="${ink}" stroke-width="2.4" stroke-linecap="round"/>`;
-      case 'closed':  return `<path d="M ${cx-5} ${cy-0.5} Q ${cx} ${cy+4.5} ${cx+5} ${cy-0.5}" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>`;
-      case 'star':    return `<path d="M ${cx} ${cy-6.5} L ${cx+1.7} ${cy-1.7} L ${cx+6.5} ${cy} L ${cx+1.7} ${cy+1.7} L ${cx} ${cy+6.5} L ${cx-1.7} ${cy+1.7} L ${cx-6.5} ${cy} L ${cx-1.7} ${cy-1.7} Z" fill="${ink}"/><circle cx="${cx-1}" cy="${cy-1.5}" r="1.1" fill="#fff" opacity="0.85"/>`;
-      case 'sparkle': return `<ellipse cx="${cx}" cy="${cy}" rx="${5.2*sc}" ry="${6.4*sc}" fill="${ink}"/><circle cx="${cx-1.6}" cy="${cy-2}" r="2" fill="#fff" opacity="0.95"/><circle cx="${cx+1.8}" cy="${cy+1.8}" r="1" fill="#fff" opacity="0.8"/>`;
-      case 'confident': return `<path d="M ${cx-5} ${cy+1} A 5 5 0 0 0 ${cx+5} ${cy+1} Z" fill="${ink}"/><path d="M ${cx-5} ${cy-3} L ${cx+5} ${cy-4.5}" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`;
-      case 'side':    return `<ellipse cx="${cx}" cy="${cy}" rx="5" ry="4" fill="#fff" stroke="${ink}" stroke-width="1.2"/><circle cx="${cx+2.4}" cy="${cy}" r="2.4" fill="${ink}"/>`;
-      case 'half':    return `<path d="M ${cx-5} ${cy-1.5} L ${cx+5} ${cy-3}" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/><path d="M ${cx-4} ${cy} Q ${cx} ${cy+2.5} ${cx+4} ${cy-0.5}" fill="none" stroke="${ink}" stroke-width="1.5" stroke-linecap="round"/>`;
-      case 'sad':     return `<path d="M ${cx-4.5} ${cy-2} Q ${cx} ${cy+2.5} ${cx+4.5} ${cy-2}" fill="none" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>${side<0?`<circle cx="${cx-4}" cy="${cy+5}" r="1.8" fill="#9ad0e6"/>`:''}`;
-      case 'worried': return `<ellipse cx="${cx}" cy="${cy+0.5}" rx="3.6" ry="4.4" fill="${ink}"/><path d="M ${cx-side*4} ${cy-5} L ${cx+side*5} ${cy-3}" fill="none" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>`;
-      default:        return `<ellipse cx="${cx}" cy="${cy}" rx="${5*sc}" ry="${6*sc}" fill="${ink}"/>${hl}`;
-    }
-  }
-  function mouth(type){
-    switch(type){
-      case 'smile_s':    return `<path d="M 44 80 Q 50 85 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
-      case 'smile_open': return `<path d="M 43 79 Q 50 89 57 79 Z" fill="#9c4a4a"/><path d="M 45 82 Q 50 86 55 82 Z" fill="#ef7d8e"/>`;
-      case 'o':          return `<ellipse cx="50" cy="81" rx="3.2" ry="3.8" fill="#9c4a4a"/>`;
-      case 'open_big':   return `<ellipse cx="50" cy="82" rx="5" ry="6" fill="#9c4a4a"/><ellipse cx="50" cy="84.5" rx="3.2" ry="2.6" fill="#ef7d8e"/>`;
-      case 'chew':       return `<path d="M 44 80 Q 50 84 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/><circle cx="61" cy="78" r="1.8" fill="#8fbf6a"/>`;
-      case 'pout':       return `<path d="M 45 83 Q 50 79 55 83" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
-      case 'tongue':     return `<path d="M 44 80 Q 50 84 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/><path d="M 48 81 Q 50 87 53 81 Z" fill="#ef7d8e"/>`;
-      case 'small':      return `<line x1="47" y1="80" x2="53" y2="80" stroke="${ink}" stroke-width="1.6" stroke-linecap="round"/>`;
-      case 'frown':      return `<path d="M 44 84 Q 50 78 56 84" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
-      default:           return `<path d="M 44 80 Q 50 84 56 80" fill="none" stroke="${ink}" stroke-width="1.8" stroke-linecap="round"/>`;
-    }
-  }
-
-  let lt=art.eye, rt=art.eye;
-  if(art.eye==='wink'){ lt='happy'; rt='round'; }   // 한쪽 눈 윙크
-  const eyes = eye(lt,35,50,-1) + eye(rt,65,50,1);
-  // 꾸미기 장식(해금·수집으로 얻는다). hat 슬롯은 종족 모자 악세서리를 대체한다.
-  const dec = (status==='locked') ? null : decor;
-  const decHat = dec && dec.slot==='hat';
-  const showAcc = acc && !(decHat && !isGlasses);
-  const accSvg = showAcc ? (isGlasses
-      ? `<text x="50" y="55" font-size="22" text-anchor="middle">${acc}</text>`
-      : `<text x="50" y="14" font-size="20" text-anchor="middle">${acc}</text>`) : '';
-  const decSvg = dec ? ({
-      hat:   `<text x="50" y="15" font-size="20" text-anchor="middle">${dec.emoji}</text>`,
-      neck:  `<text x="50" y="97" font-size="15" text-anchor="middle">${dec.emoji}</text>`,
-      badge: `<text x="34" y="94" font-size="13" text-anchor="middle">${dec.emoji}</text>`,
-      side:  `<text x="85" y="32" font-size="14" text-anchor="middle">${dec.emoji}</text>`
-    }[dec.slot] || `<text x="50" y="15" font-size="18" text-anchor="middle">${dec.emoji}</text>`) : '';
-  const extraSvg = (status==='healthy' && art.extra) ? (EXTRA_ART[art.extra]||'') : '';
-
-  // ── 커스텀 이미지가 있으면 SVG 대신 그림 사용 (위기 필터·꾸미기 이모지는 유지) ──
-  if(img){
-    const decPos={hat:'top:1%;left:50%;transform:translateX(-50%);',neck:'bottom:13%;left:50%;transform:translateX(-50%);',badge:'bottom:17%;left:30%;',side:'top:7%;right:3%;'}[dec&&dec.slot]||'top:1%;left:50%;transform:translateX(-50%);';
-    const decHtml = dec?`<div style="position:absolute;${decPos}font-size:0.5em;pointer-events:none;z-index:7;">${dec.emoji}</div>`:'';
-    return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
-  ${sparkle?`<div style="position:absolute;top:-0.05em;right:-0.05em;font-size:0.46em;animation:capySpark 1.6s ease-in-out infinite;pointer-events:none;z-index:9;">✨</div>`:''}
-  <div style="position:relative;width:2.7em;height:2.7em;transform-origin:50% 92%;animation:${anim};">
-    <img src="${img}" alt="" draggable="false" style="width:100%;height:100%;object-fit:contain;display:block;-webkit-user-drag:none;user-select:none;" />
-    ${decHtml}
-  </div>
-  ${sm.e ? `<div style="position:absolute;top:0.1em;left:-0.05em;font-size:0.44em;z-index:8;pointer-events:none;">${sm.e}</div>` : ''}
-</div>`;
-  }
-
-  return `<div style="position:relative;display:inline-block;font-size:${size}px;line-height:1;opacity:${sm.o};filter:${sm.f};">
-  ${sparkle?`<div style="position:absolute;top:-0.05em;right:-0.05em;font-size:0.46em;animation:capySpark 1.6s ease-in-out infinite;pointer-events:none;z-index:9;">✨</div>`:''}
-  <div style="position:relative;width:2em;height:2.35em;transform-origin:50% 95%;animation:${anim};">
-    <svg viewBox="0 0 100 120" width="100%" height="100%" style="display:block;overflow:visible;">
-      <g transform="${pose}">
-        <ellipse cx="30" cy="15" rx="10" ry="9" fill="${base}" stroke="${oc}" stroke-width="2"/><ellipse cx="30" cy="16" rx="4.5" ry="4.5" fill="${earIn}"/>
-        <ellipse cx="70" cy="15" rx="10" ry="9" fill="${base}" stroke="${oc}" stroke-width="2"/><ellipse cx="70" cy="16" rx="4.5" ry="4.5" fill="${earIn}"/>
-        <ellipse cx="40" cy="103" rx="8" ry="5.5" fill="${foot}" stroke="${oc}" stroke-width="1.6"/>
-        <ellipse cx="60" cy="103" rx="8" ry="5.5" fill="${foot}" stroke="${oc}" stroke-width="1.6"/>
-        <path d="M50 12 C72 12 85 25 85 52 C85 87 70 109 50 109 C30 109 15 87 15 52 C15 25 28 12 50 12 Z" fill="${base}" stroke="${oc}" stroke-width="2"/>
-        <ellipse cx="50" cy="60" rx="25" ry="33" fill="#ffffff" opacity="0.06"/>
-        <ellipse cx="50" cy="72" rx="23" ry="16" fill="${muz}"/>
-        <ellipse cx="28" cy="74" rx="7" ry="4.2" fill="#ef9bb0" opacity="${art.blush}"/>
-        <ellipse cx="72" cy="74" rx="7" ry="4.2" fill="#ef9bb0" opacity="${art.blush}"/>
-        <ellipse cx="50" cy="66" rx="11" ry="7" fill="${nz}"/>
-        <ellipse cx="50" cy="63.5" rx="6" ry="2" fill="#ffffff" opacity="0.15"/>
-        <ellipse cx="46" cy="66" rx="1.4" ry="2.2" fill="${nzd}"/><ellipse cx="54" cy="66" rx="1.4" ry="2.2" fill="${nzd}"/>
-        <line x1="50" y1="73" x2="50" y2="78" stroke="${oc}" stroke-width="1.2" stroke-linecap="round"/>
-        ${mouth(art.mouth)}
-        ${eyes}
-        ${accSvg}
-        ${decSvg}
-        ${extraSvg}
-      </g>
-    </svg>
-  </div>
-  ${sm.e ? `<div style="position:absolute;top:0.1em;left:-0.05em;font-size:0.44em;z-index:8;pointer-events:none;">${sm.e}</div>` : ''}
-</div>`;
+/* ---------- render grid ---------- */
+const grid = $("#grid");
+function tileHTML(g){
+  const badge = g.badge ? `<span class="badge ${g.badge}">${g.badge.toUpperCase()}</span>`
+              : g.play ? `<span class="badge play">▶ PLAY</span>` : "";
+  const title = (g.size !== "s" ? `<span class="big-title">${esc(g.name)}</span>` : "") +
+    (g.tag ? `<span class="tag">⭐ ${esc(g.tag)}</span>` : "");
+  return `<a class="tile ${g.size}" href="#/${g.slug}" data-cat="${g.cat}" data-name="${esc(g.name.toLowerCase())}" aria-label="${esc(g.name)}">
+    <div class="art" style="--c1:${g.c1};--c2:${g.c2};${g.a?`--a:${g.a}`:""}"><span class="emo">${g.emoji}</span></div>
+    ${title}${badge}<span class="label">${esc(g.name)}</span></a>`;
 }
+grid.insertAdjacentHTML("beforeend",
+  GAMES.map(tileHTML).join("") +
+  `<div class="empty hidden" id="empty">No games found 😢</div>`);
+const cats = $("#cats");
+cats.insertAdjacentHTML("beforeend",
+  `<h2 class="section-title" id="cats-title">Categories</h2>` +
+  CATS.map(c => `<button class="cat" data-filter="${c.id}"><span class="ci" style="--c1:${c.c1};--c2:${c.c2}">${c.emoji}</span>${c.name}</button>`).join("")
+);
+$("#yr").textContent = new Date().getFullYear();
 
-// ── Constants ────────────────────────────────────────────────
-const THEMES = {
-  onsen:    {bg:'linear-gradient(180deg,#fdf4e8,#f4e7d4)', water:'linear-gradient(180deg,#d9ece4,#bfdcd2)', card:'#fffaf2', accent:'#c97a4e', accentDark:'#a8623c', ink:'#574437', sub:'#9c8775', line:'#efe2d0', soft:'#f6ebda'},
-  riverside:{bg:'linear-gradient(180deg,#eef7f4,#e0eef0)', water:'linear-gradient(180deg,#c5e6ea,#a9d8de)', card:'#ffffff', accent:'#3f9b94', accentDark:'#2f7b75', ink:'#37494a', sub:'#7b9192', line:'#dcebea', soft:'#e6f4f2'},
-  sakura:   {bg:'linear-gradient(180deg,#fceef4,#f3e2ee)', water:'linear-gradient(180deg,#ecd6ea,#ddc2dd)', card:'#fff8fc', accent:'#cd7aa1', accentDark:'#b15f86', ink:'#56414f', sub:'#9c8593', line:'#f1dde9', soft:'#faecf4'}
-};
-const RARITY = {'일반':{c:'#9aa0a6',bg:'#eef0f2'},'희귀':{c:'#3f9b94',bg:'#e2f2f0'},'영웅':{c:'#8a6fc9',bg:'#efeafb'},'전설':{c:'#d99441',bg:'#fbf0dc'}};
-const DL = {mon:'월',tue:'화',wed:'수',thu:'목',fri:'금',sat:'토',sun:'일'};
-const DAY_ORDER = ['mon','tue','wed','thu','fri','sat','sun'];
-// 숙제 주기: 화요일에 받은 숙제는 수·목에, 목요일에 받은 숙제는 금·토·(다음)월에 완료한다.
-// assignDow = 받는 요일의 getDay() 인덱스(일0..토6). off = 받는 날로부터의 일수.
-const CYCLES = [
-  {key:'tue', label:'화요일 숙제', assignDow:2, days:[{d:'wed',off:1},{d:'thu',off:2}]},
-  {key:'thu', label:'목요일 숙제', assignDow:4, days:[{d:'fri',off:1},{d:'sat',off:2},{d:'mon',off:4}]}
-];
-// 완료(숙제)일 요일 집합. 여기에 없는 요일(화·일 등)은 '자유일'이라 자발 숙제가 가능하다.
-const COMP_DAYS = CYCLES.reduce((s,cy)=>{ cy.days.forEach(x=>{s[x.d]=true;}); return s; }, {});
-// ============================================================
-//  카피바라 데이터셋 (개성 · 표정 · 상호작용 · 깜짝친구 · 이벤트)
-//  ▸ 순수 데이터 모듈. capyMood(표정·행동) 태그가 곧 SVG 변형 '필요 목록'이 된다.
-//  ▸ 향후 SVG 작업 시 MOODS의 face/pose 힌트가 그대로 변형 사양으로 쓰인다.
-// ============================================================
-
-// 1) 개성(성격) — SPECIES.personality 값과 1:1. 기분 성향과 상호작용 반응 색깔.
-const PERSONALITY = {
-  '느긋':      {emoji:'😌', desc:'느긋하고 평온한 성격', moodBias:['평온','졸림','행복']},
-  '장난꾸러기':{emoji:'😜', desc:'장난기 많고 활발한 성격', moodBias:['신남','장난','놀람']},
-  '새침':      {emoji:'😼', desc:'새침하지만 속정 깊은 성격', moodBias:['도도','부끄럼','토라짐']},
-  '호기심':    {emoji:'🤓', desc:'호기심 가득한 탐험가 성격', moodBias:['놀람','신남','두근']},
-  '겁쟁이':    {emoji:'🫣', desc:'겁 많고 수줍은 성격', moodBias:['부끄럼','놀람','안심']}
-};
-
-// 2) 표정·행동 태그(capyMood) — 이벤트/상호작용이 가리키는 카피바라 상태.
-//    face/pose는 향후 SVG 변형 사양(눈·입·볼·자세) 힌트.
-const MOODS = {
-  '평온':  {emoji:'😌', face:'눈 반달, 입 옅은 미소', pose:'편안히 앉음'},
-  '행복':  {emoji:'😊', face:'눈 웃음, 볼 발그레', pose:'살짝 들썩'},
-  '졸림':  {emoji:'😴', face:'눈 감김, zzz', pose:'눕기 직전'},
-  '신남':  {emoji:'🤩', face:'눈 반짝(별), 입 활짝', pose:'폴짝'},
-  '놀람':  {emoji:'😲', face:'눈 동그래, 입 O', pose:'움찔'},
-  '부끄럼':{emoji:'☺️', face:'눈 곡선, 볼 진하게', pose:'고개 숙임'},
-  '먹는중':{emoji:'😋', face:'볼 오물오물', pose:'간식에 코 박기'},
-  '뿌듯':  {emoji:'😤', face:'눈 자신만만, 가슴 쭉', pose:'당당히'},
-  '토라짐':{emoji:'😠', face:'눈 옆으로, 입 삐죽', pose:'홱 돌아섬'},
-  '장난':  {emoji:'😏', face:'한쪽 눈 윙크, 혀', pose:'까불까불'},
-  '도도':  {emoji:'😼', face:'눈 반쯤, 턱 살짝 듦', pose:'우아하게'},
-  '두근':  {emoji:'😳', face:'눈 반짝, 하트', pose:'두근두근'},
-  '안심':  {emoji:'😮‍💨', face:'눈 스르르', pose:'긴장 풀림'}
-};
-
-// 3) 상호작용 — 카피바라에게 직접 해보는 행동(도감 상세에서). 개성별 반응 대사.
-const INTERACTIONS = [
-  {id:'pet', emoji:'🤚', label:'쓰다듬기', mood:'행복', intimacy:1, react:{
-    '느긋':'스르르… 기분 좋다는 듯 눈을 감아요.',
-    '장난꾸러기':'헤헤! 더 해달라고 머리를 비벼요.',
-    '새침':'흥, 별로… 하면서도 슬쩍 기대요.',
-    '호기심':'네 손을 신기하게 쳐다보다 배시시 웃어요.',
-    '겁쟁이':'처음엔 움찔하더니 곧 사르르 녹아요.',
-    '_default':'기분 좋은 듯 몸을 맡겨요.'}},
-  {id:'belly', emoji:'🫳', label:'출렁이는 뱃살 만지기', mood:'졸림', intimacy:1, react:{
-    '느긋':'뱃살이 출렁— 그대로 낮잠에 빠질 기세예요.',
-    '장난꾸러기':'간지럽다며 데굴데굴 굴러요.',
-    '새침':'…남들 앞에선 하지 말라며 새침을 떨어요.',
-    '호기심':'자기 뱃살을 같이 눌러보며 신기해해요.',
-    '겁쟁이':'부끄러운지 앞발로 얼굴을 가려요.',
-    '_default':'말랑말랑 뱃살이 기분 좋게 출렁여요.'}},
-  {id:'cheek', emoji:'👉', label:'볼 콕 찔러보기', mood:'놀람', intimacy:1, react:{
-    '느긋':'콕— 천천히 고개를 돌려 빤히 봐요.',
-    '장난꾸러기':'똑같이 네 볼을 콕 찌르려 들어요!',
-    '새침':'볼을 부풀리며 토라진 척해요.',
-    '호기심':'왜 찔렀냐는 듯 눈을 동그랗게 떠요.',
-    '겁쟁이':'화들짝 놀랐다가 이내 배시시 웃어요.',
-    '_default':'볼이 말랑— 놀란 표정이 귀여워요.'}}
-];
-
-// 4) 깜짝친구 — 카피바라 외 동·식물의 깜짝 방문(이벤트 보상으로 등장).
-const GUESTS = [
-  {id:'butterfly', emoji:'🦋', name:'나비',     line:'카피바라 코끝에 살포시 앉았어요.'},
-  {id:'frog',      emoji:'🐸', name:'개구리',   line:'연잎 위에서 개굴— 인사를 건네요.'},
-  {id:'duck',      emoji:'🦆', name:'아기 오리', line:'줄지어 카피바라 등을 타고 지나가요.'},
-  {id:'squirrel',  emoji:'🐿️', name:'다람쥐',   line:'도토리를 한 알 선물하고 쏙 사라졌어요.'},
-  {id:'ladybug',   emoji:'🐞', name:'무당벌레', line:'행운을 가져다준다며 살며시 앉았어요.'},
-  {id:'sparrow',   emoji:'🐦', name:'참새',     line:'짹짹— 응원가를 불러줬어요.'},
-  {id:'turtle',    emoji:'🐢', name:'거북이',   line:'느릿느릿 다가와 함께 일광욕을 해요.'},
-  {id:'firefly',   emoji:'✨', name:'반딧불이', line:'저녁 연못을 반짝반짝 밝혀줬어요.'}
-];
-
-// 4-1) 수집 아이템 표시용 이모지(이벤트 reward.item 이름과 매칭).
-const ITEMS = { '수박':'🍉', '유자':'🍊', '옥수수':'🌽', '반짝별':'🌟' };
-
-// 4-2) 꾸미기 장식 — 카피바라에게 입히는 악세서리.
-//   slot: hat(모자·머리, 종족 모자 대체) · neck(목걸이) · badge(가슴) · side(옆에 둥둥).
-//   unlocked(ST): 해금 조건. 이벤트 unlock 보상(ST.unlocks) 또는 간식 수집(ST.items)과 연동.
-const DECOR = [
-  {id:'medal',  name:'금메달 목걸이', emoji:'🏅', slot:'neck',  src:'2주 연속 달성 보상', unlocked:s=>(s.unlocks||[]).includes('금메달 목걸이')},
-  {id:'badge',  name:'도감 배지',     emoji:'🎖️', slot:'badge', src:'도감 50% 보상',     unlocked:s=>(s.unlocks||[]).includes('도감 배지')},
-  {id:'star',   name:'반짝별 장식',   emoji:'🌟', slot:'hat',   src:'반짝별 수집',       unlocked:s=>((s.items||{})['반짝별']||0)>0},
-  {id:'melon',  name:'수박 모자',     emoji:'🍉', slot:'hat',   src:'수박 수집',         unlocked:s=>((s.items||{})['수박']||0)>0},
-  {id:'corn',   name:'옥수수',        emoji:'🌽', slot:'side',  src:'옥수수 수집',       unlocked:s=>((s.items||{})['옥수수']||0)>0},
-  {id:'yuzu',   name:'유자',          emoji:'🍊', slot:'side',  src:'유자 수집',         unlocked:s=>((s.items||{})['유자']||0)>0},
-  // 리워드샵(한우리 코인)으로 구매하는 장식
-  {id:'tophat', name:'신사 모자',     emoji:'🎩', slot:'hat',   src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('신사 모자')},
-  {id:'scarf',  name:'포근 목도리',   emoji:'🧣', slot:'neck',  src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('포근 목도리')},
-  {id:'balloon',name:'풍선',          emoji:'🎈', slot:'side',  src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('풍선')},
-  {id:'flower', name:'꽃다발',        emoji:'💐', slot:'badge', src:'리워드샵',          unlocked:s=>(s.unlocks||[]).includes('꽃다발')}
-];
-function decorById(id){ return DECOR.find(d=>d.id===id)||null; }
-function availableDecor(){ return DECOR.filter(d=>d.unlocked(ST)); }
-// 카피바라(uid)가 착용 중인 장식을 capy()용 {emoji,slot}로. 해금이 풀린 경우만 반영.
-function decorFor(uid){ const id=(ST.equip||{})[uid]; const d=decorById(id); return (d&&d.unlocked(ST))?{emoji:d.emoji,slot:d.slot}:null; }
-
-// 4-3) 커스텀 카피바라 이미지 — assets/capy/<id>.png 가 있으면 그림을, 없으면 SVG를 쓴다.
-//   앱 시작 시 각 종 이미지를 비동기로 탐지하고, 로드된 것만 IMG_OK에 표시 → 자동 반영.
-const CAPY_IMG_BASE='assets/capy/';
-let IMG_OK={};
-function imgFor(id){ return IMG_OK[id]?(CAPY_IMG_BASE+id+'.png'):null; }
-function _inputFocused(){ const a=document.activeElement; return !!(a && (a.tagName==='INPUT'||a.tagName==='TEXTAREA')); }
-let _imgRzT; function _imgReRender(){ clearTimeout(_imgRzT); _imgRzT=setTimeout(()=>{ if(_inputFocused())return; try{render();}catch(e){} },120); }
-function probeCapyImages(){
-  if(typeof Image==='undefined') return;
-  SPECIES.forEach(s=>{ const im=new Image(); im.onload=()=>{ IMG_OK[s.id]=true; _imgReRender(); }; im.onerror=()=>{}; im.src=CAPY_IMG_BASE+s.id+'.png'; });
-}
-
-// ============================================================
-//  한우리 숙제 — 과업(task) 단위의 주간 숙제 + 한우리 코인
-//  ▸ 금요일 저녁 부여 → 다음 주 목요일까지 자유롭게 수행(요일 강제 배분 없음).
-//  ▸ task 하나 완료 = 코인 1개(PIN 불필요). 주간 전부 완료 시 보너스 +2.
-//  ▸ 목요일 자정까지 미완료 task가 남으면 rollover에서 카피바라 위기 1회.
-//  ▸ task 목록의 입력/수정은 문제집과 동일하게 초안→보호자 PIN 승인.
-// ============================================================
-const COIN_IMG='assets/coin/hanwoori.png';
-let COIN_OK=false;
-function probeCoinImage(){
-  if(typeof Image==='undefined') return;
-  const im=new Image(); im.onload=()=>{ COIN_OK=true; _imgReRender(); }; im.onerror=()=>{}; im.src=COIN_IMG;
-}
-// 코인 아이콘: 로고 이미지가 있으면 이미지, 없으면 🪙. (h()로 이스케이프되는 자리엔 쓰지 말 것)
-function coinIcon(px){ return COIN_OK?`<img src="${COIN_IMG}" alt="코인" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:-${Math.round(px*0.14)}px;">`:'🪙'; }
-// 이번 주 한우리 앵커 = 가장 최근 금요일(당일 포함). 마감은 앵커+6(목요일)까지.
-function hanwooriAnchor(today){ return dstr(dmostRecentDow(today||new Date(),5)); }
-function hwCurrent(){ const hw=ST.hanwoori; return (hw&&hw.anchor===hanwooriAnchor())?hw:null; }   // 이번 주 것만
-function hwEff(){ if(ST.hwDraft) return ST.hwDraft; const cur=hwCurrent(); return cur?cur.tasks:[]; } // 설정 화면 표시용(초안 우선)
-function hwDirty(){ const cur=hwCurrent(); return !!ST.hwDraft && JSON.stringify(ST.hwDraft)!==JSON.stringify(cur?cur.tasks:[]); }
-function hwDday(){ const end=dadd(dparse(hanwooriAnchor()),6); const t=new Date(); return Math.round((new Date(end.getFullYear(),end.getMonth(),end.getDate())-new Date(t.getFullYear(),t.getMonth(),t.getDate()))/86400000); }
-
-// 리워드샵 — 코인으로 장식을 사거나 연못에 특별 이벤트를 일으킨다.
-const SHOP=[
-  {id:'sh_tophat', type:'decor', price:8,  emoji:'🎩', name:'신사 모자',   desc:'머리에 쓰는 멋쟁이 모자',        unlock:'신사 모자'},
-  {id:'sh_scarf',  type:'decor', price:8,  emoji:'🧣', name:'포근 목도리', desc:'목에 두르는 포근한 목도리',      unlock:'포근 목도리'},
-  {id:'sh_balloon',type:'decor', price:6,  emoji:'🎈', name:'풍선',        desc:'옆에 둥둥 떠다니는 풍선',        unlock:'풍선'},
-  {id:'sh_flower', type:'decor', price:10, emoji:'💐', name:'꽃다발',      desc:'가슴에 안는 예쁜 꽃다발',        unlock:'꽃다발'},
-  {id:'sh_party',  type:'event', price:4,  emoji:'🍉', name:'수박 파티',   desc:'연못 친구들 모두 친밀도 +1'},
-  {id:'sh_guest',  type:'event', price:3,  emoji:'🐾', name:'깜짝 친구 초대', desc:'특별한 손님이 연못에 놀러와요'},
-  {id:'sh_rainbow',type:'event', price:6,  emoji:'🌈', name:'무지개 축제', desc:'연못 하늘에 무지개가 떠요'}
-];
-
-// 5) 이벤트 — 부류 4종. reward 키: intimacy, item(수집), guest(깜짝친구 id),
-//    unlock(꾸미기 해금), 비우면 순수 연출. weight=같은 부류 내 랜덤 가중치.
-//    ▸ 네 부류 모두 연결됨: voluntary(자발숙제)·catch(포획)·
-//      milestone(streak7·14/cycleComplete/dexPct50)·rescue(위기회복).
-const EVENTS = [
-  // [voluntary] 휴식일 자발 숙제 → 즐거운 깜짝 보상
-  {id:'ev_v_watermelon', category:'voluntary', rarity:'일반', weight:12, emoji:'🍉', mood:'먹는중',
-   title:'수박 간식 등장!', line:'미리 숙제한 너를 위해 카피바라가 수박 한 조각을 나눠줬어.', reward:{intimacy:1, item:'수박'}},
-  {id:'ev_v_yuzu', category:'voluntary', rarity:'일반', weight:10, emoji:'🍊', mood:'안심',
-   title:'유자탕 타임', line:'따뜻한 유자탕에 둥둥— 네 덕분에 여유로운 하루야.', reward:{intimacy:1, item:'유자'}},
-  {id:'ev_v_corn', category:'voluntary', rarity:'일반', weight:10, emoji:'🌽', mood:'먹는중',
-   title:'옥수수 파티', line:'카피바라들이 옥수수를 한 입씩 나눠 먹어.', reward:{intimacy:1, item:'옥수수'}},
-  {id:'ev_v_butterfly', category:'voluntary', rarity:'희귀', weight:6, emoji:'🦋', mood:'두근',
-   title:'작은 손님', line:'미리 숙제한 연못에 깜짝 친구가 찾아왔어.', reward:{intimacy:1, guest:'butterfly'}},
-  {id:'ev_v_nap', category:'voluntary', rarity:'일반', weight:8, emoji:'😴', mood:'졸림',
-   title:'행복한 낮잠', line:'할 일을 미리 끝낸 카피바라가 세상 편한 낮잠에 빠졌어.', reward:{intimacy:1}},
-  {id:'ev_v_star', category:'voluntary', rarity:'희귀', weight:4, emoji:'⭐', mood:'신남',
-   title:'반짝이는 밤', line:'별빛 아래 카피바라들이 너를 응원하며 노래해.', reward:{}},
-
-  // [milestone] 마일스톤 달성 (finishDay에서 연결됨)
-  {id:'ev_m_streak7', category:'milestone', trigger:{type:'streak', value:7}, rarity:'희귀', weight:1, emoji:'🔥', mood:'뿌듯',
-   title:'7일 연속 달성!', line:'일주일을 빠짐없이 해냈어. 카피바라들이 박수를 보내!', reward:{intimacy:2, item:'반짝별'}},
-  {id:'ev_m_streak14', category:'milestone', trigger:{type:'streak', value:14}, rarity:'영웅', weight:1, emoji:'🏅', mood:'신남',
-   title:'2주 연속! 대단해!', line:'꾸준함의 메달이 도착했어. 연못이 들썩여!', reward:{intimacy:3, unlock:'금메달 목걸이'}},
-  {id:'ev_m_cycle', category:'milestone', trigger:{type:'cycleComplete'}, rarity:'일반', weight:1, emoji:'🎯', mood:'뿌듯',
-   title:'한 사이클 완주!', line:'이번 숙제 묶음을 깔끔하게 끝냈어. 잘했어!', reward:{intimacy:1}},
-  {id:'ev_m_dexHalf', category:'milestone', trigger:{type:'dexPct', value:50}, rarity:'영웅', weight:1, emoji:'📚', mood:'두근',
-   title:'도감 절반 달성!', line:'친구의 절반을 모았어. 도감이 환하게 빛나!', reward:{unlock:'도감 배지'}},
-
-  // [catch] 포획 순간 연출 — 희귀도별
-  {id:'ev_c_normal', category:'catch', trigger:{type:'rarity', value:'일반'}, weight:1, emoji:'🌿', mood:'행복',
-   title:'반가운 만남', line:'평범하지만 소중한 친구가 연못에 들어왔어.', reward:{}},
-  {id:'ev_c_rare', category:'catch', trigger:{type:'rarity', value:'희귀'}, weight:1, emoji:'💎', mood:'신남',
-   title:'반짝— 희귀한 친구!', line:'쉽게 못 보는 친구가 너를 알아보고 다가왔어!', reward:{}},
-  {id:'ev_c_epic', category:'catch', trigger:{type:'rarity', value:'영웅'}, weight:1, emoji:'🛡️', mood:'뿌듯',
-   title:'영웅의 등장!', line:'늠름한 영웅 카피바라가 너의 노력을 인정했어.', reward:{}},
-  {id:'ev_c_legend', category:'catch', trigger:{type:'rarity', value:'전설'}, weight:1, emoji:'🌈', mood:'두근',
-   title:'전설이 깨어났다!', line:'전설은 매일의 작은 숙제로 완성돼. 네가 해냈어!', reward:{}},
-
-  // [rescue] 위기 구출 성공 (finishDay에서 연결됨)
-  {id:'ev_r_back', category:'rescue', weight:1, emoji:'💗', mood:'안심',
-   title:'친구가 돌아왔어!', line:'숙제를 다시 챙긴 덕에 떠나려던 친구가 연못으로 돌아왔어.', reward:{intimacy:1}},
-  {id:'ev_r_heal', category:'rescue', weight:1, emoji:'🌱', mood:'행복',
-   title:'기운을 되찾았어', line:'축 처져 있던 카피바라가 다시 통통하게 기운을 차렸어.', reward:{intimacy:1}}
-];
-
-// ── 데이터셋 헬퍼 ──
-function pickWeighted(list){ if(!list||!list.length)return null; const tot=list.reduce((s,e)=>s+(e.weight||1),0); let r=Math.random()*tot; for(let i=0;i<list.length;i++){ r-=(list[i].weight||1); if(r<0)return list[i]; } return list[list.length-1]; }
-function eventsBy(cat){ return EVENTS.filter(e=>e.category===cat); }
-function catchEvent(rarity){ return eventsBy('catch').find(e=>e.trigger&&e.trigger.value===rarity)||null; }
-function moodEmoji(m){ return (MOODS[m]||{}).emoji||'😊'; }
-function itemEmoji(name){ return ITEMS[name]||'🎁'; }
-function interactReact(personality, it){ return (it.react&&(it.react[personality]||it.react['_default']))||''; }
-const WB_COLORS = ['#c47a4e','#3f9b94','#cd7aa1','#d99441','#7a86c9','#6aa05a','#c2607a'];
-const POND_SLOTS = [[16,30],[44,20],[72,32],[26,58],[55,50],[82,62],[37,78],[64,74],[12,72],[88,40],[50,82],[20,44]];
-const SPECIES = [
-  {id:'s1',  name:'강가 통통이', biome:'강가',     color:'#b08968', accessory:'',   idle:'bob',   personality:'느긋',     line:'인우야~ 같이 첨벙첨벙 하자!',         rarity:'일반'},
-  {id:'s2',  name:'풀먹보',      biome:'강가',     color:'#a87e5a', accessory:'🍃', idle:'bob',   personality:'장난꾸러기',line:'한 입만 더 먹고 도와줄게!',           rarity:'일반'},
-  {id:'s3',  name:'온천 유자',   biome:'온천',     color:'#c98a5e', accessory:'🍊', idle:'float', personality:'느긋',     line:'탕에 몸 담그면 숙제 걱정도 사르르~', rarity:'희귀'},
-  {id:'s4',  name:'김 모락이',   biome:'온천',     color:'#cf9b6f', accessory:'',   idle:'float', personality:'새침',     line:'수증기 사이로 보이니? 나야 나.',       rarity:'일반'},
-  {id:'s5',  name:'정글 탐험가', biome:'정글',     color:'#9c8550', accessory:'🎩', idle:'bob',   personality:'호기심',   line:'오늘은 어떤 페이지를 모험할까?',       rarity:'희귀'},
-  {id:'s6',  name:'잎우산',      biome:'정글',     color:'#8f7a4d', accessory:'☂️', idle:'bob',   personality:'겁쟁이',   line:'비 와도 숙제는 해야지… 같이 가자.',   rarity:'일반'},
-  {id:'s7',  name:'뽀시래기',    biome:'설원',     color:'#e2e7ea', accessory:'',   idle:'nap',   personality:'느긋',     line:'이불 속에서 너를 응원하고 있어~',      rarity:'희귀'},
-  {id:'s8',  name:'눈송이',      biome:'설원',     color:'#dbe4ea', accessory:'❄️', idle:'float', personality:'새침',     line:'반짝— 너의 한 페이지가 눈부셔.',       rarity:'영웅'},
-  {id:'s9',  name:'공원 산책러', biome:'도시공원', color:'#ab8763', accessory:'🎀', idle:'bob',   personality:'호기심',   line:'산책하듯 가볍게 한 장 어때?',          rarity:'일반'},
-  {id:'s10', name:'비둘기 친구', biome:'도시공원', color:'#a17f5c', accessory:'🐤', idle:'bob',   personality:'장난꾸러기',line:'구구— 내가 페이지 넘겨줄게!',          rarity:'희귀'},
-  {id:'s11', name:'안경 박사',   biome:'도시공원', color:'#9a7a58', accessory:'👓', idle:'bob',   personality:'호기심',   line:'음, 이 문제 꽤 흥미로운걸?',           rarity:'영웅'},
-  {id:'s12', name:'꽃단장',      biome:'강가',     color:'#c98aa0', accessory:'🌸', idle:'float', personality:'새침',     line:'예쁘게 하고 너 기다렸어~',             rarity:'희귀'},
-  {id:'s13', name:'금빛 영웅',   biome:'온천',     color:'#e6b34d', accessory:'👑', idle:'float', personality:'느긋',     line:'황금빛 노력엔 황금빛 보상이지!',       rarity:'영웅'},
-  {id:'s14', name:'은빛 달님',   biome:'설원',     color:'#c2cdd6', accessory:'',   idle:'float', personality:'새침',     line:'달빛처럼 조용히 곁에 있을게.',         rarity:'영웅'},
-  {id:'s15', name:'무지개 전설', biome:'강가',     color:'#d98ec4', accessory:'🌈', idle:'float', personality:'호기심',   line:'전설은 매일의 작은 숙제로 완성돼!',   rarity:'전설'},
-  {id:'s16', name:'벚꽃 정령',   biome:'도시공원', color:'#f0a6c0', accessory:'🌸', idle:'float', personality:'느긋',     line:'꽃잎처럼 살랑— 오늘도 잘했어.',       rarity:'전설'}
-];
-
-// ── State ────────────────────────────────────────────────────
-const DEFAULT_STATE = {
-  screen:'home', overlay:null, theme:'onsen',
-  workbooks:[{id:'w1',name:'수학 익힘책',color:'#c47a4e'},{id:'w2',name:'국어 독해',color:'#3f9b94'}],
-  assignments:{tue:[{workbookId:'w1',from:10,to:15},{workbookId:'w2',from:20,to:24}],thu:[{workbookId:'w1',from:16,to:22},{workbookId:'w2',from:25,to:28}]},
-  settings:{minsPerPage:10,dayMin:{mon:75,tue:20,wed:30,thu:70,fri:40,sat:20,sun:0},difficulty:'normal',guardianPin:''},
-  pond:[],                 // 신규 시작: 연못 비어 있음(첫 숙제로 첫 친구 획득)
-  dexSeen:{},              // 도감 0/16
-  streak:0, dayLog:{}, setupDay:'tue',
-  newWbName:'', rowEdit:{},
-  todayKey:'tue', timerSec:0, timerRunning:false,
-  lastDate:null, streakDate:null,
-  caughtSpecies:null, caughtNew:false, crisisInfo:null, eventInfo:null, detailSpeciesId:null,
-  items:{}, unlocks:[], detailReaction:null, _wbSeq:3,
-  milestonesFired:[], eventQueue:[], equip:{}, voluntaryRescueDate:null,
-  hanwoori:{anchor:null,tasks:[]}, coins:0, hwDraft:null, hwNewTask:'', shopMsg:'',
-  pendingReward:null, verifyFor:null, pinEntry:'', pinError:false, pinDraft:'', pinDraft2:'', pinSaveErr:'', pinChangeMode:false,
-  assignDraft:null
-};
-
-let ST = {...DEFAULT_STATE};
-let _timerInterval = null;
-
-function sp(id) { return SPECIES.find(s=>s.id===id)||SPECIES[0]; }
-function wb(id) { return ST.workbooks.find(w=>w.id===id); }
-function mpp()  { return Math.max(1, ST.settings.minsPerPage||10); }
-
-function dayPages(day, asg) {
-  return ((asg||ST.assignments)[day]||[]).reduce((s,it)=>{ const p=it.to-it.from+1; return s+(p>0?p:0); },0);
-}
-function capPages(day) { return Math.max(0,Math.floor((ST.settings.dayMin[day]||0)/mpp())); }
-function distribute(total,days) {
-  const res={}; let rem=total;
-  days.forEach((d,i)=>{ if(i===days.length-1){res[d]=rem;rem=0;}else{const t=Math.min(rem,capPages(d));res[d]=t;rem-=t;} });
-  return res;
-}
-function schedule(today,asg) {
-  today = today || new Date();
-  const pages={mon:0,tue:0,wed:0,thu:0,fri:0,sat:0,sun:0};
-  let weekTotal=0;
-  CYCLES.forEach(cy=>{ const cs=cycleSchedule(cy,today,asg); weekTotal+=cs.T; cs.rows.forEach(r=>{ pages[r.wk]=r.required; }); });
-  const m=mpp(); const days={};
-  DAY_ORDER.forEach(d=>{ const pg=pages[d],mins=pg*m,cap=ST.settings.dayMin[d]||0; days[d]={pages:pg,mins,cap,fill:cap>0?Math.min(1,mins/cap):(mins>0?1:0),over:mins>cap&&cap>=0&&mins>0}; });
-  return {days,weekTotal};
-}
-function anyCrisis(pond) { return (pond||ST.pond).some(c=>c.status!=='healthy'); }
-function crisisBannerText() {
-  const c=ST.pond.find(x=>x.status!=='healthy'); if(!c) return '';
-  const s=sp(c.speciesId);
-  return ({weak:s.name+'이(가) 기운이 없어요',leaving:s.name+'이(가) 떠나려 해요',gone:s.name+'이(가) 잠시 사라졌어요'})[c.status]||s.name+'이(가) 위기예요';
-}
-
-function h(s) { if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-// ── Date / rollover helpers ──────────────────────────────────
-function dstr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function dparse(s){ const p=String(s).split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
-function dwk(d){ return ['sun','mon','tue','wed','thu','fri','sat'][d.getDay()]; }
-function dadd(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
-// today 기준 가장 최근의 dow 요일 날짜(당일 포함).
-function dmostRecentDow(today,dow){ const x=new Date(today.getFullYear(),today.getMonth(),today.getDate()); x.setDate(x.getDate()-((x.getDay()-dow+7)%7)); return x; }
-function isFreeWk(wk){ return !COMP_DAYS[wk]; }
-// today 기준 사이클의 받는날(앵커) 날짜. 이미 끝난 사이클이면 다음 주기로.
-function cycleAnchor(cy,today){
-  let a=dmostRecentDow(today,cy.assignDow);
-  const lastOff=Math.max.apply(null,cy.days.map(x=>x.off));
-  if(dstr(today)>dstr(dadd(a,lastOff))) a=dadd(a,7);
-  return a;
-}
-// 한 사이클의 각 완료일에 해당하는 실제 날짜를 매핑.
-function cycleDates(cy,today){ const a=cycleAnchor(cy,today); const map={}; cy.days.forEach(x=>{ map[x.d]=dstr(dadd(a,x.off)); }); return map; }
-// 특정 요일이 특정 날짜에 푼 페이지 수(날짜 스탬프가 일치할 때만).
-function doneOnDate(wk,ds){ const e=ST.dayLog&&ST.dayLog[wk]; return (e&&e.date===ds)?(e.pages||0):0; }
-function doneForDay(wk){ return doneOnDate(wk,dstr(new Date())); }
-// 사이클 재계산: 자유일(휴식일)에 미리 푼 분량을 풀에서 빼고, 남은 양을 완료일 순서대로 재분배.
-function cycleSchedule(cy,today,asg){
-  const a=cycleAnchor(cy,today), T=dayPages(cy.key,asg), lastOff=Math.max.apply(null,cy.days.map(x=>x.off)), todayS=dstr(today);
-  let voluntaryDone=0;
-  for(let o=0;o<=lastOff;o++){ const dt=dadd(a,o), wk=dwk(dt); if(isFreeWk(wk)) voluntaryDone+=doneOnDate(wk,dstr(dt)); }
-  voluntaryDone=Math.min(voluntaryDone,T);
-  const pool=Math.max(0,T-voluntaryDone);
-  const dist=distribute(pool,cy.days.map(x=>x.d));
-  // 완료일에 당겨 푼 초과분(credit)은 이후 완료일 required에서 차감 → '내일 숙제 당겨하기' 반영.
-  let credit=0, compSolved=0;
-  const rows=cy.days.map(x=>{
-    const ds=dstr(dadd(a,x.off)), doneRaw=doneOnDate(x.d,ds), base=dist[x.d]||0;
-    const required=Math.max(0,base-credit);
-    credit=credit-(base-required)+Math.max(0,doneRaw-required); // 소진분 차감 + 초과분 이월
-    compSolved+=doneRaw;
-    return {wk:x.d,date:ds,required,doneRaw,done:Math.min(doneRaw,required),isPast:ds<todayS,isToday:ds===todayS};
+/* ---------- search & category filter ---------- */
+const topbar = $("#topbar"), q = $("#q");
+let activeCat = null;
+function applyFilter(){
+  const term = q.value.trim().toLowerCase();
+  let n = 0;
+  grid.querySelectorAll(".tile").forEach(t => {
+    const ok = (!term || t.dataset.name.includes(term) || t.dataset.cat.includes(term)) && (!activeCat || t.dataset.cat === activeCat);
+    t.classList.toggle("hidden", !ok); if (ok) n++;
   });
-  const cycleDone=Math.min(T,voluntaryDone+compSolved);
-  return {anchor:a,T,voluntaryDone,rows,cycleDone};
+  $("#empty").classList.toggle("hidden", n > 0);
+  cats.querySelectorAll(".cat").forEach(b => b.classList.toggle("active", b.dataset.filter === activeCat));
+  $("#count").textContent = (term || activeCat) ? `${n} game${n===1?"":"s"}` : "";
 }
-// 특정 요일(완료일)이 today 기준 어느 사이클의 어느 행인지.
-function planForWeekday(wk,today){
-  for(let i=0;i<CYCLES.length;i++){ const cs=cycleSchedule(CYCLES[i],today), r=cs.rows.find(x=>x.wk===wk); if(r) return {cy:CYCLES[i],cs,row:r}; }
-  return null;
-}
-// 문제집별 축약 라벨(예: '디딤돌'→'디'). 이름이 겹치면 필요한 만큼 글자를 늘려 서로 구분한다.
-function workbookShortLabels(){
-  const wbs=ST.workbooks, lens={}; wbs.forEach(w=>{lens[w.id]=1;});
-  for(let guard=0; guard<10; guard++){
-    const seen={}; let changed=false;
-    wbs.forEach(w=>{ const lab=w.name.slice(0,lens[w.id])||w.id; (seen[lab]=seen[lab]||[]).push(w.id); });
-    Object.values(seen).forEach(ids=>{ if(ids.length>1) ids.forEach(id=>{ const w=wbs.find(x=>x.id===id); if(lens[id]<w.name.length){lens[id]++; changed=true;} }); });
-    if(!changed) break;
-  }
-  const labels={}; wbs.forEach(w=>{ labels[w.id]=w.name.slice(0,lens[w.id])||w.name||'문'; });
-  return labels;
-}
-// 한 사이클(받는 요일)의 문제집·쪽 배정을 순서대로 풀어놓은 가상 페이지 목록.
-function flatPages(cy,asg){
-  const list=[];
-  ((asg||ST.assignments)[cy.key]||[]).forEach(it=>{
-    const w=ST.workbooks.find(x=>x.id===it.workbookId);
-    for(let p=it.from;p<=it.to;p++) list.push({wbId:it.workbookId, page:p});
-  });
-  return list;
-}
-// 특정 완료일(wk) 슬롯이 실제로 '어느 문제집 몇 쪽'인지 라벨 배열로 반환. 조건이 안 맞으면 null(순번 폴백).
-//  ▸ 오프셋은 '원 분배량(base)의 누적'에서 오늘 required를 뺀 값으로 계산한다.
-//    당겨풀기로 초과분을 미리 소진했으면 그만큼 이후 날짜의 시작 페이지가 밀려야 하므로,
-//    단순히 이전 날짜들의 required를 더하는 방식(당겨쓴 몫을 반영 못함)은 쓰지 않는다.
-function todayPageLabels(wk,today){
-  const pf=planForWeekday(wk,today); if(!pf) return null;
-  const idx=pf.cs.rows.findIndex(r=>r===pf.row); if(idx<0) return null;
-  if(pf.row.required<=0) return [];
-  const pool=Math.max(0,pf.cs.T-pf.cs.voluntaryDone);
-  const dist=distribute(pool,pf.cy.days.map(x=>x.d));
-  let baseSum=0; for(let i=0;i<=idx;i++) baseSum+=dist[pf.cy.days[i].d]||0;
-  const offset=pf.cs.voluntaryDone+baseSum-pf.row.required;
-  if(offset<0) return null;
-  const flat=flatPages(pf.cy);
-  if(pf.row.required<=0) return [];
-  if(offset+pf.row.required>flat.length) return null; // 배정 변경 등으로 수가 안 맞으면 안전하게 폴백
-  const labels=workbookShortLabels();
-  return flat.slice(offset,offset+pf.row.required).map(p=>labels[p.wbId]+'-'+p.page);
-}
-// today가 자유일이면, 미리 풀 수 있는 (남은 분량이 있는) 사이클을 반환.
-function voluntaryCycle(today){
-  if(!isFreeWk(dwk(today))) return null;
-  for(let i=0;i<CYCLES.length;i++){ const cy=CYCLES[i]; if(dayPages(cy.key)<=0) continue;
-    const a=cycleAnchor(cy,today), lastOff=Math.max.apply(null,cy.days.map(x=>x.off)), tS=dstr(today);
-    if(tS>=dstr(a)&&tS<=dstr(dadd(a,lastOff))){ const cs=cycleSchedule(cy,today); if(cs.cycleDone<cs.T) return {cy,cs}; }
-  }
-  return null;
-}
-
-// 카피바라 한 마리를 한 단계 악화(healthy→weak→leaving→gone). ST.pond를 변경하고 대상 마리를 반환.
-function degradeOne() {
-  const order=['healthy','weak','leaving','gone']; let target=null;
-  ST.pond=ST.pond.map(c=>{ if(!target&&c.status!=='gone'){target=c;const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
-  return target;
-}
-// 거른 숙제일(miss) 수만큼 위기를 적용. 난이도에 따라 강도 조절.
-function applyMiss(miss) {
-  if(miss<=0) return;
-  const diff=ST.settings.difficulty||'normal';
-  let stages, resetStreak;
-  if(diff==='easy'){ stages=1; resetStreak=miss>=2; }
-  else if(diff==='firm'){ stages=miss+1; resetStreak=true; }
-  else { stages=miss; resetStreak=true; }
-  for(let i=0;i<stages;i++) degradeOne();
-  if(resetStreak) ST.streak=0;
-  const worst=ST.pond.find(c=>c.status!=='healthy');
-  if(worst) ST.crisisInfo={uid:worst.uid,name:sp(worst.speciesId).name,story:'며칠 숙제를 못 했더니 친구가 기운을 잃었어요…'};
-}
-// 날짜가 바뀐 경우: 거른 계획 요일을 집계해 위기 적용, 오늘 진행도 초기화.
-function rollover() {
-  const todayS=dstr(new Date());
-  if(!ST.lastDate){ ST.lastDate=todayS; return; }
-  if(ST.lastDate===todayS) return;
-  let miss=0, cur=dparse(ST.lastDate);
-  // 마지막 활동일부터 오늘 전날까지 훑으며, 그날 마감된 사이클이 미완료면 위기 1회(사이클 단위).
-  while(dstr(cur)<todayS){
-    CYCLES.forEach(cy=>{
-      if(dayPages(cy.key)<=0) return;
-      const a=cycleAnchor(cy,cur), lastOff=Math.max.apply(null,cy.days.map(x=>x.off));
-      if(dstr(dadd(a,lastOff))===dstr(cur)){ const cs=cycleSchedule(cy,cur); if(cs.cycleDone<cs.T) miss++; }
-    });
-    // 한우리: 주간 마감일(앵커+6=목요일)이 그날이었는데 미완료 task가 남았으면 위기 1회.
-    if(ST.hanwoori&&ST.hanwoori.anchor&&ST.hanwoori.tasks.length){
-      const hwEnd=dadd(dparse(ST.hanwoori.anchor),6);
-      if(dstr(hwEnd)===dstr(cur)&&ST.hanwoori.tasks.some(t=>!t.done)) miss++;
-    }
-    cur=dadd(cur,1);
-  }
-  applyMiss(miss);
-  ST.lastDate=todayS;
-}
-
-// ── State mutations ──────────────────────────────────────────
-function setState(upd) {
-  ST = typeof upd==='function' ? {...ST,...upd(ST)} : {...ST,...upd};
-  save(); render();
-}
-function save() {
-  try { localStorage.setItem('capy-v2-state',JSON.stringify({workbooks:ST.workbooks,assignments:ST.assignments,settings:ST.settings,pond:ST.pond,dexSeen:ST.dexSeen,streak:ST.streak,dayLog:ST.dayLog,lastDate:ST.lastDate,streakDate:ST.streakDate,_wbSeq:ST._wbSeq,theme:ST.theme,items:ST.items,unlocks:ST.unlocks,milestonesFired:ST.milestonesFired,equip:ST.equip,pendingReward:ST.pendingReward,voluntaryRescueDate:ST.voluntaryRescueDate,hanwoori:ST.hanwoori,coins:ST.coins})); } catch(e){}
-}
-function load() {
-  const tk = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
-  try { const r=localStorage.getItem('capy-v2-state'); if(r){const s=JSON.parse(r);ST={...DEFAULT_STATE,...s,todayKey:tk};} else { ST={...DEFAULT_STATE,todayKey:tk}; } } catch(e){ ST={...DEFAULT_STATE,todayKey:tk}; }
-  rollover();
-  save(); // 앱을 여는 날짜를 즉시 고정해 두어야 다음날 거른 숙제를 감지할 수 있음
-}
-
-// Mutations
-function delWb(id) {
-  const asgn={};
-  Object.keys(ST.assignments).forEach(d=>{asgn[d]=ST.assignments[d].filter(it=>it.workbookId!==id);});
-  setState({workbooks:ST.workbooks.filter(w=>w.id!==id),assignments:asgn});
-}
-function addWorkbook() {
-  const name=(ST.newWbName||'').trim(); if(!name)return;
-  const seq=(ST._wbSeq||0)+1, id='w'+seq+'_'+Date.now().toString(36).slice(-4);
-  const color=WB_COLORS[ST.workbooks.length%WB_COLORS.length];
-  setState({workbooks:[...ST.workbooks,{id,name,color}],newWbName:'',_wbSeq:seq});
-}
-// 숙제 입력: 문제집마다 한 행(요일별 1구간). ✓로 확정, ✏️로 수정, ✕로 삭제.
-//  ▸ 입력은 초안(assignDraft)에만 반영되고, '변경 내용 확인받기'로 보호자 PIN 승인을
-//    거쳐야 실제 숙제(ST.assignments)에 적용된다. 아이가 임의로 분량을 바꾸지 못하게.
-function rowKey(day,wbId){ return day+'|'+wbId; }
-function cloneAssign(a){ const o={}; Object.keys(a||{}).forEach(d=>{ o[d]=(a[d]||[]).map(x=>({...x})); }); return o; }
-function effAssign(){ return ST.assignDraft || ST.assignments; }                 // 화면 표시용(초안 우선)
-function assignDirty(){ return !!ST.assignDraft && JSON.stringify(ST.assignDraft)!==JSON.stringify(ST.assignments); }
-function getAssign(day,wbId){ return (effAssign()[day]||[]).find(it=>it.workbookId===wbId); }
-function confirmRow(day,wbId){
-  const key=rowKey(day,wbId), d=ST.rowEdit[key]||{}, from=parseInt(d.from), to=parseInt(d.to);
-  if(isNaN(from)||isNaN(to)||from<1||(to-from+1)<=0) return;
-  const draft=cloneAssign(effAssign());
-  draft[day]=[...(draft[day]||[]).filter(it=>it.workbookId!==wbId),{workbookId:wbId,from,to}];
-  const re={...ST.rowEdit}; delete re[key];
-  setState({assignDraft:draft,rowEdit:re});
-}
-function editRow(day,wbId){
-  const a=getAssign(day,wbId)||{}, key=rowKey(day,wbId);
-  setState({rowEdit:{...ST.rowEdit,[key]:{from:a.from!=null?String(a.from):'',to:a.to!=null?String(a.to):''}}});
-}
-function clearRow(day,wbId){
-  const draft=cloneAssign(effAssign());
-  draft[day]=(draft[day]||[]).filter(it=>it.workbookId!==wbId);
-  const re={...ST.rowEdit}; delete re[rowKey(day,wbId)];
-  setState({assignDraft:draft,rowEdit:re});
-}
-// 초안 적용: PIN이 있으면 확인 화면(검토+PIN)을 거치고, 없으면 바로 반영.
-function applyAssignDraft(){
-  if(!assignDirty()){ setState({assignDraft:null}); return; }
-  if(pinSet()) setState({verifyFor:'assignments',pinEntry:'',pinError:false,overlay:'verify'});
-  else commitAssignDraft();
-}
-function commitAssignDraft(){
-  if(!ST.assignDraft){ setState({overlay:null,verifyFor:null}); return; }
-  setState({assignments:ST.assignDraft,assignDraft:null,rowEdit:{},overlay:null,verifyFor:null,pinEntry:'',pinError:false});
-}
-function discardAssignDraft(){ setState({assignDraft:null,rowEdit:{}}); }
-
-// ── 한우리 숙제 mutations ────────────────────────────────────
-// task 목록 입력은 초안에 쌓고, '확인받기'(PIN)로 확정 — 아이가 임의로 task를 만들거나 지우는 것 방지.
-function addHanwooriTask(){
-  const t=(ST.hwNewTask||'').trim(); if(!t) return;
-  const draft=[...hwEff().map(x=>({...x})), {id:'t'+Date.now().toString(36)+Math.floor(Math.random()*99), title:t, done:false, doneDate:null}];
-  setState({hwDraft:draft, hwNewTask:''});
-}
-function delHanwooriTask(id){ setState({hwDraft:hwEff().filter(x=>x.id!==id).map(x=>({...x}))}); }
-function applyHanwooriDraft(){
-  if(!hwDirty()){ setState({hwDraft:null}); return; }
-  if(pinSet()) setState({verifyFor:'hanwoori',pinEntry:'',pinError:false,overlay:'verify'});
-  else commitHanwooriDraft();
-}
-function commitHanwooriDraft(){
-  if(!ST.hwDraft){ setState({overlay:null,verifyFor:null}); return; }
-  // 초안이 열려 있는 동안 아이가 완료한 task의 done 상태를 라이브에서 병합.
-  // (초안의 낡은 done:false가 완료를 덮어써 코인을 이중 획득하는 것 방지)
-  const live=hwCurrent();
-  const tasks=ST.hwDraft.map(t=>{ const lv=live&&live.tasks.find(x=>x.id===t.id); return (lv&&lv.done)?{...t,done:true,doneDate:lv.doneDate}:t; });
-  setState({hanwoori:{anchor:hanwooriAnchor(),tasks},hwDraft:null,overlay:null,verifyFor:null,pinEntry:'',pinError:false});
-}
-function discardHanwooriDraft(){ setState({hwDraft:null,hwNewTask:''}); }
-// task 완료: 코인 +1 (PIN 불필요). 이번 주 전부 완료하면 보너스 +2와 축하 카드가 이어진다.
-function completeHanwooriTask(id){
-  const cur=hwCurrent(); if(!cur) return;
-  const t=cur.tasks.find(x=>x.id===id); if(!t||t.done) return;
-  const tasks=cur.tasks.map(x=>x.id===id?{...x,done:true,doneDate:dstr(new Date())}:x);
-  let coins=(ST.coins||0)+1;
-  const queue=[];
-  const allDone=tasks.every(x=>x.done);
-  if(allDone){ coins+=2; queue.push({ev:{id:'hw_week',emoji:'🎉',title:'이번 주 한우리 완주!',line:'일주일 치 한우리 숙제를 모두 해냈어! 보너스 코인 +2!',mood:'신남'},who:null,guest:null,itemGot:null,intimacy:0,unlock:null,coins:2}); }
-  const ei={ev:{id:'hw_coin',emoji:'🪙',title:'한우리 코인 획득!',line:'"'+t.title+'" 완료! 코인이 짤랑— 들어왔어.',mood:'뿌듯'},who:null,guest:null,itemGot:null,intimacy:0,unlock:null,coins:1};
-  ST={...ST,hanwoori:{...cur,tasks},coins,eventInfo:ei,eventQueue:queue,overlay:'event'};
-  save(); render();
-}
-// ── 리워드샵 ────────────────────────────────────────────────
-function openShop(){ setState({overlay:'shop',shopMsg:''}); }
-function buyShop(id){
-  const it=SHOP.find(x=>x.id===id); if(!it) return;
-  const coins=ST.coins||0;
-  if(it.type==='decor'&&(ST.unlocks||[]).includes(it.unlock)){ setState({shopMsg:'이미 가지고 있는 장식이에요!'}); return; }
-  if(coins<it.price){ setState({shopMsg:'코인이 부족해요. 한우리 숙제로 더 모아보자!'}); return; }
-  if(it.type==='decor'){
-    setState({coins:coins-it.price,unlocks:[...(ST.unlocks||[]),it.unlock],shopMsg:it.emoji+' '+it.name+' 구매 완료! 도감에서 카피바라를 눌러 입혀보세요.'});
-    return;
-  }
-  // 이벤트형: 구매 즉시 연못 이벤트 발동(이벤트 카드로 전환)
-  if(it.id==='sh_party'&&!ST.pond.some(c=>c.status==='healthy')){ setState({shopMsg:'연못에 건강한 친구가 있어야 파티를 열 수 있어요!'}); return; }
-  let pond=ST.pond, guest=null, ev;
-  if(it.id==='sh_party'){
-    pond=ST.pond.map(c=>c.status==='healthy'?{...c,intimacy:(c.intimacy||0)+1}:c);
-    ev={id:'shop_party',emoji:'🍉',title:'수박 파티!',line:'코인으로 수박 파티를 열었어! 연못 친구들이 모두 신나게 나눠 먹어.',mood:'먹는중'};
-  } else if(it.id==='sh_guest'){
-    guest=GUESTS[Math.floor(Math.random()*GUESTS.length)];
-    ev={id:'shop_guest',emoji:'🐾',title:'깜짝 손님 도착!',line:'코인으로 초대장을 보냈더니 특별한 손님이 찾아왔어!',mood:'두근'};
-  } else {
-    ev={id:'shop_rainbow',emoji:'🌈',title:'무지개 축제!',line:'연못 하늘에 커다란 무지개가 떴어! 카피바라들이 폴짝폴짝 뛰어.',mood:'신남'};
-  }
-  const intimacy=it.id==='sh_party'?1:0;
-  ST={...ST,coins:coins-it.price,pond,eventInfo:{ev,who:it.id==='sh_party'?'연못 친구들':null,guest,itemGot:null,intimacy,unlock:null},eventQueue:[],overlay:'event'};
-  save(); render();
-}
-function setMpp(v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}})); }
-function setDayMin(d,v) { const n=parseInt(v); setState(s=>({settings:{...s.settings,dayMin:{...s.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}})); }
-function setDifficulty(key) { setState(s=>({settings:{...s.settings,difficulty:key}})); }
-function openDetail(id) { setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
-function openDexDetail(id) { if(ST.dexSeen[id]) setState({detailSpeciesId:id,detailReaction:null,overlay:'capyDetail'}); }
-function closeOverlay() { setState({overlay:null,eventInfo:null,detailReaction:null,pinChangeMode:false,pinDraft:'',pinDraft2:'',pinSaveErr:''}); }
-// 포획 오버레이 닫기: 대기 중인 milestone/rescue 이벤트가 있으면 이어서 보여준다.
-function closeCaught() {
-  const q=ST.eventQueue||[];
-  if(q.length){ const [next,...rest]=q; setState({overlay:'event',eventInfo:next,eventQueue:rest,screen:'home',caughtSpecies:null}); }
-  else setState({overlay:null,screen:'home',caughtSpecies:null,eventQueue:[]});
-}
-// 이벤트 오버레이 닫기: 큐에 남은 이벤트가 있으면 다음 이벤트로, 없으면 종료.
-function closeEvent() {
-  const q=ST.eventQueue||[];
-  if(q.length){ const [next,...rest]=q; setState({eventInfo:next,eventQueue:rest}); }
-  else setState({overlay:null,eventInfo:null,eventQueue:[]});
-}
-function toggleTimer() {
-  if(ST.timerRunning){setState({timerRunning:false});}
-  else{setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60}));}
-}
-// 오늘 숙제 시작: 타이머 가동 + 집중 모드 동시 진입(연못·도감 잠금).
-function startHomework() { setState(s=>({timerRunning:true,timerSec:s.timerSec>0?s.timerSec:mpp()*60})); }
-function completePage() {
-  const k=ST.todayKey, planned=schedule().days[k].pages; if(!planned)return;
-  const todayS=dstr(new Date()), cur=doneOnDate(k,todayS);
-  if(cur>=planned) return; // 이미 끝낸 분량 — 채집 무한반복 방지
-  const done=cur+1, dayLog={...ST.dayLog,[k]:{date:todayS,pages:done}};
-  if(done>=planned){
-    ST={...ST,dayLog,timerRunning:false,timerSec:0};
-    // 마지막 쪽 완료: PIN이 설정돼 있으면 보호자 확인을 거쳐야 보상 지급.
-    if(pinSet()){ ST={...ST,pendingReward:{day:k,date:todayS},verifyFor:'reward',pinEntry:'',pinError:false,overlay:'verify'}; save(); render(); }
-    else finishDay();
-  }
-  else setState({dayLog,timerRunning:false,timerSec:0,overlay:'break'});
-}
-// ── 보호자 PIN(보상 확인) ────────────────────────────────────
-function pinSet(){ const p=ST.settings.guardianPin; return !!(p&&p.length===6); }
-// 부모님 설정 진입: PIN이 있으면 잠금 화면을 먼저 띄운다(PIN 자체 변조 방지).
-function openSettings(){ if(pinSet()) setState({verifyFor:'settings',pinEntry:'',pinError:false,overlay:'verify',pinChangeMode:false}); else setState({overlay:'settings',pinChangeMode:false}); }
-// 대기 중인 보상 확인 다시 열기(배너에서).
-function reopenReward(){ if(ST.pendingReward) setState({verifyFor:'reward',pinEntry:'',pinError:false,overlay:'verify'}); }
-function closeVerify(){ const back=(ST.verifyFor==='pinchange'||ST.verifyFor==='pinclear')?'settings':null; setState({overlay:back,verifyFor:null,pinEntry:'',pinError:false}); }
-function pinDel(){ setState({pinEntry:(ST.pinEntry||'').slice(0,-1),pinError:false}); }
-function pinPress(d){
-  const e=((ST.pinEntry||'')+d).slice(0,6);
-  if(e.length<6){ setState({pinEntry:e,pinError:false}); return; }
-  // 6자리 완성 → 즉시 검증
-  if(e===ST.settings.guardianPin){
-    const purpose=ST.verifyFor;
-    if(purpose==='reward'){ ST={...ST,pinEntry:'',pinError:false,verifyFor:null,pendingReward:null,overlay:null}; finishDay(); }
-    else if(purpose==='assignments'){ commitAssignDraft(); }
-    else if(purpose==='hanwoori'){ commitHanwooriDraft(); }
-    else if(purpose==='pinchange'){ setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings',pinChangeMode:true,pinDraft:'',pinDraft2:'',pinSaveErr:''}); }
-    else if(purpose==='pinclear'){ setState(s=>({settings:{...s.settings,guardianPin:''},pinEntry:'',pinError:false,verifyFor:null,overlay:'settings',pinChangeMode:false,pinDraft:'',pinDraft2:'',pinSaveErr:''})); }
-    else { setState({pinEntry:'',pinError:false,verifyFor:null,overlay:'settings',pinChangeMode:false}); }
-  } else {
-    setState({pinEntry:'',pinError:true});
-  }
-}
-// 설정에서 PIN 등록/변경. 두 번 입력이 모두 6자리 숫자이고 서로 같아야 저장(오타 방지).
-function savePin(){
-  const a=(ST.pinDraft||'').trim(), b=(ST.pinDraft2||'').trim();
-  if(!/^[0-9]{6}$/.test(a)){ setState({pinSaveErr:'len'}); return; }
-  if(a!==b){ setState({pinSaveErr:'mismatch'}); return; }
-  setState(s=>({settings:{...s.settings,guardianPin:a},pinDraft:'',pinDraft2:'',pinSaveErr:'',pinChangeMode:false}));
-}
-// PIN이 이미 설정돼 있으면, 변경·해제 전에 현재 PIN 확인을 먼저 받는다(아이의 임의 변경 차단).
-function openPinChange(){ setState({verifyFor:'pinchange',pinEntry:'',pinError:false,overlay:'verify'}); }
-function openPinClear(){ setState({verifyFor:'pinclear',pinEntry:'',pinError:false,overlay:'verify'}); }
-function cancelPinChange(){ setState({pinChangeMode:false,pinDraft:'',pinDraft2:'',pinSaveErr:''}); }
-// 이벤트 보상 적용: ctx(pond/items/unlocks)를 직접 갱신하고 표시용 eventInfo를 반환.
-//  targetUid 지정 시 그 카피바라에게, 아니면 건강한 카피바라 중 랜덤으로 친밀도를 준다.
-// 위기 카피바라 한 마리를 한 단계 회복(gone→leaving→weak→healthy). finishDay/doVoluntary 공용.
-// 대상 있으면 {pond, rescued:{uid,prior}}, 없으면 {pond, rescued:null}.
-function rescueOne(pond){
-  const order=['gone','leaving','weak','healthy']; let rescued=null;
-  const next=pond.map(c=>{ if(!rescued&&c.status!=='healthy'){rescued={uid:c.uid,prior:c.status};const i=order.indexOf(c.status);return{...c,status:order[Math.min(order.length-1,i+1)]};} return c; });
-  return {pond:next, rescued};
-}
-function applyEventReward(ev, ctx, targetUid) {
-  const rw=ev.reward||{}; let who='카피바라';
-  if(rw.intimacy){
-    const healthy=ctx.pond.filter(c=>c.status==='healthy');
-    const t = targetUid ? ctx.pond.find(c=>c.uid===targetUid)
-            : (healthy.length?healthy[Math.floor(Math.random()*healthy.length)]:null);
-    if(t){ ctx.pond=ctx.pond.map(c=>c.uid===t.uid?{...c,intimacy:(c.intimacy||0)+rw.intimacy}:c); who=sp(t.speciesId).name; }
-  }
-  if(rw.item) ctx.items={...ctx.items,[rw.item]:(ctx.items[rw.item]||0)+1};
-  if(rw.unlock&&ctx.unlocks.indexOf(rw.unlock)<0) ctx.unlocks=[...ctx.unlocks,rw.unlock];
-  const guest=rw.guest?GUESTS.find(g=>g.id===rw.guest):null;
-  return {ev,who,guest,itemGot:rw.item||null,itemCount:rw.item?ctx.items[rw.item]:0,intimacy:rw.intimacy||0,unlock:rw.unlock||null};
-}
-// 휴식일 자발 숙제: 한 쪽 미리 풀기 → 사이클 분량 차감(재계산) + 친밀도↑ + 랜덤 이벤트(포획 없음).
-//  위기 중이면 하루 1회 한해 위기 회복도 함께 도와준다(포획은 여전히 없음 — 완료일 몫으로 남겨둠).
-function doVoluntary() {
-  const today=new Date(), vc=voluntaryCycle(today); if(!vc) return;
-  const wk=dwk(today), todayS=dstr(today);
-  const dayLog={...ST.dayLog,[wk]:{date:todayS,pages:doneOnDate(wk,todayS)+1}};
-  const ev=pickWeighted(eventsBy('voluntary'));
-  const ctx={pond:ST.pond,items:ST.items||{},unlocks:ST.unlocks||[]};
-  const ei=applyEventReward(ev,ctx);
-  const queue=[]; let voluntaryRescueDate=ST.voluntaryRescueDate;
-  if(anyCrisis(ctx.pond) && ST.voluntaryRescueDate!==todayS){
-    const rr=rescueOne(ctx.pond);
-    if(rr.rescued){
-      ctx.pond=rr.pond; voluntaryRescueDate=todayS;
-      const rEv=EVENTS.find(e=>e.id===(rr.rescued.prior==='weak'?'ev_r_heal':'ev_r_back'));
-      if(rEv) queue.push(applyEventReward(rEv,ctx,rr.rescued.uid));
-    }
-  }
-  ST={...ST,dayLog,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,voluntaryRescueDate,
-      eventInfo:ei,eventQueue:queue,overlay:'event',
-      crisisInfo:anyCrisis(ctx.pond)?ST.crisisInfo:null};
-  save(); render();
-}
-// 오늘(완료일) 분량을 다 끝냈고 사이클에 남은 분량이 있으면 '내일 숙제 당겨하기' 가능.
-function pullForwardInfo(){
-  const today=new Date(), tk=ST.todayKey;
-  const pf=planForWeekday(tk,today); if(!pf) return null;
-  const cs=pf.cs, row=cs.rows.find(r=>r.wk===tk);
-  if(!row || row.required<=0) return null;      // 오늘이 '숙제 있는 완료일'
-  if(row.doneRaw < row.required) return null;    // 오늘 분량을 끝냈어야
-  if(cs.cycleDone >= cs.T) return null;          // 사이클에 남은 분량이 있어야
-  return {remaining: cs.T-cs.cycleDone};
-}
-// 내일 숙제 당겨하기: 오늘에 한 쪽 더 → 초과분이 다음 완료일에서 차감. 보상은 자발 숙제와 동일(작은 보상, 포획 없음).
-function doPullForward(){
-  if(!pullForwardInfo()) return;
-  const today=new Date(), tk=ST.todayKey, todayS=dstr(today);
-  const dayLog={...ST.dayLog,[tk]:{date:todayS,pages:doneOnDate(tk,todayS)+1}};
-  const ev=pickWeighted(eventsBy('voluntary'));
-  const ctx={pond:ST.pond,items:ST.items||{},unlocks:ST.unlocks||[]};
-  const ei=applyEventReward(ev,ctx);
-  ST={...ST,dayLog,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,eventInfo:ei,eventQueue:[],overlay:'event'};
-  save(); render();
-}
-// 도감 상세에서 카피바라에게 직접 해보는 상호작용: 친밀도↑ + 개성별 반응.
-function interact(uid, id) {
-  const c=ST.pond.find(x=>x.uid===uid), it=INTERACTIONS.find(x=>x.id===id); if(!c||!it) return;
-  const s=sp(c.speciesId), personality=s.personality;
-  const pond=ST.pond.map(x=>x.uid===uid?{...x,intimacy:(x.intimacy||0)+(it.intimacy||1)}:x);
-  ST={...ST,pond,detailReaction:{emoji:it.emoji,mood:it.mood,line:interactReact(personality,it)}};
-  save();
-  // 상세 팝업을 통째로 다시 그리면 창이 껌뻑이므로, 바뀐 부분(친밀도·반응·표정)만 제자리 갱신.
-  const st=document.getElementById('detail-status');
-  if(st){
-    const owned=pond.find(x=>x.uid===uid), T=THEMES[ST.theme]||THEMES.onsen;
-    st.textContent=detailStatusLabel(owned);
-    const rb=document.getElementById('detail-react'); if(rb) rb.innerHTML=detailReactInner(T,s);
-    const cp=document.getElementById('detail-capy'); if(cp) cp.innerHTML=capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction.mood,decor:owned?decorFor(owned.uid):null,img:imgFor(s.id)});
-  } else { render(); }
-}
-// 꾸미기: 같은 장식을 다시 누르면 벗고, 다른 장식이면 갈아 끼운다(카피바라당 1개).
-function equipDecor(uid, decorId) {
-  const cur=(ST.equip||{})[uid];
-  const equip={...(ST.equip||{})}; if(cur===decorId) delete equip[uid]; else equip[uid]=decorId;
-  setState({equip});
-}
-function finishDay() {
-  const today=new Date();
-  // 위기 회복: 건강하지 않은 한 마리를 한 단계 끌어올린다(이전 상태를 기억해 rescue 이벤트 분기).
-  const rr=rescueOne(ST.pond); let pond=rr.pond, rescued=rr.rescued;
-  const unseen=SPECIES.filter(s=>!ST.dexSeen[s.id]);
-  let species,isNew;
-  if(unseen.length){species=unseen[Math.floor(Math.random()*unseen.length)];isNew=true;}
-  else{species=SPECIES[Math.floor(Math.random()*SPECIES.length)];isNew=false;}
-  if(isNew){pond=[...pond,{uid:'c'+Date.now()+Math.floor(Math.random()*999),speciesId:species.id,status:'healthy',intimacy:0}];}
-  else{let b=false;pond=pond.map(c=>{if(!b&&c.speciesId===species.id){b=true;return{...c,intimacy:(c.intimacy||0)+1};}return c;});if(!pond.find(c=>c.speciesId===species.id))pond=[...pond,{uid:'c'+Date.now(),speciesId:species.id,status:'healthy',intimacy:0}];}
-  const dexSeen={...ST.dexSeen,[species.id]:true};
-  const todayS=dstr(today);
-  const incStreak=ST.streakDate!==todayS; // 연속일수는 하루 1회만 증가
-  const newStreak=incStreak?ST.streak+1:ST.streak;
-
-  // ── milestone / rescue 이벤트 큐 구성 (caught 오버레이 닫은 뒤 순차 표시) ──
-  const ctx={pond,items:ST.items||{},unlocks:ST.unlocks||[]};
-  const queue=[]; let fired=ST.milestonesFired||[];
-  const pushEvent=(id,targetUid)=>{ const ev=EVENTS.find(e=>e.id===id); if(ev) queue.push(applyEventReward(ev,ctx,targetUid)); };
-  // rescue: 위기에서 한 단계 회복했을 때. weak→완쾌(heal), leaving/gone→복귀(back).
-  if(rescued) pushEvent(rescued.prior==='weak'?'ev_r_heal':'ev_r_back', rescued.uid);
-  // milestone(cycleComplete): 오늘이 속한 사이클이 방금 완주됐고, 그 사이클 인스턴스에서 처음일 때.
-  const pf=planForWeekday(ST.todayKey,today);
-  if(pf){ const cs2=cycleSchedule(pf.cy,today); if(cs2.cycleDone>=cs2.T){ const ck='cycle:'+pf.cy.key+':'+dstr(cs2.anchor); if(fired.indexOf(ck)<0){ pushEvent('ev_m_cycle'); fired=[...fired,ck]; } } }
-  // milestone(streak): 연속일수가 7·14에 도달하는 순간(증가한 날만).
-  if(incStreak){ if(newStreak===7) pushEvent('ev_m_streak7'); if(newStreak===14) pushEvent('ev_m_streak14'); }
-  // milestone(dexPct): 도감 완성도가 50%를 처음 넘는 순간.
-  const dexTotal=SPECIES.length;
-  const oldPct=Math.round(Object.keys(ST.dexSeen).filter(k=>ST.dexSeen[k]).length/dexTotal*100);
-  const newPct=Math.round(Object.keys(dexSeen).filter(k=>dexSeen[k]).length/dexTotal*100);
-  if(oldPct<50&&newPct>=50) pushEvent('ev_m_dexHalf');
-
-  ST={...ST,pond:ctx.pond,items:ctx.items,unlocks:ctx.unlocks,dexSeen,streak:newStreak,streakDate:todayS,milestonesFired:fired,caughtSpecies:species,caughtNew:isNew,overlay:'caught',eventQueue:queue,crisisInfo:anyCrisis(ctx.pond)?ST.crisisInfo:null};
-  save(); render();
-}
-function skipDay() {
-  const stories=['게으름 바이러스에 살짝 감염됐어!','미루기 마왕이 데려가려 해!','너무 심심해서 깊은 잠에 빠졌어…','연못 밖에서 길을 잃었대!'];
-  const target=degradeOne();
-  if(!target)return;
-  const s=sp(target.speciesId), story=stories[Math.floor(Math.random()*stories.length)];
-  setState({pond:ST.pond,crisisInfo:{uid:target.uid,name:s.name,story},overlay:'crisis',streak:0});
-}
-function demoCrisis() { skipDay(); }
-function resetAll() {
-  try{localStorage.removeItem('capy-v2-state');}catch(e){}
-  const tk=['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
-  ST={...DEFAULT_STATE,todayKey:tk}; rollover(); render();
-}
-
-// ── Timer ────────────────────────────────────────────────────
-function startTick() {
-  if(_timerInterval)clearInterval(_timerInterval);
-  _timerInterval=setInterval(()=>{
-    if(!ST.timerRunning)return;
-    if(ST.timerSec>1){
-      ST.timerSec-=1;
-      const el=document.getElementById('timer-display');
-      if(el)el.textContent=String(Math.floor(ST.timerSec/60)).padStart(2,'0')+':'+String(ST.timerSec%60).padStart(2,'0');
-      const bar=document.getElementById('timer-bar');
-      if(bar){ const tot=mpp()*60; bar.style.width=(tot>0?Math.min(100,Math.max(0,ST.timerSec/tot*100)):0)+'%'; }
-    } else { ST.timerSec=0; ST.timerRunning=false; render(); }
-  },1000);
-}
-
-// ── Render ───────────────────────────────────────────────────
-function render() {
-  // 입력창에 포커스가 있을 때 전체 재렌더로 포커스·커서·스크롤이 날아가
-  // 모바일 키보드가 닫히고 화면이 껌뻑이는 문제 방지: 재빌드 전에 상태를 기억했다가 복원.
-  let _fx=null;
-  try{
-    const a=document.activeElement;
-    if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')){
-      const da=Array.prototype.slice.call(a.attributes).find(x=>x.name.indexOf('data-')===0);
-      if(da){
-        let ss=null,se=null; try{ ss=a.selectionStart; se=a.selectionEnd; }catch(e){}
-        let n=a.parentElement,scTop=null;
-        while(n){ if(n.scrollHeight-n.clientHeight>2){ scTop=n.scrollTop; break; } n=n.parentElement; }
-        _fx={sel:'['+da.name+(da.value!==''?'="'+da.value+'"':'')+']',ss:ss,se:se,scTop:scTop};
-      }
-    }
-  }catch(e){}
-  const T=THEMES[ST.theme]||THEMES.onsen;
-  const sch=schedule(), tk=ST.todayKey;
-  const plannedToday=sch.days[tk]?sch.days[tk].pages:0;
-  const doneToday=doneForDay(tk);
-  const allDone=plannedToday>0&&doneToday>=plannedToday;
-  const dexTotal=SPECIES.length, dexSeenCount=SPECIES.filter(s=>ST.dexSeen[s.id]).length;
-  const dexPct=Math.round((dexSeenCount/dexTotal)*100);
-  const now=new Date(), wd=['일','월','화','수','목','금','토'][now.getDay()];
-  const dateLabel=(now.getMonth()+1)+'월 '+now.getDate()+'일 '+wd+'요일';
-  const cheerCandidates=ST.pond.filter(c=>c.status==='healthy');
-  const cheerSp=cheerCandidates.length?sp(cheerCandidates[0].speciesId):SPECIES[0];
-  const timerMin=String(Math.floor(ST.timerSec/60)).padStart(2,'0'), timerSec=String(ST.timerSec%60).padStart(2,'0');
-  const showCrisisBanner=anyCrisis()&&ST.overlay===null;
-  const showPendingBanner=!!ST.pendingReward&&ST.overlay===null;
-
-  const wide=isWide();
-  const overlays=`
-  ${ST.overlay==='caught'    ? renderCaught(T):''}
-  ${ST.overlay==='event'     ? renderEvent(T):''}
-  ${ST.overlay==='break'     ? renderBreak(T,cheerSp):''}
-  ${ST.overlay==='crisis'    ? renderCrisis(T):''}
-  ${ST.overlay==='dex'       ? renderDex(T,dexSeenCount,dexTotal,dexPct):''}
-  ${ST.overlay==='capyDetail'? renderDetail(T):''}
-  ${ST.overlay==='settings'  ? renderSettings(T):''}
-  ${ST.overlay==='shop'      ? renderShop(T):''}
-  ${ST.overlay==='verify'    ? renderVerify(T):''}
-  ${(wide&&ST.screen==='setup')?`<div style="position:absolute;inset:0;z-index:57;background:${T.bg};overflow-y:auto;"><div style="max-width:780px;margin:0 auto;padding:16px 24px 50px;"><div style="display:flex;justify-content:flex-end;margin-bottom:4px;"><div onclick="setState({screen:'home'})" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div></div>${renderSetup(T,sch)}</div></div>`:''}`;
-
-  const portrait=`
-<div style="position:relative;width:100%;max-width:480px;height:100dvh;display:flex;flex-direction:column;background:${T.bg};overflow:hidden;margin:0 auto;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 22px 12px;flex-shrink:0;">
-    <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};line-height:1;">🌿 인우의 카피바라 연못</div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div ${ST.timerRunning?'':'onclick="openShop()"'} class="tapbtn" style="${ST.timerRunning?'':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;color:${T.accentDark};">${coinIcon(18)} ${ST.coins||0}</div>
-      <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 13px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
-      <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
-    </div>
-  </div>
-  ${showCrisisBanner?`<div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;animation:tapPop 1.4s ease-in-out infinite;">😢</div><div style="flex:1;"><div style="font-weight:800;color:#c0503a;font-size:15px;">${crisisBannerText()}</div><div style="font-size:13px;color:#b06a5c;margin-top:1px;">지금 숙제하면 구할 수 있어! 탭해서 구출하러 가자 →</div></div></div>`:''}
-  ${showPendingBanner?`<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;margin:0 18px 6px;background:linear-gradient(180deg,#fff7e8,#ffeecb);border:2px solid #f0d49a;border-radius:18px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;"><div style="font-size:26px;">🔒</div><div style="flex:1;"><div style="font-weight:800;color:${T.accentDark};font-size:15px;">숙제 끝! 보호자 확인을 기다리고 있어요</div><div style="font-size:13px;color:${T.sub};margin-top:1px;">보호자가 PIN을 입력하면 친구를 데려올 수 있어요 →</div></div></div>`:''}
-  <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px 18px 110px;">
-    ${ST.screen==='home'  ? renderHome(T,sch,dexPct,dateLabel,plannedToday,doneToday,allDone):''}
-    ${ST.screen==='setup' ? renderSetup(T,sch):''}
-    ${ST.screen==='today' ? renderToday(T,sch,tk,plannedToday,doneToday,allDone,cheerSp,timerMin,timerSec):''}
-  </div>
-  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:10px 16px 16px;background:linear-gradient(180deg,transparent,${T.bg} 38%);">
-    ${renderNav(T)}
-  </div>
-</div>`;
-
-  document.getElementById('app').innerHTML = `
-<div style="position:relative;min-height:100dvh;display:flex;justify-content:center;background:${T.bg};font-family:'Noto Sans KR',sans-serif;color:${T.ink};">
-  ${wide ? renderDashboard(T,sch,tk,plannedToday,doneToday,allDone,cheerSp,dexSeenCount,dexTotal,dexPct,dateLabel,timerMin,timerSec) : portrait}
-  ${overlays}
-</div>`;
-  attachInputs();
-  if(_fx){ try{
-    const el=document.querySelector(_fx.sel);
-    if(el){
-      el.focus();
-      if(_fx.ss!=null){ try{ el.setSelectionRange(_fx.ss,_fx.se); }catch(e){} }
-      if(_fx.scTop!=null){ let n=el.parentElement; while(n){ if(n.scrollHeight-n.clientHeight>2){ n.scrollTop=_fx.scTop; break; } n=n.parentElement; } }
-    }
-  }catch(e){} }
-}
-
-// ── Screen renderers ─────────────────────────────────────────
-// 연못 장면(물·연잎·카피바라). height로 영역 크기 조절, 세로/가로 레이아웃 공용.
-function pondScene(T, dexPct, heightCss, showChips) {
-  const lilyPads=[{l:8,t:24,s:54,h:30,c:'#86b89f',d:5},{l:60,t:16,s:70,h:38,c:'#7fae97',d:6},{l:78,t:78,s:60,h:34,c:'#8cbfa4',d:5.5},{l:30,t:86,s:48,h:26,c:'#79a890',d:4.5}];
-  const lilies=lilyPads.map(p=>`<div style="position:absolute;left:${p.l}%;top:${p.t}%;width:${p.s}px;height:${p.h}px;background:${p.c};border-radius:50%;opacity:0.5;animation:lilyDrift ${p.d}s ease-in-out infinite;"></div>`).join('');
-  const pond=ST.pond.map((c,i)=>{
-    const s=sp(c.speciesId), slot=POND_SLOTS[i%POND_SLOTS.length], sz=Math.round(64+(slot[1]/100)*30);
-    return `<div onclick="openDetail('${s.id}')" class="tapbtn" style="position:absolute;left:${slot[0]}%;top:${slot[1]}%;transform:translate(-50%,-50%);z-index:${Math.round(slot[1])};cursor:pointer;">${capy({size:sz,color:s.color,accessory:s.accessory,idle:c.status==='gone'?'none':s.idle,status:c.status,rarity:s.rarity,personality:s.personality,decor:decorFor(c.uid),img:imgFor(s.id)})}</div>`;
-  }).join('');
-  const chips=showChips?`<div style="position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;flex-wrap:wrap;z-index:90;">
-      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🦫 채집 ${ST.pond.length}마리</div>
-      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">📚 도감 ${dexPct}%</div>
-      <div style="background:rgba(255,255,255,0.82);backdrop-filter:blur(4px);padding:7px 13px;border-radius:999px;font-weight:700;font-size:14px;">🔥 ${ST.streak}일 연속</div>
-    </div>`:'';
-  return `<div style="position:relative;isolation:isolate;height:${heightCss};min-height:300px;border-radius:30px;background:${T.water};overflow:hidden;box-shadow:inset 0 -10px 30px rgba(0,0,0,0.05),0 8px 22px rgba(0,0,0,0.06);">
-    ${chips}${lilies}${pond}
-    ${!ST.pond.length?`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${T.sub};font-weight:600;"><div style="font-family:'Gaegu',cursive;font-size:24px;color:${T.ink};">아직 연못이 조용해요</div><div style="font-size:14px;margin-top:4px;">오늘 숙제를 끝내고 첫 친구를 데려오자!</div></div>`:''}
-  </div>`;
-}
-function renderHome(T,sch,dexPct,dateLabel,planned,done,allDone) {
-  const progPct=planned>0?Math.round((done/planned)*100):(planned===0?100:0);
-  const progLabel=planned===0?'푹 쉬는 날':(done+' / '+planned+'쪽 완료');
-  const headline=planned===0?'오늘은 숙제가 없어요 🌿':(allDone?'오늘 숙제 끝! 잘했어 🎉':'오늘 '+planned+'쪽이 있어요');
-  return `<div>
-  <div style="margin-bottom:12px;">${renderMsgLink(T, ST.timerRunning)}</div>
-  ${pondScene(T,dexPct,'46dvh',true)}
-  <div style="margin-top:16px;background:${T.card};border:2px solid ${T.line};border-radius:24px;padding:18px 20px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
-      <div>
-        <div style="font-size:14px;color:${T.sub};font-weight:600;">${dateLabel}</div>
-        <div style="font-family:'Gaegu',cursive;font-size:28px;font-weight:700;margin-top:2px;">${headline}</div>
-      </div>
-      <div onclick="setState({screen:'today',overlay:null})" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;font-size:17px;padding:15px 26px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">오늘의 숙제 하기 →</div>
-    </div>
-    <div style="margin-top:14px;height:16px;background:${T.soft};border-radius:999px;overflow:hidden;">
-      <div style="height:100%;width:${progPct}%;background:${T.accent};border-radius:999px;transition:width 0.4s ease;"></div>
-    </div>
-    <div style="margin-top:8px;font-size:13px;color:${T.sub};font-weight:600;">${progLabel}</div>
-  </div>
-  <div style="margin-top:12px;">${renderMsgLink(T, ST.timerRunning)}</div>
-  <a href="squirrel.html" class="tapbtn" style="display:flex;align-items:center;gap:13px;text-decoration:none;color:inherit;margin-top:12px;background:${T.card};border:2px solid ${T.line};border-radius:24px;padding:15px 18px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
-    <div style="font-size:27px;flex:none;">🐿️</div>
-    <div style="flex:1;min-width:0;">
-      <div style="font-family:'Gaegu',cursive;font-size:22px;font-weight:700;">하람쥐 형제 이야기</div>
-      <div style="font-size:12.5px;color:${T.sub};font-weight:600;">날마다 새 이야기가 슬라이드쇼로 도착해요.</div>
-    </div>
-    <div style="font-size:20px;color:${T.sub};flex:none;">→</div>
-  </a>
-  <div style="height:26px;"></div>
-</div>`;
-}
-// M.S.G. 파일 링크 — 하루 한 편, 다람쥐부 기밀 작전 영상. 집중 중엔 잠근다.
-function renderMsgLink(T, focus){
-  const lock=!!focus;
-  return `<div ${lock?'':'onclick="location.href=\'msg.html\'"'} class="tapbtn" style="${lock?'opacity:.45;filter:grayscale(.5);pointer-events:none;':'cursor:pointer;'}display:flex;align-items:center;gap:11px;background:#14161a;border:2px solid #35505f;border-radius:20px;padding:13px 16px;box-shadow:0 6px 16px rgba(0,0,0,0.08);">
-    <div style="font-size:24px;flex:none;">${lock?'🔒':'🐿️'}</div>
-    <div style="flex:1;min-width:0;">
-      <div style="font-weight:800;font-size:15.5px;color:#e8e4d8;">M.S.G. 파일 <span style="font-size:11px;font-weight:800;color:#ff6a5a;border:1.5px solid #b3271c;border-radius:4px;padding:1px 5px;margin-left:4px;">CLASSIFIED</span></div>
-      <div style="font-size:12.5px;color:#8aa0b4;font-weight:600;margin-top:2px;">다람쥐부 오늘의 작전 영상 ${lock?'· 집중 중엔 못 봐요':'· 하루 한 편'}</div>
-    </div>
-    <div style="flex:none;font-size:13px;font-weight:800;color:#5fd08a;">${lock?'':'열기 →'}</div>
-  </div>`;
-}
-// ── 가로 태블릿 대시보드 (한 화면에 연못+오늘숙제+도감) ──────────
-function isWide(){ return window.innerWidth>=820 && window.innerWidth>=window.innerHeight; }
-// 한우리 숙제 카드 — 대시보드·세로 공용. task 체크리스트 + 코인 + 마감 안내.
-function renderHanwooriCard(T, focus){
-  const card='background:'+T.card+';border:2px solid '+T.line+';border-radius:22px;padding:15px 17px;box-shadow:0 6px 16px rgba(0,0,0,0.04);';
-  const dim=focus?'opacity:.45;filter:grayscale(.5);pointer-events:none;':'';
-  const cur=hwCurrent(), wk=dwk(new Date());
-  const coinChip=`<div ${focus?'':'onclick="openShop()"'} class="tapbtn" style="${focus?'':'cursor:pointer;'}display:flex;align-items:center;gap:5px;background:${T.soft};border:2px solid ${T.line};border-radius:999px;padding:4px 11px;font-weight:800;font-size:13px;color:${T.accentDark};">${coinIcon(16)} ${ST.coins||0} <span style="font-size:11px;color:${T.sub};">샵 →</span></div>`;
-  const head=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:800;font-size:17px;">🟠 한우리 숙제 ${focus?'<span style=\"font-size:12px;color:'+T.sub+';\">🔒 집중 중</span>':''}</div>${coinChip}</div>`;
-  if(!cur||!cur.tasks.length){
-    return `<div style="${card}${dim}">${head}
-      <div style="font-size:13px;color:${T.sub};line-height:1.55;">이번 주 한우리 숙제가 아직 없어요.<br>금요일에 받아오면 <b>✏️ 숙제설정</b>에서 입력해 주세요.</div>
-    </div>`;
-  }
-  const doneN=cur.tasks.filter(t=>t.done).length, total=cur.tasks.length, allDone=doneN===total;
-  const dday=hwDday();
-  const ddayChip = allDone?`<span style="color:#6aa05a;font-weight:800;">이번 주 완주! 🎉</span>`
-    : dday<=1?`<span style="color:#c0503a;font-weight:800;">⏰ 마감 ${dday===0?'오늘':'내일'}!</span>`
-    : `<span style="color:${T.sub};font-weight:700;">마감까지 ${dday}일</span>`;
-  const hint=(wk==='sat'||wk==='sun')?' · 📖 책 읽기 좋은 주말':(wk==='mon'||wk==='tue'||wk==='thu')?' · ✨ 한우리 하는 날':'';
-  const rows=cur.tasks.map(t=>t.done
-    ? `<div style="display:flex;align-items:center;gap:9px;padding:8px 4px;border-bottom:1px dashed ${T.line};"><div style="width:26px;height:26px;border-radius:50%;background:${T.accent};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;">✓</div><div style="flex:1;font-size:13.5px;font-weight:600;color:${T.sub};text-decoration:line-through;">${h(t.title)}</div><div style="flex:none;font-size:14px;">${coinIcon(15)}</div></div>`
-    : `<div style="display:flex;align-items:center;gap:9px;padding:8px 4px;border-bottom:1px dashed ${T.line};"><div style="width:26px;height:26px;border-radius:50%;background:${T.soft};border:2px solid ${T.line};flex:none;"></div><div style="flex:1;font-size:13.5px;font-weight:700;color:${T.ink};">${h(t.title)}</div><div onclick="completeHanwooriTask('${t.id}')" class="tapbtn" style="cursor:pointer;flex:none;background:${T.accent};color:#fff;font-weight:800;font-size:12px;padding:7px 13px;border-radius:999px;box-shadow:0 3px 0 ${T.accentDark};">다 했어요 ✓</div></div>`
-  ).join('');
-  return `<div style="${card}${dim}">${head}
-    <div style="font-size:12.5px;margin-bottom:4px;">${ddayChip}<span style="color:${T.sub};font-weight:600;font-size:12px;">${hint}</span></div>
-    <div style="height:11px;background:${T.soft};border-radius:999px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${Math.round(doneN/total*100)}%;background:linear-gradient(90deg,#e8a33d,#f3c04e);border-radius:999px;transition:width .4s;"></div></div>
-    <div style="font-size:11.5px;color:${T.sub};font-weight:700;margin-bottom:2px;">${doneN} / ${total} 완료</div>
-    ${rows}
-  </div>`;
-}
-function renderDashboard(T, sch, tk, planned, done, allDone, cheerSp, dexSeenCount, dexTotal, dexPct, dateLabel, timerMin, timerSec) {
-  const card='background:'+T.card+';border:2px solid '+T.line+';border-radius:22px;padding:16px 18px;box-shadow:0 6px 16px rgba(0,0,0,0.04);';
-  const focus=ST.timerRunning; // 집중 모드: 타이머가 돌면 연못·도감을 잠가 주의 분산을 막는다
-  // 오늘 숙제 패널
-  const todayWk=dwk(new Date()), vcToday=(tk===todayWk)?voluntaryCycle(new Date()):null;
-  let todayPanel;
-  if(planned>0){
-    const progPct=Math.min(100,Math.round(done/planned*100));
-    const pageLabels=todayPageLabels(tk,new Date());
-    const tokens=[];for(let i=0;i<planned;i++){const d=i<done; const lab=d?'✓':h((pageLabels&&pageLabels[i])||String(i+1));
-      tokens.push(`<div style="min-width:28px;height:28px;padding:0 7px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11.5px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};white-space:nowrap;">${lab}</div>`);}
-    const totSec=mpp()*60, barPct=totSec>0?Math.min(100,Math.max(0,Math.round(ST.timerSec/totSec*100))):0;
-    const running=ST.timerRunning, startLabel=(ST.timerSec>0&&ST.timerSec<totSec)?'이어서 집중하기 ▶':'오늘 숙제 시작 ▶';
-    const big=(bg,sh,extra,txt,on)=>`<div ${on?`onclick="${on}"`:''} class="tapbtn" style="${on?'cursor:pointer;':''}text-align:center;background:${bg};color:#fff;font-weight:800;font-size:17px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${sh};${extra||''}">${txt}</div>`;
-    // 숙제 시작 전: '오늘 숙제 시작' 버튼만 → 누르면 타이머+집중모드 동시 시작
-    // 집중 중: 타이머·게이지·잠깐멈춤 + '이 쪽 다 풀었어요'
-    let actions;
-    if(allDone){
-      if(ST.pendingReward){
-        actions = big('linear-gradient(180deg,#f3b24e,#e09a36)','#c07f24','font-size:15px;line-height:1.4;','🔒 보호자 확인을 받고<br>오늘의 리워드 받기','reopenReward()');
-      } else {
-        const pfi=pullForwardInfo();
-        actions = big('#6aa05a','#558044','','오늘 숙제 끝! 잘했어요 🎉')
-          + (pfi?`<div onclick="doPullForward()" class="tapbtn" style="cursor:pointer;text-align:center;margin-top:10px;background:${T.soft};color:${T.accentDark};border:2px dashed ${T.accent};font-weight:800;font-size:15px;padding:13px;border-radius:14px;">➡️ 내일 숙제 미리 하기 <span style="font-weight:700;font-size:12.5px;">(남은 ${pfi.remaining}쪽)</span></div>`:'');
-      }
-    } else if(running){
-      actions = `<div style="text-align:center;margin-bottom:6px;"><span id="timer-display" style="font-family:'Gaegu',cursive;font-size:40px;font-weight:700;color:${T.accent};">${timerMin}:${timerSec}</span></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;"><span style="font-size:15px;">⏳</span><div style="flex:1;height:11px;background:${T.soft};border-radius:999px;overflow:hidden;border:1px solid ${T.line};"><div id="timer-bar" style="height:100%;width:${barPct}%;background:linear-gradient(90deg,${T.accent},${lighten(T.accent,0.25)});border-radius:999px;transition:width 1s linear;"></div></div>
-        <div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;padding:8px 14px;border-radius:12px;font-weight:800;font-size:13px;background:${T.soft};border:2px solid ${T.line};color:${T.ink};white-space:nowrap;">⏸ 멈춤</div></div>
-      ${big(T.accent,T.accentDark,'','이 쪽 다 풀었어요 ✓','completePage()')}`;
-    } else {
-      actions = big(T.accent,T.accentDark,'font-size:18px;padding:17px;',startLabel,'startHomework()');
-    }
-    todayPanel=`<div style="${card}">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;"><div style="font-weight:800;font-size:17px;">📖 오늘의 숙제</div><div style="font-size:13px;color:${T.sub};font-weight:600;">${dateLabel}</div></div>
-      <div style="font-size:13.5px;color:${T.sub};font-weight:600;margin-bottom:8px;">${allDone?'오늘 분량 완료!':(planned+'쪽 중 '+(done+1)+'쪽째')}</div>
-      <div style="height:14px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${progPct}%;background:${T.accent};border-radius:999px;transition:width .4s;"></div></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:12px 0;">${tokens.join('')}</div>
-      ${actions}
-    </div>`;
-  } else if(vcToday){
-    const volDoneToday=doneOnDate(todayWk,dstr(new Date()));
-    todayPanel=`<div style="${card}text-align:center;">
-      <div style="font-weight:800;font-size:17px;margin-bottom:2px;">🌿 오늘은 쉬는 날</div>
-      <div style="font-size:13px;color:${T.sub};line-height:1.5;margin-bottom:8px;">미리 풀면 친밀도가 오르고 즐거운 일이 생겨요!<br>오늘 미리 푼 양 <b style="color:${T.accent};">${volDoneToday}쪽</b> · 남은 <b style="color:${T.accent};">${Math.max(0,vcToday.cs.T-vcToday.cs.cycleDone)}쪽</b></div>
-      <div onclick="doVoluntary()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:14px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">한 쪽 미리 풀기 ✏️</div>
-    </div>`;
-  } else {
-    todayPanel=`<div style="${card}text-align:center;"><div style="font-weight:800;font-size:17px;">😴 오늘은 숙제가 없는 날</div><div style="font-size:13px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요!</div></div>`;
-  }
-  // 도감 & 수집 패널
-  const its=Object.keys(ST.items||{}).filter(k=>ST.items[k]>0);
-  const itemChips=its.length?its.map(k=>`<span style="font-size:12.5px;font-weight:700;color:${T.ink};background:${T.soft};border:2px solid ${T.line};border-radius:999px;padding:3px 9px;">${itemEmoji(k)} ${ST.items[k]}</span>`).join(''):`<span style="font-size:12px;color:${T.sub};">아직 모은 간식이 없어요</span>`;
-  const dexPanel=`<div style="${card}${focus?'opacity:.45;filter:grayscale(.5);pointer-events:none;':''}">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;"><div style="font-weight:800;font-size:17px;">📚 도감 ${focus?'<span style=\"font-size:12px;color:'+T.sub+';\">🔒 집중 중</span>':''}</div>${focus?'':`<div onclick="setState({overlay:'dex'})" class="tapbtn" style="cursor:pointer;font-size:12.5px;font-weight:800;color:${T.accent};background:${T.soft};border:2px solid ${T.line};border-radius:999px;padding:5px 12px;">열기 →</div>`}</div>
-    <div style="font-size:13.5px;color:${T.sub};font-weight:700;margin-bottom:6px;">${dexSeenCount} / ${dexTotal}종 발견 · ${dexPct}%</div>
-    <div style="height:12px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${dexPct}%;background:${T.accent};border-radius:999px;"></div></div>
-    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:12px;font-weight:700;color:${T.sub};">🧺</span>${itemChips}</div>
-  </div>`;
-
-  return `<div style="width:100%;max-width:1500px;height:100dvh;display:flex;flex-direction:column;padding:14px 20px;gap:12px;margin:0 auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div style="font-family:'Gaegu',cursive;font-weight:700;font-size:26px;color:${T.accentDark};">🌿 인우의 카피바라 연못</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div ${focus?'':'onclick="openShop()"'} class="tapbtn" style="${focus?'':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;color:${T.accentDark};">${coinIcon(18)} ${ST.coins||0}</div>
-        <div style="display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:16px;">🔥 ${ST.streak}</div>
-        <div ${focus?'':`onclick="setState({screen:'setup'})"`} class="tapbtn" style="${focus?'opacity:.4;':'cursor:pointer;'}display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:14px;">${focus?'🔒':'✏️'} 숙제설정</div>
-        <a ${focus?'':'href="squirrel.html"'} class="tapbtn" style="${focus?'opacity:.4;pointer-events:none;':'cursor:pointer;'}text-decoration:none;color:inherit;display:flex;align-items:center;gap:6px;background:${T.card};border:2px solid ${T.line};padding:7px 14px;border-radius:999px;font-weight:700;font-size:14px;">🐿️ 하람쥐 이야기</a>
-        <div onclick="openSettings()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">${pinSet()?'🔒':'⚙️'}</div>
-      </div>
-    </div>
-    ${(anyCrisis()&&ST.overlay===null)?`<div class="tapbtn" style="background:linear-gradient(180deg,#fff4f0,#ffe7e0);border:2px solid #f3c4b8;border-radius:16px;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;"><div style="font-size:22px;">😢</div><div style="font-weight:800;color:#c0503a;font-size:14px;">${crisisBannerText()} — 지금 숙제하면 구할 수 있어!</div></div>`:''}
-    <div style="flex:1;min-height:0;display:flex;gap:16px;">
-      <div style="flex:1.45;min-width:0;">${focus?`<div style="position:relative;height:100%;">
-        <div style="height:100%;filter:grayscale(.7) brightness(1.03);opacity:.45;pointer-events:none;">${pondScene(T,dexPct,'100%',false)}</div>
-        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none;padding:20px;">
-          <div style="font-size:46px;">🤫</div>
-          <div style="font-family:'Gaegu',cursive;font-size:30px;font-weight:700;color:${T.accentDark};margin-top:8px;line-height:1.3;">카피바라들이 숙제<br>마치기를 기다리는 중...</div>
-          <div style="font-size:15px;color:${T.sub};margin-top:8px;font-weight:600;">집중 타이머가 끝나면 다시 만나요 🌿</div>
-        </div>
-      </div>`:pondScene(T,dexPct,'100%',false)}</div>
-      <div style="flex:1;min-width:300px;max-width:400px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
-        ${renderMsgLink(T,focus)}
-        ${dexPanel}
-        ${renderHanwooriCard(T,focus)}
-        <div style="flex:1;min-height:8px;"></div>
-        ${todayPanel}
-      </div>
-    </div>
-  </div>`;
-}
-
-function renderSetup(T,sch) {
-  const day=ST.setupDay;
-  const daySel=[{k:'tue',l:'화요일'},{k:'thu',l:'목요일'}].map(x=>{ const sel=day===x.k; return `<div onclick="setState({setupDay:'${x.k}'})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:14px;padding:9px;border-radius:11px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
-
-  const rows=ST.workbooks.map(w=>{
-    const key=day+'|'+w.id, a=getAssign(day,w.id), editing=!a||(key in ST.rowEdit), ev=ST.rowEdit[key]||{};
-    const dot=`<span style="width:13px;height:13px;border-radius:50%;background:${w.color};flex:none;"></span>`;
-    if(editing){
-      const f=parseInt(ev.from),t=parseInt(ev.to), pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null;
-      const pgLabel=pg!=null&&pg>0?pg+'쪽':(pg!=null?'확인!':'');
-      return `<div style="display:flex;align-items:center;gap:6px;background:${T.soft};border-radius:13px;padding:10px 11px;margin-bottom:8px;flex-wrap:wrap;">
-        ${dot}<span style="font-weight:700;font-size:14px;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${h(w.name)}</span>
-        <input data-row-from="${key}" type="number" inputmode="numeric" placeholder="시작" value="${h(ev.from||'')}" style="width:54px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:9px;padding:8px 3px;background:#fff;color:${T.ink};" />
-        <span style="color:${T.sub};font-weight:700;">~</span>
-        <input data-row-to="${key}" type="number" inputmode="numeric" placeholder="끝" value="${h(ev.to||'')}" style="width:54px;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:9px;padding:8px 3px;background:#fff;color:${T.ink};" />
-        <span style="color:${T.sub};font-weight:600;font-size:13px;">쪽</span>
-        <span id="rowpg-${key}" style="font-weight:800;color:${T.accent};font-size:13px;min-width:28px;">${pgLabel}</span>
-        <div onclick="confirmRow('${day}','${w.id}')" class="tapbtn" style="cursor:pointer;margin-left:auto;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;border-radius:11px;">✓</div>
-      </div>`;
-    }
-    const pg=Math.max(0,a.to-a.from+1);
-    return `<div style="display:flex;align-items:center;gap:9px;background:${lighten(T.accent,0.86)};border:2px solid ${lighten(T.accent,0.62)};border-radius:13px;padding:11px 13px;margin-bottom:8px;">
-      ${dot}<span style="font-weight:700;font-size:15px;">${h(w.name)}</span>
-      <span style="color:${T.sub};font-weight:600;font-size:14px;">p.${a.from}~${a.to}</span>
-      <span style="font-weight:800;color:${T.accentDark};font-size:14px;">${pg}쪽</span>
-      <div onclick="editRow('${day}','${w.id}')" class="tapbtn" style="cursor:pointer;margin-left:auto;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;font-size:14px;">✏️</div>
-      <div onclick="clearRow('${day}','${w.id}')" class="tapbtn" style="cursor:pointer;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;color:${T.sub};font-size:14px;">✕</div>
-    </div>`;
-  }).join('');
-  const noWb=!ST.workbooks.length?`<div style="color:${T.sub};font-size:14px;padding:8px 2px;">문제집이 없어요. ⚙️ 설정 → 📒 문제집 관리에서 먼저 추가해 주세요.</div>`:'';
-
-  const today=new Date();
-  const eff=effAssign(), schEff=schedule(today,eff);          // 미리보기는 초안 기준
-  const cyclePreview=CYCLES.map(cy=>{
-    const cs=cycleSchedule(cy,today,eff), active=cs.T>0;
-    const dayRows=cs.rows.map(r=>{
-      let dots='';
-      for(let i=0;i<r.required;i++){ const filled=i<r.done; dots+=`<span style="width:11px;height:11px;border-radius:50%;flex:none;background:${filled?T.accent:'transparent'};border:2px solid ${filled?T.accent:lighten(T.accent,0.5)};"></span>`; }
-      if(!r.required) dots=`<span style="font-size:12px;color:${T.sub};">–</span>`;
-      return `<div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
-        <div style="width:30px;text-align:center;font-weight:800;font-size:14px;color:${r.isToday?T.accentDark:T.sub};">${DL[r.wk]}${r.isToday?`<div style="font-size:9px;font-weight:700;color:${T.accent};line-height:1;">오늘</div>`:''}</div>
-        <div style="flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:15px;">${dots}</div>
-        <div style="font-size:12px;font-weight:700;color:${T.sub};width:42px;text-align:right;">${r.required?r.done+'/'+r.required:'–'}</div>
-      </div>`;
-    }).join('');
-    const volNote=cs.voluntaryDone>0?`<div style="font-size:11.5px;color:${T.accentDark};font-weight:700;margin-bottom:8px;">🌟 미리 푼 ${cs.voluntaryDone}쪽이 반영돼 분량이 줄었어요</div>`:'';
-    return `<div style="background:${active?T.soft:'transparent'};border:2px solid ${active?'transparent':T.line};border-radius:16px;padding:13px 14px;margin-bottom:10px;opacity:${active?1:0.55};">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-weight:800;font-size:14px;">${cy.label} <span style="font-weight:600;color:${T.sub};font-size:12px;">(${cy.days.map(x=>DL[x.d]).join('·')})</span></div>
-        <div style="font-weight:800;color:${active?T.accent:T.sub};font-size:13px;">${active?cs.cycleDone+' / '+cs.T+'쪽':'숙제 없음'}</div>
-      </div>
-      ${volNote}${dayRows}
-    </div>`;
-  }).join('');
-
-  return `<div>
-  <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">✏️ 숙제 설정</div>
-  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
-    <div style="font-weight:800;font-size:16px;margin-bottom:4px;">🗓️ 숙제 입력</div>
-    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">요일을 고르고, 문제집마다 시작·끝 쪽을 넣어 ✓로 입력해요. 아래 <b>확인받기</b>로 보호자 승인을 받아야 실제 숙제에 반영돼요.</div>
-    <div style="display:flex;gap:8px;margin-bottom:14px;max-width:230px;">${daySel}</div>
-    ${rows}${noWb}
-    ${assignDirty()?`<div style="margin-top:8px;background:${lighten(T.accent,0.8)};border:2px dashed ${T.accent};border-radius:14px;padding:12px 13px;">
-      <div style="font-size:12.5px;color:${T.accentDark};font-weight:700;margin-bottom:9px;line-height:1.5;">✏️ 변경한 내용이 아직 적용되지 않았어요.<br>${pinSet()?'보호자 PIN 확인을 받아야 반영돼요.':'아래 버튼으로 적용하세요.'}</div>
-      <div style="display:flex;gap:8px;">
-        <div onclick="applyAssignDraft()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:14.5px;padding:12px;border-radius:12px;">${pinSet()?'🔒 변경 내용 확인받기':'변경 내용 적용'}</div>
-        <div onclick="discardAssignDraft()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.soft};color:${T.sub};font-weight:800;font-size:14.5px;padding:12px 16px;border-radius:12px;">취소</div>
-      </div>
-    </div>`:''}
-  </div>
-  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:16px;">
-    <div style="font-weight:800;font-size:16px;margin-bottom:4px;">🟠 한우리 숙제 <span style="font-size:11.5px;color:${T.sub};font-weight:600;">(금요일 부여 · 다음 목요일까지)</span></div>
-    <div style="font-size:13px;color:${T.sub};margin-bottom:12px;">과업 하나씩 입력해요 (예: 미션 책 읽기, 과학탐탐 12~20쪽). task 하나 완료마다 코인 1개!</div>
-    ${hwEff().map(t=>`<div style="display:flex;align-items:center;gap:10px;background:${T.soft};border-radius:13px;padding:10px 13px;margin-bottom:8px;">
-      <span style="flex:none;font-size:15px;">📝</span>
-      <span style="flex:1;font-weight:700;font-size:14px;color:${t.done?T.sub:T.ink};${t.done?'text-decoration:line-through;':''}">${h(t.title)}${t.done?' ✓':''}</span>
-      <div onclick="delHanwooriTask('${t.id}')" class="tapbtn" style="cursor:pointer;width:36px;height:36px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:11px;font-size:16px;color:${T.sub};">✕</div>
-    </div>`).join('')||`<div style="font-size:13px;color:${T.sub};padding:4px 2px 10px;">이번 주 task가 없어요. 아래에 추가해 주세요.</div>`}
-    <div style="display:flex;gap:8px;margin-top:6px;">
-      <input data-hw-new="1" value="${h(ST.hwNewTask)}" placeholder="새 task (예: 원고지 작성하기)" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;background:#fff;border:2px dashed ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
-      <div onclick="addHanwooriTask()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">+ 추가</div>
-    </div>
-    ${hwDirty()?`<div style="margin-top:10px;background:${lighten(T.accent,0.8)};border:2px dashed ${T.accent};border-radius:14px;padding:12px 13px;">
-      <div style="font-size:12.5px;color:${T.accentDark};font-weight:700;margin-bottom:9px;line-height:1.5;">✏️ 변경한 task가 아직 적용되지 않았어요.<br>${pinSet()?'보호자 PIN 확인을 받아야 반영돼요.':'아래 버튼으로 적용하세요.'}</div>
-      <div style="display:flex;gap:8px;">
-        <div onclick="applyHanwooriDraft()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:14.5px;padding:12px;border-radius:12px;">${pinSet()?'🔒 변경 내용 확인받기':'변경 내용 적용'}</div>
-        <div onclick="discardHanwooriDraft()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.soft};color:${T.sub};font-weight:800;font-size:14.5px;padding:12px 16px;border-radius:12px;">취소</div>
-      </div>
-    </div>`:''}
-  </div>
-  <div style="background:${T.card};border:2px solid ${T.line};border-radius:22px;padding:16px 18px;margin-bottom:8px;">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;">
-      <div style="font-weight:800;font-size:16px;">📊 주간 배분 미리보기${assignDirty()?` <span style="font-size:11px;color:${T.accentDark};">· 미적용 변경 포함</span>`:''}</div>
-      <div style="font-weight:800;color:${T.accent};font-size:15px;">총 ${schEff.weekTotal}쪽</div>
-    </div>
-    <div style="font-size:12.5px;color:${T.sub};margin:4px 0 14px;">화 숙제는 수·목, 목 숙제는 금·토·월에 나눠 담아요 (1쪽 ≈ ${mpp()}분). ● 완료 / ○ 남음</div>
-    ${cyclePreview}
-  </div>
-</div>`;
-}
-
-function renderToday(T,sch,tk,planned,done,allDone,cheerSp,timerMin,timerSec) {
-  const daySel=['mon','tue','wed','thu','fri','sat'].map(d=>{ const sel=d===tk,pg=sch.days[d].pages; return `<div onclick="setState({todayKey:'${d}',timerRunning:false,timerSec:0})" class="tapbtn" style="cursor:pointer;flex:1;min-width:48px;text-align:center;font-weight:800;font-size:15px;padding:11px 0;border-radius:13px;background:${sel?T.accent:T.card};color:${sel?'#fff':(pg>0?T.ink:T.sub)};border:2px solid ${sel?T.accent:T.line};">${DL[d]}<div style="font-size:11px;font-weight:600;margin-top:2px;opacity:0.85;">${pg>0?pg+'쪽':'휴식'}</div></div>`; }).join('');
-
-  const pageLabels=todayPageLabels(tk,new Date());
-  const tokens=[];
-  for(let i=0;i<planned;i++){ const d=i<done; const lab=d?'✓':h((pageLabels&&pageLabels[i])||String(i+1));
-    tokens.push(`<div style="min-width:38px;height:38px;padding:0 10px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;background:${d?T.accent:T.soft};color:${d?'#fff':T.sub};border:2px solid ${d?T.accent:T.line};white-space:nowrap;">${lab}</div>`); }
-
-  const todayWk=dwk(new Date()), vcToday=(tk===todayWk)?voluntaryCycle(new Date()):null;
-  const volDoneToday=vcToday?doneOnDate(todayWk,dstr(new Date())):0;
-  const napCard=`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:36px 22px;text-align:center;"><div style="display:flex;justify-content:center;margin-bottom:8px;">${capy({size:82,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div><div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;">오늘은 숙제가 없는 날이에요</div><div style="font-size:14px;color:${T.sub};margin-top:4px;">푹 쉬어도 좋아요. 다른 요일을 눌러 미리 둘러볼 수도 있어요!</div></div>`;
-  const restCard=vcToday?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:26px 22px;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
-    <div style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:78,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null,img:imgFor(cheerSp.id)})}</div>
-    <div style="font-family:'Gaegu',cursive;font-size:23px;font-weight:700;">오늘은 쉬는 날이에요 🌿</div>
-    <div style="font-size:13.5px;color:${T.sub};margin-top:4px;line-height:1.5;">그래도 미리 풀고 싶다면 <b style="color:${T.accentDark};">${vcToday.cy.label}</b>를 당겨서 할 수 있어요.<br>미리 하면 친밀도가 오르고 즐거운 일이 생겨요!</div>
-    <div style="margin:14px 0 4px;font-size:13px;color:${T.sub};font-weight:700;">오늘 미리 푼 양 <span style="color:${T.accent};">${volDoneToday}쪽</span> · 사이클 남은 <span style="color:${T.accent};">${Math.max(0,vcToday.cs.T-vcToday.cs.cycleDone)}쪽</span></div>
-    <div onclick="doVoluntary()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:17px;padding:16px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};margin-top:8px;">한 쪽 미리 풀기 ✏️</div>
-  </div>`:napCard;
-  const body=planned>0?`<div style="background:${T.card};border:2px solid ${T.line};border-radius:26px;padding:22px;box-shadow:0 6px 16px rgba(0,0,0,0.04);">
-    <div style="display:flex;align-items:flex-start;gap:14px;">
-      <div style="flex:none;margin-top:-4px;">${capy({size:70,color:cheerSp.color,accessory:cheerSp.accessory,idle:'bob',status:'healthy',rarity:cheerSp.rarity,personality:cheerSp.personality,mood:allDone?'뿌듯':null,img:imgFor(cheerSp.id)})}</div>
-      <div style="flex:1;background:${T.soft};border-radius:16px;padding:13px 16px;font-weight:600;font-size:15px;line-height:1.5;">${allDone?'인우야, 오늘 다 해냈어! 새 친구를 데려가자 🎉':h(cheerSp.line)}</div>
-    </div>
-    <div style="text-align:center;margin:22px 0 6px;">
-      <div style="font-size:14px;color:${T.sub};font-weight:600;">${allDone?'오늘 분량 완료!':(planned+'쪽 중 '+(done+1)+'쪽째')}</div>
-      <div id="timer-display" style="font-family:'Gaegu',cursive;font-size:64px;font-weight:700;color:${T.accent};line-height:1;margin-top:4px;">${timerMin}:${timerSec}</div>
-      <div style="margin:12px auto 0;max-width:250px;display:flex;align-items:center;gap:8px;">
-        <span style="font-size:16px;">⏳</span>
-        <div style="flex:1;height:13px;background:${T.soft};border-radius:999px;overflow:hidden;border:1px solid ${T.line};">
-          <div id="timer-bar" style="height:100%;width:${(()=>{const t=mpp()*60;return t>0?Math.min(100,Math.max(0,Math.round(ST.timerSec/t*100))):0;})()}%;background:linear-gradient(90deg,${T.accent},${lighten(T.accent,0.25)});border-radius:999px;transition:width 1s linear;"></div>
-        </div>
-      </div>
-      <div style="font-size:13px;color:${T.sub};margin-top:6px;">이 쪽 집중 타이머 (1쪽 ≈ ${mpp()}분) · ${ST.timerRunning?'집중 중':'대기'}</div>
-    </div>
-    <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin:8px 0 18px;">${tokens.join('')}</div>
-    ${allDone
-      ? (ST.pendingReward
-          ? `<div onclick="reopenReward()" class="tapbtn" style="cursor:pointer;text-align:center;background:linear-gradient(180deg,#f3b24e,#e09a36);color:#fff;font-weight:800;font-size:16.5px;padding:16px;border-radius:18px;box-shadow:0 5px 0 #c07f24;line-height:1.45;">🔒 보호자 확인을 받고<br>오늘의 리워드를 받으세요<br><span style="font-size:12.5px;font-weight:700;opacity:0.95;">탭하면 PIN 입력창이 열려요</span></div>`
-          : `<div style="text-align:center;background:#6aa05a;color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 #558044;">오늘 숙제 끝! 잘했어요 🎉</div>${(()=>{const pfi=pullForwardInfo();return pfi?`<div onclick="doPullForward()" class="tapbtn" style="cursor:pointer;text-align:center;margin-top:10px;background:${T.soft};color:${T.accentDark};border:2px dashed ${T.accent};font-weight:800;font-size:16px;padding:14px;border-radius:16px;">➡️ 내일 숙제 미리 하기 <span style="font-weight:700;font-size:13px;">(남은 ${pfi.remaining}쪽)</span></div>`:'';})()}`)
-      : (ST.timerRunning
-          ? `<div onclick="toggleTimer()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.soft};color:${T.ink};border:2px solid ${T.line};font-weight:800;font-size:15px;padding:13px;border-radius:14px;margin-bottom:10px;">⏸ 잠깐 멈춤</div>
-             <div onclick="completePage()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:18px;padding:17px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">이 쪽 다 풀었어요 ✓</div>`
-          : `<div onclick="startHomework()" class="tapbtn" style="cursor:pointer;text-align:center;background:${T.accent};color:#fff;font-weight:800;font-size:19px;padding:18px;border-radius:18px;box-shadow:0 5px 0 ${T.accentDark};">${(ST.timerSec>0&&ST.timerSec<mpp()*60)?'이어서 집중하기 ▶':'오늘 숙제 시작 ▶'}</div>`)}
-  </div>`:restCard;
-
-  return `<div><div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;margin:4px 2px 12px;">📖 오늘의 숙제</div><div style="display:flex;gap:7px;margin-bottom:16px;flex-wrap:wrap;">${daySel}</div>${body}<div style="margin-top:14px;">${renderHanwooriCard(T,ST.timerRunning)}</div></div>`;
-}
-
-function renderNav(T) {
-  return [{k:'home',i:'🪷',l:'연못'},{k:'setup',i:'✏️',l:'숙제설정'},{k:'today',i:'📖',l:'오늘'},{k:'dex',i:'📚',l:'도감'}].map(n=>{
-    const active=n.k==='dex'?ST.overlay==='dex':(ST.overlay===null&&ST.screen===n.k);
-    const lock=ST.timerRunning&&n.k!=='today'; // 집중 중엔 오늘 외 탭 잠금(주의 분산 방지)
-    const click=n.k==='dex'?`setState({overlay:'dex'})`:`setState({screen:'${n.k}',overlay:null})`;
-    return `<div ${lock?'':`onclick="${click}"`} class="tapbtn" style="${lock?'opacity:.4;pointer-events:none;':'cursor:pointer;'}flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0;border-radius:18px;background:${active?T.accent:T.card};border:2px solid ${active?T.accent:T.line};"><div style="font-size:23px;">${lock?'🔒':n.i}</div><div style="font-size:12px;font-weight:800;color:${active?'#fff':T.sub};">${n.l}</div></div>`;
-  }).join('');
-}
-
-// ── Overlay renderers ────────────────────────────────────────
-function renderCaught(T) {
-  const cs=ST.caughtSpecies; if(!cs)return'';
-  const rm=RARITY[cs.rarity]||RARITY['일반'];
-  const emos=['🎉','✨','🌟','🎊','💛','🌸'];
-  const confetti=Array.from({length:18}).map((_,i)=>`<div style="position:absolute;left:${Math.round((i*53+7)%96)}%;top:-20px;font-size:${16+(i%4)*5}px;animation:confettiFall ${(2.4+(i%5)*0.4).toFixed(1)}s linear ${((i%6)*0.25).toFixed(2)}s infinite;pointer-events:none;">${emos[i%emos.length]}</div>`).join('');
-  const ce=catchEvent(cs.rarity);
-  const msg=ST.caughtNew?('성격: '+cs.personality+' · "'+cs.line+'"'):('이미 만난 친구라 친밀도가 올랐어요! "'+cs.line+'"');
-  const catchFlavor=ce?`<div style="margin-top:8px;font-size:13px;color:${T.accentDark};font-weight:700;">${ce.emoji} ${h(ce.title)} — ${h(ce.line)}</div>`:'';
-  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">${confetti}
-  <div style="position:relative;background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
-    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;color:${T.accentDark};">${ST.caughtNew?'✨ 새로운 친구를 만났어! ✨':'🎉 다시 만나서 반가워!'}</div>
-    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:112,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ce?ce.mood:null,img:imgFor(cs.id)})}</div>
-    <div style="font-weight:900;font-size:22px;">${h(cs.name)}</div>
-    <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:13px;background:${rm.bg};color:${rm.c};">${cs.rarity} · ${cs.biome}</div>
-    <div style="margin-top:12px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(msg)}</div>
-    ${catchFlavor}
-    <div onclick="closeCaught()" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">연못으로 데려가기 🪷</div>
-  </div></div>`;
-}
-
-function renderEvent(T) {
-  const ei=ST.eventInfo; if(!ei||!ei.ev)return''; const ev=ei.ev;
-  const cheer=ST.pond.filter(c=>c.status==='healthy');
-  const cs=cheer.length?sp(cheer[0].speciesId):SPECIES[0];
-  const guestHtml=ei.guest?`<div style="margin-top:8px;font-size:13.5px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:10px 13px;">${ei.guest.emoji} <b>${h(ei.guest.name)}</b> ${h(ei.guest.line)}</div>`:'';
-  const bits=[];
-  if(ei.intimacy) bits.push(`💗 ${h(ei.who)} 친밀도 +${ei.intimacy}`);
-  if(ei.itemGot) bits.push(`${ev.emoji} ${h(ei.itemGot)} 수집 (총 ${ei.itemCount}개)`);
-  if(ei.unlock) bits.push(`🎀 ${h(ei.unlock)} 해금`);
-  if(ei.coins) bits.push(`🪙 한우리 코인 +${ei.coins} (모은 코인 ${ST.coins||0}개)`);
-  if(!bits.length) bits.push('포근한 순간을 함께했어요 🌿');
-  const moodBadge=ev.mood?`<div style="position:absolute;top:-6px;right:-6px;font-size:26px;">${moodEmoji(ev.mood)}</div>`:'';
-  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:${T.card};border-radius:30px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
-    <div style="font-size:52px;line-height:1;margin-bottom:4px;">${ev.emoji}</div>
-    <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:${T.accentDark};">${h(ev.title)}</div>
-    <div style="display:flex;justify-content:center;margin:10px 0 4px;"><div style="position:relative;">${capy({size:96,color:cs.color,accessory:cs.accessory,idle:cs.idle,status:'healthy',rarity:cs.rarity,personality:cs.personality,mood:ev.mood,img:imgFor(cs.id)})}${moodBadge}</div></div>
-    <div style="margin-top:6px;font-size:14.5px;color:${T.ink};line-height:1.5;background:${T.soft};border-radius:14px;padding:12px 14px;">${h(ev.line)}</div>
-    ${guestHtml}
-    <div style="margin-top:10px;font-size:13px;color:${T.accentDark};font-weight:700;line-height:1.7;">${bits.map(h).join('<br>')}</div>
-    <div onclick="closeEvent()" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">${(ST.eventQueue&&ST.eventQueue.length)?'다음 →':'고마워! 🌿'}</div>
-  </div></div>`;
-}
-
-function renderBreak(T,cheerSp) {
-  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.42);display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:${T.card};border-radius:30px;padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
-    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">한 쪽 끝! 잠깐 쉬어가자 💤</div>
-    <div style="display:flex;justify-content:center;margin:14px 0;">${capy({size:104,color:cheerSp.color,accessory:'💤',idle:'nap',status:'healthy',rarity:'일반'})}</div>
-    <div style="font-size:14.5px;color:${T.sub};line-height:1.5;">카피바라도 유자탕에서 5분 쉬는 중이에요.<br>눈 깜빡, 어깨 으쓱, 물 한 모금!</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:18px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">다음 쪽 시작하기 →</div>
-  </div></div>`;
-}
-
-function renderCrisis(T) {
-  const ci=ST.crisisInfo; if(!ci)return'';
-  const c=ST.pond.find(x=>x.uid===ci.uid), status=c?c.status:'weak';
-  const s=c?sp(c.speciesId):SPECIES[0];
-  const stageLabel=({weak:'기운이 없어요 (1회 미완료)',leaving:'떠나려 해요 (연속 미완료)',gone:'잠시 사라졌어요 — 숙제로 데려오자!'})[status]||'';
-  return `<div style="position:absolute;inset:0;z-index:60;background:rgba(40,30,25,0.5);display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:${T.card};border-radius:30px;padding:30px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.5s ease;">
-    <div style="font-family:'Gaegu',cursive;font-size:25px;font-weight:700;color:#c0503a;">앗, 친구가 위기에 빠졌어!</div>
-    <div style="display:flex;justify-content:center;margin:14px 0 6px;">${capy({size:104,color:s.color,accessory:s.accessory,idle:'bob',status,rarity:s.rarity,img:imgFor(s.id)})}</div>
-    <div style="font-weight:900;font-size:20px;">${h(ci.name)}</div>
-    <div style="margin-top:10px;font-size:14.5px;color:${T.ink};line-height:1.5;background:#fff1ec;border-radius:14px;padding:12px 14px;">${h(ci.story)}<br><b style="color:#c0503a;">${stageLabel}</b></div>
-    <div style="margin-top:12px;font-size:14px;color:${T.accentDark};font-weight:700;">걱정 마! 지금 숙제하면 다시 데려올 수 있어 🌱</div>
-    <div onclick="setState({overlay:null,screen:'today'})" class="tapbtn" style="cursor:pointer;margin-top:16px;background:${T.accent};color:#fff;font-weight:800;font-size:16px;padding:15px;border-radius:16px;box-shadow:0 5px 0 ${T.accentDark};">구출하러 가기 🚑</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:9px;color:${T.sub};font-weight:700;font-size:14px;padding:6px;">나중에</div>
-  </div></div>`;
-}
-
-function renderDex(T,seen,total,pct) {
-  const cards=SPECIES.map(s=>{ const found=!!ST.dexSeen[s.id],rm=RARITY[s.rarity]; return `<div onclick="openDexDetail('${s.id}')" class="tapbtn" style="cursor:${found?'pointer':'default'};background:${found?T.card:T.soft};border:2px solid ${found?T.line:'transparent'};border-radius:18px;padding:12px 8px 10px;text-align:center;position:relative;"><div style="position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;color:${found?rm.c:T.sub};">${found?s.rarity:'?'}</div><div style="display:flex;justify-content:center;height:96px;align-items:center;">${capy({size:40,color:s.color,accessory:s.accessory,idle:'bob',status:found?'healthy':'locked',rarity:s.rarity,personality:s.personality,img:found?imgFor(s.id):null})}</div><div style="margin-top:6px;font-weight:700;font-size:12.5px;color:${found?T.ink:T.sub};">${found?h(s.name):'???'}</div><div style="font-size:10.5px;color:${T.sub};">${found?s.biome:'미발견'}</div></div>`; }).join('');
-  return `<div style="position:absolute;inset:0;z-index:55;background:${T.bg};display:flex;flex-direction:column;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
-    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">📚 카피바라 도감</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
-  </div>
-  <div style="padding:0 22px 10px;flex-shrink:0;">
-    <div style="font-size:14px;color:${T.sub};font-weight:600;">${seen} / ${total}종 발견 · 완성도 ${pct}%</div>
-    <div style="margin-top:6px;height:12px;background:${T.soft};border-radius:999px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${T.accent};border-radius:999px;"></div></div>
-    ${(()=>{ const its=Object.keys(ST.items||{}).filter(k=>ST.items[k]>0); return its.length?`<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:12px;font-weight:700;color:${T.sub};">🧺 모은 간식</span>${its.map(k=>`<span style="font-size:12.5px;font-weight:700;color:${T.ink};background:${T.card};border:2px solid ${T.line};border-radius:999px;padding:3px 9px;">${itemEmoji(k)} ${h(k)} ${ST.items[k]}</span>`).join('')}</div>`:''; })()}
-  </div>
-  <div style="flex:1;overflow-y:auto;padding:14px 18px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:12px;align-content:start;align-items:start;">${cards}</div>
-</div>`;
-}
-
-// 상세창 하단 상태줄 텍스트(친밀도 포함). interact()가 제자리 갱신에도 재사용.
-function detailStatusLabel(owned){
-  if(!owned) return '아직 데려오지 못한 친구예요';
-  const sl={healthy:'😊 건강하게 연못에 살고 있어요',weak:'😟 기운이 없어요',leaving:'😢 떠나려 해요',gone:'💨 잠시 사라졌어요 (숙제로 복귀)'};
-  return (sl[owned.status]||'')+' · 친밀도 '+((owned.intimacy||0)+1);
-}
-// 상세창 반응 말풍선(놀아주기 결과). detailReaction 유무에 따라 안내/말풍선.
-function detailReactInner(T,s){
-  return ST.detailReaction
-    ? `<div style="margin-top:12px;font-size:14px;color:${T.ink};background:${lighten(T.accent,0.84)};border-radius:13px;padding:11px 13px;line-height:1.5;">${ST.detailReaction.emoji} ${moodEmoji(ST.detailReaction.mood)} ${h(ST.detailReaction.line)}</div>`
-    : `<div style="margin-top:12px;font-size:12.5px;color:${T.sub};">아래 버튼으로 ${h(s.name)}와 놀아줄 수 있어요</div>`;
-}
-function renderDetail(T) {
-  const s=ST.detailSpeciesId?sp(ST.detailSpeciesId):null; if(!s)return'';
-  const owned=ST.pond.find(c=>c.speciesId===s.id), rm=RARITY[s.rarity]||RARITY['일반'];
-  const statusLabel=detailStatusLabel(owned);
-  return `<div onclick="closeOverlay()" style="position:absolute;inset:0;z-index:62;background:rgba(40,30,25,0.45);display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div onclick="event.stopPropagation()" style="background:${T.card};border-radius:28px;padding:26px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;">
-    <div id="detail-capy" style="display:flex;justify-content:center;margin-bottom:6px;">${capy({size:108,color:s.color,accessory:s.accessory,idle:s.idle,status:owned?owned.status:'healthy',rarity:s.rarity,personality:s.personality,mood:ST.detailReaction?ST.detailReaction.mood:null,decor:owned?decorFor(owned.uid):null,img:imgFor(s.id)})}</div>
-    <div style="font-weight:900;font-size:21px;">${h(s.name)}</div>
-    <div style="display:inline-block;margin-top:6px;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12.5px;background:${rm.bg};color:${rm.c};">${s.rarity} · ${s.biome} · ${(PERSONALITY[s.personality]||{}).emoji||''}${s.personality}</div>
-    <div style="margin-top:14px;font-size:14.5px;color:${T.ink};line-height:1.55;background:${T.soft};border-radius:14px;padding:13px 15px;font-style:italic;">"${h(s.line)}"</div>
-    <div id="detail-status" style="margin-top:10px;font-size:13px;color:${T.sub};font-weight:600;">${statusLabel}</div>
-    ${owned?`<div id="detail-react">${detailReactInner(T,s)}</div>
-    <div style="display:flex;gap:7px;margin-top:11px;">${INTERACTIONS.map(it=>`<div onclick="interact('${owned.uid}','${it.id}')" class="tapbtn" style="cursor:pointer;flex:1;background:${T.soft};border:2px solid ${T.line};border-radius:14px;padding:10px 4px;font-weight:800;font-size:11.5px;color:${T.ink};line-height:1.3;"><div style="font-size:20px;margin-bottom:2px;">${it.emoji}</div>${h(it.label)}</div>`).join('')}</div>
-    <div style="margin-top:13px;border-top:1px dashed ${T.line};padding-top:11px;">
-      <div style="font-size:12.5px;font-weight:800;color:${T.sub};margin-bottom:7px;text-align:left;">🎀 꾸미기 ${(ST.equip||{})[owned.uid]?`<span style="color:${T.accentDark};">(${h((decorById((ST.equip||{})[owned.uid])||{}).name||'')} 착용중 · 다시 누르면 벗기)</span>`:''}</div>
-      ${availableDecor().length?`<div style="display:flex;gap:6px;flex-wrap:wrap;">${availableDecor().map(d=>{const on=(ST.equip||{})[owned.uid]===d.id;return `<div onclick="equipDecor('${owned.uid}','${d.id}')" class="tapbtn" style="cursor:pointer;display:flex;align-items:center;gap:4px;background:${on?T.accent:T.soft};color:${on?'#fff':T.ink};border:2px solid ${on?T.accent:T.line};border-radius:999px;padding:6px 11px;font-weight:700;font-size:12px;"><span style="font-size:15px;">${d.emoji}</span>${h(d.name)}</div>`;}).join('')}</div>`:`<div style="font-size:12px;color:${T.sub};text-align:left;line-height:1.5;">아직 꾸미기 아이템이 없어요.<br>연속 달성·도감·간식 수집으로 모아보세요!</div>`}
-    </div>`:''}
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;margin-top:14px;background:${T.soft};color:${T.ink};font-weight:800;font-size:15px;padding:13px;border-radius:14px;">닫기</div>
-  </div></div>`;
-}
-
-// 숙제 변경 확인 화면에 띄울 '바뀔 내용' 요약.
-function assignReviewRows(T){
-  const d=ST.assignDraft||ST.assignments;
-  return [{k:'tue',l:'화요일 받는 숙제'},{k:'thu',l:'목요일 받는 숙제'}].map(o=>{
-    const items=(d[o.k]||[]).filter(it=>it.to-it.from+1>0);
-    const total=items.reduce((s,it)=>s+(it.to-it.from+1),0);
-    const detail=items.length?items.map(it=>{const w=ST.workbooks.find(x=>x.id===it.workbookId);return (w?h(w.name):'문제집')+' p.'+it.from+'~'+it.to;}).join('<br>'):`<span style="color:${T.sub};">숙제 없음</span>`;
-    return `<div style="padding:6px 0;border-bottom:1px solid ${T.line};"><b>${o.l} · ${total}쪽</b><div style="font-size:11.5px;color:${T.sub};margin-top:2px;line-height:1.5;">${detail}</div></div>`;
-  }).join('');
-}
-// 리워드샵 — 한우리 코인으로 장식 구매·연못 이벤트 발동.
-function renderShop(T) {
-  const coins=ST.coins||0;
-  const cards=SHOP.map(it=>{
-    const owned=it.type==='decor'&&(ST.unlocks||[]).includes(it.unlock);
-    const afford=coins>=it.price;
-    const btn=owned?`<div style="text-align:center;background:${T.soft};color:#6aa05a;font-weight:800;font-size:12.5px;padding:9px;border-radius:12px;">보유중 ✓</div>`
-      :`<div ${afford?`onclick="buyShop('${it.id}')"`:''} class="tapbtn" style="${afford?'cursor:pointer;':'opacity:.45;'}text-align:center;background:${afford?T.accent:T.soft};color:${afford?'#fff':T.sub};font-weight:800;font-size:12.5px;padding:9px;border-radius:12px;${afford?`box-shadow:0 3px 0 ${T.accentDark};`:''}">${coinIcon(14)} ${it.price}로 ${it.type==='decor'?'구매':'열기'}</div>`;
-    return `<div style="background:${T.card};border:2px solid ${T.line};border-radius:18px;padding:14px 12px;text-align:center;display:flex;flex-direction:column;gap:6px;">
-      <div style="font-size:38px;line-height:1;">${it.emoji}</div>
-      <div style="font-weight:800;font-size:14px;">${h(it.name)}</div>
-      <div style="font-size:11.5px;color:${T.sub};line-height:1.4;flex:1;">${h(it.desc)}</div>
-      <div style="font-size:10.5px;font-weight:800;color:${it.type==='decor'?'#8a6fc9':'#3f9b94'};">${it.type==='decor'?'🎀 꾸미기 장식':'✨ 연못 이벤트'}</div>
-      ${btn}
-    </div>`;
-  }).join('');
-  return `<div style="position:absolute;inset:0;z-index:55;background:${T.bg};display:flex;flex-direction:column;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
-    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">🛍️ 한우리 리워드샵</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
-  </div>
-  <div style="padding:0 22px 8px;flex-shrink:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:7px;background:${T.card};border:2px solid ${T.line};border-radius:999px;padding:8px 16px;font-weight:800;font-size:16px;color:${T.accentDark};">${coinIcon(20)} ${coins}개</div>
-    <div style="font-size:12.5px;color:${T.sub};font-weight:600;">한우리 숙제를 하면 코인이 모여요!</div>
-  </div>
-  ${ST.shopMsg?`<div style="margin:0 22px 8px;background:${lighten(T.accent,0.84)};border:2px solid ${lighten(T.accent,0.5)};border-radius:14px;padding:10px 14px;font-size:13px;font-weight:700;color:${T.accentDark};flex-shrink:0;">${h(ST.shopMsg)}</div>`:''}
-  <div style="flex:1;overflow-y:auto;padding:10px 18px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;align-content:start;">${cards}</div>
-</div>`;
-}
-
-// 보호자 확인 / 설정 잠금 / 숙제 변경 확인 — 6자리 PIN 키패드.
-function renderVerify(T) {
-  const purpose=ST.verifyFor, reward=purpose==='reward', isAssign=purpose==='assignments', isHw=purpose==='hanwoori';
-  const isPinChg=purpose==='pinchange', isPinClr=purpose==='pinclear';
-  const title=reward?'보호자 확인':isAssign?'숙제 변경 확인':isHw?'한우리 숙제 확인':(isPinChg||isPinClr)?'현재 PIN 확인':'부모님 설정 잠금';
-  const sub=reward?'오늘 숙제를 정말 다 했나요?<br>보호자가 확인하면 친구가 찾아와요 🌿'
-          :isAssign?'아래 내용으로 숙제를 바꿀까요?<br>보호자 PIN으로 확인해 주세요.'
-          :isHw?'이번 주 한우리 숙제를 아래 목록으로 정할까요?<br>보호자 PIN으로 확인해 주세요.'
-          :isPinChg?'PIN을 바꾸려면 현재 PIN을 먼저 입력해 주세요.'
-          :isPinClr?'PIN을 해제하려면 현재 PIN을 먼저 입력해 주세요.'
-          :'보호자 PIN을 입력하면 설정을 열 수 있어요.';
-  const hwReview=isHw?(ST.hwDraft||[]).map(t=>`<div style="padding:6px 0;border-bottom:1px solid ${T.line};font-size:13px;font-weight:700;">📝 ${h(t.title)}${t.done?' <span style="color:#6aa05a;">✓완료</span>':''}</div>`).join('')||`<div style="padding:8px 0;font-size:13px;color:${T.sub};">task 없음 (전체 삭제)</div>`:'';
-  const review=isAssign?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;">${assignReviewRows(T)}</div>`
-            :isHw?`<div style="text-align:left;background:${T.soft};border-radius:14px;padding:6px 14px;margin:12px 0 2px;max-height:180px;overflow-y:auto;">${hwReview}</div>`:'';
-  const entry=ST.pinEntry||'';
-  const dots=Array.from({length:6}).map((_,i)=>`<div style="width:15px;height:15px;border-radius:50%;background:${i<entry.length?T.accent:'transparent'};border:2px solid ${i<entry.length?T.accent:T.line};"></div>`).join('');
-  const kStyle=`cursor:pointer;display:flex;align-items:center;justify-content:center;height:56px;border-radius:16px;background:${T.soft};border:2px solid ${T.line};font-size:23px;font-weight:800;color:${T.ink};`;
-  const keys=['1','2','3','4','5','6','7','8','9'].map(d=>`<div onclick="pinPress('${d}')" class="tapbtn" style="${kStyle}">${d}</div>`).join('');
-  return `<div style="position:absolute;inset:0;z-index:66;background:rgba(40,30,25,0.5);display:flex;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:${T.card};border-radius:28px;padding:26px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.25);animation:capyPop 0.4s ease;max-height:92dvh;overflow-y:auto;">
-    <div style="font-size:34px;line-height:1;">🔒</div>
-    <div style="font-family:'Gaegu',cursive;font-size:24px;font-weight:700;color:${T.accentDark};margin-top:4px;">${title}</div>
-    <div style="font-size:13.5px;color:${T.sub};line-height:1.5;margin-top:6px;">${sub}</div>
-    ${review}
-    <div style="display:flex;gap:11px;justify-content:center;margin:18px 0 6px;">${dots}</div>
-    <div style="height:18px;font-size:12.5px;font-weight:700;color:#c0503a;">${ST.pinError?'PIN이 일치하지 않아요. 다시 입력해 주세요.':''}</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:8px;">
-      ${keys}
-      <div onclick="closeVerify()" class="tapbtn" style="${kStyle}font-size:13px;color:${T.sub};">${reward?'나중에':'취소'}</div>
-      <div onclick="pinPress('0')" class="tapbtn" style="${kStyle}">0</div>
-      <div onclick="pinDel()" class="tapbtn" style="${kStyle}font-size:20px;">⌫</div>
-    </div>
-  </div></div>`;
-}
-
-function renderSettings(T) {
-  const dayMinInputs=['mon','tue','wed','thu','fri','sat'].map(d=>`<div style="text-align:center;"><div style="font-weight:700;font-size:13px;color:${T.sub};margin-bottom:5px;">${DL[d]}</div><input data-daymin="${d}" type="number" inputmode="numeric" value="${ST.settings.dayMin[d]}" style="width:100%;font-size:15px;text-align:center;border:2px solid ${T.line};border-radius:12px;padding:10px;background:#fff;color:${T.ink};" /></div>`).join('');
-  const diffBtns=[{k:'easy',l:'느슨하게'},{k:'normal',l:'보통'},{k:'firm',l:'단단하게'}].map(x=>{ const sel=ST.settings.difficulty===x.k; return `<div onclick="setDifficulty('${x.k}')" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:14px;padding:12px 6px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
-  const themes=[{k:'onsen',l:'온천 어스톤'},{k:'riverside',l:'강가 아침'},{k:'sakura',l:'벚꽃 황혼'}].map(x=>{ const sel=ST.theme===x.k; return `<div onclick="setState({theme:'${x.k}'})" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:13px;padding:11px 4px;border-radius:13px;background:${sel?T.accent:T.soft};color:${sel?'#fff':T.ink};border:2px solid ${sel?T.accent:T.line};">${x.l}</div>`; }).join('');
-  const wbRows=ST.workbooks.map(w=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-      <div style="width:16px;height:16px;border-radius:50%;background:${w.color};flex:none;"></div>
-      <input data-wb-rename="${w.id}" value="${h(w.name)}" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;font-weight:600;color:${T.ink};background:${T.soft};border:2px solid transparent;border-radius:12px;padding:11px 14px;" />
-      <div onclick="delWb('${w.id}')" class="tapbtn" style="cursor:pointer;width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;background:${T.soft};border-radius:12px;font-size:18px;color:${T.sub};">✕</div>
-    </div>`).join('');
-  return `<div style="position:absolute;inset:0;z-index:58;background:${T.bg};display:flex;flex-direction:column;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 10px;flex-shrink:0;">
-    <div style="font-family:'Gaegu',cursive;font-size:26px;font-weight:700;">⚙️ 부모님 설정</div>
-    <div onclick="closeOverlay()" class="tapbtn" style="cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:${T.card};border:2px solid ${T.line};border-radius:50%;font-size:20px;">✕</div>
-  </div>
-  <div style="flex:1;overflow-y:auto;padding:6px 20px 40px;">
-    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🔒 보호자 확인 PIN ${pinSet()?'<span style="font-size:12px;color:#3f9b94;">· 설정됨</span>':`<span style="font-size:12px;color:${T.sub};">· 미설정</span>`}</div>
-      <div style="font-size:12.5px;color:${T.sub};line-height:1.5;margin-bottom:10px;">숙제를 끝내면 보호자가 PIN을 입력해야 보상(친구 데려오기)이 주어져요. 설정 진입과 숙제 변경 승인에도 같은 PIN을 사용합니다.</div>
-      ${(!pinSet()||ST.pinChangeMode)?`
-        <input data-pin-draft="1" type="password" inputmode="numeric" maxlength="6" placeholder="${pinSet()?'새 PIN 6자리':'PIN 6자리 숫자'}" value="" style="width:100%;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};margin-bottom:8px;" />
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input data-pin-draft2="1" type="password" inputmode="numeric" maxlength="6" placeholder="PIN 다시 입력" value="" style="flex:1;min-width:0;font-size:17px;letter-spacing:5px;text-align:center;background:#fff;border:2px solid ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
-          <div onclick="savePin()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">${pinSet()?'변경':'저장'}</div>
-        </div>
-        ${ST.pinSaveErr==='len'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">6자리 숫자를 입력해 주세요.</div>`:''}
-        ${ST.pinSaveErr==='mismatch'?`<div style="font-size:12px;color:#c0503a;font-weight:700;margin-top:7px;">두 번 입력한 PIN이 서로 달라요. 다시 확인해 주세요.</div>`:''}
-        ${ST.pinChangeMode?`<div onclick="cancelPinChange()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:9px;margin-top:6px;">취소</div>`:''}
-      `:`
-        <div style="display:flex;gap:8px;">
-          <div onclick="openPinChange()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.soft};color:${T.ink};font-weight:800;font-size:14px;padding:12px;border-radius:12px;border:2px solid ${T.line};">🔑 PIN 변경</div>
-          <div onclick="openPinClear()" class="tapbtn" style="cursor:pointer;flex:1;text-align:center;background:${T.soft};color:${T.sub};font-weight:800;font-size:14px;padding:12px;border-radius:12px;border:2px solid ${T.line};">PIN 해제</div>
-        </div>
-        <div style="font-size:11.5px;color:${T.sub};margin-top:8px;line-height:1.5;">변경·해제하려면 현재 PIN을 먼저 입력해야 해요.</div>
-      `}
-    </div>
-    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">📒 문제집 관리</div>
-      ${wbRows}
-      <div style="display:flex;gap:8px;margin-top:6px;">
-        <input data-new-wb="1" value="${h(ST.newWbName)}" placeholder="새 문제집 이름 (예: 영어 단어장)" style="flex:1;min-width:0;font-family:'Noto Sans KR';font-size:15px;background:#fff;border:2px dashed ${T.line};border-radius:12px;padding:11px 14px;color:${T.ink};" />
-        <div onclick="addWorkbook()" class="tapbtn" style="cursor:pointer;background:${T.accent};color:#fff;font-weight:800;padding:11px 18px;border-radius:12px;white-space:nowrap;">+ 추가</div>
-      </div>
-    </div>
-    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-weight:800;font-size:15px;margin-bottom:8px;">🎨 테마</div>
-      <div style="display:flex;gap:8px;">${themes}</div>
-    </div>
-    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-weight:800;font-size:15px;margin-bottom:4px;">⏱️ 1쪽당 예상 시간</div>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <input data-mpp="1" type="number" inputmode="numeric" value="${ST.settings.minsPerPage}" style="width:90px;font-size:16px;text-align:center;border:2px solid ${T.line};border-radius:12px;padding:11px;background:#fff;color:${T.ink};" />
-        <span style="color:${T.sub};font-weight:600;">분 / 쪽</span>
-      </div>
-    </div>
-    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-weight:800;font-size:15px;margin-bottom:10px;">🗓️ 요일별 최대 숙제 시간 (분)</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">${dayMinInputs}</div>
-      <div style="font-size:12px;color:${T.sub};margin-top:8px;">일요일은 휴무예요.</div>
-    </div>
-    <div style="background:${T.card};border:2px solid ${T.line};border-radius:20px;padding:16px 18px;margin-bottom:14px;">
-      <div style="font-weight:800;font-size:15px;margin-bottom:6px;">🌱 위기 난이도</div>
-      <div style="font-size:12.5px;color:${T.sub};margin-bottom:10px;">영구 상실은 없어요. 숙제로 항상 되찾을 수 있습니다.</div>
-      <div style="display:flex;gap:8px;">${diffBtns}</div>
-    </div>
-    <div onclick="demoCrisis()" class="tapbtn" style="cursor:pointer;text-align:center;background:#fff1ec;color:#c0503a;border:2px solid #f3c4b8;font-weight:800;font-size:14px;padding:13px;border-radius:14px;margin-bottom:10px;">🧪 (데모) 숙제 거른 날 만들기 — 위기 연출 보기</div>
-    <div onclick="resetAll()" class="tapbtn" style="cursor:pointer;text-align:center;color:${T.sub};font-weight:700;font-size:13px;padding:10px;">전체 초기화</div>
-  </div></div>`;
-}
-
-// ── Input attachment ─────────────────────────────────────────
-function attachInputs() {
-  document.querySelectorAll('[data-wb-rename]').forEach(el=>{
-    el.addEventListener('input',e=>{ const id=el.getAttribute('data-wb-rename'); ST.workbooks=ST.workbooks.map(w=>w.id===id?{...w,name:e.target.value}:w); save(); });
-  });
-  const nwb=document.querySelector('[data-new-wb]');
-  if(nwb) nwb.addEventListener('input',e=>{ST.newWbName=e.target.value;});
-  const hwn=document.querySelector('[data-hw-new]');
-  if(hwn) hwn.addEventListener('input',e=>{ST.hwNewTask=e.target.value;});
-  const pinD=document.querySelector('[data-pin-draft]');
-  if(pinD) pinD.addEventListener('input',e=>{ST.pinDraft=e.target.value.replace(/[^0-9]/g,'');});
-  const pinD2=document.querySelector('[data-pin-draft2]');
-  if(pinD2) pinD2.addEventListener('input',e=>{ST.pinDraft2=e.target.value.replace(/[^0-9]/g,'');});
-
-  function updateRowPg(key){ const d=ST.rowEdit[key]||{}; const f=parseInt(d.from),t=parseInt(d.to); const pg=(!isNaN(f)&&!isNaN(t))?(t-f+1):null; const el=document.getElementById('rowpg-'+key); if(el)el.textContent=pg!=null&&pg>0?pg+'쪽':(pg!=null?'확인!':''); }
-  document.querySelectorAll('[data-row-from]').forEach(el=>{
-    el.addEventListener('input',e=>{ const key=el.getAttribute('data-row-from'); ST.rowEdit={...ST.rowEdit,[key]:{...(ST.rowEdit[key]||{}),from:e.target.value}}; updateRowPg(key); });
-  });
-  document.querySelectorAll('[data-row-to]').forEach(el=>{
-    el.addEventListener('input',e=>{ const key=el.getAttribute('data-row-to'); ST.rowEdit={...ST.rowEdit,[key]:{...(ST.rowEdit[key]||{}),to:e.target.value}}; updateRowPg(key); });
-  });
-
-  // 숫자 입력창은 타이핑마다 전체 재렌더를 하면 모바일 키보드가 닫히고 두 자리 입력이 깨진다.
-  // (number 입력은 커서 위치를 복원할 수 없음) → 상태만 갱신·저장하고 재렌더는 하지 않는다.
-  const mppEl=document.querySelector('[data-mpp]');
-  if(mppEl)mppEl.addEventListener('input',e=>{ const n=parseInt(e.target.value); ST.settings={...ST.settings,minsPerPage:isNaN(n)?'':Math.max(1,n)}; save(); });
-
-  document.querySelectorAll('[data-daymin]').forEach(el=>{
-    el.addEventListener('input',e=>{ const d=el.getAttribute('data-daymin'); const n=parseInt(e.target.value); ST.settings={...ST.settings,dayMin:{...ST.settings.dayMin,[d]:isNaN(n)?0:Math.max(0,n)}}; save(); });
-  });
-}
-
-// ── Init ─────────────────────────────────────────────────────
-// 세로↔가로 레이아웃이 '실제로 바뀔 때만' 다시 그린다.
-// (키보드가 올라오며 생기는 resize에 render하면 포커스가 풀려 입력이 막히는 문제 방지)
-let _rzT, _lastWide=isWide();
-window.addEventListener('resize',()=>{
-  clearTimeout(_rzT);
-  _rzT=setTimeout(()=>{ if(_inputFocused())return; const w=isWide(); if(w!==_lastWide){ _lastWide=w; render(); } },200);
+function openSearch(){ topbar.classList.add("open"); setTimeout(()=>q.focus(), 50); }
+function closeSearch(){ topbar.classList.remove("open"); q.value=""; activeCat=null; applyFilter(); }
+$("#search").onclick = openSearch;
+$("#qclose").onclick = closeSearch;
+$("#home").onclick = () => { closeSearch(); scrollTo({top:0,behavior:"smooth"}); };
+q.addEventListener("input", applyFilter);
+cats.addEventListener("click", e => {
+  const b = e.target.closest(".cat"); if (!b) return;
+  activeCat = activeCat === b.dataset.filter ? null : b.dataset.filter;
+  if (activeCat) { topbar.classList.add("open"); q.placeholder = `Search in ${b.textContent.trim()}…`; }
+  else q.placeholder = "What do you want to play?";
+  applyFilter(); scrollTo({top:0,behavior:"smooth"});
 });
-load();
-render();
-probeCapyImages(); // 커스텀 이미지가 있으면 로드되는 대로 SVG를 그림으로 교체
-probeCoinImage();  // 한우리 코인 로고(assets/coin/hanwoori.png)가 있으면 🪙 대신 사용
-startTick();
+
+/* ---------- player modal ---------- */
+const player = $("#player"), stage = $("#stage");
+let cleanup = null, current = null;
+function openGame(g){
+  current = g;
+  if (cleanup) { cleanup(); cleanup = null; }
+  stage.innerHTML = "";
+  $("#ptitle").textContent = g.name;
+  const pe = $("#pemo"); pe.textContent = g.emoji; pe.style.cssText = `--c1:${g.c1};--c2:${g.c2}`;
+  $("#restart").hidden = !g.play;
+  if (g.play && IMPL[g.play]) cleanup = IMPL[g.play](stage, g);
+  else if (g.url) stage.innerHTML = `<iframe src="${esc(g.url)}" allow="autoplay; fullscreen; gamepad" allowfullscreen></iframe>`;
+  else {
+    const picks = GAMES.filter(x => x.url).sort(() => Math.random()-.5).slice(0,3);
+    stage.innerHTML = `<div class="soon"><div class="big">${g.emoji}</div><h3>Coming soon!</h3>
+      <p>${esc(g.name)} is on its way. Try one of these while you wait:</p>
+      <div class="picks">${picks.map(p=>`<a href="#/${p.slug}">${p.emoji} ${esc(p.name)}</a>`).join("")}</div></div>`;
+  }
+  if (player.hidden) { player.hidden = false; document.body.style.overflow = "hidden"; }
+  document.title = `${g.name} – unimai`;
+}
+function closeGame(){
+  if (cleanup) { cleanup(); cleanup = null; }
+  stage.innerHTML = ""; player.hidden = true; current = null;
+  document.body.style.overflow = ""; document.title = "unimai – Free Online Games";
+  if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+}
+function route(){
+  const m = location.hash.match(/^#\/(.+)/);
+  const g = m && GAMES.find(x => x.slug === m[1]);
+  g ? openGame(g) : (player.hidden || closeGame());
+}
+window.addEventListener("hashchange", route);
+$("#pclose").onclick = () => history.length > 1 && location.hash ? (location.hash = "") : closeGame();
+player.addEventListener("click", e => { if (e.target === player) $("#pclose").click(); });
+$("#restart").onclick = () => current && openGame(current);
+$("#fs").onclick = () => {
+  const el = $(".panel");
+  document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen?.().catch(()=>{});
+};
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { if (!player.hidden) $("#pclose").click(); else closeSearch(); }
+  if (e.key === "/" && player.hidden && document.activeElement !== q) { e.preventDefault(); openSearch(); }
+  if (!player.hidden && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key)) e.preventDefault();
+});
+
+const IMPL = {};
+
+route();
 </script>
 </body>
 </html>
