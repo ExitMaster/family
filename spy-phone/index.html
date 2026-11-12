@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spy Phone Breaker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:#3b2a5c; --soft:#8d80a8; --pink:#ff7eb6; --purple:#9b7bff; --blue:#5ec8ff;
+  --mint:#5fe3b4; --yellow:#ffd65c; --orange:#ff9f5a; --red:#ff4f6d;
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { margin:0; height:100%; overflow:hidden; }
+body {
+  font-family:'Fredoka', ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif;
+  color:var(--ink); background:#ffe8f4;
+  background-image:
+    radial-gradient(circle at 12% 18%, #ffd1ec 0, transparent 40%),
+    radial-gradient(circle at 88% 12%, #d6ccff 0, transparent 45%),
+    radial-gradient(circle at 72% 88%, #c6f5ff 0, transparent 45%),
+    radial-gradient(circle at 18% 92%, #fff1b8 0, transparent 40%);
+  user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+}
+button { font-family:inherit; color:inherit; cursor:pointer; }
+
+/* ── Floating background doodles ── */
+#bg { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:0; }
+#bg span { position:absolute; font-size:34px; opacity:.25; animation:float 9s ease-in-out infinite; }
+@keyframes float { 0%,100% { transform:translateY(0) rotate(-8deg); } 50% { transform:translateY(-18px) rotate(8deg); } }
+
+#app {
+  position:relative; z-index:1; height:100%; height:100dvh; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ── HUD: timer, steps, gadgets ── */
+#hud { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 12px 0; max-width:560px; width:100%; margin:0 auto; }
+.timer {
+  flex:1 1 100%; display:flex; align-items:center; gap:10px; position:relative;
+  background:#fff; border-radius:999px; padding:6px 16px 6px 10px;
+  box-shadow:0 4px 0 #f3c4e0, 0 8px 18px rgba(155,123,255,.18);
+}
+.timer .tic { font-size:22px; }
+.timer b { font-size:22px; min-width:56px; font-variant-numeric:tabular-nums; }
+.tbar { flex:1; height:12px; border-radius:999px; background:#f2e8ff; overflow:hidden; }
+.tbar i { display:block; height:100%; width:100%; border-radius:inherit; background:linear-gradient(90deg, var(--mint), var(--blue)); transition:width .25s linear; }
+.timer.warn .tbar i { background:linear-gradient(90deg, var(--yellow), var(--orange)); }
+.timer.danger .tbar i { background:linear-gradient(90deg, #ff8a8a, #ff4f8b); }
+.timer.danger { animation:pulse .6s ease-in-out infinite; }
+.timer.danger b { color:#ff4f8b; }
+@keyframes pulse { 50% { transform:scale(1.03); } }
+.pen { position:absolute; right:18px; top:-4px; color:#ff4f8b; font-weight:700; font-size:20px; pointer-events:none; animation:penup 1s ease-out forwards; }
+@keyframes penup { to { transform:translateY(-26px); opacity:0; } }
+
+.steps { display:flex; gap:6px; flex:1; }
+.step {
+  display:flex; align-items:center; gap:3px; padding:5px 9px; border-radius:999px; white-space:nowrap;
+  background:#ffffffaa; font-size:13px; font-weight:600; color:#a093bd; border:2px dashed #d9cdf0;
+}
+.step.cur { background:#fff; color:var(--ink); border:2px solid var(--purple); }
+.step.done { background:var(--mint); color:#fff; border:2px solid var(--mint); }
+.gadgets { display:flex; gap:6px; }
+.gad {
+  width:46px; height:46px; border-radius:16px; border:0; background:#fff; font-size:21px; line-height:1;
+  box-shadow:0 4px 0 #e2d6fb; position:relative; display:grid; place-items:center; padding:0 0 8px;
+}
+.gad small { position:absolute; bottom:3px; left:0; right:0; font-size:9px; font-weight:700; color:#8a7bb0; }
+.gad:active { transform:translateY(3px); box-shadow:0 1px 0 #e2d6fb; }
+.gad.on { background:linear-gradient(135deg, #b48bff, #6a4dff); box-shadow:0 4px 0 #4b33c9, 0 0 18px #a77bff; }
+.gad.on small { color:#fff; }
+.gad.nudge { animation:nudge 1s ease-in-out infinite; }
+@keyframes nudge { 0%,100% { transform:rotate(0); } 25% { transform:rotate(-12deg) scale(1.12); } 75% { transform:rotate(12deg) scale(1.12); } }
+
+/* ── The phone ── */
+#stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px 12px 18px; }
+#phone {
+  position:relative; height:100%; max-height:880px; aspect-ratio:9 / 18.5; max-width:100%; padding:11px; border-radius:48px;
+  background:linear-gradient(150deg, #ffa6d6, #b98bff 55%, #7fc8ff);
+  box-shadow:inset 0 0 0 3px #ffffffaa, 0 8px 0 #c27fd9, 0 22px 40px rgba(120,60,180,.3);
+}
+.stk { position:absolute; z-index:6; pointer-events:none; filter:drop-shadow(0 2px 0 #fff) drop-shadow(0 0 2px #fff); }
+.stk.a { top:-12px; right:-10px; font-size:34px; transform:rotate(18deg); }
+.stk.b { bottom:-14px; left:-12px; font-size:30px; transform:rotate(-16deg); }
+.stk.c { top:34%; right:-21px; font-size:22px; transform:rotate(10deg); }
+#screen { position:relative; width:100%; height:100%; border-radius:38px; overflow:hidden; background:#fff; isolation:isolate; }
+.status {
+  position:absolute; left:0; right:0; top:0; height:30px; z-index:5; pointer-events:none;
+  display:flex; align-items:center; justify-content:space-between; padding:0 24px; font-size:13px; font-weight:600;
+}
+.status.light { color:#fff; }
+.notch { position:absolute; left:50%; top:6px; transform:translateX(-50%); width:76px; height:20px; border-radius:999px; background:#2a1e40; }
+.homebar { position:absolute; left:0; right:0; bottom:0; height:22px; z-index:5; display:grid; place-items:center; cursor:pointer; }
+.homebar i { width:36%; max-width:130px; height:5px; border-radius:9px; background:#2a1e40aa; }
+.homebar.light i { background:#ffffffcc; }
+#view { position:absolute; inset:0; container-type:size; container-name:view; }
+.scr { position:absolute; inset:0; display:flex; flex-direction:column; padding:32px 0 22px; animation:enter .25s ease-out; }
+@keyframes enter { from { opacity:0; transform:scale(.97); } }
+
+/* ── Lock screen ── */
+.lock { background:linear-gradient(165deg, #6f7bff 0%, #b47cff 40%, #ff8cc6 75%, #ffc37a 100%); color:#fff; padding-left:14px; padding-right:14px; gap:8px; }
+.lock.unlocking { animation:slideup .45s ease-in forwards; }
+@keyframes slideup { to { transform:translateY(-100%); opacity:.4; } }
+.ltop { text-align:center; }
+.ltop .lk { font-size:16px; }
+.clock { font-size:clamp(32px, 13cqw, 64px); font-weight:600; line-height:1; text-shadow:0 3px 0 rgba(80,40,140,.25); }
+.date { font-size:13px; font-weight:500; }
+.owner { font-size:11px; opacity:.85; margin-top:2px; }
+.wall { flex:1; min-height:90px; position:relative; border-radius:22px; background:rgba(255,255,255,.2); box-shadow:inset 0 0 0 2px rgba(255,255,255,.35); overflow:hidden; }
+.wall.uv { touch-action:none; cursor:crosshair; }
+.ico { position:absolute; transform:translate(-50%,-50%) rotate(var(--rot)); line-height:1; filter:drop-shadow(0 2px 1px rgba(60,20,100,.25)); }
+.wall.uv .ico { filter:brightness(.5) saturate(.5); }
+.uvl { position:absolute; inset:0; pointer-events:none; display:none; background:radial-gradient(circle at var(--x) var(--y), rgba(205,150,255,.35) 0, rgba(150,80,255,.25) var(--r), rgba(25,5,60,.72) calc(var(--r) + 18px)); }
+.wall.uv .uvl { display:block; }
+.ink { position:absolute; inset:0; pointer-events:none; visibility:hidden; }
+.wall.uv .ink {
+  visibility:visible;
+  -webkit-mask-image:radial-gradient(circle at var(--x) var(--y), #000 0, #000 var(--r), transparent calc(var(--r) + 12px));
+  mask-image:radial-gradient(circle at var(--x) var(--y), #000 0, #000 var(--r), transparent calc(var(--r) + 12px));
+}
+.note {
+  position:absolute; width:78%; padding:9px 10px; border-radius:14px; text-align:center;
+  background:rgba(35,5,75,.93); border:2px dashed #c8ff6e88; color:#c8ff6e;
+  font-weight:600; font-size:14px; line-height:1.35; text-shadow:0 0 8px #9dff3a;
+}
+.note .em { font-size:24px; letter-spacing:4px; text-shadow:none; }
+.pinside { display:flex; flex-direction:column; gap:9px; justify-content:center; }
+.enter { text-align:center; font-size:13px; font-weight:500; }
+.dots { display:flex; justify-content:center; gap:14px; }
+.dots i { width:15px; height:15px; border-radius:50%; border:2.5px solid #fff; transition:background .15s, transform .15s; }
+.dots i.on { background:#fff; transform:scale(1.15); }
+.shake { animation:shake .4s; }
+@keyframes shake { 20%,60% { transform:translateX(-10px); } 40%,80% { transform:translateX(10px); } }
+.keypad { display:grid; grid-template-columns:repeat(3, 1fr); gap:9px; padding:0 7%; }
+.key { height:clamp(36px, 6.6cqh, 60px); border:0; border-radius:999px; background:rgba(255,255,255,.28); color:#fff; font-size:24px; font-weight:600; box-shadow:inset 0 0 0 2px rgba(255,255,255,.35); }
+.key:active { background:rgba(255,255,255,.6); transform:scale(.94); }
+.key.blank { visibility:hidden; }
+@container view (min-aspect-ratio: 1/1) {
+  .lock { display:grid; grid-template-columns:1.25fr 1fr; grid-template-rows:auto 1fr; column-gap:16px; row-gap:6px; padding-left:22px; padding-right:22px; }
+  .ltop { grid-column:1; grid-row:1; }
+  .wall { grid-column:1; grid-row:2; min-height:0; }
+  .pinside { grid-column:2; grid-row:1 / 3; }
+  .clock { font-size:clamp(24px, 10cqh, 44px); }
+  .owner { display:none; }
+  .key { height:clamp(28px, 13cqh, 54px); font-size:20px; }
+}
+
+/* ── Shared app chrome ── */
+.appbar { display:flex; align-items:center; gap:8px; padding:6px 12px 10px; font-weight:600; font-size:18px; }
+.back { border:0; background:#f1eaff; width:34px; height:34px; border-radius:12px; font-size:22px; line-height:1; color:var(--purple); padding:0 0 3px; flex:0 0 34px; }
+.appbar .ttl { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
+.body { flex:1; min-height:0; overflow:auto; padding:0 12px 10px; -webkit-overflow-scrolling:touch; }
+.btn { border:0; border-radius:999px; padding:11px 22px; font-size:17px; font-weight:600; color:#fff; background:linear-gradient(135deg, #ff8ac4, #a77bff); box-shadow:0 4px 0 #8a5fd6; }
+.btn:active { transform:translateY(3px); box-shadow:0 1px 0 #8a5fd6; }
+.btn.big { font-size:20px; padding:13px 26px; margin-top:6px; }
+.btn.ghost { background:#efe8ff; color:var(--purple); box-shadow:0 4px 0 #d6c8fb; }
+.small { font-size:13px; color:#7d70a0; }
+
+/* ── Home screen ── */
+.home { background:linear-gradient(180deg, #8fd3ff 0%, #c7a8ff 50%, #ffb3d9 100%); color:#fff; }
+.widget { margin:6px 14px 16px; padding:12px 14px; border-radius:22px; background:rgba(255,255,255,.28); box-shadow:inset 0 0 0 2px rgba(255,255,255,.4); text-shadow:0 1px 2px rgba(60,20,110,.3); }
+.widget b { font-size:18px; display:block; }
+.apps { display:grid; grid-template-columns:repeat(4, 1fr); gap:16px 6px; padding:0 12px; align-content:start; }
+.app { background:none; border:0; display:flex; flex-direction:column; align-items:center; gap:5px; color:#fff; font-size:12px; font-weight:600; text-shadow:0 1px 2px rgba(60,20,110,.35); position:relative; padding:0; }
+.app .ic { width:min(60px, 16cqw); aspect-ratio:1; border-radius:30%; display:grid; place-items:center; font-size:min(30px, 8cqw); background:var(--g); box-shadow:0 4px 0 rgba(0,0,0,.1), inset 0 -4px 0 rgba(0,0,0,.08); text-shadow:none; }
+.app:active .ic { transform:scale(.9); }
+.badge { position:absolute; top:-5px; left:calc(50% + min(30px, 8cqw) - 14px); min-width:22px; height:22px; border-radius:11px; background:var(--red); color:#fff; font-size:11px; display:grid; place-items:center; padding:0 5px; text-shadow:none; border:2px solid #fff; }
+.badge.lockb { background:#3b2a5c; }
+@container view (min-aspect-ratio: 1/1) {
+  .apps { grid-template-columns:repeat(8, 1fr); }
+  .app .ic { width:min(60px, 18cqh); font-size:min(30px, 9cqh); }
+}
+
+/* ── Messages ── */
+.msgs { background:#f8f5ff; }
+.th { display:flex; gap:10px; align-items:center; padding:10px 6px; width:100%; background:none; border:0; border-bottom:1px solid #ece4fb; text-align:left; }
+.av { width:44px; height:44px; flex:0 0 44px; border-radius:50%; display:grid; place-items:center; font-size:24px; background:var(--g); }
+.av.sm { width:32px; height:32px; flex:0 0 32px; font-size:18px; }
+.th .mid { flex:1; min-width:0; }
+.th .nm { font-weight:600; font-size:15px; }
+.th .pv { font-size:13px; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.th .tm { font-size:11px; color:#a99cc4; align-self:flex-start; margin-top:4px; white-space:nowrap; }
+.unread { width:10px; height:10px; border-radius:50%; background:var(--blue); flex:0 0 10px; }
+.chat { display:flex; flex-direction:column; gap:6px; padding-top:4px; }
+.bub { max-width:78%; padding:8px 12px; border-radius:18px; font-size:15px; line-height:1.3; }
+.bub.them { align-self:flex-start; background:#fff; border:2px solid #efe6ff; border-bottom-left-radius:6px; }
+.bub.me { align-self:flex-end; background:linear-gradient(135deg, #7aa8ff, #a77bff); color:#fff; border-bottom-right-radius:6px; }
+.daytag { align-self:center; font-size:11px; color:#a99cc4; margin:2px 0 4px; }
+.compose { margin:6px 12px 0; padding:9px 14px; border-radius:999px; background:#fff; border:2px solid #ece4fb; color:#b6abcc; font-size:14px; text-align:left; }
+
+/* ── Photos ── */
+.photos { background:#fff8fb; }
+.grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; }
+@container view (min-aspect-ratio: 1/1) { .grid { grid-template-columns:repeat(6, 1fr); } }
+.ph { aspect-ratio:1; border:0; border-radius:14px; background:var(--g); display:grid; place-items:center; font-size:min(40px, 10cqw); padding:0; overflow:hidden; }
+.bigph { width:min(100%, 62cqh); aspect-ratio:1; margin:0 auto; border-radius:24px; background:var(--g); display:grid; place-items:center; font-size:min(110px, 26cqw); overflow:hidden; }
+.cap { text-align:center; margin:12px 6px 0; font-weight:500; font-size:16px; }
+.balloons { display:flex; gap:7%; align-items:flex-end; justify-content:center; width:100%; height:100%; padding:10% 8% 26%; }
+.bln { width:22%; aspect-ratio:.8; border-radius:50% 50% 48% 48% / 56% 56% 44% 44%; position:relative; background:radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0, rgba(255,255,255,0) 28%), var(--c); }
+.bln::after { content:""; position:absolute; left:50%; top:100%; width:2px; height:55%; background:rgba(80,60,110,.45); }
+.balloons .bln:nth-child(2) { margin-bottom:9%; }
+
+/* ── Notes ── */
+.notes { background:#fffbea; }
+.nt { background:#fff; border-radius:16px; padding:12px 14px; margin-bottom:10px; box-shadow:0 3px 0 #f4e7b5; white-space:pre-line; font-size:14px; line-height:1.45; }
+.nt h4 { margin:0 0 4px; font-size:15px; }
+
+/* ── Files ── */
+.files { background:#eef9ff; }
+.lockbox { display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:6px 18px; }
+.bigem { font-size:min(60px, 16cqw); line-height:1.1; }
+.pw { width:100%; max-width:260px; font:inherit; font-size:20px; text-align:center; letter-spacing:3px; text-transform:uppercase; padding:10px; border-radius:14px; border:3px solid #cfe9ff; outline:none; color:var(--ink); background:#fff; user-select:text; -webkit-user-select:text; }
+.pw:focus { border-color:var(--blue); }
+.frow { display:flex; align-items:center; gap:12px; width:100%; padding:11px 10px; border:0; background:#fff; border-radius:16px; margin-bottom:8px; text-align:left; box-shadow:0 3px 0 #d4ecfb; }
+.frow .fi { font-size:28px; }
+.frow .fn { flex:1; font-weight:600; font-size:15px; }
+.frow .fs { font-size:12px; color:var(--soft); }
+.frow.secret { background:linear-gradient(135deg, #fff0f8, #f0e8ff); box-shadow:0 3px 0 #e3c9f5, inset 0 0 0 2px #ff9ad5; animation:wig 2.4s ease-in-out infinite; }
+@keyframes wig { 0%,84%,100% { transform:rotate(0); } 90% { transform:rotate(-2deg); } 96% { transform:rotate(2deg); } }
+.slots { display:flex; gap:16px; justify-content:center; margin:6px 0 10px; }
+.slot { width:min(70px, 19cqw); border:0; background:none; padding:0; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:12px; font-weight:600; color:var(--soft); }
+.slot .bln { width:100%; display:grid; place-items:center; color:#fff; font-size:26px; font-weight:700; margin-bottom:30%; }
+.slot:active .bln { transform:scale(.92); }
+.doc { background:#fffdf3; border-radius:16px; padding:16px; border:3px dashed #ff9ad5; font-size:15px; line-height:1.5; animation:enter .5s; }
+.doc h3 { margin:10px 0 6px; }
+.stamp { display:inline-block; border:3px solid var(--red); color:var(--red); font-weight:700; padding:2px 10px; border-radius:8px; transform:rotate(-6deg); letter-spacing:2px; }
+.you { font-size:28px; font-weight:700; text-align:center; color:#ff4f8b; animation:pulse .8s ease-in-out infinite; }
+
+/* ── Fun little apps ── */
+.fun { background:linear-gradient(180deg, #fff6d9, #ffe1f0); }
+.funbox { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:0 20px; }
+.funbox .bigem { font-size:min(90px, 22cqw); animation:float 3s ease-in-out infinite; }
+.funbox b { font-size:20px; }
+
+/* ── Overlay cards ── */
+#ov { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; padding:16px; background:rgba(80,40,140,.35); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+#ov.show { display:flex; }
+.card { background:#fff; border-radius:28px; padding:20px 20px 22px; max-width:440px; width:100%; max-height:100%; overflow:auto; text-align:center; box-shadow:0 8px 0 #e3d4ff, 0 20px 50px rgba(80,40,140,.3); animation:pop .35s cubic-bezier(.2,1.6,.4,1); }
+@keyframes pop { from { transform:scale(.7); opacity:0; } }
+.card h1 { margin:2px 0 6px; font-size:32px; line-height:1.1; background:linear-gradient(90deg, #ff6fae, #9b7bff, #4aa8ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.card h2 { margin:2px 0 8px; }
+.card p { margin:8px 0; line-height:1.45; }
+.hero { font-size:52px; line-height:1.1; }
+.mission { list-style:none; padding:0; margin:12px 0; text-align:left; display:flex; flex-direction:column; gap:7px; }
+.mission li { background:#f7f2ff; border-radius:14px; padding:8px 12px; display:flex; gap:10px; align-items:center; }
+.mission li b { display:grid; place-items:center; width:28px; height:28px; flex:0 0 28px; border-radius:50%; background:var(--purple); color:#fff; }
+.stars { font-size:40px; letter-spacing:6px; margin:4px 0; }
+.stars .dim { filter:grayscale(1); opacity:.3; }
+.stats { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin:10px 0; }
+.stat { background:#f7f2ff; border-radius:14px; padding:8px 12px; min-width:84px; }
+.stat b { display:block; font-size:22px; }
+.stat span { font-size:12px; color:var(--soft); }
+.newbest { color:#ff4f8b; font-weight:700; }
+.hintlist { text-align:left; display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+.hintlist div { background:#fff8d6; border-radius:14px; padding:10px 12px; line-height:1.4; }
+.row { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:12px; }
+
+#toast { position:fixed; left:50%; bottom:max(24px, env(safe-area-inset-bottom)); transform:translate(-50%, 40px); opacity:0; z-index:60; background:#3b2a5c; color:#fff; padding:10px 18px; border-radius:20px; font-weight:500; font-size:15px; width:max-content; max-width:min(92vw, 420px); text-align:center; transition:.3s; pointer-events:none; box-shadow:0 6px 20px rgba(60,20,110,.3); }
+#toast.show { transform:translate(-50%, 0); opacity:1; }
+.cf { position:fixed; top:-20px; width:10px; height:14px; z-index:55; pointer-events:none; border-radius:3px; animation:fall linear forwards; }
+@keyframes fall { to { transform:translate(var(--dx), 110vh) rotate(var(--rot)); } }
+
+/* ── Short landscape (phone sideways, TV mirroring): HUD becomes a side column ── */
+@media (orientation: landscape) and (max-height: 560px) {
+  #app { flex-direction:row; }
+  #hud { flex-direction:column; flex-wrap:nowrap; justify-content:center; width:100px; max-width:none; margin:0; padding:8px 0 8px 10px; }
+  .timer { flex:0 0 auto; width:100%; flex-direction:column; gap:5px; padding:8px; border-radius:20px; }
+  .timer .tic { display:none; }
+  .timer b { min-width:0; font-size:20px; }
+  .tbar { flex:0 0 8px; width:100%; }
+  .pen { right:auto; left:50%; top:-14px; }
+  .steps { flex:0 0 auto; flex-direction:column; width:100%; gap:4px; }
+  .step { justify-content:center; padding:3px 4px; font-size:12px; }
+  .gadgets { flex-wrap:wrap; justify-content:center; }
+  .gad { width:42px; height:42px; }
+  #stage { padding:8px 12px 12px; }
+  #phone { aspect-ratio:auto; width:100%; max-width:860px; border-radius:36px; padding:9px; }
+  #screen { border-radius:28px; }
+  .stk.b { bottom:-12px; left:30px; }
+  .stk.c { top:auto; bottom:-12px; right:40px; }
+  .card { padding:12px 18px 14px; }
+  .hero { font-size:34px; }
+  .card h1 { font-size:26px; }
+  .card p { margin:5px 0; }
+  .stars { font-size:28px; margin:0; }
+  .stats { margin:6px 0; }
+  .mission { margin:8px 0; gap:5px; }
+  .mission li { padding:5px 12px; }
+  .btn.big { font-size:18px; padding:10px 22px; }
+}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<div id="app">
+  <header id="hud">
+    <div class="timer" id="timer"><span class="tic">⏱️</span><b id="tval">5:00</b><div class="tbar"><i id="tfill"></i></div></div>
+    <div class="steps">
+      <span class="step" data-s="1">🔢 PIN</span>
+      <span class="step" data-s="2">💬 Pass</span>
+      <span class="step" data-s="3">📁 File</span>
+    </div>
+    <div class="gadgets">
+      <button class="gad" id="uvBtn" data-act="uv" title="UV light (U)">🔦<small>UV</small></button>
+      <button class="gad" id="hintBtn" data-act="hint" title="Hint">💡<small>HINT</small></button>
+      <button class="gad" id="muteBtn" data-act="mute" title="Sound">🔊<small>SOUND</small></button>
+    </div>
+  </header>
+  <main id="stage">
+    <div id="phone">
+      <span class="stk a">⭐</span><span class="stk b">🍓</span><span class="stk c">💖</span>
+      <div id="screen">
+        <div class="status" id="sb"><span id="sbTime"></span><span class="notch"></span><span>📶 🔋</span></div>
+        <div id="view"></div>
+        <div class="homebar" id="homebar" data-act="home"><i></i></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="ov"></div>
+<div id="toast"></div>
+
+<script>
+// ───────────────────────── Settings ─────────────────────────
+const TOTAL = 300;        // seconds on the clock
+const PENALTY = 5;        // seconds lost per wrong guess
+const HINT_COST = 15;     // seconds lost per hint
+const OWNER = 'Agent Sprinkles';
+const BEST_KEY = 'spy-phone-best', MUTE_KEY = 'spy-phone-mute';
+
+const $ = s => document.querySelector(s);
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const fmt = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+};
+
+// ───────────────────────── Puzzle data ─────────────────────────
+const COUNTABLE = ['🐱', '🍩', '⭐', '🐟', '🌸', '🍓', '🦋', '🍄', '🐞', '🍀'];
+
+// Password words. Every letter has enough sentences in BANK for its repeats.
+const WORDS = ['PANDA', 'MANGO', 'TACO', 'WAFFLE', 'PICKLE', 'COOKIE', 'ROCKET', 'DONUT', 'KOALA',
+  'LLAMA', 'SUSHI', 'PIZZA', 'TURTLE', 'NOODLE', 'BISCUIT'];
+const BANK = {
+  A: ['Are you coming to the park later?', 'Aww, my hamster just sneezed!', 'Apples or bananas for snack time? 🍎'],
+  B: ['Bring snacks please 🍪', 'Best day ever!!', 'Bubbles are my favorite thing 🫧'],
+  C: ['Can you believe it is Friday?', 'Cookies are in the oven 🍪', 'Cats are just fluffy ninjas 🐱'],
+  D: ['Don\'t forget our secret handshake!', 'Dancing cat video coming your way 🐱', 'Did you see the moon last night? 🌙'],
+  E: ['Every cloud looks like a bunny today ☁️', 'Eat your veggies lol 🥦'],
+  F: ['Found a really cool rock 🪨', 'Fun fact: otters hold hands when they sleep 🦦', 'Frogs can jump SO far 🐸'],
+  G: ['Guess what I saw at school!', 'Grandma made pancakes 🥞'],
+  H: ['Haha that was so funny 😂', 'Hope you have a great day ☀️'],
+  I: ['I lost my left sock again 🧦', 'Is it pizza night? 🍕', 'I drew a dragon in art class 🐉'],
+  K: ['Kittens are the best, right? 🐱', 'Keep it secret, keep it safe 🤫'],
+  L: ['Let\'s build a pillow fort 🏰', 'Look at this cute frog 🐸', 'Lunch was mac and cheese 🧀'],
+  M: ['My teacher wore a dinosaur shirt 🦖', 'Meet me at the swings!'],
+  N: ['No way, really?!', 'Nice job on your drawing 🎨'],
+  O: ['OMG the puppy is SO fluffy 🐶', 'Oops, I spilled my juice 🧃', 'Only 3 more days till the weekend!'],
+  P: ['Please save me a cupcake 🧁', 'Penguins can\'t fly but they can swim 🐧'],
+  R: ['Remember to bring your bike 🚲', 'Rainbows after the rain! 🌈'],
+  S: ['So I made slime today 🟢', 'See you tomorrow!', 'Sharks have been around longer than trees 🦈'],
+  T: ['That movie was awesome 🍿', 'Tell me a joke!', 'Today I learned how to whistle 🎶'],
+  U: ['Unicorns are real, I\'m sure of it 🦄', 'Up for a game later? 🎮'],
+  W: ['Wanna trade stickers? ⭐', 'Whoa, it\'s snowing! ❄️'],
+  Y: ['Yay, no homework!', 'You\'re my best friend 💛'],
+  Z: ['Zoo trip on Saturday! 🦁', 'Zzz… so sleepy 😴']
+};
+const REPLIES = ['lol 😂', 'omg', 'hehe', 'yesss!', '🙈', 'ok ok', 'same 😆', 'wow'];
+
+const COLORS = [['red', '#ff5d73'], ['orange', '#ff9f43'], ['yellow', '#ffd93d'], ['green', '#4cd98a'],
+  ['blue', '#4aa8ff'], ['purple', '#a77bff'], ['pink', '#ff8ad8']];
+
+function makeLock() {
+  const kinds = shuffle(COUNTABLE).slice(0, 6);
+  const pinKinds = kinds.slice(0, 4), counts = pinKinds.map(() => 1 + rnd(6));
+  const items = [];
+  pinKinds.forEach((k, i) => { for (let n = 0; n < counts[i]; n++) items.push(k); });
+  kinds.slice(4).forEach(k => { for (let n = 1 + rnd(4); n > 0; n--) items.push(k); });
+  const cells = shuffle([...Array(42).keys()]);     // 6×7 or 7×6 grid, one picture per cell
+  return {
+    pin: counts.join(''), kinds: pinKinds,
+    icons: shuffle(items).map((e, i) => ({ e, cell: cells[i], jx: Math.random() - .5, jy: Math.random() - .5, rot: rnd(40) - 20 })),
+    nx: 2 + rnd(19), ny: pick([0, 50, 100])          // where the invisible-ink note hides
+  };
+}
+
+function makeChat() {
+  const word = pick(WORDS), pools = {};
+  const lines = [...word].map(ch => (pools[ch] = pools[ch] || shuffle(BANK[ch])).pop());
+  const msgs = [];
+  lines.forEach((t, i) => {
+    msgs.push({ me: false, t });
+    if (i < lines.length - 1 && Math.random() < .45) msgs.push({ me: true, t: pick(REPLIES) });
+  });
+  msgs.push({ me: true, t: 'gtg, spy stuff 🕶️' });
+  return { word, msgs };
+}
+
+const BOSS = [
+  { me: false, t: `${OWNER}, did you lock the TOP SECRET file?` },
+  { me: true, t: 'Yes boss! It has a password now 😎' },
+  { me: false, t: 'Where did you hide the password??' },
+  { me: true, t: 'It hides at the START of every text Bunny 🐰 sent me today!' },
+  { me: false, t: 'Clever. Now delete this chat. 🔥' },
+  { me: true, t: '…later 🙃' }
+];
+const ALIEN = [{ me: false, t: 'beep boop. the password is BANANA 🍌' }, { me: false, t: 'trust me 👽' }];
+const MOM = [{ me: false, t: 'Did you feed the goldfish? 🐠' }, { me: true, t: 'yes mom' }, { me: false, t: 'Love you! Spaghetti for dinner 🍝' }];
+const PIZZA = [{ me: false, t: 'Your pizza is on the way! 🛵' }, { me: false, t: 'Rate your pizza: 🍕🍕🍕🍕🍕' }];
+
+const PHOTOS = [
+  { e: '🐶', g: 'linear-gradient(135deg,#ffe29a,#ffb3c7)', cap: 'Biscuit at the beach 🏖️' },
+  { e: '🎂', g: 'linear-gradient(135deg,#ffd1f0,#c9b6ff)', cap: 'Birthday cake! I ate 3 slices 😋' },
+  { balloons: true, g: 'linear-gradient(180deg,#bfe9ff,#f2fbff)', cap: 'My LUCKY balloons 🍀 Left to right. Never forget!' },
+  { e: '🌋', g: 'linear-gradient(135deg,#ffc29a,#ff8a8a)', cap: 'Science fair volcano. It worked TOO well.' },
+  { e: '🐸', g: 'linear-gradient(135deg,#c9f7d6,#7fe0b0)', cap: 'Frog wearing a tiny hat 🎩' },
+  { e: '🌈', g: 'linear-gradient(135deg,#a8e6ff,#ffd6f5)', cap: 'Double rainbow!!' },
+  { e: '🍦', g: 'linear-gradient(135deg,#fff0c2,#ffc2e0)', cap: 'Ice cream with Bunny 🐰' },
+  { e: '🦄', g: 'linear-gradient(135deg,#e5d4ff,#ffd4ec)', cap: 'My disguise for the costume party' },
+  { e: '🛸', g: 'linear-gradient(135deg,#c4d4ff,#d4fff1)', cap: 'A UFO?? (it was a frisbee)' }
+];
+
+const FILES = [
+  ['📄', 'homework.pdf', '2 KB', '📄 Math homework: 7 × 8 = 56. Not secret, just math.'],
+  ['🐸', 'frog_meme.png', '88 KB', '🐸 A frog in a hat. Cute, but not secret.'],
+  ['🎵', 'spy_song.mp3', '3 MB', 'song'],
+  ['🗑️', 'old_stuff.zip', '1 KB', '🗑️ Just old candy wrappers. Ew!'],
+  ['🔐', 'TOP_SECRET.spy', '?? KB', 'secret']
+];
+
+const APPS = [
+  ['messages', '💬', 'Messages', 'linear-gradient(135deg,#7ef0b4,#2fbf71)'],
+  ['photos', '🖼️', 'Photos', 'linear-gradient(135deg,#ffe08a,#ff8fb1)'],
+  ['notes', '📝', 'Notes', 'linear-gradient(135deg,#fff6b8,#ffcf3d)'],
+  ['files', '📁', 'Files', 'linear-gradient(135deg,#8fdcff,#4a8dff)'],
+  ['fun:weather', '☀️', 'Weather', 'linear-gradient(135deg,#9fe3ff,#ffe27a)'],
+  ['fun:camera', '📷', 'Camera', 'linear-gradient(135deg,#d7d2e6,#8d80a8)'],
+  ['fun:music', '🎵', 'Music', 'linear-gradient(135deg,#ff9ad5,#ff5d8f)'],
+  ['fun:games', '🎮', 'Games', 'linear-gradient(135deg,#c3a6ff,#7a5cff)']
+];
+const FUN = {
+  weather: ['☀️', 'Sunny & 72°F', 'Forecast: 100% chance of secret missions.'],
+  camera: ['🕵️', 'Say cheese! 📸', 'Wait… that\'s YOU, Agent! Back to work 😄'],
+  music: ['🎷', 'Sneaky Spy Groove', 'Tap the sax to play it!'],
+  games: ['🎮', 'Games are locked', 'No games during a mission! 🙅']
+};
+
+// ───────────────────────── Sound ─────────────────────────
+let AC = null, muted = store.get(MUTE_KEY) === '1';
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, d = .08, type = 'sine', vol = .15, when = 0) {
+  if (muted) return;
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + .02);
+}
+const SFX = {
+  tap: () => tone(880, .05, 'triangle', .08),
+  bad: () => { tone(200, .16, 'square', .06); tone(150, .22, 'square', .06, .12); },
+  good: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .16, 'triangle', .12, i * .08)),
+  win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, .22, 'triangle', .12, i * .12)),
+  lose: () => [440, 370, 311, 262].forEach((f, i) => tone(f, .3, 'sine', .12, i * .18)),
+  tick: () => tone(1250, .03, 'square', .04),
+  uv: () => { tone(300, .12, 'sawtooth', .04); tone(600, .12, 'sine', .06, .06); },
+  song: () => [392, 0, 392, 466, 392, 0, 349, 330, 0, 294, 330, 392].forEach((f, i) => f && tone(f, .16, 'triangle', .1, i * .15))
+};
+
+// ───────────────────────── Game state ─────────────────────────
+let G;
+function newGame(phase) {
+  const now = performance.now();
+  G = {
+    phase, stage: 1, screen: 'lock', entry: '', busy: false,
+    uv: false, uvUsed: false, light: { x: .5, y: .5 },
+    filesOpen: false, slots: [-1, -1, -1], read: {},
+    hintIdx: { 1: 0, 2: 0, 3: 0 }, hints: 0, mistakes: 0,
+    paused: false, left: TOTAL, deadline: now + TOTAL * 1000, lastSec: TOTAL,
+    p: { lock: makeLock(), chat: makeChat(), colors: shuffle([...COLORS.keys()]).slice(0, 3), photos: shuffle([...PHOTOS.keys()]) }
+  };
+}
+
+function hintsFor(s) {
+  const P = G.p;
+  if (s === 1) return [
+    'Spies write secrets in <b>invisible ink</b> 🤫 Turn on the 🔦 UV light, then slide your finger (or mouse) slowly over the wallpaper.',
+    `The glowing note shows 4 pictures. Count how many of each are on the wallpaper — each count is one digit. Example: there are ${P.lock.pin[0]} ${P.lock.kinds[0]}, so the PIN starts with <b>${P.lock.pin[0]}</b>.`,
+    `The PIN is <b>${P.lock.pin}</b>.`
+  ];
+  if (s === 2) return [
+    'The 📁 Files app needs a password. Open 💬 Messages and read the chat with <b>Boss 🕶️</b>.',
+    'Read only the <b>first letter</b> of each text Bunny 🐰 sent (skip your own blue replies). Put the letters together!',
+    `The password is <b>${P.chat.word}</b>. Type it into the 📁 Files app.`
+  ];
+  return [
+    'Tap 🔐 TOP_SECRET.spy in Files, then read the 📝 Notes app.',
+    'Your lucky balloons are in a picture in 🖼️ Photos. Copy their colors from left to right.',
+    `The colors are <b>${P.colors.map(i => COLORS[i][0]).join(', ')}</b>.`
+  ];
+}
+
+// ───────────────────────── Timer ─────────────────────────
+function timeLeft() {
+  if (G.phase !== 'play' || G.paused) return G.left;
+  return Math.max(0, (G.deadline - performance.now()) / 1000);
+}
+function drawTimer(t) {
+  $('#tval').textContent = fmt(t);
+  $('#tfill').style.width = (t / TOTAL * 100) + '%';
+  const el = $('#timer');
+  el.classList.toggle('warn', t <= 60 && t > 20);
+  el.classList.toggle('danger', t <= 20 && G.phase === 'play');
+}
+function tick() {
+  if (G.phase !== 'play' || G.paused) return;
+  const t = timeLeft();
+  drawTimer(t);
+  const s = Math.ceil(t);
+  if (s !== G.lastSec) {
+    G.lastSec = s;
+    if (s <= 10 && s > 0) SFX.tick();
+    drawClocks();
+    if (G.stage === 1 && !G.uvUsed && TOTAL - t > 25) $('#uvBtn').classList.add('nudge');
+  }
+  if (t <= 0) return lose();
+  requestAnimationFrame(tick);
+}
+function penalty(sec) {
+  if (G.phase !== 'play') return;
+  sec = Math.min(sec, Math.max(0, timeLeft() - 1));   // a penalty never ends the game by itself
+  if (sec <= 0) return;
+  G.deadline -= sec * 1000;
+  const p = document.createElement('span');
+  p.className = 'pen'; p.textContent = `−${Math.round(sec)}s`;
+  $('#timer').appendChild(p); setTimeout(() => p.remove(), 1000);
+}
+document.addEventListener('visibilitychange', () => {
+  if (G.phase !== 'play') return;
+  if (document.hidden) { G.left = timeLeft(); G.paused = true; }
+  else if (G.paused) { G.paused = false; G.deadline = performance.now() + G.left * 1000; requestAnimationFrame(tick); }
+});
+
+const clockStr = () => new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M/, '');
+const dateStr = () => new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+function drawClocks() {
+  $('#sbTime').textContent = clockStr();
+  const c = $('.clock'); if (c) c.textContent = clockStr();
+}
+
+// ───────────────────────── Screens ─────────────────────────
+const bar = (title, backTo = true) =>
+  `<div class="appbar">${backTo ? '<button class="back" data-act="back" aria-label="Back">‹</button>' : ''}<div class="ttl">${title}</div></div>`;
+const balloonsHTML = cols => `<div class="balloons">${cols.map(i => `<div class="bln" style="--c:${COLORS[i][1]}"></div>`).join('')}</div>`;
+const slotsHTML = () => G.slots.map((c, i) =>
+  `<button class="slot" data-act="slot" data-arg="${i}"><div class="bln" style="--c:${c < 0 ? '#d9d1ea' : COLORS[c][1]}">${c < 0 ? '?' : ''}</div>${c < 0 ? 'tap me' : COLORS[c][0]}</button>`
+).join('');
+const dots = () => [0, 1, 2, 3].map(i => `<i class="${i < G.entry.length ? 'on' : ''}"></i>`).join('');
+
+function threads() {
+  return [
+    { id: 'bunny', name: 'Bunny 🐰', av: '🐰', g: '#ffd6ea', tm: '9:41 AM', msgs: G.p.chat.msgs, unread: true },
+    { id: 'boss', name: 'Boss 🕶️', av: '🕶️', g: '#dcd4ff', tm: '8:15 AM', msgs: BOSS, unread: true },
+    { id: 'alien', name: 'Unknown 👽', av: '👽', g: '#d2ffe6', tm: 'Yesterday', msgs: ALIEN },
+    { id: 'mom', name: 'Mom 💕', av: '💕', g: '#ffe0e6', tm: 'Yesterday', msgs: MOM },
+    { id: 'pizza', name: 'Pizza Palace 🍕', av: '🍕', g: '#fff0c9', tm: 'Monday', msgs: PIZZA }
+  ];
+}
+
+const SCREENS = {
+  lock() {
+    const L = G.p.lock;
+    return `<div class="scr lock" id="lock">
+      <div class="ltop"><div class="lk">🔒</div><div class="clock">${clockStr()}</div><div class="date">${dateStr()}</div><div class="owner">Property of ${OWNER} 🧁 · no snooping!</div></div>
+      <div class="wall${G.uv ? ' uv' : ''}" id="wall">
+        ${L.icons.map((o, i) => `<span class="ico" data-i="${i}" style="--rot:${o.rot}deg">${o.e}</span>`).join('')}
+        <div class="uvl"></div>
+        <div class="ink"><div class="note" style="left:${L.nx}%;top:${L.ny}%;transform:translateY(-${L.ny}%) rotate(-3deg)">🤫 My PIN = how many<br><span class="em">${L.kinds.join('')}</span><br>(in this order!)</div></div>
+      </div>
+      <div class="pinside">
+        <div class="enter">Enter passcode</div>
+        <div class="dots" id="dots">${dots()}</div>
+        <div class="keypad">
+          ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => `<button class="key" data-act="key" data-arg="${k}">${k}</button>`).join('')}
+          <span class="key blank"></span><button class="key" data-act="key" data-arg="0">0</button><button class="key" data-act="key" data-arg="del" aria-label="Delete">⌫</button>
+        </div>
+      </div>
+    </div>`;
+  },
+  home() {
+    const unread = ['bunny', 'boss'].filter(id => !G.read[id]).length;
+    return `<div class="scr home">
+      <div class="widget"><b>Hi, ${OWNER}! 🧁</b>🕶️ Today's mission: <i>TOP SECRET</i></div>
+      <div class="apps">${APPS.map(([id, ic, name, g]) => {
+        const badge = id === 'messages' && unread ? `<span class="badge">${unread}</span>`
+          : id === 'files' && !G.filesOpen ? '<span class="badge lockb">🔒</span>' : '';
+        return `<button class="app" data-act="go" data-arg="${id}"><span class="ic" style="--g:${g}">${ic}</span>${name}${badge}</button>`;
+      }).join('')}</div>
+    </div>`;
+  },
+  messages() {
+    return `<div class="scr msgs">${bar('💬 Messages')}<div class="body">${threads().map(t => {
+      const last = t.msgs[t.msgs.length - 1].t;
+      return `<button class="th" data-act="go" data-arg="thread:${t.id}">
+        ${t.unread && !G.read[t.id] ? '<span class="unread"></span>' : ''}
+        <span class="av" style="--g:${t.g}">${t.av}</span>
+        <span class="mid"><div class="nm">${t.name}</div><div class="pv">${last}</div></span><span class="tm">${t.tm}</span></button>`;
+    }).join('')}</div></div>`;
+  },
+  thread(id) {
+    const t = threads().find(x => x.id === id);
+    G.read[id] = true;
+    return `<div class="scr msgs">${bar(`<span class="av sm" style="--g:${t.g}">${t.av}</span>${t.name}`)}
+      <div class="body"><div class="chat"><div class="daytag">${t.tm}</div>
+        ${t.msgs.map(m => `<div class="bub ${m.me ? 'me' : 'them'}">${m.t}</div>`).join('')}
+      </div></div>
+      <button class="compose" data-act="compose">Message…</button></div>`;
+  },
+  photos() {
+    return `<div class="scr photos">${bar('🖼️ Photos')}<div class="body"><div class="grid">${G.p.photos.map(i => {
+      const ph = PHOTOS[i];
+      return `<button class="ph" style="--g:${ph.g}" data-act="go" data-arg="photo:${i}">${ph.balloons ? balloonsHTML(G.p.colors) : ph.e}</button>`;
+    }).join('')}</div></div></div>`;
+  },
+  photo(i) {
+    const ph = PHOTOS[i];
+    return `<div class="scr photos">${bar('🖼️ Photo')}<div class="body">
+      <div class="bigph" style="--g:${ph.g}">${ph.balloons ? balloonsHTML(G.p.colors) : ph.e}</div>
+      <div class="cap">${ph.cap}</div></div></div>`;
+  },
+  notes() {
+    return `<div class="scr notes">${bar('📝 Notes')}<div class="body">
+      <div class="nt"><h4>🛒 Shopping</h4>carrots for Bunny 🥕
+glitter
+1 fake mustache 🥸
+more glitter ✨</div>
+      <div class="nt"><h4>🔐 My secret file</h4>TOP_SECRET.spy has a COLOR LOCK 🎨
+The colors = my lucky balloons 🎈
+(I took a photo so I don't forget 📸)</div>
+      <div class="nt"><h4>😂 Jokes</h4>Why did the spy stay in bed?
+Because he was UNDERCOVER! 🛏️</div>
+    </div></div>`;
+  },
+  files() {
+    if (!G.filesOpen) return `<div class="scr files">${bar('📁 Files')}<div class="body">
+      <form class="lockbox" data-form="pw">
+        <div class="bigem">🔒</div><b>Files is password protected</b>
+        <input class="pw" id="pw" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" placeholder="PASSWORD">
+        <button class="btn" type="submit">Unlock 🔓</button>
+        <div class="small">Psst… I'd never forget it. It's hiding in my texts 💬</div>
+      </form></div></div>`;
+    return `<div class="scr files">${bar('📁 Files')}<div class="body">${FILES.map(([ic, name, size, what], i) =>
+      `<button class="frow${what === 'secret' ? ' secret' : ''}" data-act="file" data-arg="${i}"><span class="fi">${ic}</span><span class="fn">${name}</span><span class="fs">${size}</span></button>`
+    ).join('')}</div></div>`;
+  },
+  colorlock() {
+    return `<div class="scr files">${bar('🔐 TOP_SECRET.spy')}<div class="body"><div class="lockbox">
+      <div class="bigem">🎨</div><b>COLOR LOCK</b><div>Enter my lucky balloon colors</div>
+      <div class="slots" id="slots">${slotsHTML()}</div>
+      <button class="btn" data-act="openlock">Open 🔓</button>
+      <div class="small">Tap a balloon to change its color</div>
+    </div></div></div>`;
+  },
+  secret() {
+    return `<div class="scr files">${bar('🔓 TOP_SECRET.spy', false)}<div class="body"><div class="doc">
+      <span class="stamp">TOP SECRET</span>
+      <h3>Operation: Surprise Party 🎂</h3>
+      Step 1: Invite everybody 💌<br>Step 2: Blow up the lucky balloons 🎈<br>Step 3: Bake a GIANT cake 🍰<br>Step 4: Throw the party for the best agent ever…
+      <div class="you">…YOU! 🎉</div>
+    </div></div></div>`;
+  },
+  fun(id) {
+    const [ic, title, text] = FUN[id];
+    return `<div class="scr fun">${bar(APPS.find(a => a[0] === 'fun:' + id)[2])}<div class="funbox">
+      <div class="bigem" ${id === 'music' ? 'data-act="song" style="cursor:pointer"' : ''}>${ic}</div><b>${title}</b><div>${text}</div></div></div>`;
+  }
+};
+
+function render() {
+  const [name, arg] = G.screen.split(':');
+  $('#view').innerHTML = SCREENS[name](arg);
+  const light = name === 'lock' || name === 'home';
+  $('#sb').classList.toggle('light', light);
+  $('#homebar').classList.toggle('light', light);
+  if (name === 'lock') layoutWall();
+  if (name === 'files' && !G.filesOpen && matchMedia('(pointer:fine)').matches) $('#pw').focus();
+  drawClocks();
+  drawHud();
+}
+function go(screen) { G.screen = screen; render(); }
+function back() {
+  const [name] = G.screen.split(':');
+  if (name === 'lock' || name === 'secret') return;
+  go(name === 'thread' ? 'messages' : name === 'photo' ? 'photos' : name === 'colorlock' ? 'files' : 'home');
+}
+function drawHud() {
+  document.querySelectorAll('.step').forEach(el => {
+    const s = +el.dataset.s, done = G.stage > s || G.phase === 'won';
+    el.classList.toggle('done', done);
+    el.classList.toggle('cur', !done && G.stage === s);
+  });
+  $('#uvBtn').classList.toggle('on', G.uv);
+  if (G.stage !== 1 || G.uvUsed) $('#uvBtn').classList.remove('nudge');
+  $('#muteBtn').firstChild.textContent = muted ? '🔇' : '🔊';
+  drawTimer(timeLeft());
+}
+
+// Pictures sit in a 6×7 grid (7×6 when the wallpaper is wide), sized to the wallpaper.
+function layoutWall() {
+  const w = $('#wall'); if (!w) return;
+  const W = w.clientWidth, H = w.clientHeight;
+  const cols = W > H * 1.1 ? 7 : 6, rows = 42 / cols, cw = W / cols, ch = H / rows;
+  const fs = Math.max(14, Math.min(cw, ch) * .62);
+  w.querySelectorAll('.ico').forEach(el => {
+    const o = G.p.lock.icons[el.dataset.i], c = o.cell % cols, r = Math.floor(o.cell / cols);
+    el.style.left = ((c + .5 + o.jx * .35) * cw) + 'px';
+    el.style.top = ((r + .5 + o.jy * .35) * ch) + 'px';
+    el.style.fontSize = fs + 'px';
+  });
+  w.style.setProperty('--r', Math.max(46, Math.min(W, H) * .32) + 'px');
+  w.style.setProperty('--x', G.light.x * W + 'px');
+  w.style.setProperty('--y', G.light.y * H + 'px');
+}
+function moveLight(e) {
+  const w = $('#wall'); if (!w) return;
+  const r = w.getBoundingClientRect();
+  G.light.x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  G.light.y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  w.style.setProperty('--x', G.light.x * r.width + 'px');
+  w.style.setProperty('--y', G.light.y * r.height + 'px');
+}
+['pointermove', 'pointerdown'].forEach(ev => document.addEventListener(ev, e => {
+  if (G.uv && e.target.closest && e.target.closest('#wall')) moveLight(e);
+}));
+addEventListener('resize', layoutWall);
+
+// ───────────────────────── Actions ─────────────────────────
+function toast(msg, ms = 2400) {
+  const t = $('#toast');
+  t.innerHTML = msg; t.classList.add('show');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), ms);
+}
+function shake(el) { if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function wrong(msg) {
+  SFX.bad(); G.mistakes++;
+  if (navigator.vibrate) navigator.vibrate(120);
+  penalty(PENALTY);
+  toast(`❌ ${msg} −${PENALTY}s`);
+}
+
+function pressKey(k) {
+  if (G.phase !== 'play' || G.screen !== 'lock' || G.busy) return;
+  SFX.tap();
+  if (k === 'del') G.entry = G.entry.slice(0, -1);
+  else if (G.entry.length < 4) G.entry += k;
+  $('#dots').innerHTML = dots();
+  if (G.entry.length === 4) { G.busy = true; setTimeout(checkPin, 220); }
+}
+function checkPin() {
+  G.busy = false;
+  if (G.phase !== 'play') return;
+  if (G.entry === G.p.lock.pin) {
+    SFX.good(); G.stage = 2; G.uv = false; G.entry = ''; G.busy = true;
+    $('#lock').classList.add('unlocking'); drawHud();
+    setTimeout(() => { G.busy = false; go('home'); toast('🔓 Unlocked! Next: get into 📁 Files'); }, 450);
+  } else {
+    G.entry = ''; $('#dots').innerHTML = dots(); shake($('#dots'));
+    wrong('Wrong PIN!');
+  }
+}
+function tryPassword() {
+  const inp = $('#pw'), v = inp.value.toUpperCase().replace(/[^A-Z]/g, '');
+  if (!v) return;
+  if (v === G.p.chat.word) {
+    SFX.good(); G.filesOpen = true; G.stage = 3; inp.blur(); render();
+    toast('🎉 Files unlocked! Find the secret file');
+  } else {
+    inp.value = ''; shake(inp);
+    wrong(v === 'BANANA' ? 'That was the alien\'s prank! 👽🍌' : 'Wrong password!');
+  }
+}
+function openColorLock() {
+  if (G.slots.includes(-1)) { SFX.bad(); return toast('🎈 Pick a color for every balloon first'); }
+  if (G.slots.every((c, i) => c === G.p.colors[i])) win();
+  else { shake($('#slots')); wrong('Wrong colors!'); }
+}
+function toggleUV() {
+  if (G.phase !== 'play') return;
+  G.uv = !G.uv; G.uvUsed = true; SFX.uv();
+  if (G.uv && G.screen !== 'lock') toast('🔦 No invisible ink here… hmm');
+  const w = $('#wall');
+  if (w) { if (G.uv) G.light = { x: .5, y: .5 }; w.classList.toggle('uv', G.uv); layoutWall(); }
+  drawHud();
+}
+
+function act(a, arg) {
+  if (a === 'start') return start();
+  if (a === 'closeov') return closeOv();
+  if (a === 'mute') { muted = !muted; store.set(MUTE_KEY, muted ? '1' : '0'); drawHud(); return SFX.tap(); }
+  if (a === 'song') return SFX.song();
+  if (G.phase !== 'play') return;
+  switch (a) {
+    case 'key': return pressKey(arg);
+    case 'uv': return toggleUV();
+    case 'hint': return showHint();
+    case 'morehint':
+      G.hintIdx[G.stage]++; G.hints++; penalty(HINT_COST); SFX.tap();
+      return showHint();
+    case 'go': SFX.tap(); return go(arg);
+    case 'back': SFX.tap(); return back();
+    case 'home':
+      if (G.screen === 'lock') return toast('🔒 Crack the PIN first!');
+      if (G.screen !== 'secret' && G.screen !== 'home') { SFX.tap(); go('home'); }
+      return;
+    case 'compose': return toast('🤫 Shh! Never text from a spy\'s phone.');
+    case 'file': {
+      const f = FILES[arg];
+      if (f[3] === 'secret') { SFX.tap(); return go('colorlock'); }
+      if (f[3] === 'song') { SFX.song(); return toast('🎵 Sneaky spy music! Doo-doo-doo…'); }
+      SFX.tap(); return toast(f[3]);
+    }
+    case 'slot':
+      SFX.tap();
+      G.slots[arg] = (G.slots[arg] + 1) % COLORS.length;
+      $('#slots').innerHTML = slotsHTML();
+      return;
+    case 'openlock': return openColorLock();
+  }
+}
+document.addEventListener('click', e => {
+  if (e.target.id === 'ov' && G.ovKind === 'hint') return closeOv();
+  const el = e.target.closest('[data-act]');
+  if (el) act(el.dataset.act, el.dataset.arg);
+});
+document.addEventListener('submit', e => { e.preventDefault(); if (G.phase === 'play') tryPassword(); });
+document.addEventListener('keydown', e => {
+  if ($('#ov').classList.contains('show')) {
+    if (e.key === 'Escape' && G.ovKind === 'hint') closeOv();
+    return;
+  }
+  if (G.phase !== 'play' || e.target.tagName === 'INPUT') return;
+  if (G.screen === 'lock' && /^[0-9]$/.test(e.key)) pressKey(e.key);
+  else if (G.screen === 'lock' && e.key === 'Backspace') pressKey('del');
+  else if (e.key === 'Escape') back();
+  else if (e.key === 'u' || e.key === 'U') toggleUV();
+});
+
+// ───────────────────────── Overlays ─────────────────────────
+function ov(html, kind) { G.ovKind = kind; const o = $('#ov'); o.innerHTML = html; o.classList.add('show'); }
+function closeOv() { $('#ov').classList.remove('show'); G.ovKind = null; }
+const getBest = () => +store.get(BEST_KEY) || 0;
+
+function showBrief() {
+  const best = getBest();
+  ov(`<div class="card">
+    <div class="hero">🕵️📱</div>
+    <h1>Spy Phone Breaker</h1>
+    <p><b>Agent!</b> The sneaky spy <b>${OWNER}</b> 🧁 left their phone behind. Break in before the timer runs out!</p>
+    <ol class="mission">
+      <li><b>1</b><span>🔢 Crack the 4-digit PIN. The clue is hidden!</span></li>
+      <li><b>2</b><span>💬 Find the password in a text message</span></li>
+      <li><b>3</b><span>📁 Open the secret file</span></li>
+    </ol>
+    <p class="small">Your gadgets: 🔦 <b>UV light</b> shows invisible ink · 💡 <b>Hint</b> costs ${HINT_COST}s · a wrong guess costs ${PENALTY}s</p>
+    <button class="btn big" data-act="start">🚀 Start mission (${fmt(TOTAL)})</button>
+    ${best ? `<p class="small">🏆 Best time: ${fmt(best)}</p>` : ''}
+  </div>`, 'brief');
+}
+function showHint() {
+  const list = hintsFor(G.stage), n = G.hintIdx[G.stage];
+  ov(`<div class="card">
+    <div class="hero">📡</div><h2>HQ Hints · Step ${G.stage}</h2>
+    ${n ? `<div class="hintlist">${list.slice(0, n).map((h, i) => `<div><b>Hint ${i + 1}:</b> ${h}</div>`).join('')}</div>`
+        : '<p>Stuck, Agent? HQ can help — but every hint costs time!</p>'}
+    <div class="row">
+      ${n < list.length ? `<button class="btn" data-act="morehint">Get hint ${n + 1} of ${list.length} (−${HINT_COST}s)</button>` : ''}
+      <button class="btn ghost" data-act="closeov">Back to mission</button>
+    </div>
+  </div>`, 'hint');
+}
+function showWin() {
+  const used = G.used;
+  let stars = 3;
+  if (G.hints >= 1) stars--;
+  if (G.hints >= 3 || used > 240) stars--;
+  stars = Math.max(1, stars);
+  const prev = getBest(), isBest = !prev || used < prev;
+  if (isBest) store.set(BEST_KEY, String(Math.ceil(used)));
+  const rank = ['', 'Rookie Agent 🐣', 'Super Sleuth 🔍', 'Master Spy 🕶️'][stars];
+  ov(`<div class="card">
+    <div class="hero">🏆</div>
+    <h1>Mission Complete!</h1>
+    <div class="stars">${'⭐'.repeat(stars)}${'<span class="dim">⭐</span>'.repeat(3 - stars)}</div>
+    <p><b>Rank: ${rank}</b></p>
+    <div class="stats">
+      <div class="stat"><b>${fmt(used)}</b><span>time</span></div>
+      <div class="stat"><b>${G.hints}</b><span>hints</span></div>
+      <div class="stat"><b>${G.mistakes}</b><span>oopsies</span></div>
+    </div>
+    <p>${isBest ? '<span class="newbest">🎉 New best time!</span>' : `🏆 Best time: ${fmt(prev)}`}</p>
+    <p class="small">The spy's big secret? A surprise party for <b>you</b>! 🎂</p>
+    <button class="btn big" data-act="start">🔁 Play again (new puzzles)</button>
+  </div>`, 'win');
+}
+function showLose() {
+  ov(`<div class="card">
+    <div class="hero">🔒💤</div>
+    <h1>Time's up!</h1>
+    <p>The phone went into <b>Super Lock Mode</b>.${G.stage > 1 ? ` You finished ${G.stage - 1} of 3 steps. So close!` : ''}</p>
+    <p>Every great spy gets a second chance.</p>
+    <button class="btn big" data-act="start">🔁 Try again (new puzzles)</button>
+  </div>`, 'lose');
+}
+
+function confetti() {
+  const cols = ['#ff6fae', '#ffd65c', '#5fe3b4', '#5ec8ff', '#a77bff', '#ff9f5a'];
+  for (let i = 0; i < 90; i++) {
+    const d = document.createElement('i');
+    d.className = 'cf';
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.background = pick(cols);
+    d.style.setProperty('--dx', (Math.random() * 160 - 80) + 'px');
+    d.style.setProperty('--rot', (rnd(720) - 360) + 'deg');
+    d.style.animationDuration = (2.2 + Math.random() * 2) + 's';
+    d.style.animationDelay = Math.random() * .8 + 's';
+    if (Math.random() < .4) d.style.borderRadius = '50%';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 5200);
+  }
+}
+
+// ───────────────────────── Flow ─────────────────────────
+function start() {
+  audio();
+  document.querySelectorAll('.cf').forEach(c => c.remove());
+  newGame('play');
+  closeOv();
+  render();
+  requestAnimationFrame(tick);
+}
+function win() {
+  G.left = timeLeft(); G.used = TOTAL - G.left; G.phase = 'won';
+  SFX.win(); go('secret');
+  setTimeout(() => { showWin(); confetti(); }, 1700);
+}
+function lose() {
+  G.left = 0; G.phase = 'lost'; G.uv = false;
+  SFX.lose(); drawHud(); showLose();
+}
+
+// Background doodles, then show the briefing over a fresh locked phone.
+$('#bg').innerHTML = ['🔍', '⭐', '🔑', '💖', '🕶️', '🍬', '✨', '📱', '🌈', '🔐'].map((e, i) =>
+  `<span style="left:${(i * 37 + 5) % 95}%;top:${(i * 53 + 8) % 90}%;animation-delay:${-i * 1.3}s">${e}</span>`).join('');
+newGame('brief');
+render();
+showBrief();
+</script>
+</body>
+</html>
