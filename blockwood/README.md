@@ -21,6 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
+| Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
 | Pick block | `1`–`9` or mouse wheel |
 | Mute | `M` (or the Sound button in the pause menu) |
@@ -57,6 +58,13 @@ build on it, fly over it. The world saves in the browser.
 - 16×64×16 chunks generated from seeded value noise; view distance 3–8 chunks (pause menu).
 - Blocks: grass, dirt, stone, sand, water, oak log, oak leaves, oak planks, cobblestone,
   glass, bricks, stone bricks, wool, snow, coal ore, iron ore, TNT and bedrock.
+- **Obsidian**: dark purple blocks deep underground, near the bedrock. Mine it with an iron
+  pickaxe, or trade for it (the Builder swaps 10 cobblestone for 10 obsidian).
+- **The Nether**: build an obsidian frame 4 wide and 5 tall (the corners can be left out), light
+  the inside with **flint and steel** (1 iron ingot + 1 cobblestone, or from the Blacksmith) and
+  walk into the purple portal. The Nether is a huge red cavern of netherrack with glowstone hanging
+  from the ceiling and gold ore in the walls. One step there is 8 steps in the Overworld, and a
+  portal home appears where you arrive; walk back in to return. Beds explode down there!
 - **Caves**: winding tunnels and big dark caverns underground (overhangs and caves are shaded dark).
 - **Dig to the other side**: break through the bedrock at the very bottom and you fall out of the
   sky on the other side of the world. Do it again to come home.
@@ -64,6 +72,12 @@ build on it, fly over it. The world saves in the browser.
 - **Animals**: pigs, sheep, cows, chickens and hopping rabbits wander the land, and fish swim in
   lakes and the sea. They run when you hit them. In Survival they drop porkchops, wool, beef,
   chicken and fish, which you can cook with coal.
+- **Endermen**: tall black creatures with purple eyes that come out at night (and sometimes in
+  the Nether). They leave you alone unless you stare at them or hit them, then they teleport
+  after you. They drop ender pearls.
+- **Piglins** live in the Nether. They're friendly unless you hit one (then the whole group gets
+  angry). Right click one while holding a gold ingot to barter: they give back obsidian,
+  glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
 - **Sound effects** for digging, building, footsteps, splashes, animals and explosions (all synthesized).
 - 10-minute day/night cycle with sun, moon and sunset sky.
 - **New world** in the pause menu deletes the current world and makes a new seed.
