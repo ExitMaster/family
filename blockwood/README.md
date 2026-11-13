@@ -65,6 +65,14 @@ build on it, fly over it. The world saves in the browser.
   walk into the purple portal. The Nether is a huge red cavern of netherrack with glowstone hanging
   from the ceiling and gold ore in the walls. One step there is 8 steps in the Overworld, and a
   portal home appears where you arrive; walk back in to return. Beds explode down there!
+- **The End and the Ender Dragon**: craft an **eye of ender** (1 ender pearl + 1 glowstone, or
+  buy one from the Librarian) and right click the ground with it. An End portal opens right
+  there: jump in. You arrive on a little obsidian platform next to a floating island of end
+  stone in the void, so build a bridge across. Eight obsidian towers have healing crystals on
+  top; hit a crystal (even from far away) to blow it up. The Ender Dragon circles the island,
+  dives at you, and sometimes lands on the bedrock fountain in the middle, which is the best time
+  to hit it. Its health bar is at the top of the screen. Beat it and the exit portal opens in the
+  fountain (with a dragon egg on top) to take you home. Don't fall off: in Survival the void kills you.
 - **Caves**: winding tunnels and big dark caverns underground (overhangs and caves are shaded dark).
 - **Dig to the other side**: break through the bedrock at the very bottom and you fall out of the
   sky on the other side of the world. Do it again to come home.

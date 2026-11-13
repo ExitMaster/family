@@ -146,6 +146,9 @@ select{
 #hurt.on{opacity:1;transition:none}
 #sleep{position:fixed;inset:0;background:#05060c;opacity:0;pointer-events:none;transition:opacity 1s}
 #sleep.on{opacity:1}
+#boss{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:min(420px,62vw);text-align:center;font-family:var(--display);font-size:15px;text-shadow:0 2px 0 #000;pointer-events:none}
+#boss div{height:10px;margin-top:4px;background:rgba(0,0,0,.55);border:2px solid #000;border-radius:2px}
+#boss i{display:block;height:100%;width:100%;background:linear-gradient(#e27aff,#8a2ad0)}
 #portalFx{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(160,70,255,.3),rgba(110,20,210,.9))}
 .slot .cnt{left:auto;top:auto;right:3px;bottom:1px;font-size:11px;font-weight:600;color:var(--ink);text-shadow:0 1px 0 #000}
 #invUI{
@@ -195,6 +198,7 @@ select{
 <div id="hurt"></div>
 <div id="sleep"></div>
 <div id="portalFx"></div>
+<div id="boss" hidden><b>Ender Dragon</b><div><i></i></div></div>
 
 <div id="touch" hidden>
   <div id="joy" aria-label="Move stick"><div id="knob"></div></div>
@@ -246,6 +250,7 @@ select{
       <dt>Villagers</dt><dd>Right click a villager to trade for emeralds (Survival)</dd>
       <dt>Airplane</dt><dd>Place it, right click to get in. <kbd>W</kbd>/<kbd>S</kbd> speed up and slow down, arrow keys steer (<kbd>↑</kbd> climb, <kbd>↓</kbd> dive, <kbd>←</kbd><kbd>→</kbd> turn), <kbd>V</kbd> autopilots to the nearest villager's house, <kbd>Shift</kbd> to get out</dd>
       <dt>Nether</dt><dd>Build an obsidian frame 4 wide and 5 tall, light it with flint and steel, and walk in. Piglins there trade for gold ingots.</dd>
+      <dt>The End</dt><dd>Craft an eye of ender (ender pearl + glowstone) and right click the ground with it to open an End portal. Jump in, break the crystals on the towers, then beat the Ender Dragon.</dd>
       <dt>Ender pearl</dt><dd>Right click to teleport to where you look</dd>
       <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
       <dt>Kill</dt><dd><kbd>K</kbd> instantly kills the animal or monster you look at (or the nearest one)</dd>
@@ -307,10 +312,11 @@ let TOUCH = matchMedia('(pointer: coarse)').matches;
 
 /* ---------- blocks ---------- */
 const CS = 16, H = 64, PH = H + 2, PX = CS + 2, WATER = 26;
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19, BED=20, OBSIDIAN=21, PORTAL=22, NETHERRACK=23, GLOW=24, NGOLD=25, BEDH = 9 / 16;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19, BED=20, OBSIDIAN=21, PORTAL=22, NETHERRACK=23, GLOW=24, NGOLD=25, ENDSTONE=26, ENDPORTAL=27, ENDFRAME=28, EGG=29, BEDH = 9 / 16;
 const T = {GRASS_TOP:0, GRASS_SIDE:1, DIRT:2, STONE:3, SAND:4, WATER:5, LOG_SIDE:6, LOG_TOP:7, LEAVES:8, PLANKS:9, COBBLE:10, GLASS:11, BRICK:12, BEDROCK:13, COAL:14,
   IRON:15, SNOW:16, SNOW_SIDE:17, TNT_SIDE:18, TNT_TOP:19, TNT_BOTTOM:20, SBRICK:21, WOOL:22, TORCH:23, BED_TOP:24, BED_SIDE:25,
-  OBSIDIAN:26, PORTAL:27, NETHERRACK:28, GLOW:29, NGOLD:30};
+  OBSIDIAN:26, PORTAL:27, NETHERRACK:28, GLOW:29, NGOLD:30,
+  ENDSTONE:31, ENDPORTAL:32, ENDFRAME:33, EGG:34};
 const BLOCKS = [];
 const def = (id, n, top, bottom = top, side = top) => BLOCKS[id] = {n, t: [top, bottom, side]};
 def(GRASS, 'Grass', T.GRASS_TOP, T.DIRT, T.GRASS_SIDE);
@@ -338,13 +344,17 @@ def(PORTAL, 'Nether portal', T.PORTAL);
 def(NETHERRACK, 'Netherrack', T.NETHERRACK);
 def(GLOW, 'Glowstone', T.GLOW);
 def(NGOLD, 'Nether gold ore', T.NGOLD);
+def(ENDSTONE, 'End stone', T.ENDSTONE);
+def(ENDPORTAL, 'End portal', T.ENDPORTAL);
+def(ENDFRAME, 'End portal frame', T.ENDFRAME);
+def(EGG, 'Dragon egg', T.EGG);
 
 const NB = 32, SOLID = new Uint8Array(NB), TRANSP = new Uint8Array(NB), AOS = new Uint8Array(NB);
 for (let i = 1; i < NB; i++) { SOLID[i] = i !== WATERB ? 1 : 0; AOS[i] = (i !== WATERB && i !== GLASS) ? 1 : 0; }
-TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = TRANSP[TORCH] = TRANSP[BED] = TRANSP[PORTAL] = 1;
-SOLID[TORCH] = AOS[TORCH] = AOS[BED] = SOLID[PORTAL] = AOS[PORTAL] = 0;
+TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = TRANSP[TORCH] = TRANSP[BED] = TRANSP[PORTAL] = TRANSP[ENDPORTAL] = 1;
+SOLID[TORCH] = AOS[TORCH] = AOS[BED] = SOLID[PORTAL] = AOS[PORTAL] = SOLID[ENDPORTAL] = AOS[ENDPORTAL] = 0;
 const LIGHT = new Uint8Array(NB); // blocks that give off light
-LIGHT[TORCH] = LIGHT[GLOW] = LIGHT[PORTAL] = 1;
+LIGHT[TORCH] = LIGHT[GLOW] = LIGHT[PORTAL] = LIGHT[ENDPORTAL] = 1;
 const DEFAULT_HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, GLASS, TORCH, TNT];
 
 /* ---------- textures (procedural 16px tiles in an 8x8 atlas) ---------- */
@@ -456,6 +466,15 @@ const rackPx = (x, y, r) => r() < .25 ? J([84, 28, 28], r, 14) : J([116, 42, 40]
 tile(T.NETHERRACK, () => rackPx);
 tile(T.GLOW, () => (x, y, r) => { const v = r(); return v < .18 ? J([176, 124, 58], r, 16) : v < .5 ? J([255, 236, 170], r, 10) : J([236, 192, 104], r, 18); });
 tile(T.NGOLD, ore([250, 206, 60], rackPx));
+tile(T.ENDSTONE, () => (x, y, r) => r() < .16 ? J([196, 198, 132], r, 14) : J([224, 226, 166], r, 16));
+tile(T.ENDPORTAL, () => (x, y, r) => { const v = r(); return v < .05 ? [150, 240, 220] : v < .1 ? J([70, 50, 140], r, 20) : J([10, 12, 22], r, 8); });
+tile(T.ENDFRAME, () => (x, y, r) => {
+  const ex = Math.abs(x - 7.5), ey = Math.abs(y - 7.5);
+  if (ex < 2 && ey < 2) return J([14, 50, 40], r, 8);
+  if (ex < 3.5 && ey < 3.5) return J([52, 150, 116], r, 18);
+  return (x === 0 || y === 0 || x === 15 || y === 15) ? J([150, 160, 120], r, 10) : J([196, 206, 160], r, 14);
+});
+tile(T.EGG, () => (x, y, r) => r() < .2 ? J([100, 40, 150], r, 20) : J([18, 10, 26], r, 10));
 
 // average colour per tile (for break particles)
 const TILE_AVG = [];
@@ -543,11 +562,12 @@ function treeAt(x, z) {
 const chunks = new Map();
 const edits = new Map(); // chunkKey -> Map(index -> block)
 let dim = 'o'; // 'o' overworld, 'n' the Nether (its chunks and edits are kept apart by key)
-const ck = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096) + (dim === 'n' ? 1e8 : 0);
+const ck = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096) + (dim === 'n' ? 1e8 : dim === 'e' ? 2e8 : 0);
 const idxOf = (x, y, z) => y + H * (x + CS * z);
 
 function genData(cx, cz) {
   if (dim === 'n') return genNether(cx, cz);
+  if (dim === 'e') return genEnd(cx, cz);
   const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS, W = CS + 4;
   const hg = new Int16Array(W * W);
   for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) hg[x + z * W] = heightAt(ox + x - 2, oz + z - 2);
@@ -872,7 +892,7 @@ function physics(dt) {
   const wasGround = P.onGround;
   P.onGround = false; hitWall = false;
   for (let i = 0; i < steps; i++) { moveAxis('x', P.vx * h); moveAxis('z', P.vz * h); moveAxis('y', P.vy * h); }
-  if (P.y < -4) otherSide();
+  if (P.y < -4) { if (dim === 'e') voidFall(); else otherSide(); }
   portalCheck(dt);
   if (mode === 's') survivalMove(dt, inWater, sprint);
   if (P.onGround || inWater || P.fly) st.noFall = false;
@@ -898,7 +918,7 @@ function raycast(o, d, maxD) {
   let px = x, py = y, pz = z;
   for (let i = 0; i < 64; i++) {
     const b = getBlock(x, y, z);
-    if (b !== AIR && b !== WATERB && b !== PORTAL) return {x, y, z, px, py, pz, b};
+    if (b !== AIR && b !== WATERB && b !== PORTAL && b !== ENDPORTAL) return {x, y, z, px, py, pz, b};
     px = x; py = y; pz = z;
     if (tmx < tmy && tmx < tmz) { if (tmx > maxD) break; x += sx; tmx += tdx; }
     else if (tmy < tmz) { if (tmy > maxD) break; y += sy; tmy += tdy; }
@@ -926,6 +946,7 @@ function act(button) {
     if (m && m.kind === 'piglin') { barter(m); return; }
   }
   if (button === 2 && target && target.b === BED) { useBed(target.x, target.y, target.z); return; }
+  if (button === 0 && dim === 'e' && endHit()) return;
   const s = inv[sel];
   if (button === 0) {
     const reach = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) - .4 : 4;
@@ -942,6 +963,7 @@ function act(button) {
   } else if (button === 2) {
     if (s && s.id === PLANE) { placePlane(target.px + .5, target.py, target.pz + .5); return; }
     if (s && s.id === FLINT) { useFlint(); return; }
+    if (s && s.id === ENDEYE) { useEye(); return; }
     if (!s || s.id >= 64) return;
     const {px, py, pz} = target, b = s.id;
     if (py < 0 || py >= H) return;
@@ -995,6 +1017,12 @@ const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a
 let headInWater = false, skyLight = 1, dayAmt = 1;
 function updateSky() {
   sun.visible = moon.visible = dim === 'o';
+  if (dim === 'e') { // the End: a dark violet void with a flat, pale light
+    sky.copy(END_SKY); dayU.value = .85; minU.value = .5; skyLight = .85; dayAmt = 0; matWater.color.setScalar(.7);
+    lightA.intensity = .65; lightD.intensity = .35;
+    scene.fog.color.copy(sky); scene.background = sky; scene.fog.near = RD * CS * .45; scene.fog.far = RD * CS * 1.1;
+    return;
+  }
   if (dim === 'n') { // no sun down here: a dim red haze and glowing rocks
     sky.copy(NETHER_SKY); dayU.value = 0; minU.value = .45; skyLight = .8; dayAmt = 0; matWater.color.setScalar(.6);
     lightA.intensity = .6; lightD.intensity = .25;
@@ -1054,7 +1082,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1065,7 +1093,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: otherPlanes};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1088,10 +1116,14 @@ function spawn() {
   P.x = 8.5; P.z = 8.5; P.y = H - 4; P.fly = true;
 }
 function applySave(s) {
-  edits.clear(); dim = 'o'; otherPlanes = [];
+  edits.clear(); dim = 'o'; planeStash = {}; endState = freshEnd();
   if (s && typeof s.seed === 'number') {
-    if (s.dim === 'n') dim = 'n';
-    if (Array.isArray(s.planesX)) otherPlanes = s.planesX.filter(a => Array.isArray(a) && a.length === 4);
+    if (s.dim === 'n' || s.dim === 'e') dim = s.dim;
+    const okP = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && v.length === 4) : [];
+    if (Array.isArray(s.planesX)) planeStash[dim === 'n' ? 'o' : 'n'] = okP(s.planesX);
+    else if (s.planesX && typeof s.planesX === 'object') for (const k of ['o', 'n', 'e']) planeStash[k] = okP(s.planesX[k]);
+    if (s.end && typeof s.end === 'object') endState = {dead: !!s.end.dead, hp: Math.max(1, Math.min(DRAGON_HP, +s.end.hp || DRAGON_HP)),
+      cr: Array.isArray(s.end.cr) && s.end.cr.length === 8 ? s.end.cr.map(Boolean) : Array(8).fill(true)};
     SEED = s.seed;
     for (const k in s.edits || {}) edits.set(Number(k), new Map(s.edits[k]));
     invs = {c: creativeInv(), s: Array(36).fill(null)};
@@ -1115,7 +1147,7 @@ function applySave(s) {
   spawn();
 }
 function newWorld() {
-  resetWorld(); edits.clear(); clearMobs(); dim = 'o'; otherPlanes = [];
+  resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd();
   SEED = Math.floor(Math.random() * 1e6);
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
   invs = {c: creativeInv(), s: Array(36).fill(null)}; inv = invs[mode]; ensurePlane();
@@ -1452,9 +1484,10 @@ function updateMobs(dt) {
     spawnT = 1.5;
     let pass = 0, host = 0;
     for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
-    if (pass < 12) { if (dim === 'n') netherSpawn(Math.random() < .85 ? 'piglin' : 'enderman'); else trySpawn(); }
+    if (dim === 'e') { if (pass < 5) netherSpawn('enderman'); }
+    else if (pass < 12) { if (dim === 'n') netherSpawn(Math.random() < .85 ? 'piglin' : 'enderman'); else trySpawn(); }
     spawnVillagers();
-    if (mode === 's' && host < 5 && !dead) { if (dim === 'n') netherSpawn('magma'); else trySpawnZombie(); }
+    if (mode === 's' && host < 5 && !dead) { if (dim === 'n') netherSpawn('magma'); else if (dim === 'o') trySpawnZombie(); }
   }
   const fl = Math.floor;
   for (let i = mobs.length - 1; i >= 0; i--) {
@@ -1518,6 +1551,7 @@ function killMob(m) {
 // K: instantly kill the creature you're looking at, or else the nearest one close by
 function killKey() {
   if (dead || sleeping) return;
+  if (dim === 'e' && dragon.alive && dragonRay(64) >= 0) { hurtDragon(1e6); return; }
   let m = mobHit(8);
   if (!m) {
     let bd = 36;
@@ -1571,7 +1605,7 @@ function explode(cx, cy, cz) {
     const x = fx + dx, y = fy + dy, z = fz + dz;
     if (Math.hypot(x + .5 - cx, y + .5 - cy, z + .5 - cz) > R - Math.random() * .9) continue;
     const b = getBlock(x, y, z);
-    if (b === AIR || b === BEDROCK || b === WATERB) continue;
+    if (b === AIR || b === BEDROCK || b === WATERB || b === OBSIDIAN || b === ENDFRAME || b === PORTAL || b === ENDPORTAL) continue;
     setBlock(x, y, z, AIR);
     if (b === TNT) igniteTNT(x, y, z, .4 + Math.random() * .6);
     else if (n++ % 6 === 0) burst(x, y, z, b);
@@ -1586,6 +1620,7 @@ function explode(cx, cy, cz) {
   }
   shake = Math.max(shake, 1 - pd / 24);
   for (const m of mobs.slice()) if (Math.hypot(m.x - cx, m.y - cy, m.z - cz) < 5) killMob(m);
+  if (dragon.alive && Math.hypot(dragon.x - cx, dragon.y - cy, dragon.z - cz) < 8) hurtDragon(12);
 }
 
 /* ---------- items ---------- */
@@ -1855,7 +1890,7 @@ function die() {
 }
 function respawn() {
   dead = false; deadEl.hidden = true;
-  if (dim === 'n') switchDim('o');
+  if (dim !== 'o') switchDim('o');
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false, inv: 1});
   if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
   P.vx = P.vy = P.vz = 0;
@@ -2104,7 +2139,7 @@ function swim(m, K, dt) {
 const sleepEl = $('#sleep');
 let sleeping = false;
 function useBed(x, y, z) {
-  if (dim === 'n') { setBlock(x, y, z, AIR); igniteTNT(x, y, z, .05); toast('Beds explode in the Nether!', 2600); return; }
+  if (dim !== 'o') { setBlock(x, y, z, AIR); igniteTNT(x, y, z, .05); toast(`Beds explode in the ${dim === 'n' ? 'Nether' : 'End'}!`, 2600); return; }
   spawnPt = [x + .5, y + BEDH, z + .5]; saveDirty = true;
   if (dayAmt > .35) { toast('Spawn point set. You can only sleep at night.', 2600); return; }
   if (mobs.some(m => KINDS[m.kind].hostile && Math.hypot(m.x - x, m.y - y, m.z - z) < 10)) { toast("You can't sleep now, monsters are nearby", 2600); return; }
@@ -2297,7 +2332,7 @@ function villagerThink(m, dt) {
   }
 }
 function spawnVillagers() {
-  if (dim === 'n') return;
+  if (dim !== 'o') return;
   for (let rx = Math.floor((P.x - 70) / VR); rx <= Math.floor((P.x + 70) / VR); rx++)
     for (let rz = Math.floor((P.z - 70) / VR); rz <= Math.floor((P.z + 70) / VR); rz++) {
       const v = village(rx, rz);
@@ -2430,7 +2465,7 @@ function autoLand() {
   const pl = riding;
   if (!pl) return;
   if (pl.auto) { pl.auto = null; toast('Autopilot off'); return; }
-  if (dim === 'n') { toast('There are no villages in the Nether'); return; }
+  if (dim !== 'o') { toast(`There are no villages in the ${dim === 'n' ? 'Nether' : 'End'}`); return; }
   let best = null, bd = Infinity;
   const rx0 = Math.floor(pl.x / VR), rz0 = Math.floor(pl.z / VR);
   for (let r = 0; r <= 8 && !best; r++) // search outwards ring by ring
@@ -2599,10 +2634,11 @@ function genNether(cx, cz) {
 }
 
 const NETHER_SKY = new THREE.Color(0x4a120c), PURPLE = new THREE.Color(0xb050ff);
-let otherPlanes = [], portalT = 0, portalLock = false;
+let planeStash = {}, portalT = 0, portalLock = false; // parked airplanes of the dimensions you're not in
 const portalFx = $('#portalFx');
 function portalCheck(dt) {
   const fl = Math.floor, x = fl(P.x), z = fl(P.z);
+  if (getBlock(x, fl(P.y + .3), z) === ENDPORTAL) { if (!portalLock) { portalLock = true; endTravel(); } return; }
   const inP = getBlock(x, fl(P.y + .3), z) === PORTAL || getBlock(x, fl(P.y + 1.3), z) === PORTAL;
   if (!inP) { portalLock = false; portalT = 0; }
   else if (!portalLock) {
@@ -2615,14 +2651,14 @@ function portalCheck(dt) {
 // swap the loaded world for the other dimension; each dimension keeps its own parked airplanes
 function switchDim(to) {
   if (to === dim) return;
-  const keep = planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw]);
+  planeStash[dim] = planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw]);
   clearMobs(); resetWorld();
   dim = to;
-  otherPlanes.forEach(a => addPlane(+a[0], +a[1], +a[2], +a[3])); otherPlanes = keep;
+  (planeStash[to] || []).forEach(a => addPlane(+a[0], +a[1], +a[2], +a[3])); planeStash[to] = [];
   saveDirty = true;
 }
 function travel() {
-  const to = dim === 'o' ? 'n' : 'o', k = to === 'n' ? 1 / 8 : 8; // one step in the Nether is 8 in the Overworld
+  const to = dim === 'o' ? 'n' : 'o', k = to === 'n' ? 1 / 8 : dim === 'n' ? 8 : 1; // one step in the Nether is 8 in the Overworld
   const x = Math.floor(P.x * k), z = Math.floor(P.z * k);
   switchDim(to);
   const p = findPortal(x, z) || makePortal(x, z);
@@ -2769,6 +2805,241 @@ function netherSpawn(kind) {
   if (spots.length) addMob(kind, x + .5, spots[Math.floor(Math.random() * spots.length)], z + .5);
 }
 
+/* ---------- the End and the Ender Dragon ---------- */
+const ENDEYE = 88;
+item(ENDEYE, 'Eye of ender', g => { rects(g, '#2e8a6e', [[5, 4, 6, 8], [4, 5, 8, 6]]); rects(g, '#9ef0c8', [[6, 6, 4, 4]]); rects(g, '#0e2a22', [[7, 6, 2, 4]]); }, {max: 16});
+PALETTE.push(ENDEYE);
+RECIPES.push([ENDEYE, 1, [[PEARL, 1], [GLOW, 1]]]);
+PROFS.librarian.trades.unshift([ENDEYE, 1, [[EMERALD, 2]]], [PEARL, 2, [[EMERALD, 1]]]);
+HARD[ENDSTONE] = 1.8; NEED[ENDSTONE] = 1; HARD[ENDFRAME] = 10; HARD[ENDPORTAL] = 0; DROP[ENDPORTAL] = 0; HARD[EGG] = .5;
+MAT[ENDSTONE] = MAT[ENDFRAME] = 'rock'; MAT[ENDPORTAL] = 'glass';
+
+const END_Y = 30, DRAGON_HP = 120, END_SKY = new THREE.Color(0x150a22);
+// eight obsidian towers around the island, each with a healing crystal on top
+const PILLARS = Array.from({length: 8}, (_, i) => { const a = i * Math.PI / 4 + .3; return [Math.round(Math.cos(a) * 30), Math.round(Math.sin(a) * 30), 40 + (i * 7) % 17]; });
+const freshEnd = () => ({dead: false, hp: DRAGON_HP, cr: Array(8).fill(true)});
+let endState = freshEnd();
+
+function genEnd(cx, cz) {
+  const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS;
+  for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+    const wx = ox + x, wz = oz + z, base = H * (x + CS * z), r = Math.hypot(wx + .5, wz + .5);
+    const R = 50 + (vnoise(wx / 14, wz / 14, 1500) - .5) * 16;
+    if (r < R) {
+      const top = END_Y + Math.floor((vnoise(wx / 9, wz / 9, 1510) - .5) * 4), dep = Math.floor(3 + (1 - (r / R) ** 2) * 22);
+      for (let y = Math.max(1, top - dep); y <= top; y++) d[base + y] = ENDSTONE;
+    }
+    if (wx >= 68 && wx <= 72 && wz >= -2 && wz <= 2) d[base + END_Y + 8] = OBSIDIAN; // where you arrive
+    for (const [px, pz, top] of PILLARS) {
+      if ((wx - px) ** 2 + (wz - pz) ** 2 > 5) continue;
+      for (let y = END_Y - 8; y <= top; y++) d[base + y] = OBSIDIAN;
+      if (wx === px && wz === pz) d[base + top + 1] = BEDROCK;
+    }
+    const q = wx * wx + wz * wz;
+    if (q <= 12) { // the bedrock fountain in the middle: the way home opens here
+      for (let y = END_Y + 1; y < H; y++) d[base + y] = AIR;
+      d[base + END_Y] = BEDROCK;
+      if (q > 4) d[base + END_Y + 1] = BEDROCK;
+      if (!q) for (let y = END_Y + 1; y <= END_Y + 4; y++) d[base + y] = BEDROCK;
+    }
+  }
+  const e = edits.get(ck(cx, cz));
+  if (e) for (const [i, b] of e) d[i] = b;
+  return d;
+}
+function useEye() {
+  if (!target) return;
+  if (dim === 'e') { toast("You're already in the End"); return; }
+  const {x, y, z} = target;
+  for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+    for (let yy = y + 1; yy <= y + 3; yy++) setBlock(x + dx, yy, z + dz, AIR);
+    const ax = Math.abs(dx), az = Math.abs(dz);
+    if (ax < 2 || az < 2) setBlock(x + dx, y, z + dz, ax === 2 || az === 2 ? ENDFRAME : ENDPORTAL);
+  }
+  if (mode === 's') use1(sel);
+  tone(220, 110, 1.4, .25, 'sawtooth'); tone(660, 990, .8, .1, 'sine', null, .3);
+  toast('The End portal is open! Jump in to fight the Ender Dragon.', 3500);
+}
+function endTravel() {
+  if (dim === 'e') {
+    switchDim('o');
+    if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+    toast('Back home in the Overworld', 3000);
+  } else {
+    switchDim('e');
+    P.x = 70.5; P.y = END_Y + 9; P.z = .5; P.yaw = Math.PI / 2; P.pitch = 0;
+    toast(endState.dead ? 'The End. The dragon is gone, but its island is still here.'
+      : 'Welcome to the End! Bridge over to the island, break the crystals on the towers, then defeat the Ender Dragon.', 5000);
+  }
+  P.vx = P.vy = P.vz = 0; st.fallY = null; st.noFall = false; P.fly = false; refreshMeta();
+  noise(1.5, 'lowpass', 500, 1, 1.1, null, 80);
+}
+function voidFall() {
+  if (mode === 's' && !dead) { P.y = -4; P.vy = 0; st.hp = 0; die(); return; }
+  P.x = 70.5; P.y = END_Y + 9; P.z = .5; P.vx = P.vy = P.vz = 0; toast('Saved from the void!');
+}
+
+const dragon = {g: null, alive: false, x: 0, y: 50, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, state: 'circle', t: 6, ang: 0, sit: 0, hitT: 0, dieT: 0, flapT: 0, wings: [], mats: []};
+let endLoaded = false, crystals = [];
+const bossEl = $('#boss'), bossBar = $('#boss i'), bossName = $('#boss b');
+const crystalMat = new THREE.MeshBasicMaterial({color: 0xff80e0}), cageMat = new THREE.MeshBasicMaterial({color: 0xe8c8ff, wireframe: true});
+const beamMat = new THREE.LineBasicMaterial({color: 0xe090ff});
+function dpart(g, c, w, h, d, x, y, z) {
+  const mt = new THREE.MeshLambertMaterial({color: c}), m = new THREE.Mesh(boxG, mt);
+  dragon.mats.push(mt); m.scale.set(w, h, d); m.position.set(x, y, z); g.add(m); return m;
+}
+function buildDragon() {
+  const g = new THREE.Group(), body = 0x1c1c22, dark = 0x0e0e12, bone = 0x3c3c48, eye = 0xd070ff;
+  g.rotation.order = 'YXZ'; dragon.mats = [];
+  dpart(g, body, 2.4, 1.8, 5, 0, 0, 0);
+  for (let i = 0; i < 4; i++) dpart(g, bone, .3, .5, .5, 0, 1.1, -1.8 + i * 1.2);
+  dpart(g, body, 1, 1, 2.6, 0, .4, -3.6);
+  dpart(g, body, 1.7, 1.3, 2.2, 0, .6, -5.8);
+  dpart(g, dark, 1.3, .5, 1.3, 0, .05, -7.2);
+  dpart(g, eye, .4, .22, .1, -.5, .95, -6.92); dpart(g, eye, .4, .22, .1, .5, .95, -6.92);
+  dpart(g, bone, .25, .6, .25, -.5, 1.5, -5.2); dpart(g, bone, .25, .6, .25, .5, 1.5, -5.2);
+  for (let i = 0; i < 6; i++) { dpart(g, body, 1.2 - i * .17, 1 - i * .13, 1.4, 0, -.1 + i * .05, 3.2 + i * 1.3); dpart(g, bone, .2, .35, .35, 0, .55 - i * .05, 3.2 + i * 1.3); }
+  for (const [x, z] of [[-1, -1.6], [1, -1.6], [-1, 1.6], [1, 1.6]]) dpart(g, body, .6, 1.4, .6, x, -1.4, z);
+  dragon.wings = [-1, 1].map(sg => {
+    const w = new THREE.Group(); w.position.set(sg * 1.2, .6, -.6);
+    dpart(w, 0x2c2a36, 6.5, .12, 3.8, sg * 3.3, 0, .9); dpart(w, bone, 6.6, .3, .3, sg * 3.3, .1, -1);
+    g.add(w); return w;
+  });
+  return g;
+}
+function makeCrystal(i) {
+  const [px, pz, top] = PILLARS[i], g = new THREE.Group();
+  const core = new THREE.Mesh(boxG, crystalMat), cage = new THREE.Mesh(boxG, cageMat);
+  core.scale.setScalar(.6); cage.scale.setScalar(1.15); g.add(core, cage);
+  const y = top + 2.8; g.position.set(px + .5, y, pz + .5); scene.add(g);
+  const beam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), beamMat);
+  beam.frustumCulled = false; beam.visible = false; scene.add(beam);
+  return {i, g, core, cage, beam, x: px + .5, y, z: pz + .5};
+}
+function endLoad() {
+  endLoaded = true;
+  crystals = endState.cr.map((on, i) => on ? makeCrystal(i) : null).filter(Boolean);
+  if (!endState.dead) {
+    dragon.g = buildDragon(); scene.add(dragon.g);
+    Object.assign(dragon, {alive: true, x: 0, y: END_Y + 22, z: -38, vx: 0, vy: 0, vz: 0, state: 'circle', t: 10, ang: -Math.PI / 2, dieT: 0});
+  }
+  bossName.textContent = 'Ender Dragon · ' + crystals.length + ' crystals';
+  bossEl.hidden = !dragon.alive;
+}
+function dropDragonMesh() {
+  if (!dragon.g) return;
+  scene.remove(dragon.g); dragon.mats.forEach(m => m.dispose()); dragon.g = null;
+}
+function endUnload() {
+  endLoaded = false;
+  for (const c of crystals) { scene.remove(c.g, c.beam); c.beam.geometry.dispose(); }
+  crystals = []; dropDragonMesh(); dragon.alive = false; dragon.dieT = 0; bossEl.hidden = true;
+}
+function roar() { const at = [dragon.x, dragon.y, dragon.z]; tone(75, 40, 1.6, .5, 'sawtooth', at); noise(1.2, 'lowpass', 420, 1, .9, at); }
+function dragonRay(maxD) {
+  const D = dragon, hx = D.x - Math.sin(D.yaw) * 5.8, hz = D.z - Math.cos(D.yaw) * 5.8;
+  const a = rayBox([D.x - 3, D.y - 2, D.z - 3], [D.x + 3, D.y + 2, D.z + 3], maxD), b = rayBox([hx - 1.3, D.y - 1, hz - 1.3], [hx + 1.3, D.y + 2, hz + 1.3], maxD);
+  return a < 0 ? b : b < 0 ? a : Math.min(a, b);
+}
+// left click in the End: crystals can be hit from far away (as if you threw something), the dragon up close
+function endHit() {
+  const far = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) : 64;
+  let best = null, bt = Math.min(far, 64);
+  for (const c of crystals) {
+    const y = c.g.position.y, t = rayBox([c.x - .8, y - .8, c.z - .8], [c.x + .8, y + .8, c.z + .8], bt);
+    if (t >= 0 && t < bt) { bt = t; best = c; }
+  }
+  if (best) { blowCrystal(best); return true; }
+  if (dragon.alive && dragonRay(Math.min(far, 7)) >= 0) { hurtDragon(mode === 'c' ? 8 : damageOf()); exhaust(.1); return true; }
+  return false;
+}
+function blowCrystal(c) {
+  endState.cr[c.i] = false; crystals.splice(crystals.indexOf(c), 1);
+  scene.remove(c.g, c.beam); c.beam.geometry.dispose();
+  explode(c.x, c.g.position.y, c.z); saveDirty = true;
+  const left = crystals.length;
+  bossName.textContent = 'Ender Dragon · ' + left + ' crystals';
+  toast(left ? `Crystal destroyed! ${left} left` : 'All the crystals are gone. Now get the dragon!', 2600);
+}
+function hurtDragon(dmg) {
+  if (!dragon.alive) return;
+  endState.hp -= dmg; dragon.hitT = .25; saveDirty = true;
+  tone(120, 50, .5, .4, 'sawtooth', [dragon.x, dragon.y, dragon.z]);
+  if (dragon.state === 'perch' && dragon.sit > 0 && Math.random() < .25) { dragon.state = 'circle'; dragon.t = 6; dragon.ang = Math.atan2(dragon.z, dragon.x); }
+  if (endState.hp <= 0) {
+    dragon.alive = false; dragon.dieT = 4; endState.dead = true; endState.hp = 0; bossEl.hidden = true;
+    roar(); toast('You defeated the Ender Dragon!', 5000);
+  }
+}
+function dragonDone() { // after the death show: the way home opens and the egg appears
+  dropDragonMesh();
+  for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const q = dx * dx + dz * dz; if (q && q <= 4) setBlock(dx, END_Y + 1, dz, ENDPORTAL); }
+  setBlock(0, END_Y + 5, 0, EGG);
+  [523, 659, 784, 1046].forEach((f, i) => tone(f, f, .5, .14, 'triangle', null, i * .18));
+  toast('The exit portal is open. Jump in to go home!', 4000);
+}
+function updateEnd(dt) {
+  if (dim !== 'e') { if (endLoaded) endUnload(); return; }
+  if (!endLoaded) endLoad();
+  const D = dragon, T = performance.now() / 1000;
+  for (const c of crystals) {
+    c.core.rotation.set(T * 1.3, T * 1.7, 0); c.cage.rotation.set(-T, T * .8, T * .5);
+    c.g.position.y = c.y + Math.sin(T * 2 + c.i) * .3;
+    const on = D.alive && Math.hypot(D.x - c.x, D.y - c.y, D.z - c.z) < 45;
+    c.beam.visible = on;
+    if (on) {
+      const a = c.beam.geometry.attributes.position;
+      a.setXYZ(0, c.x, c.g.position.y, c.z); a.setXYZ(1, D.x, D.y, D.z); a.needsUpdate = true;
+      endState.hp = Math.min(DRAGON_HP, endState.hp + dt); // crystals heal the dragon
+    }
+  }
+  if (D.dieT > 0) { // death show: rise, spin and burst
+    D.dieT -= dt; D.y += dt * 3; D.g.rotation.y += dt * 3;
+    if (frame % 3 === 0) burst(Math.floor(D.x + (Math.random() - .5) * 8), Math.floor(D.y + (Math.random() - .5) * 4), Math.floor(D.z + (Math.random() - .5) * 8), 0, Math.random() < .5 ? PURPLE : new THREE.Color(0xffe080));
+    D.g.position.set(D.x, D.y, D.z);
+    if (D.dieT <= 0) dragonDone();
+    return;
+  }
+  if (!D.alive) return;
+  D.t -= dt; D.hitT -= dt;
+  let tx, ty, tz, sp;
+  if (D.state === 'circle') {
+    D.ang += dt * .3; tx = Math.cos(D.ang) * 38; tz = Math.sin(D.ang) * 38; ty = END_Y + 22; sp = 14;
+    if (D.t <= 0) {
+      const r = Math.random();
+      if (r < .5 && !dead) { D.state = 'swoop'; D.t = 7; roar(); }
+      else if (r < .8) { D.state = 'perch'; D.t = 20; D.sit = 0; }
+      else D.t = 5 + Math.random() * 6;
+    }
+  } else if (D.state === 'swoop') { // dive at the player
+    tx = P.x; ty = P.y + 1.2; tz = P.z; sp = 19;
+    if (Math.hypot(D.x - P.x, D.y - P.y - 1, D.z - P.z) < 3.5) { hurtPlayer(6, D.x, D.z); P.vy = 11; D.state = 'circle'; D.t = 8; D.ang = Math.atan2(D.z, D.x); }
+    if (D.t <= 0 || dead) { D.state = 'circle'; D.t = 8; D.ang = Math.atan2(D.z, D.x); }
+  } else { // land on the fountain pillar: your chance to hit it
+    tx = .5; ty = END_Y + 6.2; tz = .5; sp = 11;
+    if (Math.hypot(D.x - tx, D.y - ty, D.z - tz) < 1.5) {
+      D.sit += dt; D.x = tx; D.y = ty; D.z = tz; D.vx = D.vy = D.vz = 0;
+      let dy = Math.atan2(-(P.x - D.x), -(P.z - D.z)) - D.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); D.yaw += dy * Math.min(1, 2 * dt); D.pitch *= .9;
+      if (D.sit > 8) { D.state = 'circle'; D.t = 8; D.ang = Math.atan2(-30, 0); }
+    } else if (D.t <= 0) { D.state = 'circle'; D.t = 6; D.ang = Math.atan2(D.z, D.x); }
+  }
+  if (!(D.state === 'perch' && D.sit > 0)) {
+    const dx = tx - D.x, dy = ty - D.y, dz = tz - D.z, dl = Math.hypot(dx, dy, dz) || 1, v = sp * (D.state === 'perch' ? Math.min(1, dl / 8 + .15) : 1), k = Math.min(1, 1.6 * dt);
+    D.vx += (dx / dl * v - D.vx) * k; D.vy += (dy / dl * v - D.vy) * k; D.vz += (dz / dl * v - D.vz) * k;
+    D.x += D.vx * dt; D.y += D.vy * dt; D.z += D.vz * dt;
+    const hv = Math.hypot(D.vx, D.vz);
+    if (hv > .5) { let a = Math.atan2(-D.vx, -D.vz) - D.yaw; a = Math.atan2(Math.sin(a), Math.cos(a)); D.yaw += a * Math.min(1, 3 * dt); }
+    D.pitch += (Math.atan2(D.vy, hv + .1) * .6 - D.pitch) * Math.min(1, 3 * dt);
+  }
+  const sitting = D.state === 'perch' && D.sit > 0, flap = sitting ? .3 : Math.sin(T * 3.4) * .55;
+  D.wings[0].rotation.z = -flap; D.wings[1].rotation.z = flap;
+  if (!sitting && (D.flapT -= dt) <= 0) { D.flapT = 1.85; noise(.4, 'lowpass', 260, .7, .45, [D.x, D.y, D.z]); }
+  if (Math.random() < dt * .04) roar();
+  for (const m of D.mats) m.emissive.setHex(D.hitT > 0 ? 0x990000 : 0);
+  D.g.position.set(D.x, D.y, D.z); D.g.rotation.set(D.pitch, D.yaw, 0);
+  bossBar.style.width = Math.max(0, endState.hp / DRAGON_HP * 100) + '%';
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2781,7 +3052,7 @@ function loop(now) {
     updateSurvival(dt); updateMining(dt); ensureCobble();
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
-    updateMobs(dt); updateTNT(dt); updatePlanes(dt);
+    updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt);
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;
   }
