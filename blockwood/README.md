@@ -31,6 +31,14 @@ build on it, fly over it. The world saves in the browser.
 ## Game modes
 
 - **Creative**: fly, every block and item, break blocks instantly.
+- **OneBlock** (press *Play OneBlock* in the pause menu): you stand on a single block floating in
+  the sky with nothing else around. Break it and a new block appears in the same spot, so you
+  slowly collect everything you need to build an island. The blocks go through phases: Plains
+  (grass, dirt, logs), Underground (stone, coal, iron), Snowy mountains, Beach, Village (planks,
+  bricks, wool), the Nether (netherrack, gold, glowstone, obsidian) and the End (end stone, dragon
+  egg), then start over. Sometimes a treasure pops out, or an animal or monster from that phase.
+  Fall off and you land back on the block. Press *Back to the big world* to go home; your
+  OneBlock island is saved.
 - **Survival** (pick it in the pause menu): 10 hearts and 10 food. Falling, drowning, zombies
   and TNT hurt you; food slowly drains and full food heals you. Blocks take time to dig and
   go into your backpack; stone needs a pickaxe, iron ore a stone pickaxe. Zombies come out at

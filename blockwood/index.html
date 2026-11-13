@@ -252,6 +252,7 @@ select{
       <dt>Nether</dt><dd>Build an obsidian frame 4 wide and 5 tall, light it with flint and steel, and walk in. Piglins there trade for gold ingots.</dd>
       <dt>The End</dt><dd>Craft an eye of ender (ender pearl + glowstone) and right click the ground with it to open an End portal. Jump in, break the crystals on the towers, then beat the Ender Dragon.</dd>
       <dt>Ender pearl</dt><dd>Right click to teleport to where you look</dd>
+      <dt>OneBlock</dt><dd>In the pause menu, press Play OneBlock: you stand on a single block in the sky. Break it and a new one appears, going from plains to underground, snow, beach, village, the Nether and the End.</dd>
       <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
       <dt>Kill</dt><dd><kbd>K</kbd> instantly kills the animal or monster you look at (or the nearest one)</dd>
       <dt>Sound</dt><dd><kbd>M</kbd> mutes</dd>
@@ -274,6 +275,10 @@ select{
         <option value="c">Creative: fly, endless blocks</option>
         <option value="s">Survival: health, hunger, crafting</option>
       </select>
+    </div>
+    <div class="row">
+      <span class="meta">OneBlock: live on one magic block that turns into something new every time you break it</span>
+      <button id="obBtn" class="btn small" type="button">Play OneBlock</button>
     </div>
     <div class="row">
       <label for="rd">View distance</label>
@@ -561,13 +566,14 @@ function treeAt(x, z) {
 /* ---------- world storage ---------- */
 const chunks = new Map();
 const edits = new Map(); // chunkKey -> Map(index -> block)
-let dim = 'o'; // 'o' overworld, 'n' the Nether (its chunks and edits are kept apart by key)
-const ck = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096) + (dim === 'n' ? 1e8 : dim === 'e' ? 2e8 : 0);
+let dim = 'o'; // 'o' overworld, 'n' the Nether, 'e' the End, 'b' the OneBlock world (its chunks and edits are kept apart by key)
+const ck = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096) + (dim === 'n' ? 1e8 : dim === 'e' ? 2e8 : dim === 'b' ? 3e8 : 0);
 const idxOf = (x, y, z) => y + H * (x + CS * z);
 
 function genData(cx, cz) {
   if (dim === 'n') return genNether(cx, cz);
   if (dim === 'e') return genEnd(cx, cz);
+  if (dim === 'b') return genOneBlock(cx, cz);
   const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS, W = CS + 4;
   const hg = new Int16Array(W * W);
   for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) hg[x + z * W] = heightAt(ox + x - 2, oz + z - 2);
@@ -647,6 +653,7 @@ function setBlock(x, y, z, b) {
   if (dz) markDirty(cx, cz + dz);
   if (dx && dz) markDirty(cx + dx, cz + dz);
   saveDirty = true;
+  if (dim === 'b' && b === AIR && x === 0 && y === OB_Y && z === 0) nextOneBlock();
   return true;
 }
 
@@ -892,7 +899,7 @@ function physics(dt) {
   const wasGround = P.onGround;
   P.onGround = false; hitWall = false;
   for (let i = 0; i < steps; i++) { moveAxis('x', P.vx * h); moveAxis('z', P.vz * h); moveAxis('y', P.vy * h); }
-  if (P.y < -4) { if (dim === 'e') voidFall(); else otherSide(); }
+  if (P.y < -4) { if (dim === 'e' || dim === 'b') voidFall(); else otherSide(); }
   portalCheck(dt);
   if (mode === 's') survivalMove(dt, inWater, sprint);
   if (P.onGround || inWater || P.fly) st.noFall = false;
@@ -1016,7 +1023,7 @@ const sky = new THREE.Color(), sunDir = new THREE.Vector3();
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 let headInWater = false, skyLight = 1, dayAmt = 1;
 function updateSky() {
-  sun.visible = moon.visible = dim === 'o';
+  sun.visible = moon.visible = dim === 'o' || dim === 'b';
   if (dim === 'e') { // the End: a dark violet void with a flat, pale light
     sky.copy(END_SKY); dayU.value = .85; minU.value = .5; skyLight = .85; dayAmt = 0; matWater.color.setScalar(.7);
     lightA.intensity = .65; lightD.intensity = .35;
@@ -1082,7 +1089,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1093,7 +1100,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1116,9 +1123,10 @@ function spawn() {
   P.x = 8.5; P.z = 8.5; P.y = H - 4; P.fly = true;
 }
 function applySave(s) {
-  edits.clear(); dim = 'o'; planeStash = {}; endState = freshEnd();
+  edits.clear(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   if (s && typeof s.seed === 'number') {
-    if (s.dim === 'n' || s.dim === 'e') dim = s.dim;
+    if (['n', 'e', 'b'].includes(s.dim)) dim = s.dim;
+    obN = Math.max(0, s.ob | 0);
     const okP = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && v.length === 4) : [];
     if (Array.isArray(s.planesX)) planeStash[dim === 'n' ? 'o' : 'n'] = okP(s.planesX);
     else if (s.planesX && typeof s.planesX === 'object') for (const k of ['o', 'n', 'e']) planeStash[k] = okP(s.planesX[k]);
@@ -1147,7 +1155,7 @@ function applySave(s) {
   spawn();
 }
 function newWorld() {
-  resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd();
+  resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   SEED = Math.floor(Math.random() * 1e6);
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
   invs = {c: creativeInv(), s: Array(36).fill(null)}; inv = invs[mode]; ensurePlane();
@@ -1159,6 +1167,7 @@ function refreshMeta() {
   $('#rd').value = String(RD);
   $('#bFly').classList.toggle('on', P.fly); $('#bDown').hidden = !P.fly;
   $('#snd').textContent = S.on ? 'Sound on' : 'Sound off';
+  $('#obBtn').textContent = dim === 'b' ? 'Back to the big world' : 'Play OneBlock';
   $('#gm').value = mode; $('#stats').hidden = mode !== 's'; statsKey = '';
 }
 function toggleSound() {
@@ -1890,9 +1899,9 @@ function die() {
 }
 function respawn() {
   dead = false; deadEl.hidden = true;
-  if (dim !== 'o') switchDim('o');
+  if (dim !== 'o' && dim !== 'b') switchDim('o');
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false, inv: 1});
-  if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+  if (dim === 'b') obHome(); else if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
   P.vx = P.vy = P.vz = 0;
   if (!TOUCH && !dragMode) requestLock();
   saveDirty = true;
@@ -2139,8 +2148,10 @@ function swim(m, K, dt) {
 const sleepEl = $('#sleep');
 let sleeping = false;
 function useBed(x, y, z) {
-  if (dim !== 'o') { setBlock(x, y, z, AIR); igniteTNT(x, y, z, .05); toast(`Beds explode in the ${dim === 'n' ? 'Nether' : 'End'}!`, 2600); return; }
+  const keepSpawn = spawnPt;
+  if (dim === 'n' || dim === 'e') { setBlock(x, y, z, AIR); igniteTNT(x, y, z, .05); toast(`Beds explode in the ${dim === 'n' ? 'Nether' : 'End'}!`, 2600); return; }
   spawnPt = [x + .5, y + BEDH, z + .5]; saveDirty = true;
+  if (dim === 'b') spawnPt = keepSpawn; // OneBlock always sends you back to the block
   if (dayAmt > .35) { toast('Spawn point set. You can only sleep at night.', 2600); return; }
   if (mobs.some(m => KINDS[m.kind].hostile && Math.hypot(m.x - x, m.y - y, m.z - z) < 10)) { toast("You can't sleep now, monsters are nearby", 2600); return; }
   sleeping = true; mine.on = false; held = null;
@@ -2465,7 +2476,7 @@ function autoLand() {
   const pl = riding;
   if (!pl) return;
   if (pl.auto) { pl.auto = null; toast('Autopilot off'); return; }
-  if (dim !== 'o') { toast(`There are no villages in the ${dim === 'n' ? 'Nether' : 'End'}`); return; }
+  if (dim !== 'o') { toast(`There are no villages in ${{n: 'the Nether', e: 'the End', b: 'OneBlock'}[dim]}`); return; }
   let best = null, bd = Infinity;
   const rx0 = Math.floor(pl.x / VR), rz0 = Math.floor(pl.z / VR);
   for (let r = 0; r <= 8 && !best; r++) // search outwards ring by ring
@@ -2876,7 +2887,8 @@ function endTravel() {
 }
 function voidFall() {
   if (mode === 's' && !dead) { P.y = -4; P.vy = 0; st.hp = 0; die(); return; }
-  P.x = 70.5; P.y = END_Y + 9; P.z = .5; P.vx = P.vy = P.vz = 0; toast('Saved from the void!');
+  if (dim === 'b') obHome(); else { P.x = 70.5; P.y = END_Y + 9; P.z = .5; P.vx = P.vy = P.vz = 0; }
+  toast('Saved from the void!');
 }
 
 const dragon = {g: null, alive: false, x: 0, y: 50, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, state: 'circle', t: 6, ang: 0, sit: 0, hitT: 0, dieT: 0, flapT: 0, wings: [], mats: []};
@@ -3040,6 +3052,69 @@ function updateEnd(dt) {
   bossBar.style.width = Math.max(0, endState.hp / DRAGON_HP * 100) + '%';
 }
 
+/* ---------- OneBlock ---------- */
+// a world of nothing but one magic block in the sky; break it and it turns into the next block of its phase
+const OB_Y = 32, OB_CYCLE = 520;
+const OB_PHASES = [
+  {n: 'Plains', at: 0, blocks: [[GRASS, 5], [DIRT, 4], [LOG, 4], [LEAVES, 1], [SAND, 1]], mobs: ['pig', 'sheep', 'cow', 'chicken'], loot: [[APPLE, 3], [STICK, 4], [WOOL, 2], [TORCH, 4]]},
+  {n: 'Underground', at: 40, blocks: [[STONE, 6], [COAL, 3], [IRON, 2], [DIRT, 1], [COBBLE, 1]], mobs: ['zombie'], loot: [[COALI, 4], [RAWIRON, 3], [TORCH, 6], [SPICK, 1]]},
+  {n: 'Snowy mountains', at: 110, blocks: [[SNOW, 4], [STONE, 3], [LOG, 2], [IRON, 1.5]], mobs: ['rabbit', 'sheep'], loot: [[IRONI, 3], [WOOL, 4], [IPICK, 1]]},
+  {n: 'Beach', at: 170, blocks: [[SAND, 6], [GLASS, 1], [DIRT, 1], [LOG, 1]], mobs: ['chicken', 'rabbit'], loot: [[RFISH, 4], [CFISH, 3], [GLASS, 8]]},
+  {n: 'Village', at: 230, blocks: [[PLANKS, 3], [BRICK, 2], [SBRICK, 2], [WOOL, 2], [GLASS, 1], [LOG, 1]], mobs: ['villager'], loot: [[EMERALD, 3], [BED, 1], [STEAK, 3], [ISWORD, 1]]},
+  {n: 'the Nether', at: 310, blocks: [[NETHERRACK, 6], [NGOLD, 2], [GLOW, 1.5], [OBSIDIAN, 1]], mobs: ['piglin', 'magma'], loot: [[GOLDI, 3], [FLINT, 1], [OBSIDIAN, 4]]},
+  {n: 'the End', at: 400, blocks: [[ENDSTONE, 7], [OBSIDIAN, 2], [EGG, .2]], mobs: ['enderman'], loot: [[PEARL, 2], [ENDEYE, 1]]},
+];
+let obN = 0;
+const obPhase = n => { const k = n % OB_CYCLE; let ph = OB_PHASES[0]; for (const p of OB_PHASES) if (k >= p.at) ph = p; return ph; };
+const pickW = list => { let r = Math.random() * list.reduce((a, b) => a + b[1], 0); for (const [v, w] of list) if ((r -= w) < 0) return v; return list[0][0]; };
+function genOneBlock(cx, cz) {
+  const d = new Uint8Array(CS * CS * H);
+  if (!cx && !cz) d[idxOf(0, OB_Y, 0)] = GRASS;
+  const e = edits.get(ck(cx, cz));
+  if (e) for (const [i, b] of e) d[i] = b;
+  return d;
+}
+function nextOneBlock() {
+  const prev = obPhase(obN), ph = obPhase(++obN);
+  setBlock(0, OB_Y, 0, pickW(ph.blocks));
+  tone(520, 780, .12, .08, 'sine', [.5, OB_Y + .5, .5]);
+  if (ph !== prev) {
+    toast(obN % OB_CYCLE ? `New phase: ${ph.n}!` : 'You finished every phase! Back to the plains.', 3200);
+    [392, 523, 659].forEach((f, i) => tone(f, f, .3, .12, 'triangle', null, i * .14));
+  }
+  if (Math.random() < 1 / 14) {
+    const kind = ph.mobs[Math.floor(Math.random() * ph.mobs.length)];
+    if (!KINDS[kind].hostile || mode === 's') {
+      addMob(kind, .5, OB_Y + 1, .5);
+      const m = mobs[mobs.length - 1];
+      if (kind === 'villager') { m.prof = PROF_KEYS[Math.floor(Math.random() * PROF_KEYS.length)]; m.home = [.5, .5]; m.vk = 'ob'; }
+    }
+  }
+  if (mode === 's' && Math.random() < 1 / 12) {
+    const [id, k] = ph.loot[Math.floor(Math.random() * ph.loot.length)], n = Math.max(1, Math.ceil(k * (.5 + Math.random() * .7)));
+    give(id, n); toast(`Treasure! ${n} ${nameOf(id).toLowerCase()}`, 2400);
+  }
+}
+function obHome() {
+  if (getBlock(0, OB_Y, 0) === AIR) setBlock(0, OB_Y, 0, GRASS);
+  P.x = .5; P.y = OB_Y + 1; P.z = .5; P.vx = P.vy = P.vz = 0; st.fallY = null; st.noFall = false;
+}
+function toggleOneBlock() {
+  if (dim === 'b') {
+    switchDim('o');
+    if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+    P.vx = P.vy = P.vz = 0; st.fallY = null;
+    toast('Back in the big world', 2500);
+  } else {
+    switchDim('b');
+    if (mode !== 's') setMode('s');
+    obHome(); P.fly = false; P.yaw = 0; P.pitch = -.5;
+    toast(obN ? `Back to your OneBlock (${obN} broken)` : 'OneBlock! Break the block under your feet. It keeps changing. Don\'t fall!', 4500);
+  }
+  refreshMeta(); persist();
+}
+$('#obBtn').addEventListener('click', toggleOneBlock);
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3053,6 +3128,7 @@ function loop(now) {
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt);
+    if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;
   }
