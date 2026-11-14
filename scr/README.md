@@ -55,6 +55,10 @@ and **C** still changes its colour.
 
 The traffic on the roads is made of real cars too.
 
+The **Lamborghinis** (Aventador, Huracán, Revuelto, Countach, Urus) and **Ferraris** (F40,
+LaFerrari, SF90, 488, Testarossa, Purosangue) are detailed supercars too, with wedge
+noses, cockpit canopies, air intakes, big rear wings and their badges.
+
 The **Teslas** (Model 3, Y, Y L, S Plaid, X, Roadster and the Cybertruck) are built as
 detailed models of the real cars, with their light bars, badges and wheels. The **electric
 cars** (the Teslas, Ioniq 5 and EV6) **sound like EVs** — a quiet rising whine instead of an
