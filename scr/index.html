@@ -3943,7 +3943,7 @@ function boot(hot){
     if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
     audioTick -= dt;
     if (audioTick <= 0){ audioTick = 0.1;
-      if (F.drive && car.free && !car.taxi && myCar.ev){ sfx.engine(false, 0); sfx.ev(live, car.speed, car.speed < -0.5); }
+      if (F.drive && car.free && !car.taxi && myCar.ev){ sfx.engine(false, 0); sfx.ev(live, car.speed, false); }
       else { const snd = F.cruise ? { mul: 0.3, vol: 0.03 } : F.drive ? { mul: 0.7, vol: 0.03 } : (plane.sound || {}); sfx.ev(false, 0, false); sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
     }
     if (live){ dtHud = dt; updateFreeHud(); }
@@ -5129,6 +5129,7 @@ function boot(hot){
   function endDrive(){
     if (F.drive){ F.drive = false; F.ground = false; }
     if (sfx.ev) sfx.ev(false, 0, false);
+    cockpit.visible = false;
     worldCars.rent.visible = worldCars.taxi.visible = false; planeRoot.visible = true;
     if (hotel) endHotel();
     endRoute();
@@ -5213,16 +5214,57 @@ function boot(hot){
   }
   // the car camera: 0 = behind (chase), 1 = the driver's seat
   const mirrorCam = new THREE.PerspectiveCamera(48, 3.2, 0.3, 4000);
+  // the car interior you see from the driver's seat: a dashboard, the steering wheel and the
+  // big centre touchscreen. It is one model, placed at the car each frame, hidden otherwise.
+  const cockpit = new THREE.Group(); cockpit.visible = false; scene.add(cockpit);
+  let tabletCtx = null, tabletTex = null;
+  (function buildCockpit(){
+    const dark = mat(0x15171b), mid = mat(0x26292f), M = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); cockpit.add(o); return o; };
+    // the dashboard sweeping across in front, with a soft top lip
+    M(2.4, 0.5, 0.5, dark, 0, 1.02, -0.78); M(2.4, 0.06, 0.62, mid, 0, 1.28, -0.74);
+    M(2.4, 0.9, 0.1, dark, 0, 0.65, -0.95);   // the lower dash / footwell wall
+    // the Tesla centre tablet: a thin screen on a little stalk, angled towards the driver
+    const screenMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    { const c = document.createElement('canvas'); c.width = 256; c.height = 160; tabletCtx = c.getContext('2d'); tabletTex = new THREE.CanvasTexture(c); screenMat.map = tabletTex; }
+    M(0.06, 0.34, 0.5, dark, 0.14, 1.15, -0.7);              // the stalk
+    const scr = M(0.52, 0.34, 0.02, screenMat, 0.14, 1.28, -0.66); scr.rotation.y = 0.28;   // the screen, turned to the driver
+    M(0.56, 0.38, 0.02, dark, 0.14, 1.28, -0.675).rotation.y = 0.28;   // its bezel, just behind
+    // the steering wheel in front of the driver (the left seat), a yoke-ish rounded wheel
+    const wheel = new THREE.Group(); wheel.position.set(-0.38, 1.0, -0.5); wheel.rotation.x = -0.5; cockpit.add(wheel);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.028, 10, 28), mat(0x111317)); wheel.add(rim);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 16), mid); hub.rotation.x = Math.PI / 2; wheel.add(hub);
+    [[-1, 0], [1, 0], [0, -1]].forEach(([sx, sy]) => { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.17, 0.02), mid); sp.position.set(sx * 0.09, sy * 0.09, 0); if (sx) sp.rotation.z = Math.PI / 2; wheel.add(sp); });
+    { const t = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xd0202a })); t.position.set(0, 0, 0.03); wheel.add(t); }   // red T on the hub
+    cockpit.userData.wheel = wheel;
+    // door tops / A-pillars at the sides to frame the view a little
+    [-1, 1].forEach(sd => M(0.08, 0.7, 1.2, dark, sd * 0.95, 1.1, -0.1));
+  })();
+  let tabletT = 0;
+  function updateTablet(kmh){
+    if (!tabletCtx) return;
+    const c = tabletCtx, w = 256, h = 160;
+    c.fillStyle = '#0d1016'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#1b2230'; c.fillRect(8, 8, w - 16, 44);   // a little map strip
+    c.strokeStyle = '#3fa9f5'; c.lineWidth = 4; c.beginPath(); c.moveTo(20, 46); c.lineTo(110, 14); c.lineTo(236, 30); c.stroke();
+    c.fillStyle = '#ffffff'; c.font = 'bold 54px sans-serif'; c.textAlign = 'center'; c.fillText(String(kmh), w / 2, 118);
+    c.fillStyle = '#8a93a6'; c.font = 'bold 18px sans-serif'; c.fillText('km/h', w / 2, 146);
+    tabletTex.needsUpdate = true;
+  }
   function switchDriveView(){ car.view = car.view ? 0 : 1; toast(car.view ? "Driver's seat" : 'Behind the car', ''); }
   function driveCam(dt){
     const c = car, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw), rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
     if (car.view && !c.taxi){
-      // from the driver's seat, looking ahead down the road
-      const ex = c.x - rx * 0.35 + fx * 0.1, ez = c.z - rz * 0.35 + fz * 0.1, ey = c.y + 1.35;
+      // from the driver's seat: a little lower, looking down the road over the dashboard
+      const ex = c.x - rx * 0.35 + fx * 0.15, ez = c.z - rz * 0.35 + fz * 0.15, ey = c.y + 1.22;
       dCam.lerp(camT.set(ex, ey, ez), 1 - Math.exp(-dt * 16));
       camera.position.copy(dCam); camera.up.set(0, 1, 0);
-      camera.lookAt(ex + fx * 30, ey + 0.2, ez + fz * 30);
+      camera.lookAt(ex + fx * 30, ey - 1.2, ez + fz * 30);
+      // sit the cockpit at the car, facing forward, and spin the wheel a touch with the steering
+      cockpit.visible = true; cockpit.position.set(c.x, c.y, c.z); cockpit.rotation.set(0, c.yaw, 0);
+      if (cockpit.userData.wheel) cockpit.userData.wheel.rotation.z = -(keys.r || keys.dd ? 1 : 0) * 0.5 + (keys.l ? 1 : 0) * 0.5 + stick.x * -0.5;
+      if ((tabletT -= dt) <= 0){ tabletT = 0.15; updateTablet(Math.round(Math.abs(c.speed) * 3.6)); }
     } else {
+      cockpit.visible = false;
       const D = c.taxi ? 11 : 9, Hc = c.taxi ? 5 : 3.8;
       camT.set(c.x + Math.sin(c.yaw) * D, c.y + Hc, c.z + Math.cos(c.yaw) * D);
       camT.y = Math.max(camT.y, Math.max(groundAt(camT.x, camT.z), 0) + 1.5);
