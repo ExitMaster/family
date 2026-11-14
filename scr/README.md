@@ -38,6 +38,10 @@ Field, always with **45,000 points** to start. Drive anywhere (arrows / WASD or 
 
 ## Real cars
 
+Press **B** (or VIEW) while driving to switch the camera between **behind the car** and the
+**driver's seat**. In the driver's seat there's always a floating **rear-view mirror** across
+the top showing what's behind you.
+
 Press **V** (or CARS) while driving, or at the airport curb, to open the **garage** and
 choose from 46 real cars, each with its own shape and top speed. Your choice is saved,
 and **C** still changes its colour.
