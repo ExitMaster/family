@@ -36,6 +36,10 @@ Field, always with **45,000 points** to start. Drive anywhere (arrows / WASD or 
 - **From your island**, walk to the end of the pier and FLY BACK to the airport you came
   from.
 
+The **2026 Tesla Roadster** can **fly** 🚀 — hold **FLY** (or **Shift**) to fire its rocket
+thrusters and lift off, then steer around in the air (it can soar over water, buildings
+and the new **skyscrapers** downtown). Let go to float back down.
+
 ## Real cars
 
 Press **B** (or VIEW) while driving to switch the camera between **behind the car** and the
