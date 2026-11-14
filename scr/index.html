@@ -419,6 +419,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <button class="ap" id="btn-ride-wc" hidden>BATHROOM</button>
     <button class="ap" id="btn-ride-jump" hidden>JUMP (J)</button>
     <button class="ap" id="btn-ride-car" hidden>CARS (V)</button>
+    <button class="ap" id="btn-ride-view" hidden>VIEW (B)</button>
   </div>
 </div>
 <div id="fade"></div>
@@ -467,9 +468,18 @@ const sfx = (() => {
     const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 1400; wf.Q.value = 1.2;
     const wg = ctx.createGain(); wg.gain.value = 0;
     w1.connect(wf); w2.connect(wf); wf.connect(wg); wg.connect(master); w1.start(); w2.start();
-    const rev = ctx.createOscillator(); rev.type = 'sine'; rev.frequency.value = 880;
-    const rg = ctx.createGain(); rg.gain.value = 0; rev.connect(rg); rg.connect(master); rev.start();
-    ev = { w1, w2, wg, rev, rg };
+    // the Tesla reversing sound: two slightly detuned saw tones through a soft low-pass, pulsed
+    // on and off by an LFO (so it warbles), then gated on only while actually reversing
+    const rv1 = ctx.createOscillator(); rv1.type = 'sawtooth'; rv1.frequency.value = 600;
+    const rv2 = ctx.createOscillator(); rv2.type = 'sawtooth'; rv2.frequency.value = 600; rv2.detune.value = 22;
+    const rvf = ctx.createBiquadFilter(); rvf.type = 'lowpass'; rvf.frequency.value = 1300; rvf.Q.value = 3;
+    const trem = ctx.createGain(); trem.gain.value = 0.5;           // pulsed between 0 and 1 by the LFO
+    const rg = ctx.createGain(); rg.gain.value = 0;                 // the on/off gate
+    rv1.connect(rvf); rv2.connect(rvf); rvf.connect(trem); trem.connect(rg); rg.connect(master);
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 2.7;   // the pulse rate
+    const lfoDepth = ctx.createGain(); lfoDepth.gain.value = 0.5; lfo.connect(lfoDepth); lfoDepth.connect(trem.gain);
+    rv1.start(); rv2.start(); lfo.start();
+    ev = { w1, w2, wg, rv1, rv2, rg };
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
@@ -526,9 +536,9 @@ const sfx = (() => {
       ev.wg.gain.setTargetAtTime(on ? 0.016 + Math.min(sp, 14) * 0.0016 : 0, now, 0.15);
       ev.w1.frequency.setTargetAtTime(f, now, 0.1);
       ev.w2.frequency.setTargetAtTime(f * 1.5, now, 0.1);
-      // the reverse sound: a warbling two-note beep that wobbles, like the real car
-      if (on && reversing){ const wob = 660 + Math.sin(now * 11) * 90; ev.rev.frequency.setTargetAtTime(wob, now, 0.03); ev.rg.gain.setTargetAtTime(0.03, now, 0.05); }
-      else ev.rg.gain.setTargetAtTime(0, now, 0.05);
+      // the reverse sound: pulsing, warbling detuned tones with a slow pitch wobble, like the real car
+      if (on && reversing){ const base = 560 + Math.sin(now * 1.6) * 55; ev.rv1.frequency.setTargetAtTime(base, now, 0.08); ev.rv2.frequency.setTargetAtTime(base, now, 0.08); ev.rg.gain.setTargetAtTime(0.05, now, 0.04); }
+      else ev.rg.gain.setTargetAtTime(0, now, 0.08);
     },
     engineOff(){ if (engine) engine.g.gain.setTargetAtTime(0, ctx.currentTime, 0.1); if (ev){ ev.wg.gain.setTargetAtTime(0, ctx.currentTime, 0.1); ev.rg.gain.setTargetAtTime(0, ctx.currentTime, 0.1); } },
     get muted(){ return muted; },
@@ -740,6 +750,7 @@ function boot(hot){
     { id: 'pig', name: 'Flying Pig', note: 'When pigs fly!', color: '#ff9fb8', cruise: 45, boost: 110, pitch: 1.7, turn: 1.7, pax: 1, sound: { mul: 1.2, vol: 0.02 } },
     { id: 'cow', name: 'Cow', note: 'A cow with a jetpack', color: '#ffffff', cruise: 45, boost: 115, pitch: 1.5, turn: 1.5, pax: 1, sound: { mul: 2.2, vol: 0.035 } },
     { id: 'puppy', name: 'Puppy', note: 'Dog with flying goggles', color: '#c68a5a', cruise: 50, boost: 120, pitch: 1.8, turn: 1.8, pax: 1, sound: { mul: 1.6, vol: 0.035 } },
+    { id: 'kitty', name: 'Cat', note: 'A flying cat with a jetpack', color: '#ff9a3d', cruise: 50, boost: 125, pitch: 1.9, turn: 2.0, pax: 1, sound: { mul: 1.4, vol: 0.03 } },
     { id: 'kitty', name: 'Super Kitty', note: 'Cat in a red cape', color: '#ffa040', cruise: 55, boost: 135, pitch: 2.1, turn: 2.1, fixedGear: true, pax: 1, sound: { mul: 3, vol: 0.006 } },
     { id: 'robot', name: 'Robot', note: 'Rocket boots', color: '#b8c0c8', cruise: 70, boost: 180, pitch: 1.8, turn: 1.8, fixedGear: true, pax: 1, sound: { mul: 2.0, vol: 0.04 } },
     { id: 'burger', name: 'Burger', note: 'Cheeseburger with everything', color: '#d9a05a', cruise: 40, boost: 100, pitch: 1.5, turn: 1.6, fixedGear: true, pax: 2, sound: { mul: 1.6, vol: 0.035 } },
@@ -1828,6 +1839,27 @@ function boot(hot){
         both((x) => [-0.5, 0.5].forEach(z => gearBox(0.15, 0.5, 0.15, x, -0.75, z, Br)), 0.35);
         break;
       }
+      case 'kitty': {   // a ginger cat with a jetpack and a swishing tail
+        const Or = 0xff9a3d, Dk = 0xe07a1d, Pk = 0xffb8c8, K = 0x1b1b22, Cr = 0xfff1d6;
+        ball(0.62, Or, 0, 0, 0, 1, 0.9, 1.5);                       // body
+        ball(0.3, Cr, 0, -0.5, 0.35, 1, 0.7, 1);                    // pale tummy
+        [-0.6, 0.0, 0.6].forEach(z => box(0.86, 0.04, 0.12, Dk, 0, 0.48, z));   // tabby stripes
+        ball(0.5, Or, 0, 0.32, -1.2);                               // head
+        ball(0.26, Cr, 0, 0.12, -1.6, 1, 0.9, 1);                   // muzzle
+        both((x) => { const e = add(new THREE.ConeGeometry(0.2, 0.34, 4), Or, x, 0.72, -1.1); e.rotation.x = 0.2; ball(0.09, Pk, x, 0.66, -1.16, 1, 1, 0.5); }, 0.3);   // ears
+        both((x) => ball(0.1, 0x3fe08a, x, 0.4, -1.5, 1, 1.3, 0.6), 0.17);   // green eyes
+        ball(0.07, Pk, 0, 0.26, -1.74);                             // pink nose
+        both((x) => { for (let k = 0; k < 3; k++) box(0.34, 0.012, 0.012, 0xffffff, x * 0.4, 0.2 - k * 0.06, -1.7, 0, x > 0 ? 0.2 : -0.2, 0); }, 1);   // whiskers
+        // a swishing tail, built from segments, that wags as it flies
+        const tail = new THREE.Group(); tail.position.set(0, 0.1, 1.0); root.add(tail);
+        let py = 0, pz = 0; for (let k = 0; k < 5; k++){ const seg = new THREE.Mesh(new THREE.SphereGeometry(0.16 - k * 0.02, 10, 8), mat(k % 2 ? Dk : Or)); py += 0.12 + k * 0.03; pz += 0.18; seg.position.set(0, py, pz); tail.add(seg); }
+        sp.push({ o: tail, axis: 'y', rate: 1.6 });   // the tail swishes behind the cat
+        box(0.5, 0.5, 0.5, 0x3fa9f5, 0, -0.2, 0.55);                // the jetpack
+        both((x) => { tube(0.17, 0.17, 0.9, GRAY, x, 0.35, 0.65); flame(x, 0.35, 1.1, 0.16, 0.5); }, 0.28);
+        both((x) => box(0.14, 0.04, 0.5, 0xff8a1d, x * 2.2, 0.1, 0), 1);   // little wings
+        both((x) => [-0.6, 0.6].forEach(z => gearBox(0.14, 0.5, 0.14, x, -0.7, z, Or)), 0.33);
+        break;
+      }
       case 'kitty': {   // a superhero cat in a red cape
         const O = 0xffa040, o = -0.45;
         ball(0.55, O, 0, o, 0, 0.9, 0.85, 1.8); ball(0.42, O, 0, o + 0.15, -1.15);
@@ -2806,6 +2838,7 @@ function boot(hot){
     if (state === 'play' && F.ride && !/^(KeyC|KeyV|Escape|KeyP|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyD)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
     if (state === 'play' && F.ride && e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     if (state === 'play' && F.drive){
+      if (e.code === 'KeyB' && !car.taxi){ e.preventDefault(); switchDriveView(); return; }
       if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){ e.preventDefault(); driveAction(); return; }
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|KeyV|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
@@ -4971,7 +5004,7 @@ function boot(hot){
     sfx.chime(); renderSteps(); toast('Rent a car (R) or take a taxi (T)', 'info');
   }
   // driving in the open world: your rental car (you steer) or a taxi (it drives itself) to a hotel
-  const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, taxi: false, tx: 0, tz: 0, km: 0, warnT: -9, crashT: -9 };
+  const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, taxi: false, tx: 0, tz: 0, km: 0, warnT: -9, crashT: -9, view: 0 };
   const worldCars = { rent: makeCar(0x3fa9f5, false, myCar), taxi: makeCar(0xffd23d, true) };
   // the rental car comes in lots of colours: C (or COLOR) swaps to the next one
   const STEALTH_GREY = 0x50555c;   // Tesla's Stealth Grey
@@ -5001,6 +5034,7 @@ function boot(hot){
   });
   $('btn-cars-done').addEventListener('click', closeGarage);
   $('btn-ride-car').addEventListener('click', e => { e.currentTarget.blur(); if ((state === 'play' && F.drive && !car.taxi) || (state === 'ride' && ride.curb && !ride.ui)) openGarage(); });
+  $('btn-ride-view').addEventListener('click', e => { e.currentTarget.blur(); if (state === 'play' && F.drive && !car.taxi) switchDriveView(); });
   function switchRentColor(){
     rentCol = (rentCol + 1) % RENT_COLS.length;
     worldCars.rent = recolor(worldCars.rent, scene); curbCar = recolor(curbCar, rideScene);
@@ -5177,13 +5211,46 @@ function boot(hot){
     else if (el) txt(el, 'HOTEL ' + (dist / 1000).toFixed(1) + ' km ' + (Math.abs(turn) < 0.35 ? 'ahead' : turn > 0 ? 'to the left' : 'to the right') + ' · ' + 'IAS ' + String(Math.round(Math.abs(c.speed) * 1.944)).padStart(3, '0') + ' kt · ' + Math.round(Math.abs(c.speed) * 3.6) + ' km/h');
     if (!c.free && dist < 25 && state === 'play') finishDrive(true);
   }
+  // the car camera: 0 = behind (chase), 1 = the driver's seat
+  const mirrorCam = new THREE.PerspectiveCamera(48, 3.2, 0.3, 4000);
+  function switchDriveView(){ car.view = car.view ? 0 : 1; toast(car.view ? "Driver's seat" : 'Behind the car', ''); }
   function driveCam(dt){
-    const c = car, D = c.taxi ? 11 : 9, Hc = c.taxi ? 5 : 3.8;
-    camT.set(c.x + Math.sin(c.yaw) * D, c.y + Hc, c.z + Math.cos(c.yaw) * D);
-    camT.y = Math.max(camT.y, Math.max(groundAt(camT.x, camT.z), 0) + 1.5);
-    dCam.lerp(camT, 1 - Math.exp(-dt * 5));
-    camera.position.copy(dCam); camera.up.set(0, 1, 0);
-    camera.lookAt(c.x - Math.sin(c.yaw) * 6, c.y + 1.2, c.z - Math.cos(c.yaw) * 6);
+    const c = car, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw), rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
+    if (car.view && !c.taxi){
+      // from the driver's seat, looking ahead down the road
+      const ex = c.x - rx * 0.35 + fx * 0.1, ez = c.z - rz * 0.35 + fz * 0.1, ey = c.y + 1.35;
+      dCam.lerp(camT.set(ex, ey, ez), 1 - Math.exp(-dt * 16));
+      camera.position.copy(dCam); camera.up.set(0, 1, 0);
+      camera.lookAt(ex + fx * 30, ey + 0.2, ez + fz * 30);
+    } else {
+      const D = c.taxi ? 11 : 9, Hc = c.taxi ? 5 : 3.8;
+      camT.set(c.x + Math.sin(c.yaw) * D, c.y + Hc, c.z + Math.cos(c.yaw) * D);
+      camT.y = Math.max(camT.y, Math.max(groundAt(camT.x, camT.z), 0) + 1.5);
+      dCam.lerp(camT, 1 - Math.exp(-dt * 5));
+      camera.position.copy(dCam); camera.up.set(0, 1, 0);
+      camera.lookAt(c.x - Math.sin(c.yaw) * 6, c.y + 1.2, c.z - Math.cos(c.yaw) * 6);
+    }
+  }
+  // the rear-view mirror: a small inset at the top that always shows what's behind you,
+  // flipped left-to-right like a real mirror
+  function drawMirror(){
+    const c = car, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
+    mirrorCam.position.set(c.x - fx * 0.2, c.y + 1.5, c.z - fz * 0.2);
+    mirrorCam.up.set(0, 1, 0); mirrorCam.lookAt(c.x + fx * 30, c.y + 1.6, c.z + fz * 30);   // look behind
+    const dom = renderer.domElement, dpr = renderer.getPixelRatio();
+    const mw = Math.min(dom.width * 0.46, 380 * dpr), mh = mw / 3.4, mx = (dom.width - mw) / 2, my = dom.height - mh - 14 * dpr, b = 3 * dpr;
+    const oc = renderer.getClearColor(new THREE.Color()), oa = renderer.getClearAlpha();
+    renderer.setScissorTest(true);
+    // the mirror's dark frame
+    renderer.setScissor(mx - b, my - b, mw + 2 * b, mh + 2 * b); renderer.setViewport(mx - b, my - b, mw + 2 * b, mh + 2 * b);
+    renderer.setClearColor(0x14161c, 1); renderer.clear();
+    // the view behind, in its own little viewport
+    renderer.setScissor(mx, my, mw, mh); renderer.setViewport(mx, my, mw, mh);
+    mirrorCam.aspect = mw / mh; mirrorCam.updateProjectionMatrix();
+    renderer.render(scene, mirrorCam);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, dom.width, dom.height);
+    renderer.setClearColor(oc, oa);
   }
 
   /* ---------------- Cruise ship ---------------- */
@@ -6455,7 +6522,7 @@ function boot(hot){
   let carBtnShown = false;
   function syncJump(){
     const carOn = (state === 'play' && !!F.drive && !car.taxi) || (state === 'ride' && !!ride.curb && !ride.ui);
-    if (carOn !== carBtnShown){ carBtnShown = carOn; $('btn-ride-car').hidden = !carOn; }
+    if (carOn !== carBtnShown){ carBtnShown = carOn; $('btn-ride-car').hidden = !carOn; $('btn-ride-view').hidden = !(state === 'play' && !!F.drive && !car.taxi); }
     const on = state === 'island' ? !isle.ui && !isle.swim : state === 'ride' ? !ride.ui && !ride.seated : state === 'play' && !!F.cruise && !cruise.ui;
     if (on !== jumpShown){ jumpShown = on; $('btn-ride-jump').hidden = !on; }
   }
@@ -6472,6 +6539,7 @@ function boot(hot){
     if (F.drive) driveCam(dt);
     else if (F.cruise) cruiseCam(dt);
     renderer.render(scene, camera);
+    if (F.drive && !car.taxi && car.view) drawMirror();
   }
 
   Object.assign(F, { x: 0, y: 260, z: 900, yaw: 0.6, ground: false, speed: 65 });
