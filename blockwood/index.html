@@ -139,6 +139,9 @@ kbd{
 #chatLog{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));max-width:min(440px,70vw);display:flex;flex-direction:column;gap:3px;pointer-events:none}
 #chatLog div{background:rgba(0,0,0,.5);padding:3px 8px;border-radius:3px;line-height:1.4;overflow-wrap:anywhere;transition:opacity 1s}
 #chatLog div.old{opacity:0}
+#chatLog.open div{opacity:1}
+#chatLog i{color:var(--muted)}
+#bChat{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(max(16px,env(safe-area-inset-right,0px)) + 54px);width:44px;height:44px;font-size:18px}
 #chatLog b{color:var(--gold)}
 #chatIn{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(118px + env(safe-area-inset-bottom,0px));width:min(440px,80vw);user-select:text;-webkit-user-select:text}
 select,#seedIn,.tin,#chatIn{
@@ -205,7 +208,7 @@ select,#seedIn,.tin,#chatIn{
 <div id="cross" aria-hidden="true"></div>
 <div id="charge" hidden><i></i></div>
 <div id="chatLog" aria-live="polite"></div>
-<input id="chatIn" type="text" maxlength="80" autocomplete="off" placeholder="Say something · Enter sends · Esc cancels" hidden>
+<input id="chatIn" type="text" maxlength="80" autocomplete="off" placeholder="Say something, or /help · Enter sends · Esc cancels" hidden>
 <div id="toast" role="status"></div>
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
 <canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
@@ -225,6 +228,7 @@ select,#seedIn,.tin,#chatIn{
     <button class="tb" id="bDown" type="button" hidden>Down</button>
     <button class="tb" id="bJump" type="button">Jump</button>
   </div>
+  <button class="tb" id="bChat" type="button" aria-label="Chat">💬</button>
   <button class="tb" id="bPause" type="button" aria-label="Pause">II</button>
 </div>
 
@@ -270,6 +274,7 @@ select,#seedIn,.tin,#chatIn{
       <dt>OneBlock</dt><dd>In the pause menu, press Play OneBlock: you stand on a single block in the sky. Break it and a new one appears, going from plains to underground, snow, beach, village, the Nether and the End.</dd>
       <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
       <dt>Kill</dt><dd><kbd>K</kbd> instantly kills the animal or monster you look at (or the nearest one)</dd>
+      <dt>Chat</dt><dd><kbd>T</kbd> or <kbd>Enter</kbd> to talk (to everyone in a multiplayer room). Commands: <kbd>/help</kbd>, <kbd>/day</kbd>, <kbd>/night</kbd>, <kbd>/seed</kbd>, <kbd>/spawn</kbd>, <kbd>/fly</kbd></dd>
       <dt>Sound</dt><dd><kbd>M</kbd> mutes</dd>
       <dt>Pause</dt><dd><kbd>Esc</kbd></dd>
     </dl>
@@ -1296,6 +1301,7 @@ addEventListener('keydown', e => {
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
     if (e.code === 'KeyM' && !e.repeat) toggleSound();
     if (e.code === 'KeyV' && !e.repeat) autoLand();
+    if (e.code === 'KeyT' || e.code === 'Enter') { e.preventDefault(); openChat(''); return; }
     keys[e.code] = true;
     return;
   }
@@ -1313,7 +1319,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') toggleSound();
   if (e.code === 'KeyE') openInv();
   if (e.code === 'KeyK') killKey();
-  if (e.code === 'KeyT' && mp.on) { e.preventDefault(); openChat(); return; }
+  if (e.code === 'KeyT' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Slash') { e.preventDefault(); openChat(e.code === 'Slash' ? '/' : ''); return; }
   if (e.code === 'KeyV') toast('Get in your airplane first, then press V to fly to a village house');
   if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code[5] - 1);
   if (e.code === 'Escape' && !locked) pause();
@@ -3445,28 +3451,56 @@ function mpTick(dt) {
   const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d].join();
   if (sig !== mp.last) { mp.last = sig; quiet(mp.fb.update(R('/players/' + mp.uid), me)); }
 }
+/* ---------- chat ---------- */
+// T, Enter or / opens it. In a multiplayer room messages go to everyone; on your own they just show here.
+// Lines fade after a while, but opening the chat shows the last ten again.
 function showChat(n, m) {
-  const line = document.createElement('div'), b = document.createElement('b');
-  b.textContent = n.slice(0, 12) + ' '; line.append(b, m.slice(0, 80));
+  const line = document.createElement('div');
+  if (n === null) { const i = document.createElement('i'); i.textContent = m; line.append(i); } // a game message
+  else { const b = document.createElement('b'); b.textContent = n.slice(0, 12) + ' '; line.append(b, m.slice(0, 80)); tone(880, 1100, .08, .06, 'sine'); }
   chatLog.append(line);
-  while (chatLog.children.length > 6) chatLog.firstChild.remove();
+  while (chatLog.children.length > 10) chatLog.firstChild.remove();
   setTimeout(() => line.classList.add('old'), 14000);
-  setTimeout(() => line.remove(), 15000);
-  tone(880, 1100, .08, .06, 'sine');
 }
-function openChat() {
+function openChat(prefix = '') {
   for (const k in keys) keys[k] = false;
-  chatIn.hidden = false; chatIn.value = ''; chatIn.focus();
+  held = null; mine.on = false;
+  chatLog.classList.add('open');
+  chatIn.hidden = false; chatIn.value = prefix; chatIn.focus();
+}
+function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
+const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
+const CMDS = {
+  help: () => 'Commands: /day  /night  /seed  /spawn  /fly  /clear',
+  day: () => { tod = .1; return 'The sun comes up'; },
+  night: () => { tod = .6; return 'Night falls… watch out for monsters'; },
+  seed: () => 'World seed: ' + SEED,
+  spawn: () => {
+    if (riding) exitPlane();
+    if (dim === 'b') obHome();
+    else { if (dim !== 'o') switchDim('o'); if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn(); }
+    P.vx = P.vy = P.vz = 0; st.fallY = null;
+    return 'Back to your spawn point';
+  },
+  fly: () => { if (mode !== 'c') return 'Flying only works in Creative'; toggleFly(); return P.fly ? 'Flying' : 'Walking'; },
+  clear: () => { chatLog.textContent = ''; return null; },
+};
+function sendChat(m) {
+  if (!m) return;
+  if (m[0] === '/') {
+    const f = CMDS[m.slice(1).trim().toLowerCase()];
+    const out = f ? f() : `Unknown command ${m.slice(0, 20)}. Type /help`;
+    if (out) showChat(null, out);
+  } else if (mp.on) quiet(mp.fb.push(R('/chat'), {n: mp.name, m, t: mp.fb.serverTimestamp()}));
+  else showChat(myName(), m);
 }
 chatIn.addEventListener('keydown', e => {
   e.stopPropagation();
-  if (e.key === 'Enter') {
-    const m = chatIn.value.trim().slice(0, 80);
-    if (m && mp.on) quiet(mp.fb.push(R('/chat'), {n: mp.name, m, t: mp.fb.serverTimestamp()}));
-    chatIn.hidden = true; chatIn.blur();
-  } else if (e.key === 'Escape') { chatIn.hidden = true; chatIn.blur(); }
+  if (e.key === 'Enter') { const m = chatIn.value.trim().slice(0, 80); closeChat(); sendChat(m); }
+  else if (e.key === 'Escape') closeChat();
 });
-chatIn.addEventListener('blur', () => { chatIn.hidden = true; });
+chatIn.addEventListener('blur', () => { chatIn.hidden = true; chatLog.classList.remove('open'); });
+$('#bChat').addEventListener('click', () => { if (playing) openChat(''); });
 
 /* ---------- creepers ---------- */
 const GUNPOWDER = 91;
