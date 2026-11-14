@@ -476,7 +476,7 @@ const SAMPLE_ENGINES = {
     hud: st => `🔋 ${Math.max(0, st.batt|0)}%  ·  ${Math.abs(Math.round(st.v*4))} km/h  ·  ⚡${st.got|0}`,
     overText: () => "Battery empty!",
     setup: st => { sky(st, "#bfe3ff", 190);
-      const P = 34, N = 5, R = 10; st.P = P; st.N = N; st.lim = N*P + 4;
+      const P = 34, N = 8, R = 10; st.P = P; st.N = N; st.lim = N*P + 4;
       const ground = H3.plane(2*N*P + 80, 2*N*P + 80, 0x3a3d44); st.scene.add(ground);
       const grass = H3.plane(900, 900, 0x5f8f45); grass.position.y = -.05; st.scene.add(grass);
       for (let k = -N; k <= N; k++) for (const ax of [0, 1]) { const l = H3.box(ax ? .25 : 2*N*P, .02, ax ? 2*N*P : .25, 0xf2d64b); l.position.set(ax ? k*P : 0, .02, ax ? 0 : k*P); l.receiveShadow = true; l.castShadow = false; st.scene.add(l); }
@@ -489,10 +489,10 @@ const SAMPLE_ENGINES = {
           for (let t = 0; t < 5; t++) { const tr = H3.tree(); tr.scale.setScalar(1.6); tr.position.set(cx + (Math.random()-.5)*(w-6), .3, cz + (Math.random()-.5)*(w-6)); st.scene.add(tr); }
           continue; }
         const q = w/2;
-        for (const [ox, oz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) { const h = 5 + Math.random()*(Math.abs(i) + Math.abs(j) < 4 ? 30 : 14);
+        for (const [ox, oz] of [[-1,-1],[1,-1],[-1,1],[1,1]]) { const h = 5 + Math.random()*(Math.abs(i) + Math.abs(j) < 5 ? 34 : 16);
           const bw = q - 1.5 - Math.random()*2, bd = q - 1.5 - Math.random()*2;
           const bl = H3.box(bw, h, bd, cols[Math.random()*cols.length|0]); bl.position.set(cx + ox*q/2, h/2 + .25, cz + oz*q/2); st.scene.add(bl);
-          const win = H3.box(bw + .05, h*.7, bd + .05, 0x2b4a6b, {metalness:.5, roughness:.2, transparent:true, opacity:.45}); win.position.copy(bl.position); win.castShadow = false; st.scene.add(win); }
+          if (Math.random() < .4) { const roof = H3.box(bw*.4, 1.2, bd*.4, 0x6c757d); roof.position.set(bl.position.x, h + .85, bl.position.z); st.scene.add(roof); } }
       }
       st.arrow = new THREE.Mesh(new THREE.ConeGeometry(.6, 1.8, 12), new THREE.MeshBasicMaterial({color:0xffd43b})); st.arrow.rotation.x = -Math.PI/2;
       st.arrowG = new THREE.Group(); st.arrowG.add(st.arrow); st.scene.add(st.arrowG);
@@ -508,7 +508,7 @@ const SAMPLE_ENGINES = {
         const post = H3.cyl(.25, .25, 4, 0xffe14d, 8); post.position.y = 2; post.material = new THREE.MeshBasicMaterial({color:0xffe14d, transparent:true, opacity:.35});
         gg.add(sp, ring, post, H3.blob(1.2)); gg.position.set(x, 0, z); st.group.add(gg); st.charges.push({gg, ring}); };
       for (let i = 0; i < 3; i++) st.addCharge();
-      for (let i = 0; i < 16; i++) { const ax = i % 2, line = rand(), dir = Math.random() < .5 ? 1 : -1;
+      for (let i = 0; i < 48; i++) { const ax = i % 2, line = rand(), dir = Math.random() < .5 ? 1 : -1;
         const m = H3.car(new THREE.Color().setHSL(Math.random(), .55, .5).getHex(), false); st.group.add(m);
         st.traffic.push({m, ax, line: line + dir*2.5, dir, s:(Math.random()*2 - 1)*N*P, v:6 + Math.random()*5}); } },
     update: (st, dt) => {
