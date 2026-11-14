@@ -56,21 +56,34 @@ const H3 = {
     const hl = new THREE.Mesh(new THREE.BoxGeometry(1.6, .1, .06), new THREE.MeshBasicMaterial({color: sleek ? 0xd6ecff : 0xfff2b0})); hl.position.set(0, .82, sleek ? -2.72 : -2.12); g.add(hl);
     const tl = new THREE.Mesh(new THREE.BoxGeometry(1.7, .12, .06), new THREE.MeshBasicMaterial({color:0xff3344})); tl.position.set(0, .85, 2.12); g.add(tl);
     return g; },
-  modelYL() { // long 3-row electric crossover, pearl white
-    const g = new THREE.Group(), W = 0xf4f5f7, paint = {metalness:.35, roughness:.25}, glass = {metalness:.7, roughness:.1};
-    const body = this.box(2.1, .85, 5.2, W, paint); body.position.y = .75; g.add(body);
-    const hood = this.box(2.0, .5, 1.3, W, paint); hood.position.set(0, .95, -2.05); hood.rotation.x = .12; g.add(hood);
-    const cab = this.box(1.86, .78, 3.5, 0x141b24, glass); cab.position.set(0, 1.55, .35); g.add(cab);
-    const roof = this.box(1.8, .1, 3.1, W, paint); roof.position.set(0, 1.98, .45); g.add(roof);
-    const wind = this.box(1.8, .08, 1.0, 0x141b24, glass); wind.position.set(0, 1.62, -1.6); wind.rotation.x = -.62; g.add(wind);
-    const rear = this.box(1.8, .08, .7, 0x141b24, glass); rear.position.set(0, 1.62, 2.25); rear.rotation.x = .75; g.add(rear);
-    const wg = new THREE.CylinderGeometry(.46, .46, .34, 20), rg = new THREE.CylinderGeometry(.3, .3, .36, 6);
-    for (const [x, z] of [[-1.02, -1.65], [1.02, -1.65], [-1.02, 1.75], [1.02, 1.75]]) {
-      const w = new THREE.Mesh(wg, this.mat(0x111111)); w.rotation.z = Math.PI/2; w.position.set(x, .46, z); w.castShadow = true; g.add(w);
-      const r = new THREE.Mesh(rg, this.mat(0x9aa3ad, {metalness:.8, roughness:.3})); r.rotation.z = Math.PI/2; r.position.set(x*1.01, .46, z); g.add(r); }
-    const hl = new THREE.Mesh(new THREE.BoxGeometry(1.9, .07, .05), new THREE.MeshBasicMaterial({color:0xe6f3ff})); hl.position.set(0, 1.02, -2.62); g.add(hl);
-    const tl = new THREE.Mesh(new THREE.BoxGeometry(1.95, .1, .05), new THREE.MeshBasicMaterial({color:0xff2a3a})); tl.position.set(0, 1.08, 2.62); g.add(tl);
-    const sh = this.blob(2.4); sh.scale.set(.6, 1.2, 1); g.add(sh);
+  modelYL() { // long 3-row electric crossover, pearl white — smooth extruded profile
+    const g = new THREE.Group(), W = 0xf3f4f6;
+    const paint = this.mat(W, {metalness:.45, roughness:.22}), glass = this.mat(0x0d131b, {metalness:.85, roughness:.06}),
+      black = this.mat(0x1a1c20, {roughness:.7}), rimM = this.mat(0xb7bec6, {metalness:.9, roughness:.25});
+    const ext = (shape, width, bev, mat) => { const geo = new THREE.ExtrudeGeometry(shape, {depth:width - 2*bev, bevelEnabled:true, bevelThickness:bev, bevelSize:bev*.8, bevelSegments:4, curveSegments:18});
+      geo.translate(0, 0, -(width - 2*bev)/2); const m = new THREE.Mesh(geo, mat); m.rotation.y = Math.PI/2; m.castShadow = m.receiveShadow = true; return m; };
+    const WF = 1.68, WR = -1.78, WY = .46, AR = .58; // wheel positions (front is +u → -z)
+    const b = new THREE.Shape(); b.moveTo(-2.58, .36); b.lineTo(WR - AR, .36); b.lineTo(WR - AR, WY); b.absarc(WR, WY, AR, Math.PI, 0, true); b.lineTo(WR + AR, .3);
+    b.lineTo(WF - AR, .3); b.lineTo(WF - AR, WY); b.absarc(WF, WY, AR, Math.PI, 0, true); b.lineTo(WF + AR, .34);
+    b.lineTo(2.55, .38); b.quadraticCurveTo(2.74, .52, 2.7, .82); b.quadraticCurveTo(2.62, .98, 2.25, 1.02); b.quadraticCurveTo(1.7, 1.08, 1.25, 1.14);
+    b.lineTo(-2.3, 1.16); b.quadraticCurveTo(-2.62, 1.12, -2.64, .9); b.lineTo(-2.62, .5); b.quadraticCurveTo(-2.62, .38, -2.58, .36);
+    g.add(ext(b, 2.02, .16, paint));
+    const c = new THREE.Shape(); c.moveTo(1.3, 1.08); c.quadraticCurveTo(.55, 1.55, .05, 1.74); c.quadraticCurveTo(-.9, 1.82, -1.75, 1.74);
+    c.quadraticCurveTo(-2.25, 1.6, -2.42, 1.1); c.lineTo(1.3, 1.08);
+    g.add(ext(c, 1.72, .14, glass));
+    const pil = this.box(.08, .5, .1, W, {metalness:.45, roughness:.22}); // B/C pillars in body colour
+    for (const z of [.35, 1.35]) for (const x of [-.86, .86]) { const q = pil.clone(); q.position.set(x, 1.42, z); g.add(q); }
+    const clad = new THREE.Mesh(new THREE.BoxGeometry(2.06, .16, 2.1), black); clad.position.set(0, .38, .05); g.add(clad);
+    const fb = new THREE.Mesh(new THREE.BoxGeometry(1.7, .16, .1), black); fb.position.set(0, .45, -2.7); g.add(fb);
+    for (const x of [-1, 1]) { // headlights, mirrors
+      const hl = new THREE.Mesh(new THREE.BoxGeometry(.5, .07, .06), new THREE.MeshBasicMaterial({color:0xeaf6ff})); hl.position.set(x*.66, .86, -2.69); hl.rotation.y = x*.25; g.add(hl);
+      const mr = new THREE.Mesh(new THREE.BoxGeometry(.22, .14, .3), black); mr.position.set(x*1.1, 1.2, -1.0); g.add(mr); }
+    const tl = new THREE.Mesh(new THREE.BoxGeometry(1.9, .07, .05), new THREE.MeshBasicMaterial({color:0xff1f33})); tl.position.set(0, 1.0, 2.66); g.add(tl);
+    const tg = new THREE.CylinderGeometry(.46, .46, .3, 26), rg = new THREE.CylinderGeometry(.33, .33, .32, 5), hg = new THREE.CylinderGeometry(.09, .09, .34, 10);
+    for (const [x, z] of [[-.96, -WF], [.96, -WF], [-.96, -WR], [.96, -WR]]) {
+      const w = new THREE.Group(); w.add(new THREE.Mesh(tg, black), new THREE.Mesh(rg, rimM), new THREE.Mesh(hg, black));
+      w.children.forEach(m => m.castShadow = true); w.rotation.z = Math.PI/2; w.position.set(x, WY, z); g.add(w); }
+    const sh = this.blob(2.4); sh.scale.set(.62, 1.22, 1); g.add(sh);
     return g; },
   tree() { const g = new THREE.Group(); const t = this.cyl(.18, .25, 1.2, 0x6b4226, 8); t.position.y = .6; g.add(t);
     const c = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.6, 9), this.mat(0x2d8a3e)); c.position.y = 2.3; c.castShadow = true; g.add(c); return g; },
