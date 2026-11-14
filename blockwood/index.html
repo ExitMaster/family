@@ -46,6 +46,8 @@ body{
 #cross::before{left:9px;top:0;width:2px;height:20px}
 #cross::after{top:9px;left:0;height:2px;width:20px}
 
+#charge{position:fixed;left:50%;top:calc(50% + 20px);width:44px;height:5px;transform:translateX(-50%);background:rgba(0,0,0,.5);border-radius:3px;pointer-events:none;overflow:hidden}
+#charge i{display:block;height:100%;width:0;background:#f2d66b}
 #hotbar{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(12px + env(safe-area-inset-bottom,0px));
@@ -194,6 +196,7 @@ select,#seedIn{
 <div id="tint" hidden></div>
 <div id="info" aria-live="off"></div>
 <div id="cross" aria-hidden="true"></div>
+<div id="charge" hidden><i></i></div>
 <div id="toast" role="status"></div>
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
 <canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
@@ -253,6 +256,7 @@ select,#seedIn{
       <dt>Airplane</dt><dd>Place it, right click to get in. <kbd>W</kbd>/<kbd>S</kbd> speed up and slow down, arrow keys steer (<kbd>↑</kbd> climb, <kbd>↓</kbd> dive, <kbd>←</kbd><kbd>→</kbd> turn), <kbd>V</kbd> autopilots to the nearest villager's house, <kbd>Shift</kbd> to get out</dd>
       <dt>Nether</dt><dd>Build an obsidian frame 4 wide and 5 tall, light it with flint and steel, and walk in. Piglins there trade for gold ingots.</dd>
       <dt>The End</dt><dd>Craft an eye of ender (ender pearl + glowstone) and right click the ground with it to open an End portal. Jump in, break the crystals on the towers, then beat the Ender Dragon.</dd>
+      <dt>Bow</dt><dd>Hold right click to pull back, let go to shoot. Survival needs arrows (1 stick + 1 cobblestone makes 4).</dd>
       <dt>Ender pearl</dt><dd>Right click to teleport to where you look</dd>
       <dt>OneBlock</dt><dd>In the pause menu, press Play OneBlock: you stand on a single block in the sky. Break it and a new one appears, going from plains to underground, snow, beach, village, the Nether and the End.</dd>
       <dt>Sleep</dt><dd>Right click a bed at night to skip to morning. It also sets where you respawn.</dd>
@@ -949,6 +953,7 @@ function updateTarget() {
 }
 function act(button) {
   if (dead || sleeping || riding) return;
+  if (button === 2 && inv[sel] && inv[sel].id === BOW) { drawBow(); return; }
   if (button === 0 || button === 2) {
     const far = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) : 5;
     const pl = planeHit(Math.min(5, far));
@@ -1248,6 +1253,7 @@ canvas.addEventListener('mousedown', e => {
 addEventListener('mouseup', e => {
   held = null; mine.on = false;
   if (mdrag) { if (mdrag.dist < 6) act(mdrag.b); mdrag = null; }
+  if (bow.on) releaseBow();
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('wheel', e => {
@@ -1323,7 +1329,7 @@ const endTouch = e => {
   if (!t) return;
   touchLook.delete(e.pointerId); clearTimeout(t.timer);
   if (t.mining) mine.on = false;
-  else if (playing && t.dist < 10 && performance.now() - t.t < 350) act(tmode);
+  else if (playing && t.dist < 10 && performance.now() - t.t < 350) { act(tmode); if (bow.on) releaseBow(); }
 };
 canvas.addEventListener('pointerup', endTouch);
 canvas.addEventListener('pointercancel', e => { touchLook.delete(e.pointerId); mine.on = false; });
@@ -1471,7 +1477,7 @@ function addMob(kind, x, y, z) {
   mobs.push({kind, g, legs, x, y, z, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28, ry: 0, t: 0, walk: false, flee: 0, hp: KINDS[kind].hp, ph: 0, ground: false});
 }
 function removeMob(i) { scene.remove(mobs[i].g); mobs.splice(i, 1); }
-function clearMobs() { clearPlanes(); while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
+function clearMobs() { clearPlanes(); clearArrows(); while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
 const LAND = ['pig', 'sheep', 'cow', 'chicken', 'rabbit'], LAND_W = [3, 3, 3, 3, 1.5];
 function pickKind() {
   let r = Math.random() * LAND_W.reduce((a, b) => a + b);
@@ -1531,7 +1537,7 @@ function updateMobs(dt) {
     else if (K.neutral) neutralThink(m, K, dt);
     else if (K.hostile) {
       if (mode !== 's') { removeMob(i); continue; }
-      zombieThink(m, dt);
+      if (K.archer) archerThink(m, K, dt); else zombieThink(m, dt);
     } else if (m.flee > 0) {
       if (m.t <= 0) { m.yaw = Math.atan2(-dx, -dz) + (Math.random() - .5) * 1.4; m.t = .7; }
       m.walk = true;
@@ -2097,7 +2103,7 @@ function trySpawnZombie() {
   const y = spots[Math.floor(Math.random() * spots.length)];
   if (y > colTop(x, z) && dayAmt > .3) return;
   if (torchNear(x, y, z, 10)) return;
-  addMob('zombie', x + .5, y, z + .5);
+  addMob(Math.random() < .4 ? 'skeleton' : 'zombie', x + .5, y, z + .5);
 }
 
 /* ---------- more animals ---------- */
@@ -3139,6 +3145,128 @@ function toggleOneBlock() {
 }
 $('#obBtn').addEventListener('click', toggleOneBlock);
 
+/* ---------- bows, arrows and skeletons ---------- */
+const BOW = 89, ARROW = 90;
+item(BOW, 'Bow', g => {
+  diag(g, '#8a6234', 3, 2, 3, 1, 1); diag(g, '#8a6234', 6, 5, 4, 1, 1, 2); diag(g, '#8a6234', 10, 9, 3, 1, 1);
+  rects(g, '#5a3a1a', [[3, 2, 2, 2], [12, 11, 2, 2]]); diag(g, '#e8e8e8', 3, 3, 10, 1, 1, 1); rects(g, '#e8e8e8', [[3, 3, 1, 10], [3, 12, 10, 1]]);
+}, {max: 1});
+item(ARROW, 'Arrow', g => { diag(g, '#8a6a3a', 4, 11, 8, 1, -1, 1); rects(g, '#b0b0b0', [[11, 3, 2, 2], [12, 2, 2, 1], [13, 3, 1, 2]]); rects(g, '#f4f4f4', [[2, 11, 2, 1], [3, 12, 1, 2], [2, 13, 1, 1]]); });
+PALETTE.push(BOW, ARROW);
+RECIPES.push([BOW, 1, [[STICK, 3], [WOOL, 3]]], [ARROW, 4, [[STICK, 1], [COBBLE, 1]]]);
+PROFS.smith.trades.unshift([BOW, 1, [[EMERALD, 1]]]);
+PROFS.fisher.trades.unshift([ARROW, 16, [[EMERALD, 1]]]);
+OB_PHASES[1].mobs.push('skeleton'); OB_PHASES[1].loot.push([ARROW, 8], [BOW, 1]);
+
+const bow = {on: false, t: 0, quick: false}, chargeEl = $('#charge'), chargeBar = $('#charge i'), arrows = [];
+function drawBow() {
+  if (bow.on) return;
+  if (mode === 's' && !countOf(ARROW)) { toast('You need arrows to shoot (1 stick + 1 cobblestone makes 4)', 2600); return; }
+  bow.on = true; bow.t = 0; bow.quick = !locked; // taps and drag-look clicks shoot straight away
+  tone(180, 260, .5, .05, 'triangle');
+}
+function releaseBow() {
+  const pw = bow.quick ? .85 : Math.max(.25, Math.min(1, bow.t / .9)); // even a quick click lets a weak arrow fly
+  bow.on = false; chargeEl.hidden = true;
+  if (dead || riding) return;
+  if (mode === 's') { if (!countOf(ARROW)) return; take(ARROW, 1); renderHotbar(); saveDirty = true; }
+  const sp = 12 + 38 * pw, o = cam.position;
+  shootArrow(o.x + dirV.x * .6, o.y + dirV.y * .6 - .1, o.z + dirV.z * .6, dirV.x * sp, dirV.y * sp, dirV.z * sp, Math.round(2 + 7 * pw), false);
+  tone(320, 110, .16, .22, 'triangle'); noise(.12, 'highpass', 2600, 1, .3);
+}
+function shootArrow(x, y, z, vx, vy, vz, dmg, fromMob) {
+  const g = new THREE.Group();
+  part(g, 0x8a6a3a, .05, .05, .7, 0, 0, 0); part(g, 0x9a9a9a, .1, .1, .14, 0, 0, .38);
+  part(g, 0xf0f0f0, .02, .16, .18, 0, 0, -.3); part(g, 0xf0f0f0, .16, .02, .18, 0, 0, -.3);
+  scene.add(g);
+  arrows.push({g, x, y, z, vx, vy, vz, dmg, fromMob, stuck: false, life: 20});
+  if (arrows.length > 80) removeArrow(arrows.findIndex(a => a.stuck) >>> 0);
+}
+function removeArrow(i) { if (!arrows[i]) return; scene.remove(arrows[i].g); arrows.splice(i, 1); }
+function clearArrows() { while (arrows.length) removeArrow(0); }
+const inBox = (x, y, z, cx, y0, cz, hw, h) => Math.abs(x - cx) < hw && Math.abs(z - cz) < hw && y > y0 && y < y0 + h;
+function arrowHits(a) {
+  if (a.fromMob) {
+    if (inBox(a.x, a.y, a.z, P.x, P.y, P.z, HW + .15, PHGT)) { hurtPlayer(a.dmg, a.x - a.vx * .1, a.z - a.vz * .1); return true; }
+    return false;
+  }
+  for (const m of mobs) {
+    const K = KINDS[m.kind];
+    if (!inBox(a.x, a.y, a.z, m.x, m.y - .05, m.z, K.hw + .12, K.h + .1)) continue;
+    const v = Math.hypot(a.vx, a.vz) || 1;
+    hurtMob(m, a.dmg); m.vx += a.vx / v * 4; m.vz += a.vz / v * 4; m.vy = Math.max(m.vy, 3);
+    return true;
+  }
+  if (dim === 'e') {
+    for (const c of crystals) if (Math.hypot(a.x - c.x, a.y - c.g.position.y, a.z - c.z) < 1) { blowCrystal(c); return true; }
+    const D = dragon, hx = D.x - Math.sin(D.yaw) * 5.8, hz = D.z - Math.cos(D.yaw) * 5.8;
+    if (D.alive && (inBox(a.x, a.y, a.z, D.x, D.y - 2, D.z, 3, 4) || inBox(a.x, a.y, a.z, hx, D.y - 1, hz, 1.4, 3))) { hurtDragon(a.dmg); return true; }
+  }
+  return false;
+}
+function updateArrows(dt) {
+  for (let i = arrows.length - 1; i >= 0; i--) {
+    const a = arrows[i];
+    if (a.stuck) { if ((a.life -= dt) <= 0) removeArrow(i); continue; }
+    a.vy -= 18 * dt;
+    const steps = Math.max(1, Math.ceil(Math.hypot(a.vx, a.vy, a.vz) * dt / .25));
+    let gone = false;
+    for (let s = 0; s < steps && !a.stuck; s++) {
+      const nx = a.x + a.vx * dt / steps, ny = a.y + a.vy * dt / steps, nz = a.z + a.vz * dt / steps;
+      if (SOLID[getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz))]) {
+        a.stuck = true; noise(.08, 'bandpass', 900, 2, .4, [nx, ny, nz]);
+        break;
+      }
+      a.x = nx; a.y = ny; a.z = nz;
+      if (arrowHits(a)) { gone = true; break; }
+    }
+    if (gone || a.y < -20 || (a.life -= dt * .2) <= 0) { removeArrow(i); continue; }
+    a.g.position.set(a.x, a.y, a.z);
+    if (!a.stuck) a.g.lookAt(a.x + a.vx, a.y + a.vy, a.z + a.vz);
+  }
+}
+function updateBow(dt) {
+  if (!bow.on) return;
+  const s = inv[sel];
+  if (!s || s.id !== BOW || !playing || dead) { bow.on = false; chargeEl.hidden = true; return; }
+  bow.t += dt; chargeEl.hidden = false;
+  chargeBar.style.width = Math.min(100, bow.t / .9 * 100) + '%';
+}
+
+KINDS.skeleton = {hw: .3, h: 1.95, speed: 2.2, hp: 20, col: 0xdcdcd2, hostile: true, archer: true, biped: true, hurtF: 560, build(g) {
+  const c = this.col, dark = 0x8e8e86;
+  part(g, c, .14, .7, .14, 0, 1.1, 0);
+  for (const y of [1.4, 1.26, 1.12, .98]) part(g, c, .44, .06, .22, 0, y, 0);
+  part(g, c, .46, .46, .46, 0, 1.68, 0); part(g, 0x1a1a1a, .12, .1, .02, -.1, 1.72, -.235); part(g, 0x1a1a1a, .12, .1, .02, .1, 1.72, -.235);
+  part(g, dark, .26, .05, .02, 0, 1.56, -.235);
+  for (const sx of [-.28, .28]) {
+    const arm = new THREE.Group(); arm.position.set(sx, 1.38, 0); part(arm, c, .1, .1, .66, 0, 0, -.3);
+    if (sx < 0) { part(arm, 0x7a5a32, .05, .7, .05, 0, 0, -.64); part(arm, 0xeeeeee, .01, .66, .01, 0, 0, -.58); }
+    g.add(arm);
+  }
+  return [leg(g, c, .11, .75, -.1, 0), leg(g, c, .11, .75, .1, 0)];
+}, say(at) { for (let k = 0; k < 3; k++) tone(1300, 900, .05, .07, 'square', at, k * .07); }, drop() { give(ARROW, 1 + Math.floor(Math.random() * 3)); if (Math.random() < .12) give(BOW, 1); }};
+// skeletons keep their distance and shoot
+function archerThink(m, K, dt) {
+  const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
+  m.shoot = (m.shoot === undefined ? 1.5 : m.shoot) - dt;
+  if (!dead && d < 18 && Math.abs(P.y - m.y) < 10) {
+    m.walk = d < 5 || d > 11;
+    m.yaw = d < 5 ? Math.atan2(dx, dz) : Math.atan2(-dx, -dz);
+    if (m.shoot <= 0 && d < 16) {
+      m.shoot = 1.8 + Math.random() * 1.2; m.walk = false; m.yaw = Math.atan2(-dx, -dz);
+      const sx = m.x, sy = m.y + 1.45, sz = m.z, ty = P.y + 1.2, dist = Math.hypot(dx, ty - sy, dz), sp = 22, t = dist / sp;
+      shootArrow(sx - Math.sin(m.yaw) * .5, sy, sz - Math.cos(m.yaw) * .5, dx / dist * sp, (ty - sy) / t + 9 * t, dz / dist * sp, 3, true);
+      tone(360, 140, .14, .14, 'triangle', [sx, sy, sz]);
+    }
+    if (Math.random() < dt * .12) K.say([m.x, m.y + 1.6, m.z]);
+  } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
+  if (dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
+    m.burnT = 1;
+    if (m.y + 1 >= colTop(Math.floor(m.x), Math.floor(m.z))) { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xff8a20)); hurtMob(m, 3); }
+  }
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3151,7 +3279,7 @@ function loop(now) {
     updateSurvival(dt); updateMining(dt); ensureCobble();
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
-    updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt);
+    updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;

@@ -21,6 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
+| Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
 | Pick block | `1`–`9` or mouse wheel |
@@ -89,6 +90,12 @@ build on it, fly over it. The world saves in the browser.
 - **Animals**: pigs, sheep, cows, chickens and hopping rabbits wander the land, and fish swim in
   lakes and the sea. They run when you hit them. In Survival they drop porkchops, wool, beef,
   chicken and fish, which you can cook with coal.
+- **Bows and arrows**: craft a bow (3 sticks + 3 wool) and arrows (1 stick + 1 cobblestone makes 4),
+  or buy them from the Blacksmith and Fisher. Hold right click to pull the bow back and let go to
+  shoot; a full pull does 9 damage. Arrows fly in an arc, stick in blocks, and can hit the Ender
+  Dragon and blow up its crystals from far away. In Creative the bow needs no arrows.
+- **Skeletons** come out at night with zombies. They keep their distance and shoot arrows at you,
+  burn in daylight, and drop arrows (and sometimes a bow).
 - **Piglins** live in the Nether. They're friendly unless you hit one (then the whole group gets
   angry). Right click one while holding a gold ingot to barter: they give back obsidian,
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
