@@ -996,6 +996,8 @@ function act(button) {
   if (button === 2) {
     const m = mobHit(4);
     if (m && m.kind === 'villager') { talk(m); return; }
+    const gv = !m && mp.on && ghostHit(4);
+    if (gv && gv.kind === 'villager') { talk(gv); return; }
     if (m && m.kind === 'piglin') { barter(m); return; }
   }
   if (button === 2 && target && target.b === BED) { useBed(target.x, target.y, target.z); return; }
@@ -1005,6 +1007,8 @@ function act(button) {
     const reach = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) - .4 : 4;
     const m = mobHit(Math.min(4, reach));
     if (m) { hurtMob(m, mode === 'c' ? 5 : damageOf(), true); exhaust(.1); return; }
+    const gh = mp.on && ghostHit(Math.min(4, reach));
+    if (gh) { hitGhost(gh, mode === 'c' ? 5 : damageOf()); exhaust(.1); return; }
   }
   if (button === 2 && s && s.id === PEARL) { throwPearl(); return; }
   if (button === 2 && s && ITEMS[s.id] && ITEMS[s.id].food) { eat(s); return; }
@@ -1512,7 +1516,7 @@ let spawnT = 1;
 function addMob(kind, x, y, z) {
   const g = new THREE.Group(), legs = KINDS[kind].build(g);
   scene.add(g);
-  mobs.push({kind, g, legs, x, y, z, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28, ry: 0, t: 0, walk: false, flee: 0, hp: KINDS[kind].hp, ph: 0, ground: false});
+  mobs.push({id: ++mobSeq, kind, g, legs, x, y, z, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28, ry: 0, t: 0, walk: false, flee: 0, hp: KINDS[kind].hp, ph: 0, ground: false});
 }
 function removeMob(i) { scene.remove(mobs[i].g); mobs.splice(i, 1); }
 function clearMobs() { clearPlanes(); clearArrows(); while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
@@ -1561,9 +1565,10 @@ function updateMobs(dt) {
     spawnT = 1.5;
     let pass = 0, host = 0;
     for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
-    if (pass < 12 && dim !== 'e') { if (dim === 'n') netherSpawn('piglin'); else trySpawn(); }
-    spawnVillagers();
-    if (mode === 's' && host < 5 && !dead) { if (dim === 'n') netherSpawn('magma'); else if (dim === 'o') trySpawnZombie(); }
+    const lead = mpLeader();
+    if (lead && pass < 12 && dim !== 'e') { if (dim === 'n') netherSpawn('piglin'); else trySpawn(); }
+    if (lead) spawnVillagers();
+    if (lead && mode === 's' && host < 5 && !dead) { if (dim === 'n') netherSpawn('magma'); else if (dim === 'o') trySpawnZombie(); }
   }
   const fl = Math.floor;
   for (let i = mobs.length - 1; i >= 0; i--) {
@@ -1623,16 +1628,21 @@ function killMob(m) {
   burst(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), 0, new THREE.Color(KINDS[m.kind].col));
   noise(.25, 'lowpass', 700, .7, .6, [m.x, m.y, m.z]);
   removeMob(i);
-  if (mode === 's' && KINDS[m.kind].drop) KINDS[m.kind].drop();
+  if (mode === 's' && KINDS[m.kind].drop && !m.noDrop) KINDS[m.kind].drop();
 }
 // K: instantly kill the creature you're looking at, or else the nearest one close by
 function killKey() {
   if (dead || sleeping) return;
   if (dim === 'e' && dragon.alive && dragonRay(64) >= 0) { hurtDragon(1e6); return; }
   let m = mobHit(8);
+  const gh = !m && mp.on && ghostHit(8);
+  if (gh) { hitGhost(gh, 1e6); return; }
   if (!m) {
     let bd = 36;
     for (const o of mobs) { const d = (o.x - P.x) ** 2 + (o.y - P.y) ** 2 + (o.z - P.z) ** 2; if (d < bd && o.kind !== 'villager') { bd = d; m = o; } }
+    let g = null;
+    if (mp.on) for (const o of ghosts.values()) { const d = (o.x - P.x) ** 2 + (o.y - P.y) ** 2 + (o.z - P.z) ** 2; if (o.g.visible && d < bd && o.kind !== 'villager') { bd = d; g = o; } }
+    if (g) { hitGhost(g, 1e6); return; }
   }
   if (!m) { toast('Nothing to kill nearby'); return; }
   hurtMob(m, 1e6, true);
@@ -3240,6 +3250,10 @@ function arrowHits(a) {
     hurtMob(m, a.dmg); m.vx += a.vx / v * 4; m.vz += a.vz / v * 4; m.vy = Math.max(m.vy, 3);
     return true;
   }
+  if (mp.on) for (const g of ghosts.values()) {
+    const K = KINDS[g.kind];
+    if (g.g.visible && inBox(a.x, a.y, a.z, g.x, g.y - .05, g.z, K.hw + .12, K.h + .1)) { hitGhost(g, a.dmg, a.vx, a.vz); return true; }
+  }
   if (dim === 'e') {
     for (const c of crystals) if (Math.hypot(a.x - c.x, a.y - c.g.position.y, a.z - c.z) < 1) { blowCrystal(c); return true; }
     const D = dragon, hx = D.x - Math.sin(D.yaw) * 5.8, hz = D.z - Math.cos(D.yaw) * 5.8;
@@ -3368,9 +3382,12 @@ async function mpJoinRoom() {
   const me = R('/players/' + mp.uid);
   quiet(fb.set(me, mpMe()));
   quiet(fb.onDisconnect(me).remove());
+  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.remove(R('/hits/' + mp.uid)));
+  mp.mobSig = null; mp.mobT = 0;
   const onEdit = s => mpApplyEdit(s.key, s.val());
   mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})),
+    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
   refreshMeta(); updateInfo();
@@ -3380,8 +3397,8 @@ function mpLeave() {
   if (!mp.on) return;
   const fb = mp.fb;
   mp.subs.forEach(u => u()); mp.subs = [];
-  quiet(fb.remove(R('/players/' + mp.uid)));
-  mp.on = false;
+  quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid)));
+  mp.on = false; clearGhosts();
   for (const a of avatars.values()) scene.remove(a.g);
   avatars.clear(); marksEl.textContent = ''; mpFriends.textContent = '';
   resetWorld(); clearMobs(); applySave(loadSaved()); // back to your own world, exactly as you left it
@@ -3440,6 +3457,8 @@ function buildAvatar(name, col) {
 }
 function mpTick(dt) {
   if (!mp.on) return;
+  updateGhosts(dt);
+  if ((mp.mobT -= dt) <= 0) { mp.mobT = .25; mpPublishMobs(); }
   for (const a of avatars.values()) {
     const p = a.p, vis = !!p && p.d === dim && Date.now() - a.seen < 60000;
     a.g.visible = vis;
@@ -3665,6 +3684,99 @@ function updateFriendMarks() {
     arr.hidden = false; arr.style.transform = `rotate(${Math.atan2(sx, sy)}rad)`;
   }
   for (const el of [...marksEl.children]) if (!avatars.has(el.dataset.id)) el.remove();
+}
+
+/* ---------- shared mobs in multiplayer ---------- */
+// Each game runs the mobs it made and shares where they are a few times a second; everyone else sees them as
+// "ghosts" that copy those moves. Hitting a ghost sends the hit to the game that owns the mob. Only one player
+// per area (the one with the smallest id nearby) makes new animals and monsters, so a group doesn't see double.
+let mobSeq = 0;
+const ghosts = new Map();
+function mpLeader() {
+  if (!mp.on) return true;
+  for (const [id, a] of avatars) if (a.p && a.p.d === dim && id < mp.uid && Math.hypot(a.p.x - P.x, a.p.z - P.z) < 80) return false;
+  return true;
+}
+function mpPublishMobs() {
+  const m = {};
+  for (const o of mobs) {
+    if (o.y < -10) continue;
+    m[o.id] = [o.kind, +o.x.toFixed(2), +o.y.toFixed(2), +o.z.toFixed(2), +(o.ry || 0).toFixed(2), Math.max(0, Math.round(o.hp)), o.prof || 0, o.fuse > 0 ? 1 : 0];
+  }
+  const sig = Object.keys(m).length ? JSON.stringify(m) : '';
+  if (sig === mp.mobSig) return;
+  mp.mobSig = sig;
+  quiet(mp.fb.set(R('/mobs/' + mp.uid), sig ? {d: dim, m} : null));
+}
+function mpGhosts(all) {
+  const seen = new Set();
+  for (const [owner, pack] of Object.entries(all)) {
+    if (owner === mp.uid || !pack || !pack.m) continue;
+    for (const [id, v] of Object.entries(pack.m)) {
+      if (!Array.isArray(v) || !KINDS[v[0]]) continue;
+      const key = owner + ':' + id;
+      seen.add(key);
+      let g = ghosts.get(key);
+      if (!g) {
+        if (v[0] === 'villager') KINDS.villager.prof = PROFS[v[6]] ? v[6] : PROF_KEYS[0];
+        const grp = new THREE.Group(), legs = KINDS[v[0]].build(grp);
+        scene.add(grp);
+        g = {owner, id: +id, kind: v[0], g: grp, legs, x: v[1], y: v[2], z: v[3], ry: v[4], ph: 0, prof: v[6] || null};
+        ghosts.set(key, g);
+      }
+      Object.assign(g, {tx: v[1], ty: v[2], tz: v[3], tyaw: v[4], hp: v[5], fuse: v[7], d: pack.d});
+    }
+  }
+  for (const [key, g] of ghosts) if (!seen.has(key)) dropGhost(key, g);
+}
+function dropGhost(key, g) { scene.remove(g.g); ghosts.delete(key); }
+function clearGhosts() { for (const [key, g] of ghosts) dropGhost(key, g); }
+function updateGhosts(dt) {
+  const k = Math.min(1, 10 * dt);
+  for (const g of ghosts.values()) {
+    g.g.visible = g.d === dim && !g.dead;
+    if (!g.g.visible) continue;
+    if (Math.hypot(g.tx - g.x, g.tz - g.z) > 8) { g.x = g.tx; g.y = g.ty; g.z = g.tz; }
+    const ox = g.x, oz = g.z;
+    g.x += (g.tx - g.x) * k; g.y += (g.ty - g.y) * k; g.z += (g.tz - g.z) * k;
+    let dy = g.tyaw - g.ry; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); g.ry += dy * k;
+    const v = Math.hypot(g.x - ox, g.z - oz) / Math.max(dt, 1e-3), K = KINDS[g.kind], sw = Math.sin(g.ph += dt * v * 5) * Math.min(.7, v * .5);
+    if (K.swim) g.legs[0].rotation.y = Math.sin(g.ph * 2) * .5;
+    else g.legs.forEach((l, j) => { l.rotation.x = (K.biped ? j % 2 === 0 : j < 2) ? sw : -sw; });
+    const fl = g.g.getObjectByName('flash');
+    if (fl) { fl.visible = !!g.fuse && Math.floor(performance.now() / 125) % 2 === 0; g.g.scale.setScalar(g.fuse ? 1.15 : 1); }
+    g.g.position.set(g.x, g.y, g.z); g.g.rotation.y = g.ry;
+  }
+}
+function ghostHit(maxD) {
+  let best = null, bt = maxD;
+  for (const g of ghosts.values()) {
+    if (!g.g.visible) continue;
+    const K = KINDS[g.kind], t = rayBox([g.x - K.hw, g.y, g.z - K.hw], [g.x + K.hw, g.y + K.h, g.z + K.hw], bt);
+    if (t >= 0 && t < bt) { bt = t; best = g; }
+  }
+  return best;
+}
+// you hit a mob that lives in a friend's game: tell their game, and keep the loot yourself
+function hitGhost(g, dmg, kx = dirV.x, kz = dirV.z) {
+  quiet(mp.fb.push(R('/hits/' + g.owner), {id: g.id, dmg: Math.min(dmg, 1e6), kx: +kx.toFixed(2), kz: +kz.toFixed(2)}));
+  const K = KINDS[g.kind];
+  tone(K.hurtF, K.hurtF / 2, .18, .25, 'square', [g.x, g.y + 1, g.z]);
+  if (dmg >= g.hp) {
+    g.dead = true; g.g.visible = false;
+    burst(Math.floor(g.x), Math.floor(g.y), Math.floor(g.z), 0, new THREE.Color(K.col));
+    if (mode === 's' && K.drop) K.drop();
+  }
+}
+function mpOnHit(s) {
+  const v = s.val() || {};
+  quiet(mp.fb.remove(s.ref));
+  const m = mobs.find(o => o.id === v.id);
+  if (!m || !(v.dmg > 0)) return;
+  if (v.dmg >= m.hp) m.noDrop = true; // the friend who hit it got the loot
+  const kl = Math.hypot(v.kx, v.kz) || 1;
+  m.vx += v.kx / kl * 6; m.vz += v.kz / kl * 6; m.vy = 5;
+  hurtMob(m, v.dmg);
 }
 
 /* ---------- main loop ---------- */

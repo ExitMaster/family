@@ -129,7 +129,11 @@ joins with the same code is in the same world:
   hear where everyone is ("Alice: 61 blocks east", or which world they're in), and `/tp Alice`
   (or just `/tp` for the closest) to jump right next to them, even into the Nether or the End.
   The pause menu also has a **Go to …** button for each friend.
-- Animals, monsters and the Ender Dragon are your own, and your backpack stays yours.
+- Everyone sees the same animals and monsters, including the ones that pop out of a OneBlock.
+  Each mob lives in the game of the player who made it; when you're near each other only one
+  of you makes new ones, so you don't get double. You can hit anyone's mobs (sword, arrows or `K`)
+  and you get the loot. Monsters chase the player whose game made them.
+- The Ender Dragon is your own, and your backpack stays yours.
 
 Press **Leave** to go back to your own world, exactly as you left it. Nothing from the room is
 saved into your own world. Multiplayer needs the internet and works on the website
