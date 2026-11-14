@@ -309,6 +309,7 @@ footer a{text-decoration:underline}
   </div>
 </div>
 
+<script src="samples.js"></script>
 <script>
 /* =====================================================================
    GAME CATALOG
@@ -341,6 +342,7 @@ const GAMES = [
 const CATS = [
   {id:"arcade",    name:"Arcade",    emoji:"🕹️", c1:"#b44cff", c2:"#5a1fd1"},
   {id:"puzzle",    name:"Puzzle",    emoji:"🧩", c1:"#ffd166", c2:"#f28482"},
+  {id:"racing",    name:"Racing",    emoji:"🏁", c1:"#4cc9f0", c2:"#4361ee"},
   {id:"action",    name:"Action",    emoji:"💥", c1:"#ff9f1c", c2:"#e63946"},
   {id:"casual",    name:"Casual",    emoji:"🍭", c1:"#ff8fab", c2:"#7b2cbf"},
   {id:"adventure", name:"Adventure", emoji:"🗺️", c1:"#80ed99", c2:"#38a3a5"},
@@ -349,6 +351,7 @@ const CATS = [
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+if (window.SAMPLE_GAMES || typeof SAMPLE_GAMES !== "undefined") GAMES.push(...SAMPLE_GAMES);
 GAMES.forEach(g => g.slug = (g.url && g.url.match(/^([a-z0-9-]+)\/$/)?.[1]) || slug(g.name));
 const store = {
   get(k,d=0){ try{ const v=localStorage.getItem("unimai:"+k); return v==null?d:JSON.parse(v);}catch{ return d; } },
@@ -755,6 +758,7 @@ IMPL.ttt = root => {
   return () => clearTimeout(to);
 };
 
+Object.assign(IMPL, SAMPLE_ENGINES);
 route();
 </script>
 </body>
