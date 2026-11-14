@@ -1563,7 +1563,7 @@ function updateMobs(dt) {
     else if (K.neutral) neutralThink(m, K, dt);
     else if (K.hostile) {
       if (mode !== 's') { removeMob(i); continue; }
-      if (K.archer) archerThink(m, K, dt); else zombieThink(m, dt);
+      if (K.archer) archerThink(m, K, dt); else if (K.creeper) creeperThink(m, K, dt); else zombieThink(m, dt);
     } else if (m.flee > 0) {
       if (m.t <= 0) { m.yaw = Math.atan2(-dx, -dz) + (Math.random() - .5) * 1.4; m.t = .7; }
       m.walk = true;
@@ -2129,7 +2129,8 @@ function trySpawnZombie() {
   const y = spots[Math.floor(Math.random() * spots.length)];
   if (y > colTop(x, z) && dayAmt > .3) return;
   if (torchNear(x, y, z, 10)) return;
-  addMob(Math.random() < .4 ? 'skeleton' : 'zombie', x + .5, y, z + .5);
+  const roll = Math.random();
+  addMob(roll < .3 ? 'skeleton' : roll < .6 ? 'creeper' : 'zombie', x + .5, y, z + .5);
 }
 
 /* ---------- more animals ---------- */
@@ -3333,7 +3334,7 @@ async function mpJoinRoom() {
   try { fb = await firebase(); }
   catch (e) {
     mpJoin.disabled = false;
-    mpStatus.textContent = 'Could not connect. Check the internet, or open the game at exitmaster.github.io/family/blockwood/ (the copy inside Claude can\'t go online).';
+    mpStatus.textContent = 'Could not connect. Check the internet, or open the game at unimai.net/blockwood/ (the copy inside Claude can\'t go online).';
     return;
   }
   persist(); // your own world is safe in this browser while you visit the room
@@ -3462,6 +3463,43 @@ chatIn.addEventListener('keydown', e => {
   } else if (e.key === 'Escape') { chatIn.hidden = true; chatIn.blur(); }
 });
 chatIn.addEventListener('blur', () => { chatIn.hidden = true; });
+
+/* ---------- creepers ---------- */
+const GUNPOWDER = 91;
+item(GUNPOWDER, 'Gunpowder', g => { rects(g, '#5e5e5e', [[4, 8, 8, 4], [5, 6, 6, 7], [3, 10, 10, 2]]); rects(g, '#8a8a8a', [[6, 7, 2, 1], [9, 9, 1, 1], [5, 10, 1, 1]]); rects(g, '#3a3a3a', [[7, 11, 3, 1], [11, 9, 1, 1]]); });
+PALETTE.push(GUNPOWDER);
+RECIPES.push([TNT, 1, [[GUNPOWDER, 3], [SAND, 2]]]);
+OB_PHASES[1].mobs.push('creeper');
+const FLASH = new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: .55, depthWrite: false});
+KINDS.creeper = {hw: .3, h: 1.8, speed: 2.1, hp: 20, col: 0x4caf3a, hostile: true, creeper: true, hurtF: 300, build(g) {
+  const c = this.col, dark = 0x2e7a26, face = 0x101410;
+  part(g, c, .5, .9, .32, 0, .85, 0); part(g, dark, .2, .3, .02, .1, 1, -.161); part(g, dark, .14, .2, .02, -.12, .6, -.161);
+  part(g, c, .5, .5, .5, 0, 1.55, 0); part(g, dark, .16, .14, .02, .14, 1.72, -.251);
+  part(g, face, .12, .12, .02, -.11, 1.63, -.252); part(g, face, .12, .12, .02, .11, 1.63, -.252);
+  part(g, face, .1, .18, .02, 0, 1.47, -.252); part(g, face, .06, .12, .02, -.08, 1.42, -.252); part(g, face, .06, .12, .02, .08, 1.42, -.252);
+  const f = new THREE.Mesh(boxG, FLASH); f.name = 'flash'; f.scale.set(.56, 1.84, .56); f.position.y = .91; f.visible = false; g.add(f);
+  return [leg(g, c, .22, .4, -.13, -.16), leg(g, c, .22, .4, .13, .16), leg(g, c, .22, .4, .13, -.16), leg(g, c, .22, .4, -.13, .16)];
+}, say() {}, drop() { give(GUNPOWDER, 1 + (Math.random() < .5 ? 1 : 0)); }};
+// creepers sneak up, hiss, swell and flash, then blow up (unless you run away in time)
+function creeperThink(m, K, dt) {
+  const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz), dy = Math.abs(P.y - m.y);
+  const flash = m.g.getObjectByName('flash');
+  if (!dead && d < 16 && dy < 6) {
+    m.yaw = Math.atan2(-dx, -dz);
+    if (m.fuse > 0 || (d < 2.6 && dy < 2.5)) {
+      if (!(m.fuse > 0)) { m.fuse = 1.5; noise(1.5, 'highpass', 3000, .7, .55, [m.x, m.y + 1, m.z]); }
+      m.walk = false;
+      if (d > 6) { m.fuse = 0; m.g.scale.setScalar(1); flash.visible = false; return; } // you got away
+      m.fuse -= dt;
+      m.g.scale.setScalar(1 + (1 - m.fuse / 1.5) * .25);
+      flash.visible = Math.floor(m.fuse * 8) % 2 === 0;
+      if (m.fuse <= 0) { const x = m.x, y = m.y + .9, z = m.z; m.y = -50; explode(x, y, z); }
+    } else m.walk = true;
+  } else {
+    if (m.fuse > 0) { m.fuse = 0; m.g.scale.setScalar(1); flash.visible = false; }
+    if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
+  }
+}
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;

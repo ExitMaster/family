@@ -4,7 +4,7 @@ A Minecraft-style voxel sandbox in **one HTML file** (three.js from a CDN, no bu
 An endless generated world of hills, lakes, beaches, stone peaks and oak forests: dig it up,
 build on it, fly over it. The world saves in the browser.
 
-> <https://exitmaster.github.io/family/blockwood/>
+> <https://unimai.net/blockwood/>
 
 ## Controls
 
@@ -96,6 +96,9 @@ build on it, fly over it. The world saves in the browser.
   Dragon and blow up its crystals from far away. In Creative the bow needs no arrows.
 - **Skeletons** come out at night with zombies. They keep their distance and shoot arrows at you,
   burn in daylight, and drop arrows (and sometimes a bow).
+- **Creepers** are green and silent. They sneak up at night, then hiss, swell up and flash white
+  for a second and a half before they explode, blowing a hole in the ground. Run more than 6 blocks
+  away while one is hissing and it calms down. They drop gunpowder (3 gunpowder + 2 sand makes TNT).
 - **Piglins** live in the Nether. They're friendly unless you hit one (then the whole group gets
   angry). Right click one while holding a gold ingot to barter: they give back obsidian,
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
@@ -120,7 +123,7 @@ joins with the same code is in the same world:
 
 Press **Leave** to go back to your own world, exactly as you left it. Nothing from the room is
 saved into your own world. Multiplayer needs the internet and works on the website
-(<https://exitmaster.github.io/family/blockwood/>), not inside the Claude preview. It uses the
+(<https://unimai.net/blockwood/>), not inside the Claude preview. It uses the
 family Firebase database under `rooms/{CODE}/blockwood`, so no rule changes are needed.
 
 ## Saving
