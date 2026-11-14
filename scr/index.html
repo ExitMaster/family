@@ -467,9 +467,18 @@ const sfx = (() => {
     const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 1400; wf.Q.value = 1.2;
     const wg = ctx.createGain(); wg.gain.value = 0;
     w1.connect(wf); w2.connect(wf); wf.connect(wg); wg.connect(master); w1.start(); w2.start();
-    const rev = ctx.createOscillator(); rev.type = 'sine'; rev.frequency.value = 880;
-    const rg = ctx.createGain(); rg.gain.value = 0; rev.connect(rg); rg.connect(master); rev.start();
-    ev = { w1, w2, wg, rev, rg };
+    // the Tesla reversing sound: two slightly detuned saw tones through a soft low-pass, pulsed
+    // on and off by an LFO (so it warbles), then gated on only while actually reversing
+    const rv1 = ctx.createOscillator(); rv1.type = 'sawtooth'; rv1.frequency.value = 600;
+    const rv2 = ctx.createOscillator(); rv2.type = 'sawtooth'; rv2.frequency.value = 600; rv2.detune.value = 22;
+    const rvf = ctx.createBiquadFilter(); rvf.type = 'lowpass'; rvf.frequency.value = 1300; rvf.Q.value = 3;
+    const trem = ctx.createGain(); trem.gain.value = 0.5;           // pulsed between 0 and 1 by the LFO
+    const rg = ctx.createGain(); rg.gain.value = 0;                 // the on/off gate
+    rv1.connect(rvf); rv2.connect(rvf); rvf.connect(trem); trem.connect(rg); rg.connect(master);
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 2.7;   // the pulse rate
+    const lfoDepth = ctx.createGain(); lfoDepth.gain.value = 0.5; lfo.connect(lfoDepth); lfoDepth.connect(trem.gain);
+    rv1.start(); rv2.start(); lfo.start();
+    ev = { w1, w2, wg, rv1, rv2, rg };
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
@@ -526,9 +535,9 @@ const sfx = (() => {
       ev.wg.gain.setTargetAtTime(on ? 0.016 + Math.min(sp, 14) * 0.0016 : 0, now, 0.15);
       ev.w1.frequency.setTargetAtTime(f, now, 0.1);
       ev.w2.frequency.setTargetAtTime(f * 1.5, now, 0.1);
-      // the reverse sound: a warbling two-note beep that wobbles, like the real car
-      if (on && reversing){ const wob = 660 + Math.sin(now * 11) * 90; ev.rev.frequency.setTargetAtTime(wob, now, 0.03); ev.rg.gain.setTargetAtTime(0.03, now, 0.05); }
-      else ev.rg.gain.setTargetAtTime(0, now, 0.05);
+      // the reverse sound: pulsing, warbling detuned tones with a slow pitch wobble, like the real car
+      if (on && reversing){ const base = 560 + Math.sin(now * 1.6) * 55; ev.rv1.frequency.setTargetAtTime(base, now, 0.08); ev.rv2.frequency.setTargetAtTime(base, now, 0.08); ev.rg.gain.setTargetAtTime(0.05, now, 0.04); }
+      else ev.rg.gain.setTargetAtTime(0, now, 0.08);
     },
     engineOff(){ if (engine) engine.g.gain.setTargetAtTime(0, ctx.currentTime, 0.1); if (ev){ ev.wg.gain.setTargetAtTime(0, ctx.currentTime, 0.1); ev.rg.gain.setTargetAtTime(0, ctx.currentTime, 0.1); } },
     get muted(){ return muted; },
