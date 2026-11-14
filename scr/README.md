@@ -55,6 +55,11 @@ and **C** still changes its colour.
 
 The traffic on the roads is made of real cars too.
 
+The **Teslas** (Model 3, Y, Y L, S Plaid, X, Roadster and the Cybertruck) are built as
+detailed models of the real cars, with their light bars, badges and wheels. The **electric
+cars** (the Teslas, Ioniq 5 and EV6) **sound like EVs** — a quiet rising whine instead of an
+engine — and make the **classic Tesla reversing tone** when you back up.
+
 ## Bombs
 
 The **fighter jets** (Thunder, Comet, Hog, Tiger, Lightning, Delta Dart, Viper, Raptor and
