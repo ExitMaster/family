@@ -830,7 +830,8 @@ function burst(x, y, z, b, col) {
 const HW = .3, PHGT = 1.8, EYE = 1.62, DAY = 600;
 const P = {x: 0, y: 40, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: -.15, onGround: false, fly: false};
 let tod = .08, sel = 0, RD = TOUCH ? 4 : 6, mode = 'c'; // mode: 'c' creative, 's' survival
-let invs = {c: creativeInv(), s: Array(36).fill(null)}, inv = invs.c, hand = null, invOpen = false, dead = false, spawnPt = null;
+const INV = 63; // 9 hotbar slots + a 54-slot backpack
+let invs = {c: creativeInv(), s: Array(INV).fill(null)}, inv = invs.c, hand = null, invOpen = false, dead = false, spawnPt = null;
 const st = {hp: 20, food: 20, air: 10, ex: 0, regen: 0, starve: 0, drown: 0, inv: 0, fallY: null, noFall: false};
 const mine = {on: false, x: 0, y: 0, z: 0, p: 0, snd: 0};
 const keys = {};
@@ -1134,7 +1135,7 @@ function applySave(s) {
       cr: Array.isArray(s.end.cr) && s.end.cr.length === 8 ? s.end.cr.map(Boolean) : Array(8).fill(true)};
     SEED = s.seed;
     for (const k in s.edits || {}) edits.set(Number(k), new Map(s.edits[k]));
-    invs = {c: creativeInv(), s: Array(36).fill(null)};
+    invs = {c: creativeInv(), s: Array(INV).fill(null)};
     if (s.invs) { invs.c = unpackInv(s.invs.c) || invs.c; invs.s = unpackInv(s.invs.s) || invs.s; }
     else if (Array.isArray(s.hotbar)) s.hotbar.forEach((b, i) => { if (i < 9 && BLOCKS[b]) invs.c[i] = {id: b, n: 1}; });
     mode = s.mode === 's' ? 's' : 'c'; inv = invs[mode]; ensurePlane();
@@ -1158,7 +1159,7 @@ function newWorld() {
   resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   SEED = Math.floor(Math.random() * 1e6);
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
-  invs = {c: creativeInv(), s: Array(36).fill(null)}; inv = invs[mode]; ensurePlane();
+  invs = {c: creativeInv(), s: Array(INV).fill(null)}; inv = invs[mode]; ensurePlane();
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false});
   spawn(); renderHotbar(); refreshMeta(); persist();
 }
@@ -1493,8 +1494,7 @@ function updateMobs(dt) {
     spawnT = 1.5;
     let pass = 0, host = 0;
     for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
-    if (dim === 'e') { if (pass < 5) netherSpawn('enderman'); }
-    else if (pass < 12) { if (dim === 'n') netherSpawn(Math.random() < .85 ? 'piglin' : 'enderman'); else trySpawn(); }
+    if (pass < 12 && dim !== 'e') { if (dim === 'n') netherSpawn('piglin'); else trySpawn(); }
     spawnVillagers();
     if (mode === 's' && host < 5 && !dead) { if (dim === 'n') netherSpawn('magma'); else if (dim === 'o') trySpawnZombie(); }
   }
@@ -1712,15 +1712,16 @@ const RECIPES = [
 ];
 
 /* ---------- inventory ---------- */
-function creativeInv() { const a = Array(36).fill(null); DEFAULT_HOTBAR.forEach((b, i) => a[i] = {id: b, n: 1}); return a; }
+function creativeInv() { const a = Array(INV).fill(null); DEFAULT_HOTBAR.forEach((b, i) => a[i] = {id: b, n: 1}); return a; }
 const packInv = a => a.map(s => s ? [s.id, s.n] : 0);
 function unpackInv(a) {
-  if (!Array.isArray(a) || a.length !== 36) return null;
+  if (!Array.isArray(a) || a.length < 36 || a.length > INV) return null;
+  while (a.length < INV) a.push(0); // older saves had a smaller backpack
   return a.map(s => Array.isArray(s) && validId(s[0]) ? {id: s[0], n: Math.max(1, Math.min(maxOf(s[0]), s[1] | 0))} : null);
 }
 const countOf = id => inv.reduce((t, s) => t + (s && s.id === id ? s.n : 0), 0);
 function take(id, n) {
-  for (let i = 35; i >= 0 && n > 0; i--) {
+  for (let i = INV - 1; i >= 0 && n > 0; i--) {
     const s = inv[i];
     if (!s || s.id !== id) continue;
     const k = Math.min(n, s.n); s.n -= k; n -= k;
@@ -1732,7 +1733,7 @@ function addRange(id, n, a, b) {
   for (let i = a; i < b && n > 0; i++) if (!inv[i]) { const k = Math.min(n, maxOf(id)); inv[i] = {id, n: k}; n -= k; }
   return n;
 }
-const addItem = (id, n) => addRange(id, n, 0, 36);
+const addItem = (id, n) => addRange(id, n, 0, INV);
 function give(id, n) {
   if (addItem(id, n)) toast('Backpack full');
   tone(800 + Math.random() * 300, 1300, .07, .12, 'sine');
@@ -1775,7 +1776,7 @@ function slotClick(i, e) {
   const s = inv[i];
   if (e.shiftKey && s && !hand) {
     inv[i] = null;
-    const left = i < 9 ? addRange(s.id, s.n, 9, 36) : addRange(s.id, s.n, 0, 9);
+    const left = i < 9 ? addRange(s.id, s.n, 9, INV) : addRange(s.id, s.n, 0, 9);
     if (left) inv[i] = {id: s.id, n: left};
   } else if (e.button === 2) {
     if (!hand && s) { const k = Math.ceil(s.n / 2); hand = {id: s.id, n: k}; s.n -= k; if (!s.n) inv[i] = null; }
@@ -1806,7 +1807,7 @@ function renderInv() {
   $('#invHint').textContent = curTrades ? 'Pick a trade. Villagers pay emeralds for food and supplies, and sell tools, food and beds.' : surv
     ? 'Click to pick up and put down · right-click takes half · shift-click moves between hotbar and backpack. Start by punching a tree for logs.'
     : 'Click anything to put it in the selected hotbar slot. Click a hotbar slot below to choose it.';
-  if (surv) for (let i = 9; i < 36; i++) grid.append(mkSlot(i));
+  if (surv) for (let i = 9; i < INV; i++) grid.append(mkSlot(i));
   else for (const id of PALETTE) {
     const b = mkBtn(id, 0);
     b.addEventListener('click', () => { inv[sel] = {id, n: 1}; renderInv(); renderHotbar(); toast(nameOf(id)); saveDirty = true; });
@@ -2073,7 +2074,7 @@ function trySpawnZombie() {
   const y = spots[Math.floor(Math.random() * spots.length)];
   if (y > colTop(x, z) && dayAmt > .3) return;
   if (torchNear(x, y, z, 10)) return;
-  addMob(Math.random() < .25 && getBlock(x, y + 2, z) === AIR ? 'enderman' : 'zombie', x + .5, y, z + .5);
+  addMob('zombie', x + .5, y, z + .5);
 }
 
 /* ---------- more animals ---------- */
@@ -2291,7 +2292,7 @@ const COBBLE_ALWAYS = 100000;
 function ensureCobble() {
   if (mode !== 's' || (hand && hand.id === COBBLE)) return;
   let at = -1, changed = false;
-  for (let i = 0; i < 36; i++) {
+  for (let i = 0; i < INV; i++) {
     const s = inv[i];
     if (!s || s.id !== COBBLE) continue;
     if (at < 0) at = i; else { inv[i] = null; changed = true; }
@@ -3062,7 +3063,7 @@ const OB_PHASES = [
   {n: 'Beach', at: 170, blocks: [[SAND, 6], [GLASS, 1], [DIRT, 1], [LOG, 1]], mobs: ['chicken', 'rabbit'], loot: [[RFISH, 4], [CFISH, 3], [GLASS, 8]]},
   {n: 'Village', at: 230, blocks: [[PLANKS, 3], [BRICK, 2], [SBRICK, 2], [WOOL, 2], [GLASS, 1], [LOG, 1]], mobs: ['villager'], loot: [[EMERALD, 3], [BED, 1], [STEAK, 3], [ISWORD, 1]]},
   {n: 'the Nether', at: 310, blocks: [[NETHERRACK, 6], [NGOLD, 2], [GLOW, 1.5], [OBSIDIAN, 1]], mobs: ['piglin', 'magma'], loot: [[GOLDI, 3], [FLINT, 1], [OBSIDIAN, 4]]},
-  {n: 'the End', at: 400, blocks: [[ENDSTONE, 7], [OBSIDIAN, 2], [EGG, .2]], mobs: ['enderman'], loot: [[PEARL, 2], [ENDEYE, 1]]},
+  {n: 'the End', at: 400, blocks: [[ENDSTONE, 7], [OBSIDIAN, 2], [EGG, .2]], mobs: [], loot: [[PEARL, 2], [ENDEYE, 1]]},
 ];
 let obN = 0;
 const obPhase = n => { const k = n % OB_CYCLE; let ph = OB_PHASES[0]; for (const p of OB_PHASES) if (k >= p.at) ph = p; return ph; };
@@ -3082,7 +3083,7 @@ function nextOneBlock() {
     toast(obN % OB_CYCLE ? `New phase: ${ph.n}!` : 'You finished every phase! Back to the plains.', 3200);
     [392, 523, 659].forEach((f, i) => tone(f, f, .3, .12, 'triangle', null, i * .14));
   }
-  if (Math.random() < 1 / 14) {
+  if (ph.mobs.length && Math.random() < 1 / 14) {
     const kind = ph.mobs[Math.floor(Math.random() * ph.mobs.length)];
     if (!KINDS[kind].hostile || mode === 's') {
       addMob(kind, .5, OB_Y + 1, .5);

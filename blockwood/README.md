@@ -43,6 +43,7 @@ build on it, fly over it. The world saves in the browser.
   and TNT hurt you; food slowly drains and full food heals you. Blocks take time to dig and
   go into your backpack; stone needs a pickaxe, iron ore a stone pickaxe. Zombies come out at
   night and in dark caves and burn in daylight. If you die you respawn with your backpack.
+  The backpack holds 54 stacks on top of the 9-slot hotbar.
   You always carry 100,000 cobblestone: it tops itself back up no matter how much you use.
 - **Crafting** in the backpack: planks, sticks, torches, wooden/stone/iron pickaxes and swords,
   iron ingots (raw iron + coal), beds, cooked porkchops, steak, chicken and fish, glass, stone, stone bricks, bricks and TNT.
@@ -88,9 +89,6 @@ build on it, fly over it. The world saves in the browser.
 - **Animals**: pigs, sheep, cows, chickens and hopping rabbits wander the land, and fish swim in
   lakes and the sea. They run when you hit them. In Survival they drop porkchops, wool, beef,
   chicken and fish, which you can cook with coal.
-- **Endermen**: tall black creatures with purple eyes that come out at night (and sometimes in
-  the Nether). They leave you alone unless you stare at them or hit them, then they teleport
-  after you. They drop ender pearls.
 - **Piglins** live in the Nether. They're friendly unless you hit one (then the whole group gets
   angry). Right click one while holding a gold ingot to barter: they give back obsidian,
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
