@@ -1069,11 +1069,11 @@ function resetWorld() {
 
 /* ---------- sky ---------- */
 const SKY_DAY = new THREE.Color(0x8cc0f2), SKY_NIGHT = new THREE.Color(0x0b1028), SKY_DUSK = new THREE.Color(0xf0935c), WATER_FOG = new THREE.Color(0x1d3f8a);
-const sky = new THREE.Color(), sunDir = new THREE.Vector3();
+const sky = new THREE.Color(), sunDir = new THREE.Vector3(), SKY_GREY = new THREE.Color(0x7d8794), GLOOM = new THREE.Color(), BOLT_SKY = new THREE.Color(0xe8ecff);
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 let headInWater = false, skyLight = 1, dayAmt = 1;
 function updateSky() {
-  sun.visible = moon.visible = dim === 'o' || dim === 'b';
+  sun.visible = moon.visible = (dim === 'o' || dim === 'b') && wAmt < .6;
   if (dim === 'e') { // the End: a dark violet void with a flat, pale light
     sky.copy(END_SKY); dayU.value = .85; minU.value = .5; skyLight = .85; dayAmt = 0; matWater.color.setScalar(.7);
     lightA.intensity = .65; lightD.intensity = .35;
@@ -1088,16 +1088,18 @@ function updateSky() {
   }
   minU.value = .1;
   const a = tod * Math.PI * 2, sh = Math.sin(a);
-  const day = smooth(-.15, .25, sh), light = .3 + .7 * day;
-  sky.copy(SKY_NIGHT).lerp(SKY_DAY, day).lerp(SKY_DUSK, Math.max(0, 1 - Math.abs(sh) / .3) * .45);
-  dayU.value = light; skyLight = light; dayAmt = day; matWater.color.setScalar(light);
+  const day = smooth(-.15, .25, sh), light = (.3 + .7 * day) * (1 - .22 * wAmt - .2 * sAmt) + flash * .5;
+  sky.copy(SKY_NIGHT).lerp(SKY_DAY, day).lerp(SKY_DUSK, Math.max(0, 1 - Math.abs(sh) / .3) * .45 * (1 - wAmt));
+  if (wAmt > 0) sky.lerp(GLOOM.copy(SKY_GREY).multiplyScalar(.15 + .85 * day * (1 - .45 * sAmt)), wAmt * .8);
+  if (flash > 0) sky.lerp(BOLT_SKY, flash * .6);
+  dayU.value = light; skyLight = light; dayAmt = day * (1 - .7 * sAmt); matWater.color.setScalar(Math.min(1, light));
   lightA.intensity = .5 * light; lightD.intensity = .55 * light;
   if (headInWater) {
     scene.fog.color.copy(WATER_FOG).multiplyScalar(light); scene.background = scene.fog.color;
     scene.fog.near = 1; scene.fog.far = 20;
   } else {
     scene.fog.color.copy(sky); scene.background = sky;
-    scene.fog.near = RD * CS * .5; scene.fog.far = RD * CS * .95;
+    scene.fog.near = RD * CS * (.5 - .3 * wAmt); scene.fog.far = RD * CS * (.95 - .3 * wAmt);
   }
   sunDir.set(Math.cos(a), sh, .25).normalize();
   sun.position.copy(cam.position).addScaledVector(sunDir, 400); sun.lookAt(cam.position);
@@ -1150,7 +1152,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN, w: [weather, Math.round(wLeft)]};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1195,6 +1197,7 @@ function applySave(s) {
     sel = (s.sel | 0) % 9;
     if ([3, 4, 6, 8].includes(s.rd)) RD = s.rd;
     if (typeof s.tod === 'number') tod = s.tod;
+    if (Array.isArray(s.w) && W_NAME[s.w[0]] && s.w[1] > 0) { weather = s.w[0]; wLeft = +s.w[1]; wAmt = sAmt = weather === 'clear' ? 0 : 1; if (weather !== 'storm') sAmt = 0; }
     P.fly = !!s.fly;
     if (s.snd === false) S.on = false;
     clearPlanes();
@@ -2241,7 +2244,8 @@ function useBed(x, y, z) {
   sleepEl.classList.add('on');
   [392, 330, 262].forEach((f, i) => tone(f, f * .99, .7, .12, 'sine', null, i * .55));
   setTimeout(() => {
-    tod = .02; sleeping = false; saveDirty = true;
+    setTod(.02); sleeping = false; saveDirty = true;
+    if (weather === 'storm') setWeather('clear');
     sleepEl.classList.remove('on');
     toast('Good morning!', 2000);
   }, 2400);
@@ -3370,6 +3374,7 @@ async function mpJoinRoom() {
   persist(); // your own world is safe in this browser while you visit the room
   Object.assign(mp, {room, name, base: `rooms/${room}/blockwood`, joinedAt: Date.now(), color: SHIRTS[Math.abs(hashStr(mp.uid)) % SHIRTS.length]});
   let meta;
+  mp.subs.push(fb.onValue(fb.ref(fb.db, '.info/serverTimeOffset'), s => { mp.off = s.val() || 0; }));
   try {
     const res = await fb.runTransaction(R('/meta'), cur => cur || {seed: SEED, made: Date.now()});
     meta = res.snapshot.val();
@@ -3383,10 +3388,15 @@ async function mpJoinRoom() {
   quiet(fb.set(me, mpMe()));
   quiet(fb.onDisconnect(me).remove());
   quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.remove(R('/hits/' + mp.uid)));
-  mp.mobSig = null; mp.mobT = 0;
+  mp.mobSig = null; mp.mobT = 0; mp.sky = null;
+  try { // one clock and one sky for the whole room
+    const now = serverNow();
+    const res = await fb.runTransaction(R('/sky'), cur => cur && typeof cur.tod === 'number' ? undefined : {tod, at: now, w: weather, until: Math.round(now + Math.max(5, wLeft) * 1000)});
+    mpSky(res.snapshot.val());
+  } catch (e) {}
   const onEdit = s => mpApplyEdit(s.key, s.val());
   mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
-    fb.onValue(R('/players'), s => mpPlayers(s.val() || {})),
+    fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
     fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
@@ -3398,7 +3408,7 @@ function mpLeave() {
   const fb = mp.fb;
   mp.subs.forEach(u => u()); mp.subs = [];
   quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid)));
-  mp.on = false; clearGhosts();
+  mp.on = false; mp.sky = null; clearGhosts();
   for (const a of avatars.values()) scene.remove(a.g);
   avatars.clear(); marksEl.textContent = ''; mpFriends.textContent = '';
   resetWorld(); clearMobs(); applySave(loadSaved()); // back to your own world, exactly as you left it
@@ -3497,9 +3507,9 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /day  /night  /seed  /spawn  /fly  /clear',
-  day: () => { tod = .1; return 'The sun comes up'; },
-  night: () => { tod = .6; return 'Night falls… watch out for monsters'; },
+  help: () => 'Commands: /find  /tp NAME  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  day: () => { setTod(.1); return 'The sun comes up'; },
+  night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
   spawn: () => {
     if (riding) exitPlane();
@@ -3779,6 +3789,141 @@ function mpOnHit(s) {
   hurtMob(m, v.dmg);
 }
 
+/* ---------- weather: rain, snow and thunderstorms ---------- */
+// Clear spells and wet spells take turns. Where the ground is snowy it snows instead of raining, and roofs keep you dry.
+// Storms are dark enough for monsters to come out in the daytime. In a multiplayer room the room keeps one sky for
+// everyone: the time of day and the weather live at rooms/{CODE}/blockwood/sky, so friends always see the same thing.
+const W_NAME = {clear: 'Clear skies', rain: 'Rain', storm: 'Thunderstorm'};
+let weather = 'clear', wLeft = 240 + Math.random() * 300, wAmt = 0, sAmt = 0, flash = 0, boltT = 4, snowy = false;
+function nextWeather(w) { // what comes after w, and for how many seconds
+  if (w !== 'clear') return ['clear', 300 + Math.random() * 420];
+  return [Math.random() < .3 ? 'storm' : 'rain', 120 + Math.random() * 180];
+}
+const DROPS = TOUCH ? 900 : 2000, WR = 12;
+const dropX = new Float32Array(DROPS), dropY = new Float32Array(DROPS), dropZ = new Float32Array(DROPS);
+const rainGeo = new THREE.BufferGeometry(), rainPos = new Float32Array(DROPS * 6);
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+const rainMesh = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({color: 0xa9c4e8, transparent: true, opacity: .55, fog: false}));
+const snowGeo = new THREE.BufferGeometry(), snowPos = new Float32Array(DROPS * 3);
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+const snowMesh = new THREE.Points(snowGeo, new THREE.PointsMaterial({color: 0xffffff, size: .13, transparent: true, opacity: .9, fog: false}));
+const boltGeo = new THREE.BufferGeometry(), boltMesh = new THREE.Line(boltGeo, new THREE.LineBasicMaterial({color: 0xf4f6ff, fog: false}));
+for (const o of [rainMesh, snowMesh, boltMesh]) { o.frustumCulled = false; o.visible = false; scene.add(o); }
+for (let i = 0; i < DROPS; i++) { dropX[i] = (Math.random() * 2 - 1) * WR; dropZ[i] = (Math.random() * 2 - 1) * WR; dropY[i] = Math.random() * 22 - 8; }
+// the highest roof over each column near you, so drops stop on it
+const HG = WR * 2 + 1, roof = new Int16Array(HG * HG);
+let roofX = 1e9, roofZ = 1e9, roofT = 0;
+function updateRoofs() {
+  roofX = Math.floor(P.x); roofZ = Math.floor(P.z);
+  let sn = 0;
+  for (let i = 0; i < HG; i++) for (let j = 0; j < HG; j++) {
+    const x = roofX - WR + i, z = roofZ - WR + j, y = colTop(x, z);
+    roof[i * HG + j] = y;
+    if (y >= 0 && getBlock(x, y, z) === SNOW) sn++;
+  }
+  snowy = sn > HG * HG * .08 || roof[WR * HG + WR] > WATER + 21; // snowy ground or high mountains
+}
+function roofAt(x, z) {
+  const i = Math.floor(x) - roofX + WR, j = Math.floor(z) - roofZ + WR;
+  return i >= 0 && j >= 0 && i < HG && j < HG ? roof[i * HG + j] + 1 : -99;
+}
+let rainSnd = null;
+function rainSound(vol) {
+  if (!S.on || !S.ctx || vol < .01) {
+    if (rainSnd) { const r = rainSnd; rainSnd = null; r.g.gain.setTargetAtTime(0, S.ctx.currentTime, .3); setTimeout(() => r.s.stop(), 1500); }
+    return;
+  }
+  if (!rainSnd) {
+    const c = S.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = S.nb; s.loop = true; f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = .4; g.gain.value = 0;
+    s.connect(f); f.connect(g); g.connect(S.out); s.start();
+    rainSnd = {s, g};
+  }
+  rainSnd.g.gain.setTargetAtTime(vol, S.ctx.currentTime, .4);
+}
+function lightning() {
+  const a = Math.random() * 6.283, d = 25 + Math.random() * 50, x = P.x + Math.sin(a) * d, z = P.z + Math.cos(a) * d;
+  const pts = [], top = Math.max(H + 30, P.y + 50), y0 = Math.max(0, colTop(Math.floor(x), Math.floor(z)) + 1);
+  for (let k = 0, n = 9; k <= n; k++) { const y = top + (y0 - top) * k / n, j = k && k < n ? 2.2 : 0; pts.push(x + (Math.random() - .5) * j * 2, y, z + (Math.random() - .5) * j * 2); }
+  boltGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3)); boltGeo.computeBoundingSphere();
+  boltMesh.visible = dim === 'o' || dim === 'b'; flash = 1;
+  setTimeout(() => { boltMesh.visible = false; }, 180);
+  setTimeout(() => { noise(2.6, 'lowpass', 160, .7, .7, null, 40); noise(.5, 'lowpass', 900, .5, .35, null, 200); }, d / 340 * 1000 * 3);
+}
+// set the time of day or the weather (sleeping, /day, /weather…); in a room it changes for everyone
+const serverNow = () => Date.now() + (mp.off || 0);
+function setTod(t) {
+  tod = t; saveDirty = true;
+  if (mp.on && mp.sky) quiet(mp.fb.update(R('/sky'), {tod: t, at: serverNow()}));
+}
+function setWeather(w, secs = nextWeather(w === 'clear' ? 'rain' : 'clear')[1]) {
+  weather = w; wLeft = secs; saveDirty = true;
+  if (mp.on && mp.sky) quiet(mp.fb.update(R('/sky'), {w, until: Math.round(serverNow() + secs * 1000)}));
+}
+function mpSky(v) {
+  if (!v || typeof v.tod !== 'number' || !W_NAME[v.w]) return;
+  const before = mp.sky && mp.sky.w;
+  mp.sky = v;
+  if (before && before !== v.w && dim !== 'n' && dim !== 'e') toast(W_NAME[v.w], 2000);
+}
+let skyTryT = 0;
+function updateWeather(dt) {
+  if (mp.on && mp.sky) { // the room's clock and weather
+    const now = serverNow(), s = mp.sky;
+    tod = ((s.tod + (now - s.at) / (DAY * 1000)) % 1 + 1) % 1;
+    weather = s.w; wLeft = (s.until - now) / 1000;
+    if (wLeft <= 0 && (skyTryT -= dt) <= 0) { // the first one to notice moves the weather on, once
+      skyTryT = 3;
+      quiet(mp.fb.runTransaction(R('/sky'), cur => {
+        if (!cur || cur.until > serverNow()) return; // someone already did
+        const [w, secs] = nextWeather(cur.w);
+        return Object.assign(cur, {w, until: Math.round(serverNow() + secs * 1000)});
+      }));
+    }
+  } else {
+    tod = (tod + dt / DAY) % 1;
+    if ((wLeft -= dt) <= 0) {
+      [weather, wLeft] = nextWeather(weather);
+      if (dim !== 'n' && dim !== 'e') toast(W_NAME[weather], 2000);
+    }
+  }
+  const outside = dim === 'o' || dim === 'b';
+  const k = Math.min(1, dt / 4);
+  wAmt += ((outside && weather !== 'clear' ? 1 : 0) - wAmt) * k;
+  sAmt += ((outside && weather === 'storm' ? 1 : 0) - sAmt) * k;
+  flash = Math.max(0, flash - dt * 4);
+  if (outside && weather === 'storm' && (boltT -= dt) <= 0) { boltT = 5 + Math.random() * 14; lightning(); }
+  if ((roofT -= dt) <= 0 || Math.abs(Math.floor(P.x) - roofX) > 3 || Math.abs(Math.floor(P.z) - roofZ) > 3) { roofT = .4; if (outside && wAmt > .01) updateRoofs(); }
+  const n = Math.round(DROPS * wAmt * (TOUCH ? .8 : 1));
+  rainMesh.visible = n > 0 && !snowy; snowMesh.visible = n > 0 && snowy;
+  rainSound(outside && !snowy && !headInWater ? wAmt * (.06 + sAmt * .05) : 0);
+  if (!n) return;
+  const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z, fall = snowy ? 2.2 : 16, t = performance.now() / 1000;
+  for (let i = 0; i < n; i++) {
+    dropY[i] -= fall * dt;
+    let x = cx + dropX[i], z = cz + dropZ[i];
+    if (snowy) { x += Math.sin(t * .8 + i) * .4; z += Math.cos(t * .7 + i * 1.3) * .4; }
+    if (cy + dropY[i] < Math.max(roofAt(x, z), cy - 10)) { // landed: start again high above you
+      dropX[i] = (Math.random() * 2 - 1) * WR; dropZ[i] = (Math.random() * 2 - 1) * WR; dropY[i] = 10 + Math.random() * 6;
+      x = cx + dropX[i]; z = cz + dropZ[i];
+      if (roofAt(x, z) > cy + dropY[i]) dropY[i] = -50; // under a roof: hide it
+    }
+    const y = cy + dropY[i];
+    if (snowy) { snowPos[i * 3] = x; snowPos[i * 3 + 1] = y; snowPos[i * 3 + 2] = z; }
+    else { const o = i * 6; rainPos[o] = rainPos[o + 3] = x; rainPos[o + 1] = y; rainPos[o + 4] = y + .55; rainPos[o + 2] = rainPos[o + 5] = z; }
+  }
+  if (snowy) { snowGeo.setDrawRange(0, n); snowGeo.attributes.position.needsUpdate = true; }
+  else { rainGeo.setDrawRange(0, n * 2); rainGeo.attributes.position.needsUpdate = true; }
+}
+CMDS.weather = a => {
+  const w = {clear: 'clear', sun: 'clear', sunny: 'clear', rain: 'rain', snow: 'rain', storm: 'storm', thunder: 'storm'}[(a || '').toLowerCase()];
+  if (!w) return `It's ${W_NAME[weather].toLowerCase()} now. Type /weather clear, /weather rain or /weather storm`;
+  setWeather(w); return W_NAME[w] + (mp.on ? ' for everyone in the room' : '');
+};
+CMDS.rain = () => CMDS.weather('rain');
+CMDS.storm = CMDS.thunder = () => CMDS.weather('storm');
+CMDS.sun = () => CMDS.weather('clear');
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3789,7 +3934,7 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if (!dead && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    tod = (tod + dt / DAY) % 1;
+    updateWeather(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();

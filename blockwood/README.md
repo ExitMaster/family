@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/day`, `/night`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -109,6 +109,10 @@ build on it, fly over it. The world saves in the browser.
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
 - **Sound effects** for digging, building, footsteps, splashes, animals and explosions (all synthesized).
 - 10-minute day/night cycle with sun, moon and sunset sky.
+- **Weather**: clear spells and rain take turns. On snowy ground and high mountains it snows instead,
+  and roofs keep you dry. **Thunderstorms** darken the sky with lightning and thunder, and are dark
+  enough for monsters to come out in the daytime (sleeping through one clears it). Change it with
+  `/weather clear`, `/weather rain` or `/weather storm` (or `/rain`, `/storm`, `/sun`).
 - **New world** in the pause menu deletes the current world and makes a new one. Type a **seed** in the
   box next to it first to get that exact world again (numbers or any word, like `castle`); leave it
   empty for a random one. Your current seed is shown just above, so you can share it with friends.
@@ -124,6 +128,8 @@ joins with the same code is in the same world:
   and stays in the room for next time.
 - You see each other walking around with name tags (in the same dimension).
 - Press `T` to chat.
+- Everyone has the **same time of day and the same weather**. When someone sleeps, uses `/day`
+  or `/night`, or changes the weather, it changes for the whole room.
 - **Find your friends**: everyone in the room has a marker with their name and distance; when
   they're off-screen, a yellow arrow at the edge of the screen points the way. Type `/find` to
   hear where everyone is ("Alice: 61 blocks east", or which world they're in), and `/tp Alice`
