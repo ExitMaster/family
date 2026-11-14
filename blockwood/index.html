@@ -1560,6 +1560,7 @@ function updateMobs(dt) {
     if (K.swim) { swim(m, K, dt); continue; }
     m.t -= dt; m.flee -= dt;
     if (K.villager) villagerThink(m, dt);
+    else if (K.golem) golemThink(m, K, dt);
     else if (K.neutral) neutralThink(m, K, dt);
     else if (K.hostile) {
       if (mode !== 's') { removeMob(i); continue; }
@@ -1627,7 +1628,8 @@ function killKey() {
 function hurtMob(m, dmg = 1, byPlayer = false) {
   const K = KINDS[m.kind];
   m.hp -= dmg;
-  if (K.neutral) { // neutral mobs fight back; piglins gang up, endermen blink away
+  if (K.golem) { if (byPlayer) m.angry = 25; }
+  else if (K.neutral) { // neutral mobs fight back; piglins gang up, endermen blink away
     if (byPlayer) for (const o of mobs) if (o === m || (o.kind === m.kind && m.kind === 'piglin' && Math.hypot(o.x - m.x, o.z - m.z) < 16)) o.angry = 30;
     if (m.kind === 'enderman' && m.hp > 0 && Math.random() < .6) tpMob(m);
   } else if (!K.hostile) { m.flee = 5; m.t = 0; }
@@ -1683,7 +1685,7 @@ function explode(cx, cy, cz) {
     P.vx += px * f; P.vz += pz * f; P.vy = Math.min(14, Math.max(P.vy, 0) + py * f + 4); P.onGround = false;
   }
   shake = Math.max(shake, 1 - pd / 24);
-  for (const m of mobs.slice()) if (Math.hypot(m.x - cx, m.y - cy, m.z - cz) < 5) killMob(m);
+  for (const m of mobs.slice()) if (Math.hypot(m.x - cx, m.y - cy, m.z - cz) < 5) { if (KINDS[m.kind].golem) hurtMob(m, 30); else killMob(m); }
   if (dragon.alive && Math.hypot(dragon.x - cx, dragon.y - cy, dragon.z - cz) < 8) hurtDragon(12);
 }
 
@@ -2412,6 +2414,8 @@ function spawnVillagers() {
         const m = mobs[mobs.length - 1];
         m.prof = KINDS.villager.prof; m.vk = v.key; m.home = [v.x, v.z];
       }
+      const gy = groundAt(v.x + 3, v.z);
+      if (gy > 0) { addMob('golem', v.x + 3.5, gy, v.z + .5); mobs[mobs.length - 1].home = [v.x + .5, v.z + .5]; } // one iron golem keeps watch
     }
 }
 function talk(m) {
@@ -3117,7 +3121,7 @@ const OB_PHASES = [
   {n: 'Underground', at: 40, blocks: [[STONE, 6], [COAL, 3], [IRON, 2], [DIRT, 1], [COBBLE, 1]], mobs: ['zombie'], loot: [[COALI, 4], [RAWIRON, 3], [TORCH, 6], [SPICK, 1]]},
   {n: 'Snowy mountains', at: 110, blocks: [[SNOW, 4], [STONE, 3], [LOG, 2], [IRON, 1.5]], mobs: ['rabbit', 'sheep'], loot: [[IRONI, 3], [WOOL, 4], [IPICK, 1]]},
   {n: 'Beach', at: 170, blocks: [[SAND, 6], [GLASS, 1], [DIRT, 1], [LOG, 1]], mobs: ['chicken', 'rabbit'], loot: [[RFISH, 4], [CFISH, 3], [GLASS, 8]]},
-  {n: 'Village', at: 230, blocks: [[PLANKS, 3], [BRICK, 2], [SBRICK, 2], [WOOL, 2], [GLASS, 1], [LOG, 1]], mobs: ['villager'], loot: [[EMERALD, 3], [BED, 1], [STEAK, 3], [ISWORD, 1]]},
+  {n: 'Village', at: 230, blocks: [[PLANKS, 3], [BRICK, 2], [SBRICK, 2], [WOOL, 2], [GLASS, 1], [LOG, 1]], mobs: ['villager', 'villager', 'golem'], loot: [[EMERALD, 3], [BED, 1], [STEAK, 3], [ISWORD, 1]]},
   {n: 'the Nether', at: 310, blocks: [[NETHERRACK, 6], [NGOLD, 2], [GLOW, 1.5], [OBSIDIAN, 1]], mobs: ['piglin', 'magma'], loot: [[GOLDI, 3], [FLINT, 1], [OBSIDIAN, 4]]},
   {n: 'the End', at: 400, blocks: [[ENDSTONE, 7], [OBSIDIAN, 2], [EGG, .2]], mobs: [], loot: [[PEARL, 2], [ENDEYE, 1]]},
 ];
@@ -3499,6 +3503,52 @@ function creeperThink(m, K, dt) {
     if (m.fuse > 0) { m.fuse = 0; m.g.scale.setScalar(1); flash.visible = false; }
     if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
   }
+}
+
+/* ---------- iron golems ---------- */
+KINDS.golem = {hw: .6, h: 2.7, speed: 1.5, fast: 2.2, hp: 100, col: 0xd6d0c4, golem: true, hurtF: 140, build(g) {
+  const c = this.col, vine = 0x4a8a2a, dark = 0x9a948a;
+  part(g, c, .9, .75, .55, 0, 1.85, 0); part(g, c, .6, .45, .4, 0, 1.3, 0);
+  part(g, vine, .3, .5, .02, -.2, 1.9, -.28); part(g, vine, .14, .3, .02, .25, 1.6, -.28); part(g, vine, .3, .14, .02, .2, 2.15, .28);
+  const head = new THREE.Group(); head.position.set(0, 2.2, -.12); g.add(head);
+  part(head, c, .42, .48, .42, 0, .24, 0); part(head, dark, .1, .2, .1, 0, .16, -.25);
+  part(head, 0x7a1010, .08, .06, .02, -.1, .3, -.215); part(head, 0x7a1010, .08, .06, .02, .1, .3, -.215);
+  part(head, dark, .34, .06, .02, 0, .38, -.215);
+  for (const [sx, nm] of [[-.6, 'armL'], [.6, 'armR']]) {
+    const a = new THREE.Group(); a.name = nm; a.position.set(sx, 2.15, 0);
+    part(a, c, .26, 1.4, .3, 0, -.7, 0); if (sx > 0) part(a, vine, .02, .4, .2, .135, -.5, 0);
+    g.add(a);
+  }
+  return [leg(g, c, .3, 1.05, -.2, 0), leg(g, c, .3, 1.05, .2, 0)];
+}, say(at) { tone(90, 70, .3, .2, 'square', at); }, drop() { give(IRONI, 3 + Math.floor(Math.random() * 3)); }};
+const golemHit = at => { tone(140, 60, .25, .45, 'square', at); noise(.2, 'bandpass', 700, 2, .7, at); };
+// golems guard their village: they go after any monster close by, and after you only if you hit them
+function golemThink(m, K, dt) {
+  m.home = m.home || [m.x, m.z];
+  m.atk = (m.atk || 0) - dt; m.swing = Math.max(0, (m.swing || 0) - dt);
+  let tgt = null, td = 18;
+  if (m.angry > 0 && mode === 's' && !dead) { m.angry -= dt; tgt = P; td = Math.hypot(P.x - m.x, P.z - m.z); }
+  else for (const o of mobs) {
+    if (!KINDS[o.kind].hostile || o.y < -10) continue;
+    const d = Math.hypot(o.x - m.x, o.z - m.z);
+    if (d < td && Math.abs(o.y - m.y) < 6 && Math.hypot(o.x - m.home[0], o.z - m.home[1]) < 30) { td = d; tgt = o; }
+  }
+  if (tgt) {
+    const dx = tgt.x - m.x, dz = tgt.z - m.z;
+    m.yaw = Math.atan2(-dx, -dz); m.walk = td > 1.9;
+    if (td < 2.4 && Math.abs(tgt.y - m.y) < 2.5 && m.atk <= 0) {
+      m.atk = 1.2; m.swing = .45; golemHit([m.x, m.y + 2, m.z]);
+      if (tgt === P) { hurtPlayer(7, m.x, m.z); P.vy = 10; P.onGround = false; }
+      else { hurtMob(tgt, 15); tgt.vy = 10; tgt.vx += dx / (td || 1) * 3; tgt.vz += dz / (td || 1) * 3; }
+    }
+  } else if (m.t <= 0) {
+    const hx = m.home[0] - m.x, hz = m.home[1] - m.z;
+    m.walk = Math.random() < .5; m.t = 3 + Math.random() * 5;
+    m.yaw = Math.hypot(hx, hz) > 14 ? Math.atan2(-hx, -hz) : Math.random() * 6.283;
+    if (Math.random() < .2) K.say([m.x, m.y + 2, m.z]);
+  }
+  const s = m.swing > 0 ? -2.4 * Math.sin(m.swing / .45 * Math.PI) : Math.sin(m.ph) * .4;
+  m.g.getObjectByName('armL').rotation.x = s; m.g.getObjectByName('armR').rotation.x = m.swing > 0 ? s : -Math.sin(m.ph) * .4;
 }
 
 /* ---------- main loop ---------- */

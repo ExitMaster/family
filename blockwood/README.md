@@ -96,6 +96,10 @@ build on it, fly over it. The world saves in the browser.
   Dragon and blow up its crystals from far away. In Creative the bow needs no arrows.
 - **Skeletons** come out at night with zombies. They keep their distance and shoot arrows at you,
   burn in daylight, and drop arrows (and sometimes a bow).
+- **Iron golems** guard every village: big iron giants with vines growing on them that wander
+  around the houses. When a zombie, skeleton, creeper or magma cube comes close, the golem stomps
+  over and throws it into the air with a huge punch. They leave you alone, unless you hit one;
+  then it punches you too. A creeper blast only dents them. They drop iron ingots.
 - **Creepers** are green and silent. They sneak up at night, then hiss, swell up and flash white
   for a second and a half before they explode, blowing a hole in the ground. Run more than 6 blocks
   away while one is hissing and it calms down. They drop gunpowder (3 gunpowder + 2 sand makes TNT).
