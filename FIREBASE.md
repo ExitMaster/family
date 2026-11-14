@@ -261,7 +261,7 @@ complete set lives in one file, and that file is the one you paste.
 
 | 경로 | 쓰는 게임 | 없으면 생기는 일 |
 |---|---|---|
-| `rooms` | 🚀 제트팩 점프 · 🐰 버니 | 같이 하기(방 만들기)가 안 됨 |
+| `rooms` | 🚀 제트팩 점프 · 🐰 버니 · ⛏️ 블록우드 (`rooms/{방코드}/blockwood`) | 같이 하기(방 만들기)가 안 됨 |
 | `banks` | 🚀 제트팩 점프 | 별·아바타가 기기에만 남음 |
 | `obbyScores` | 🧗 오비 | 온라인 순위표 대신 이 기기 기록만 |
 | `obbySaves` | 🧗 오비 | 닉네임 진행도가 다른 기기로 안 따라감 |

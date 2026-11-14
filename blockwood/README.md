@@ -105,6 +105,24 @@ build on it, fly over it. The world saves in the browser.
   box next to it first to get that exact world again (numbers or any word, like `castle`); leave it
   empty for a random one. Your current seed is shown just above, so you can share it with friends.
 
+## Multiplayer
+
+Play in the same world with your family, like Jetpack Jump. In the pause menu, type **your name**
+and a **room code** (3 to 6 letters or numbers, like `FAM1`) and press **Join**. Everyone who
+joins with the same code is in the same world:
+
+- The room uses the world seed of whoever made it first.
+- Every block anyone breaks or places (TNT, portals, the OneBlock block…) shows up for everyone,
+  and stays in the room for next time.
+- You see each other walking around with name tags (in the same dimension).
+- Press `T` to chat.
+- Animals, monsters and the Ender Dragon are your own, and your backpack stays yours.
+
+Press **Leave** to go back to your own world, exactly as you left it. Nothing from the room is
+saved into your own world. Multiplayer needs the internet and works on the website
+(<https://exitmaster.github.io/family/blockwood/>), not inside the Claude preview. It uses the
+family Firebase database under `rooms/{CODE}/blockwood`, so no rule changes are needed.
+
 ## Saving
 
 Everything is kept in `localStorage` under `blockwood.save.v1`: the seed, every block you

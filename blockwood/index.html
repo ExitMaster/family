@@ -133,8 +133,15 @@ kbd{
 .row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
 .row label,.meta{color:var(--muted)}
 #seed{user-select:text;-webkit-user-select:text}
-#seedIn{flex:1 1 180px;min-width:0;user-select:text;-webkit-user-select:text;touch-action:auto}
-select,#seedIn{
+#seedIn,.tin{flex:1 1 140px;min-width:0;user-select:text;-webkit-user-select:text;touch-action:auto}
+.mph{margin:0;font-family:var(--display);font-size:22px;font-weight:600}
+#mpRoom{text-transform:uppercase}
+#chatLog{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(150px + env(safe-area-inset-bottom,0px));max-width:min(440px,70vw);display:flex;flex-direction:column;gap:3px;pointer-events:none}
+#chatLog div{background:rgba(0,0,0,.5);padding:3px 8px;border-radius:3px;line-height:1.4;overflow-wrap:anywhere;transition:opacity 1s}
+#chatLog div.old{opacity:0}
+#chatLog b{color:var(--gold)}
+#chatIn{position:fixed;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(118px + env(safe-area-inset-bottom,0px));width:min(440px,80vw);user-select:text;-webkit-user-select:text}
+select,#seedIn,.tin,#chatIn{
   font-family:var(--mono);font-size:13px;color:var(--ink);background:rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.3);border-radius:4px;padding:5px 8px;
 }
@@ -197,6 +204,8 @@ select,#seedIn{
 <div id="info" aria-live="off"></div>
 <div id="cross" aria-hidden="true"></div>
 <div id="charge" hidden><i></i></div>
+<div id="chatLog" aria-live="polite"></div>
+<input id="chatIn" type="text" maxlength="80" autocomplete="off" placeholder="Say something · Enter sends · Esc cancels" hidden>
 <div id="toast" role="status"></div>
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
 <canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
@@ -314,6 +323,19 @@ select,#seedIn{
         <button id="noNew" class="btn small" type="button">Keep this world</button>
       </div>
     </div>
+    <div class="divider"></div>
+    <h2 class="mph">Multiplayer</h2>
+    <p class="meta" style="margin:0;line-height:1.5">Play in the same world as your family: everyone types the same room code (like in Jetpack Jump). Press <kbd>T</kbd> to chat.</p>
+    <div class="row">
+      <label for="mpName">Your name</label>
+      <input id="mpName" class="tin" type="text" maxlength="12" autocomplete="off" spellcheck="false" placeholder="name">
+    </div>
+    <div class="row">
+      <label for="mpRoom">Room code</label>
+      <input id="mpRoom" class="tin" type="text" maxlength="6" autocomplete="off" spellcheck="false" placeholder="e.g. FAM1">
+      <button id="mpJoin" class="btn small" type="button">Join</button>
+    </div>
+    <p class="meta" id="mpStatus" style="margin:0;line-height:1.5" aria-live="polite"></p>
     <p id="err" hidden></p>
   </div>
 </div>
@@ -577,7 +599,7 @@ function treeAt(x, z) {
 const chunks = new Map();
 const edits = new Map(); // chunkKey -> Map(index -> block)
 let dim = 'o'; // 'o' overworld, 'n' the Nether, 'e' the End, 'b' the OneBlock world (its chunks and edits are kept apart by key)
-const ck = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096) + (dim === 'n' ? 1e8 : dim === 'e' ? 2e8 : dim === 'b' ? 3e8 : 0);
+const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : 0);
 const idxOf = (x, y, z) => y + H * (x + CS * z);
 
 function genData(cx, cz) {
@@ -663,7 +685,8 @@ function setBlock(x, y, z, b) {
   if (dz) markDirty(cx, cz + dz);
   if (dx && dz) markDirty(cx + dx, cz + dz);
   saveDirty = true;
-  if (dim === 'b' && b === AIR && x === 0 && y === OB_Y && z === 0) nextOneBlock();
+  if (mp.on && !mp.applying) mpSendEdit(x, y, z, b);
+  if (dim === 'b' && b === AIR && x === 0 && y === OB_Y && z === 0 && !mp.applying) nextOneBlock();
   return true;
 }
 
@@ -1101,7 +1124,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1116,6 +1139,7 @@ function serialize() {
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
+  if (mp.on) return; // a shared room never overwrites your own saved world
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (e) {}
 }
 function loadSaved() {
@@ -1289,6 +1313,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') toggleSound();
   if (e.code === 'KeyE') openInv();
   if (e.code === 'KeyK') killKey();
+  if (e.code === 'KeyT' && mp.on) { e.preventDefault(); openChat(); return; }
   if (e.code === 'KeyV') toast('Get in your airplane first, then press V to fly to a village house');
   if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code[5] - 1);
   if (e.code === 'Escape' && !locked) pause();
@@ -1368,6 +1393,7 @@ $('#bPause').addEventListener('click', pause);
 $('#snd').addEventListener('click', toggleSound);
 $('#rd').addEventListener('change', e => { RD = +e.target.value; computeOffsets(); unloadFar(); persist(); });
 $('#newWorld').addEventListener('click', () => {
+  if (mp.on) { toast('Leave the multiplayer room first'); return; }
   const sd = seedOf($('#seedIn').value);
   $('#confirmMsg').textContent = 'Delete this world and everything you built, then generate a new one' + (sd === null ? ' with a random seed?' : ` with seed ${sd}?`);
   $('#confirm').hidden = false; $('#yesNew').focus();
@@ -3267,6 +3293,176 @@ function archerThink(m, K, dt) {
   }
 }
 
+/* ---------- multiplayer (same Firebase rooms as Jetpack Jump) ---------- */
+// Everyone who types the same room code shares one world: the room keeps the seed of whoever made it, every block
+// anyone breaks or places, where each player is, and a little chat. Your own single-player world is left alone.
+// Data lives under rooms/{CODE}/blockwood, next to (never on top of) Jetpack Jump's rooms/{CODE}/players and /game.
+const firebaseConfig = {
+  apiKey: 'AIzaSyDNETb44pue8Kg9tYWqna7y6N7MlCoMpU0',
+  authDomain: 'unimai-game-hub.firebaseapp.com',
+  databaseURL: 'https://unimai-game-hub-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'unimai-game-hub',
+  appId: '1:527407328515:web:751f851d2a00e0a2980d36'
+};
+const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.5/';
+const MP_KEY = 'blockwood.mp', SHIRTS = [0xd8342c, 0x2f8f9c, 0xf2c230, 0x7a3fc0, 0x3fae4a, 0xe8772e, 0x2a5fd0, 0xe85a9a];
+const mp = {on: false, applying: false, fb: null, uid: null, room: '', name: '', base: '', subs: [], sendT: 0, last: '', joinedAt: 0, color: SHIRTS[0]};
+const avatars = new Map();
+const mpStatus = $('#mpStatus'), mpName = $('#mpName'), mpRoom = $('#mpRoom'), mpJoin = $('#mpJoin'), chatLog = $('#chatLog'), chatIn = $('#chatIn');
+try { const m = JSON.parse(localStorage.getItem(MP_KEY) || '{}'); mpName.value = m.name || ''; mpRoom.value = m.room || ''; } catch (e) {}
+
+async function firebase() {
+  if (mp.fb) return mp.fb;
+  const [appMod, authMod, dbMod] = await Promise.all([import(FB_SDK + 'firebase-app.js'), import(FB_SDK + 'firebase-auth.js'), import(FB_SDK + 'firebase-database.js')]);
+  const app = appMod.initializeApp(firebaseConfig, 'blockwood');
+  const cred = await authMod.signInAnonymously(authMod.getAuth(app));
+  mp.uid = cred.user.uid;
+  return mp.fb = Object.assign({db: dbMod.getDatabase(app)}, dbMod);
+}
+const R = path => mp.fb.ref(mp.fb.db, mp.base + path);
+const quiet = p => { if (p && p.catch) p.catch(() => {}); };
+
+async function mpJoinRoom() {
+  const room = mpRoom.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const name = (mpName.value.trim() || 'Player' + Math.floor(Math.random() * 900 + 100)).slice(0, 12);
+  if (room.length < 3 || room.length > 6) { mpStatus.textContent = 'Room codes are 3 to 6 letters or numbers, like FAM1.'; mpRoom.focus(); return; }
+  mpRoom.value = room; mpName.value = name;
+  try { localStorage.setItem(MP_KEY, JSON.stringify({name, room})); } catch (e) {}
+  mpJoin.disabled = true; mpStatus.textContent = 'Connecting…';
+  let fb;
+  try { fb = await firebase(); }
+  catch (e) {
+    mpJoin.disabled = false;
+    mpStatus.textContent = 'Could not connect. Check the internet, or open the game at exitmaster.github.io/family/blockwood/ (the copy inside Claude can\'t go online).';
+    return;
+  }
+  persist(); // your own world is safe in this browser while you visit the room
+  Object.assign(mp, {room, name, base: `rooms/${room}/blockwood`, joinedAt: Date.now(), color: SHIRTS[Math.abs(hashStr(mp.uid)) % SHIRTS.length]});
+  let meta;
+  try {
+    const res = await fb.runTransaction(R('/meta'), cur => cur || {seed: SEED, made: Date.now()});
+    meta = res.snapshot.val();
+  } catch (e) { mpJoin.disabled = false; mpStatus.textContent = 'The room did not answer: ' + e.message; return; }
+  mp.on = true;
+  // load the room's world
+  resetWorld(); clearMobs(); edits.clear();
+  SEED = meta.seed | 0; dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0; spawnPt = null; P.fly = false;
+  spawn(); renderHotbar();
+  const me = R('/players/' + mp.uid);
+  quiet(fb.set(me, mpMe()));
+  quiet(fb.onDisconnect(me).remove());
+  const onEdit = s => mpApplyEdit(s.key, s.val());
+  mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
+    fb.onValue(R('/players'), s => mpPlayers(s.val() || {})),
+    fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
+  mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
+  refreshMeta(); updateInfo();
+  toast(`Joined room ${room} · press T to chat`, 3500);
+}
+function mpLeave() {
+  if (!mp.on) return;
+  const fb = mp.fb;
+  mp.subs.forEach(u => u()); mp.subs = [];
+  quiet(fb.remove(R('/players/' + mp.uid)));
+  mp.on = false;
+  for (const a of avatars.values()) scene.remove(a.g);
+  avatars.clear();
+  resetWorld(); clearMobs(); applySave(loadSaved()); // back to your own world, exactly as you left it
+  mpJoin.textContent = 'Join'; mpRoom.disabled = mpName.disabled = false;
+  mpStatus.textContent = 'You left the room. Your own world is back.';
+  renderHotbar(); refreshMeta(); updateInfo();
+  toast('Back in your own world', 2500);
+}
+mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
+for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
+
+function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, t: mp.fb.serverTimestamp()});
+// every block change in a shared world goes to the room (called from setBlock)
+function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${dim}_${x}_${y}_${z}`), b)); }
+function mpApplyEdit(key, v) {
+  const m = /^([oneb])_(-?\d+)_(\d+)_(-?\d+)$/.exec(key);
+  if (!m || !Number.isInteger(v) || v < 0 || v >= NB || (v && !BLOCKS[v])) return;
+  const d = m[1], x = +m[2], y = +m[3], z = +m[4];
+  if (y >= H) return;
+  const cx = Math.floor(x / CS), cz = Math.floor(z / CS), k = ck(cx, cz, d);
+  if (d === dim && chunks.has(k)) { mp.applying = true; setBlock(x, y, z, v); mp.applying = false; return; }
+  if (!edits.has(k)) edits.set(k, new Map());
+  edits.get(k).set(idxOf(x - cx * CS, y, z - cz * CS), v); // picked up when that part of the world loads
+}
+function mpPlayers(all) {
+  const names = [mp.name];
+  for (const [id, p] of Object.entries(all)) {
+    if (id === mp.uid || !p || typeof p.x !== 'number') continue;
+    names.push(String(p.n || '?').slice(0, 12));
+    let a = avatars.get(id);
+    if (!a) { a = buildAvatar(String(p.n || '?').slice(0, 12), SHIRTS.includes(p.c) ? p.c : SHIRTS[0]); a.x = p.x; a.y = p.y; a.z = p.z; a.yaw = p.yaw || 0; avatars.set(id, a); if (Date.now() - mp.joinedAt > 3000) toast(`${p.n} joined`); }
+    a.p = p; a.seen = Date.now();
+  }
+  for (const [id, a] of avatars) if (!all[id]) { scene.remove(a.g); avatars.delete(id); toast(`${a.name} left`); }
+  mpStatus.textContent = `Room ${mp.room} · ${names.length} playing: ${names.join(', ')}`;
+}
+function buildAvatar(name, col) {
+  const g = new THREE.Group(), skin = 0xe0b48c, pants = 0x2e3a6a;
+  part(g, col, .5, .7, .28, 0, 1.1, 0);
+  const head = new THREE.Group(); head.position.set(0, 1.45, 0);
+  part(head, skin, .46, .46, .46, 0, .23, 0); part(head, 0x3a2a1a, .48, .12, .48, 0, .44, 0); eyes(head, .27, -.235, .1);
+  g.add(head);
+  const arms = [-.36, .36].map(sx => { const a = new THREE.Group(); a.position.set(sx, 1.42, 0); part(a, col, .2, .62, .2, 0, -.28, 0); part(a, skin, .2, .12, .2, 0, -.62, 0); g.add(a); return a; });
+  const legs = [leg(g, pants, .22, .75, -.12, 0), leg(g, pants, .22, .75, .12, 0)];
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const x = c.getContext('2d'); x.font = '600 32px "Pixelify Sans", monospace';
+  const w = Math.min(250, x.measureText(name).width + 28);
+  x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect((256 - w) / 2, 8, w, 48);
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name, 128, 33);
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(c), depthTest: false}));
+  tag.material.fog = false; tag.scale.set(2, .5, 1); tag.position.y = 2.35; tag.renderOrder = 5; g.add(tag);
+  scene.add(g);
+  return {g, head, arms, legs, name, x: 0, y: 0, z: 0, yaw: 0, ph: 0, p: null, seen: 0};
+}
+function mpTick(dt) {
+  if (!mp.on) return;
+  for (const a of avatars.values()) {
+    const p = a.p, vis = !!p && p.d === dim && Date.now() - a.seen < 60000;
+    a.g.visible = vis;
+    if (!vis) continue;
+    if (Math.hypot(p.x - a.x, p.z - a.z) > 10) { a.x = p.x; a.y = p.y; a.z = p.z; }
+    const k = Math.min(1, 10 * dt), ox = a.x, oz = a.z;
+    a.x += (p.x - a.x) * k; a.y += (p.y - a.y) * k; a.z += (p.z - a.z) * k;
+    let dy = (p.yaw || 0) - a.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); a.yaw += dy * k;
+    const sp = Math.hypot(a.x - ox, a.z - oz) / Math.max(dt, 1e-3), sw = Math.sin(a.ph += dt * sp * 3.5) * Math.min(.7, sp * .25);
+    a.legs[0].rotation.x = sw; a.legs[1].rotation.x = -sw; a.arms[0].rotation.x = -sw; a.arms[1].rotation.x = sw;
+    a.head.rotation.x = Math.max(-1, Math.min(1, p.pitch || 0));
+    a.g.position.set(a.x, a.y, a.z); a.g.rotation.y = a.yaw;
+  }
+  if ((mp.sendT -= dt) > 0) return;
+  mp.sendT = .15;
+  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d].join();
+  if (sig !== mp.last) { mp.last = sig; quiet(mp.fb.update(R('/players/' + mp.uid), me)); }
+}
+function showChat(n, m) {
+  const line = document.createElement('div'), b = document.createElement('b');
+  b.textContent = n.slice(0, 12) + ' '; line.append(b, m.slice(0, 80));
+  chatLog.append(line);
+  while (chatLog.children.length > 6) chatLog.firstChild.remove();
+  setTimeout(() => line.classList.add('old'), 14000);
+  setTimeout(() => line.remove(), 15000);
+  tone(880, 1100, .08, .06, 'sine');
+}
+function openChat() {
+  for (const k in keys) keys[k] = false;
+  chatIn.hidden = false; chatIn.value = ''; chatIn.focus();
+}
+chatIn.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter') {
+    const m = chatIn.value.trim().slice(0, 80);
+    if (m && mp.on) quiet(mp.fb.push(R('/chat'), {n: mp.name, m, t: mp.fb.serverTimestamp()}));
+    chatIn.hidden = true; chatIn.blur();
+  } else if (e.key === 'Escape') { chatIn.hidden = true; chatIn.blur(); }
+});
+chatIn.addEventListener('blur', () => { chatIn.hidden = true; });
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3279,7 +3475,7 @@ function loop(now) {
     updateSurvival(dt); updateMining(dt); ensureCobble();
     tod = (tod + dt / DAY) % 1;
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
-    updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt);
+    updateMobs(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;
