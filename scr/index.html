@@ -5254,11 +5254,11 @@ function boot(hot){
   function driveCam(dt){
     const c = car, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw), rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
     if (car.view && !c.taxi){
-      // from the driver's seat: a little lower, looking down the road over the dashboard
-      const ex = c.x - rx * 0.35 + fx * 0.15, ez = c.z - rz * 0.35 + fz * 0.15, ey = c.y + 1.22;
+      // from the driver's seat, sitting up high, looking down the road over the dashboard
+      const ex = c.x - rx * 0.35 + fx * 0.15, ez = c.z - rz * 0.35 + fz * 0.15, ey = c.y + 1.55;
       dCam.lerp(camT.set(ex, ey, ez), 1 - Math.exp(-dt * 16));
       camera.position.copy(dCam); camera.up.set(0, 1, 0);
-      camera.lookAt(ex + fx * 30, ey - 1.2, ez + fz * 30);
+      camera.lookAt(ex + fx * 30, ey - 2.0, ez + fz * 30);
       // sit the cockpit at the car, facing forward, and spin the wheel a touch with the steering
       cockpit.visible = true; cockpit.position.set(c.x, c.y, c.z); cockpit.rotation.set(0, c.yaw, 0);
       if (cockpit.userData.wheel) cockpit.userData.wheel.rotation.z = -(keys.r || keys.dd ? 1 : 0) * 0.5 + (keys.l ? 1 : 0) * 0.5 + stick.x * -0.5;
