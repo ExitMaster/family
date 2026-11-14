@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/day`, `/night`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/day`, `/night`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -124,6 +124,11 @@ joins with the same code is in the same world:
   and stays in the room for next time.
 - You see each other walking around with name tags (in the same dimension).
 - Press `T` to chat.
+- **Find your friends**: everyone in the room has a marker with their name and distance; when
+  they're off-screen, a yellow arrow at the edge of the screen points the way. Type `/find` to
+  hear where everyone is ("Alice: 61 blocks east", or which world they're in), and `/tp Alice`
+  (or just `/tp` for the closest) to jump right next to them, even into the Nether or the End.
+  The pause menu also has a **Go to …** button for each friend.
 - Animals, monsters and the Ender Dragon are your own, and your backpack stays yours.
 
 Press **Leave** to go back to your own world, exactly as you left it. Nothing from the room is
