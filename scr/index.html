@@ -420,6 +420,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
     <button class="ap" id="btn-ride-jump" hidden>JUMP (J)</button>
     <button class="ap" id="btn-ride-car" hidden>CARS (V)</button>
     <button class="ap" id="btn-ride-view" hidden>VIEW (B)</button>
+    <button class="ap boost" id="btn-ride-fly" hidden>FLY (hold)</button>
   </div>
 </div>
 <div id="fade"></div>
@@ -2840,7 +2841,7 @@ function boot(hot){
     if (state === 'play' && F.drive){
       if (e.code === 'KeyB' && !car.taxi){ e.preventDefault(); switchDriveView(); return; }
       if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){ e.preventDefault(); driveAction(); return; }
-      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|KeyV|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
+      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|KeyV|ShiftLeft|ShiftRight|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
     // island life: walk with the arrows, SPACE does whatever is in front of you, I opens your pocket
@@ -3421,9 +3422,12 @@ function boot(hot){
           if (Math.abs(freeH(x + 20, z) - freeH(x - 20, z)) > 16 || Math.abs(freeH(x, z + 20) - freeH(x, z - 20)) > 16) continue;
           if (cityExcluded(x, z)) continue;
           const r2 = hash2(bi * 13 + li * 17 + 5, bj * 19 + lj * 23 + 9), dens = vnoise(x / 1800 + 3, z / 1800 - 7);
-          let hgt = 9 + Math.pow(r2, 2.5) * 95 * (0.25 + dens);
+          // downtown blocks (high density) grow real skyscrapers; the tallest are the slimmest
+          let hgt = 9 + Math.pow(r2, 2.2) * 110 * (0.25 + dens);
+          if (dens > 0.55) hgt += Math.pow(r2, 4) * 260 * (dens - 0.5);
           if (da < 2000) hgt = Math.min(hgt, 22);
-          const w = 22 + hash2(li + bi * 3, lj + bj * 5) * 26, d = 22 + hash2(lj + bj * 7, li + bi * 9) * 26;
+          let w = 22 + hash2(li + bi * 3, lj + bj * 5) * 26, d = 22 + hash2(lj + bj * 7, li + bi * 9) * 26;
+          if (hgt > 120){ const sl = clamp(1 - (hgt - 120) / 420, 0.45, 1); w *= sl; d *= sl; }
           o.position.set(x, h0 - 4, z); o.scale.set(w, hgt + 4, d); o.updateMatrix();
           city.setMatrixAt(n, o.matrix);
           city.setColorAt(n, c3.setHSL(hash2(bi + li * 3, bj - lj * 5), 0.25, 0.6 + 0.3 * r2));
@@ -4583,7 +4587,7 @@ function boot(hot){
     { id: 'teslay', ev: true, n: 'Tesla Model Y', top: 250, acc: 36, L: 4.75, W: 1.95, H: 0.8, cab: [2.6, 0.75, 0.3], slope: true, up: 0.1 },
     { id: 'teslayl', ev: true, n: 'Tesla Model Y L', top: 201, acc: 32, L: 5.0, W: 1.95, H: 0.82, cab: [3.0, 0.8, 0.3], slope: true, up: 0.12, wb: 3.2, tesla: true, r: 0.42 },
     { id: 'teslax', ev: true, n: 'Tesla Model X', top: 262, acc: 42, L: 5.05, W: 2.0, H: 0.85, cab: [2.9, 0.8, 0.3], slope: true, up: 0.12 },
-    { id: 'roadster', ev: true, n: 'Tesla Roadster (2026)', top: 400, acc: 60, L: 4.3, W: 2.0, H: 0.55, cab: [1.6, 0.45, 0.2], wedge: true, r: 0.35 },
+    { id: 'roadster', ev: true, fly: true, n: 'Tesla Roadster (2026)', top: 400, acc: 60, L: 4.3, W: 2.0, H: 0.55, cab: [1.6, 0.45, 0.2], wedge: true, r: 0.35 },
     { id: 'cyber', ev: true, n: 'Tesla Cybertruck', top: 209, acc: 40, L: 5.7, W: 2.2, H: 0.95, cab: [2.6, 0.85, -0.2], up: 0.35, r: 0.48, cyber: true },
     { id: 'mustang', n: 'Ford Mustang', top: 250, acc: 32, L: 4.8, W: 1.95, H: 0.75, cab: [1.9, 0.6, 0.6], stripes: true },
     { id: 'p911', n: 'Porsche 911', top: 300, acc: 36, L: 4.5, W: 1.85, H: 0.65, cab: [1.9, 0.6, 0.45], slope: true, wing: 'small', r: 0.35 },
@@ -5044,6 +5048,15 @@ function boot(hot){
   worldCars.rent.visible = worldCars.taxi.visible = false; scene.add(worldCars.rent, worldCars.taxi);
   if (myCar.id === 'teslayl'){ rentCol = RENT_COLS.indexOf(STEALTH_GREY); worldCars.rent = recolor(worldCars.rent, scene); curbCar = recolor(curbCar, rideScene); worldCars.rent.visible = false; }
   const dCam = new THREE.Vector3();
+  // the Roadster's SpaceX rocket thrusters: flame cones under the car, shown while it flies
+  const carThrust = new THREE.Group(); carThrust.visible = false; scene.add(carThrust);
+  [[-0.7, -1.2], [0.7, -1.2], [-0.7, 1.2], [0.7, 1.2]].forEach(([x, z]) => {
+    const fl = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.9, 10), new THREE.MeshBasicMaterial({ color: 0x5fd0ff, transparent: true, opacity: 0.85 }));
+    fl.position.set(x, -0.5, z); fl.rotation.x = Math.PI; carThrust.add(fl);
+  });
+  let flyHold = false;
+  (function wireFly(){ const btn = document.getElementById('btn-ride-fly'); const on = v => e => { flyHold = v; btn.classList.toggle('held', v); if (v) e.preventDefault(); };
+    btn.addEventListener('pointerdown', on(true)); ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => btn.addEventListener(n, on(false))); })();
   let hotel = null, routeRoad = null;
   const route = { x0: 0, z0: 0, x1: 0, z1: 0 };
   function buildRoute(x0, z0, x1, z1){
@@ -5130,7 +5143,7 @@ function boot(hot){
   function endDrive(){
     if (F.drive){ F.drive = false; F.ground = false; }
     if (sfx.ev) sfx.ev(false, 0, false);
-    cockpit.visible = false;
+    cockpit.visible = false; carThrust.visible = false; flyHold = false;
     worldCars.rent.visible = worldCars.taxi.visible = false; planeRoot.visible = true;
     if (hotel) endHotel();
     endRoute();
@@ -5175,7 +5188,9 @@ function boot(hot){
       toast('CRASH into ' + what + '! Repair fee: -' + fee.toLocaleString() + ' points', 'warn');
       return true;
     };
-    if (bumped){ const hit = crash('a car'); c.speed *= -0.3; bumped.wait = 1.5; if (!hit && t - c.warnT > 2){ c.warnT = t; sfx.hit(); toast('Bonk! Watch out for the cars', 'warn'); } }
+    const highUp = !!myCar.fly && c.y > groundAt(c.x, c.z) + 2.5;   // flying over everything
+    if (highUp){ c.km += Math.hypot(nx - c.x, nz - c.z); c.x = nx; c.z = nz; }
+    else if (bumped){ const hit = crash('a car'); c.speed *= -0.3; bumped.wait = 1.5; if (!hit && t - c.warnT > 2){ c.warnT = t; sfx.hit(); toast('Bonk! Watch out for the cars', 'warn'); } }
     else if (cityHit(nx, c.y + 1, nz, 1.5)){ const hit = crash('a building'); c.speed = 0; if (!hit && t - c.warnT > 3){ c.warnT = t; toast('Bonk! A building', 'warn'); } }
     else if (groundAt(nx, nz) < 0.6 && !road(nx, nz)){   // no driving into lakes (bridges are fine)
       c.speed = 0;
@@ -5183,20 +5198,33 @@ function boot(hot){
     } else { c.km += Math.hypot(nx - c.x, nz - c.z); c.x = nx; c.z = nz; }
     const field = airfieldAt(c.x, c.z), fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw);
     const gy = onRunway(field) ? rwyTop(field.a) : road(c.x, c.z) ? roadY(groundAt(c.x, c.z)) : groundAt(c.x, c.z);
-    // gravity: the car follows the ground, but over the top of a hill at speed it flies off
-    // and falls back down. On the ground it rises and falls with the slope it's driving up.
-    const fly = c.y + (c.vy || 0) * dt - 0.5 * GRAV * dt * dt;
-    if (fly > gy + 0.12 && dt > 0){
-      if (!c.air && c.vy > 4 && t - (c.jumpT || -9) > 4){ c.jumpT = t; toast('Wheee! 🚗💨', ''); }
-      c.air = true; c.vy -= GRAV * dt; c.y = fly;
+    // the Roadster flies: hold FLY (or Shift) to fire the rocket thrusters and rise
+    const thrusting = !!myCar.fly && !c.taxi && (keys.b || flyHold) && c.y < gy + 150;
+    if (myCar.fly && (thrusting || c.y > gy + 0.12)){
+      // in the air: thrust pushes up, gravity pulls down, and you settle gently on the ground
+      c.vy = clamp((c.vy || 0) + (thrusting ? 46 : 0) * dt - GRAV * dt, -26, 20);
+      c.y += c.vy * dt;
+      if (c.y <= gy){ c.y = gy; c.vy = 0; c.air = false; } else c.air = true;
     } else {
-      if (c.air && c.vy < -9){ sfx.hit(); c.speed *= 0.85; }
-      c.air = false; c.y = gy;
-      c.vy = clamp(c.speed * (groundAt(c.x, c.z) - groundAt(c.x - fx * 3 * Math.sign(c.speed || 1), c.z - fz * 3 * Math.sign(c.speed || 1))) / 3 * Math.sign(c.speed || 1), -25, 25);
+      // gravity: the car follows the ground, but over the top of a hill at speed it flies off
+      // and falls back down. On the ground it rises and falls with the slope it's driving up.
+      const fly = c.y + (c.vy || 0) * dt - 0.5 * GRAV * dt * dt;
+      if (fly > gy + 0.12 && dt > 0){
+        if (!c.air && c.vy > 4 && t - (c.jumpT || -9) > 4){ c.jumpT = t; toast('Wheee! 🚗💨', ''); }
+        c.air = true; c.vy -= GRAV * dt; c.y = fly;
+      } else {
+        if (c.air && c.vy < -9){ sfx.hit(); c.speed *= 0.85; }
+        c.air = false; c.y = gy;
+        c.vy = clamp(c.speed * (groundAt(c.x, c.z) - groundAt(c.x - fx * 3 * Math.sign(c.speed || 1), c.z - fz * 3 * Math.sign(c.speed || 1))) / 3 * Math.sign(c.speed || 1), -25, 25);
+      }
     }
     const m = c.taxi ? worldCars.taxi : worldCars.rent;
     m.position.set(c.x, c.y, c.z);
     m.rotation.set(0, c.yaw, 0);
+    // the rocket flames: on when the Roadster is off the ground, flickering
+    const flying = !!myCar.fly && c.y > gy + 0.3;
+    carThrust.visible = flying;
+    if (flying){ carThrust.position.set(c.x, c.y, c.z); carThrust.rotation.set(0, c.yaw, 0); carThrust.scale.y = (thrusting ? 1.3 : 0.6) * (0.8 + Math.random() * 0.4); }
     m.rotateX(c.air ? Math.atan2(c.vy, Math.max(6, Math.abs(c.speed))) * 0.6 : Math.atan2(groundAt(c.x + fx * 2, c.z + fz * 2) - groundAt(c.x - fx * 2, c.z - fz * 2), 4));
     F.x = c.x; F.z = c.z; F.y = c.y + 2; F.speed = Math.abs(c.speed);
     const el = document.getElementById('driveInfo');
@@ -6566,6 +6594,7 @@ function boot(hot){
   function syncJump(){
     const carOn = (state === 'play' && !!F.drive && !car.taxi) || (state === 'ride' && !!ride.curb && !ride.ui);
     if (carOn !== carBtnShown){ carBtnShown = carOn; $('btn-ride-car').hidden = !carOn; $('btn-ride-view').hidden = !(state === 'play' && !!F.drive && !car.taxi); }
+    $('btn-ride-fly').hidden = !(state === 'play' && !!F.drive && !car.taxi && !!myCar.fly);
     const on = state === 'island' ? !isle.ui && !isle.swim : state === 'ride' ? !ride.ui && !ride.seated : state === 'play' && !!F.cruise && !cruise.ui;
     if (on !== jumpShown){ jumpShown = on; $('btn-ride-jump').hidden = !on; }
   }
