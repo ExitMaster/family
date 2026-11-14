@@ -5189,8 +5189,8 @@ function boot(hot){
           else { tz = Math.round(c.z / ROAD_R) * ROAD_R; tx = c.x + Math.sign(Hx || 1) * LA; }                              // a horizontal road (constant z)
           const bdir = Math.atan2(-(tx - c.x), -(tz - c.z));
           steer = -clamp(wrapA(bdir - c.yaw) * 2, -1, 1);
-          const cruise = Math.min(myCar.top / 3.6 * 0.5, 22);
-          throttle = c.speed < cruise ? 0.6 : 0;
+          const cruise = Math.min(myCar.top / 3.6 * 0.8, 42);   // faster: up to ~150 km/h
+          throttle = c.speed < cruise ? 1 : 0;
         }
       }
     }
