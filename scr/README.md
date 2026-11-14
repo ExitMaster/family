@@ -42,6 +42,9 @@ and the new **skyscrapers** downtown). Let go to float back down.
 
 ## Real cars
 
+**Double-tap SPACE** (out on the road) to turn on **Autopilot** 🤖 — the car drives and
+steers itself down the road. Touch the controls, or double-tap SPACE again, to switch it off.
+
 Press **B** (or VIEW) while driving to switch the camera between **behind the car** and the
 **driver's seat**. In the driver's seat you see the car's **dashboard, steering wheel and centre tablet**
 (showing your speed), with a floating **rear-view mirror** across the top showing what's

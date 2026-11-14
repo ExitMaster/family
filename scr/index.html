@@ -2840,7 +2840,14 @@ function boot(hot){
     if (state === 'play' && F.ride && e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     if (state === 'play' && F.drive){
       if (e.code === 'KeyB' && !car.taxi){ e.preventDefault(); switchDriveView(); return; }
-      if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){ e.preventDefault(); driveAction(); return; }
+      if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyE') && !car.taxi){
+        e.preventDefault();
+        const hasAction = !!(ride.carAirport || car.atHarbour || car.atHouse || car.atSecret);
+        if (hasAction){ driveAction(); }
+        else if (t - (car.spaceT || -9) < 0.35){ car.spaceT = -9; toggleAutopilot(); }   // double-tap
+        else car.spaceT = t;
+        return;
+      }
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|KeyW|KeyA|KeyS|KeyD|KeyC|KeyV|ShiftLeft|ShiftRight|Escape|KeyP)$/.test(e.code)){ if (KEYMAP[e.code]) e.preventDefault(); return; }
       if (e.code === 'KeyD'){ keys.dd = true; e.preventDefault(); return; }
     }
@@ -5009,7 +5016,7 @@ function boot(hot){
     sfx.chime(); renderSteps(); toast('Rent a car (R) or take a taxi (T)', 'info');
   }
   // driving in the open world: your rental car (you steer) or a taxi (it drives itself) to a hotel
-  const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, taxi: false, tx: 0, tz: 0, km: 0, warnT: -9, crashT: -9, view: 0 };
+  const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, taxi: false, tx: 0, tz: 0, km: 0, warnT: -9, crashT: -9, view: 0, autopilot: false };
   const worldCars = { rent: makeCar(0x3fa9f5, false, myCar), taxi: makeCar(0xffd23d, true) };
   // the rental car comes in lots of colours: C (or COLOR) swaps to the next one
   const STEALTH_GREY = 0x50555c;   // Tesla's Stealth Grey
@@ -5143,7 +5150,7 @@ function boot(hot){
   function endDrive(){
     if (F.drive){ F.drive = false; F.ground = false; }
     if (sfx.ev) sfx.ev(false, 0, false);
-    cockpit.visible = false; carThrust.visible = false; flyHold = false;
+    cockpit.visible = false; carThrust.visible = false; flyHold = false; car.autopilot = false;
     worldCars.rent.visible = worldCars.taxi.visible = false; planeRoot.visible = true;
     if (hotel) endHotel();
     endRoute();
@@ -5170,6 +5177,22 @@ function boot(hot){
     else {
       steer = clamp((keys.r || keys.dd ? 1 : 0) - (keys.l ? 1 : 0) + stick.x, -1, 1);
       throttle = clamp((keys.u ? 1 : 0) - (keys.d || keys.f ? 1 : 0) + stick.y, -1, 1);
+      // Autopilot: the car steers down the nearest grid road and holds a steady speed. Any
+      // touch of the controls switches it off, just like a real car.
+      if (car.autopilot){
+        if (Math.abs(steer) > 0.2 || Math.abs(throttle) > 0.2 || keys.b){ car.autopilot = false; toast('Autopilot off', ''); }
+        else {
+          // aim at a point a little way ahead on the nearest grid road, snapped to its centre
+          const Hx = -Math.sin(c.yaw), Hz = -Math.cos(c.yaw), LA = 28;
+          let tx, tz;
+          if (Math.abs(Hx) < Math.abs(Hz)){ tx = Math.round(c.x / ROAD_R) * ROAD_R; tz = c.z + Math.sign(Hz || 1) * LA; }   // a vertical road (constant x)
+          else { tz = Math.round(c.z / ROAD_R) * ROAD_R; tx = c.x + Math.sign(Hx || 1) * LA; }                              // a horizontal road (constant z)
+          const bdir = Math.atan2(-(tx - c.x), -(tz - c.z));
+          steer = -clamp(wrapA(bdir - c.yaw) * 2, -1, 1);
+          const cruise = Math.min(myCar.top / 3.6 * 0.5, 22);
+          throttle = c.speed < cruise ? 0.6 : 0;
+        }
+      }
     }
     // the rental car goes up to 210 km/h; the taxi takes it easy
     c.speed += throttle * (throttle < 0 && c.speed > 0 ? 30 : c.taxi ? 9 : myCar.acc) * dt;
@@ -5280,6 +5303,7 @@ function boot(hot){
     tabletTex.needsUpdate = true;
   }
   function switchDriveView(){ car.view = car.view ? 0 : 1; toast(car.view ? "Driver's seat" : 'Behind the car', ''); }
+  function toggleAutopilot(){ car.autopilot = !car.autopilot; sfx.ap(car.autopilot); toast(car.autopilot ? 'Autopilot ON 🤖 (double-tap SPACE to stop)' : 'Autopilot off', car.autopilot ? 'info' : ''); }
   function driveCam(dt){
     const c = car, fx = -Math.sin(c.yaw), fz = -Math.cos(c.yaw), rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
     if (car.view && !c.taxi){
