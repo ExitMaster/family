@@ -138,7 +138,9 @@ joins with the same code is in the same world:
 - Everyone sees the same animals and monsters, including the ones that pop out of a OneBlock.
   Each mob lives in the game of the player who made it; when you're near each other only one
   of you makes new ones, so you don't get double. You can hit anyone's mobs (sword, arrows or `K`)
-  and you get the loot. Monsters chase the player whose game made them.
+  and you get the loot.
+- **Monsters chase whoever is closest**, you or a friend (in Survival). Zombies, skeleton arrows and
+  creeper blasts hurt your friends too, and a piglin or iron golem goes after the friend who hit it.
 - The Ender Dragon is your own, and your backpack stays yours.
 
 Press **Leave** to go back to your own world, exactly as you left it. Nothing from the room is
