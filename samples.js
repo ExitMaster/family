@@ -416,6 +416,6 @@ const SAMPLE_GAMES = (() => {
   ]);
   // tile colours: spread hues across the grid
   L.forEach((g, i) => { const h = (i * 47) % 360; g.c1 = `hsl(${h},85%,72%)`; g.c2 = `hsl(${(h+40)%360},70%,45%)`; g.size = "s"; });
-  L.unshift({name:"Drive a Tesla", emoji:"🚘", c1:"#e9ecef", c2:"#495057", size:"m", cat:"racing", play:"ev", badge:"new", sample:true});
+  L.unshift({name:"Drive a Tesla", emoji:"🚘", c1:"#e9ecef", c2:"#495057", size:"l", cat:"racing", play:"ev", badge:"new", sample:true});
   return L;
 })();
