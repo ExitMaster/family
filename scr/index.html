@@ -446,7 +446,7 @@ const RWY_START = RWY_LEN / 2 - 18;   // where a takeoff starts: just past the t
 
 /* ---------------- Sound ---------------- */
 const sfx = (() => {
-  let ctx = null, master = null, engine = null, noiseBuf = null;
+  let ctx = null, master = null, engine = null, ev = null, noiseBuf = null;
   let muted = !!store.get('scr.muted', false);
   function init(){
     if (ctx) return;
@@ -460,6 +460,16 @@ const sfx = (() => {
     const g = ctx.createGain(); g.gain.value = 0;
     o1.connect(f); o2.connect(f); f.connect(g); g.connect(master); o1.start(); o2.start();
     engine = { o1, o2, g };
+    // an electric motor whine for EVs: two high sine tones (one a fifth up) through a gentle
+    // band-pass, plus a faint reversing beep tone
+    const w1 = ctx.createOscillator(); w1.type = 'sine';
+    const w2 = ctx.createOscillator(); w2.type = 'triangle';
+    const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 1400; wf.Q.value = 1.2;
+    const wg = ctx.createGain(); wg.gain.value = 0;
+    w1.connect(wf); w2.connect(wf); wf.connect(wg); wg.connect(master); w1.start(); w2.start();
+    const rev = ctx.createOscillator(); rev.type = 'sine'; rev.frequency.value = 880;
+    const rg = ctx.createGain(); rg.gain.value = 0; rev.connect(rg); rg.connect(master); rev.start();
+    ev = { w1, w2, wg, rev, rg };
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
@@ -509,6 +519,18 @@ const sfx = (() => {
       engine.o1.frequency.setTargetAtTime(f, now, 0.15);
       engine.o2.frequency.setTargetAtTime(f * 1.006, now, 0.15);
     },
+    // an EV: a quiet rising whine, plus the classic Tesla reversing tone when backing up
+    ev(on, speed, reversing){
+      if (!ev) return;
+      const now = ctx.currentTime, sp = Math.abs(speed), f = 420 + sp * 26;
+      ev.wg.gain.setTargetAtTime(on ? 0.016 + Math.min(sp, 14) * 0.0016 : 0, now, 0.15);
+      ev.w1.frequency.setTargetAtTime(f, now, 0.1);
+      ev.w2.frequency.setTargetAtTime(f * 1.5, now, 0.1);
+      // the reverse sound: a warbling two-note beep that wobbles, like the real car
+      if (on && reversing){ const wob = 660 + Math.sin(now * 11) * 90; ev.rev.frequency.setTargetAtTime(wob, now, 0.03); ev.rg.gain.setTargetAtTime(0.03, now, 0.05); }
+      else ev.rg.gain.setTargetAtTime(0, now, 0.05);
+    },
+    engineOff(){ if (engine) engine.g.gain.setTargetAtTime(0, ctx.currentTime, 0.1); if (ev){ ev.wg.gain.setTargetAtTime(0, ctx.currentTime, 0.1); ev.rg.gain.setTargetAtTime(0, ctx.currentTime, 0.1); } },
     get muted(){ return muted; },
     setMuted(m){ muted = m; store.set('scr.muted', m); if (master) master.gain.value = m ? 0 : 0.6; }
   };
@@ -2756,7 +2778,7 @@ function boot(hot){
   let state = 'attract', t = 0, skyDist = 0;
   let score = 0, coins = 0, boostT = 0, shake = 0;
   let chain = 0, mult = 1, lastCoinT = -9;
-  function pause(){ if (state !== 'play') return; state = 'paused'; sfx.engine(false, 0); saveProgress(); show('pause'); }
+  function pause(){ if (state !== 'play') return; state = 'paused'; sfx.engine(false, 0); if (sfx.ev) sfx.ev(false, 0, false); saveProgress(); show('pause'); }
   function resume(){ if (state !== 'paused') return; state = 'play'; sfx.resume(); show(null); }
 
   /* ---------------- Pickups & hits ---------------- */
@@ -3584,7 +3606,7 @@ function boot(hot){
     endRide(); endCruise(); endIsland();
     camera.near = 1; camera.far = CAM_FAR; camera.updateProjectionMatrix();
     if (state === 'play' || state === 'paused') saveProgress();
-    clearFreeItems(); clearMissiles(); hushAnnounce(); $('prompt').hidden = true; sfx.engine(false, 0);
+    clearFreeItems(); clearMissiles(); hushAnnounce(); $('prompt').hidden = true; sfx.engine(false, 0); if (sfx.ev) sfx.ev(false, 0, false);
     Object.assign(F, { auto: false, autoFinal: false, crashT: 0, boostHeld: false, ground: false, pitch: 0, speed: 65, gear: true, gearT: 1, flipped: false });
     showGear(1);
     F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 150);
@@ -3887,7 +3909,10 @@ function boot(hot){
 
     if (live && (saveTick -= dt) <= 0){ saveTick = 2; saveProgress(); }
     audioTick -= dt;
-    if (audioTick <= 0){ audioTick = 0.1; const snd = F.cruise ? { mul: 0.3, vol: 0.03 } : F.drive ? { mul: 0.7, vol: 0.03 } : (plane.sound || {}); sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
+    if (audioTick <= 0){ audioTick = 0.1;
+      if (F.drive && car.free && !car.taxi && myCar.ev){ sfx.engine(false, 0); sfx.ev(live, car.speed, car.speed < -0.5); }
+      else { const snd = F.cruise ? { mul: 0.3, vol: 0.03 } : F.drive ? { mul: 0.7, vol: 0.03 } : (plane.sound || {}); sfx.ev(false, 0, false); sfx.engine(live, Math.min(F.speed, 190), snd.mul, (snd.vol || 0.045) * (F.under ? 0.35 : 1)); }
+    }
     if (live){ dtHud = dt; updateFreeHud(); }
   }
   let dtHud = 0;
@@ -4520,13 +4545,13 @@ function boot(hot){
     { id: 'fiat', n: 'Fiat 500', top: 160, acc: 14, L: 3.5, W: 1.65, H: 0.8, cab: [1.9, 0.6, 0.15], round: true, r: 0.32 },
     { id: 'smart', n: 'Smart ForTwo', top: 145, acc: 13, L: 2.7, W: 1.65, H: 0.9, cab: [1.6, 0.8, 0.2], r: 0.33, wb: 1.8 },
     { id: 'prius', n: 'Toyota Prius', top: 180, acc: 15, L: 4.5, W: 1.8, H: 0.75, cab: [2.6, 0.7, 0.35], slope: true },
-    { id: 'tesla', n: 'Tesla Model 3', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.7, cab: [2.5, 0.65, 0.3], slope: true },
-    { id: 'teslas', n: 'Tesla Model S Plaid', top: 322, acc: 55, L: 5.0, W: 1.95, H: 0.7, cab: [2.7, 0.65, 0.35], slope: true },
-    { id: 'teslay', n: 'Tesla Model Y', top: 250, acc: 36, L: 4.75, W: 1.95, H: 0.8, cab: [2.6, 0.75, 0.3], slope: true, up: 0.1 },
-    { id: 'teslayl', n: 'Tesla Model Y L', top: 201, acc: 32, L: 5.0, W: 1.95, H: 0.82, cab: [3.0, 0.8, 0.3], slope: true, up: 0.12, wb: 3.2, tesla: true, r: 0.42 },
-    { id: 'teslax', n: 'Tesla Model X', top: 262, acc: 42, L: 5.05, W: 2.0, H: 0.85, cab: [2.9, 0.8, 0.3], slope: true, up: 0.12 },
-    { id: 'roadster', n: 'Tesla Roadster', top: 400, acc: 60, L: 4.3, W: 2.0, H: 0.55, cab: [1.6, 0.45, 0.2], wedge: true, r: 0.35 },
-    { id: 'cyber', n: 'Tesla Cybertruck', top: 209, acc: 40, L: 5.7, W: 2.2, H: 0.95, cab: [2.6, 0.85, -0.2], up: 0.35, r: 0.48, cyber: true },
+    { id: 'tesla', ev: true, n: 'Tesla Model 3', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.7, cab: [2.5, 0.65, 0.3], slope: true },
+    { id: 'teslas', ev: true, n: 'Tesla Model S Plaid', top: 322, acc: 55, L: 5.0, W: 1.95, H: 0.7, cab: [2.7, 0.65, 0.35], slope: true },
+    { id: 'teslay', ev: true, n: 'Tesla Model Y', top: 250, acc: 36, L: 4.75, W: 1.95, H: 0.8, cab: [2.6, 0.75, 0.3], slope: true, up: 0.1 },
+    { id: 'teslayl', ev: true, n: 'Tesla Model Y L', top: 201, acc: 32, L: 5.0, W: 1.95, H: 0.82, cab: [3.0, 0.8, 0.3], slope: true, up: 0.12, wb: 3.2, tesla: true, r: 0.42 },
+    { id: 'teslax', ev: true, n: 'Tesla Model X', top: 262, acc: 42, L: 5.05, W: 2.0, H: 0.85, cab: [2.9, 0.8, 0.3], slope: true, up: 0.12 },
+    { id: 'roadster', ev: true, n: 'Tesla Roadster', top: 400, acc: 60, L: 4.3, W: 2.0, H: 0.55, cab: [1.6, 0.45, 0.2], wedge: true, r: 0.35 },
+    { id: 'cyber', ev: true, n: 'Tesla Cybertruck', top: 209, acc: 40, L: 5.7, W: 2.2, H: 0.95, cab: [2.6, 0.85, -0.2], up: 0.35, r: 0.48, cyber: true },
     { id: 'mustang', n: 'Ford Mustang', top: 250, acc: 32, L: 4.8, W: 1.95, H: 0.75, cab: [1.9, 0.6, 0.6], stripes: true },
     { id: 'p911', n: 'Porsche 911', top: 300, acc: 36, L: 4.5, W: 1.85, H: 0.65, cab: [1.9, 0.6, 0.45], slope: true, wing: 'small', r: 0.35 },
     { id: 'f40', n: 'Ferrari F40', top: 324, acc: 40, L: 4.4, W: 2.0, H: 0.6, cab: [1.6, 0.5, 0.35], wedge: true, wing: 'big', r: 0.34 },
@@ -4556,97 +4581,159 @@ function boot(hot){
     { id: 'amg', n: 'Mercedes-AMG GT', top: 318, acc: 40, L: 4.6, W: 1.95, H: 0.65, cab: [1.8, 0.55, 0.6], slope: true, r: 0.36 },
     { id: 'm3', n: 'BMW M3', top: 290, acc: 36, L: 4.8, W: 1.9, H: 0.75, cab: [2.3, 0.65, 0.35], r: 0.37 },
     { id: 'civic', n: 'Honda Civic Type R', top: 275, acc: 32, L: 4.6, W: 1.9, H: 0.72, cab: [2.4, 0.65, 0.4], slope: true, wing: 'big', r: 0.35 },
-    { id: 'ioniq5', n: 'Hyundai Ioniq 5', top: 185, acc: 30, L: 4.6, W: 1.9, H: 0.85, cab: [2.8, 0.75, 0.3], boxy: true, r: 0.42 },
-    { id: 'ev6', n: 'Kia EV6', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.75, cab: [2.5, 0.65, 0.35], slope: true, r: 0.4 },
+    { id: 'ioniq5', ev: true, n: 'Hyundai Ioniq 5', top: 185, acc: 30, L: 4.6, W: 1.9, H: 0.85, cab: [2.8, 0.75, 0.3], boxy: true, r: 0.42 },
+    { id: 'ev6', ev: true, n: 'Kia EV6', top: 260, acc: 38, L: 4.7, W: 1.9, H: 0.75, cab: [2.5, 0.65, 0.35], slope: true, r: 0.4 },
     { id: 'genesis', n: 'Genesis G90', top: 250, acc: 26, L: 5.3, W: 1.95, H: 0.8, cab: [2.7, 0.7, 0.4], roofC: 0x1b2340, r: 0.4 },
     { id: 'rolls', n: 'Rolls-Royce Phantom', top: 250, acc: 24, L: 5.8, W: 2.05, H: 0.85, cab: [2.8, 0.75, 0.4], roofC: 0x1b2340, r: 0.42 },
     { id: 'skyrocket', n: 'Sky Rocket (SECRET)', top: 650, acc: 80, L: 5.0, W: 2.1, H: 0.5, cab: [1.6, 0.45, 0.25], wedge: true, wing: 'big', twoTone: 0xffc23d, r: 0.36, secret: true }
   ];
   const carModel = id => CAR_MODELS.find(c => c.id === id) || CAR_MODELS[0];
-  // The Tesla Model Y L, modelled closely on the real car: 4.98 m long, 1.92 m wide, 1.67 m
-  // tall, 3.04 m between the wheels. The body is its real side profile (round nose, long
-  // hood, wheel arches, tailgate) pushed out across the width with rounded edges; on top sits
-  // the all-glass greenhouse and roof. Then the details: the full-width light bars front and
-  // back, the TESLA lettering, mirrors, door lines, flush handles and aero wheels.
-  const ylPaint = {};
-  function modelYL(color){
-    const g = new THREE.Group();
-    const Y = v => v <= 0.3 ? v : 0.3 + (v - 0.3) * 1.12;   // taller than the real one: 12% more height above the sills
-    const paint = ylPaint[color] || (ylPaint[color] = new THREE.MeshPhongMaterial({ color, shininess: 80, specular: 0x555555 }));
+  // The Teslas, modelled closely on the real cars from their real sizes and side outlines.
+  // Each body is its side profile (nose at -x, y up) pushed out across the width with rounded
+  // edges; on top sits the dark glass greenhouse. Paths: m = move, l = line, q = curve,
+  // b = bezier, a = a wheel arch at that axle. Heights are in metres off the road.
+  const TESLAS = {
+    // Model Y L: the long six-seater (made 12% taller than the real one, as asked)
+    teslayl: { W: 1.92, ghW: 1.62, lift: 1.12, r: 0.36, axles: [-1.52, 1.52], front: 'bar', rear: 'bar',
+      body: [['m', -2.36, 0.26], ['b', -2.47, 0.30, -2.47, 0.62, -2.42, 0.74], ['q', -2.36, 0.84, -2.15, 0.87], ['q', -1.60, 0.94, -1.12, 1.00], ['l', 2.22, 1.10], ['q', 2.40, 1.12, 2.43, 1.05], ['q', 2.46, 0.80, 2.42, 0.52], ['q', 2.40, 0.32, 2.30, 0.27], ['a', 1.52], ['a', -1.52], ['l', -2.36, 0.26]],
+      gh: [['m', -1.18, 0.98], ['q', -0.80, 1.30, -0.42, 1.55], ['q', 0.30, 1.69, 1.40, 1.62], ['q', 2.00, 1.52, 2.28, 1.09], ['l', -1.18, 0.98]],
+      spoiler: [1.36, 1.115, 2.33], y: { bar: 0.79, head: 0.6, intake: 0.36, plate: 0.48, badge: 0.71, rear: 1.0, text: 0.9, rplate: 0.62, diff: 0.34 },
+      doors: [-1.0, 0.22, 1.32], handles: [-0.18, 1.02], belt: 1.07, mirror: [-0.98, 1.08], trim: [3.3, 0.5] },
+    // Model Y: the same design as the Y L, shorter, with a faster sloping roof
+    teslay: { W: 1.92, ghW: 1.62, lift: 1, r: 0.36, axles: [-1.47, 1.42], front: 'bar', rear: 'bar',
+      body: [['m', -2.29, 0.26], ['b', -2.40, 0.30, -2.40, 0.62, -2.35, 0.74], ['q', -2.29, 0.84, -2.08, 0.87], ['q', -1.55, 0.94, -1.08, 1.00], ['l', 2.12, 1.08], ['q', 2.32, 1.11, 2.35, 1.03], ['q', 2.38, 0.80, 2.34, 0.52], ['q', 2.32, 0.32, 2.22, 0.27], ['a', 1.42], ['a', -1.47], ['l', -2.29, 0.26]],
+      gh: [['m', -1.14, 0.98], ['q', -0.78, 1.28, -0.40, 1.50], ['q', 0.20, 1.62, 0.95, 1.56], ['q', 1.75, 1.42, 2.20, 1.07], ['l', -1.14, 0.98]],
+      spoiler: [1.36, 1.095, 2.25], y: { bar: 0.79, head: 0.6, intake: 0.36, plate: 0.48, badge: 0.71, rear: 0.98, text: 0.88, rplate: 0.62, diff: 0.34 },
+      doors: [-0.96, 0.15, 1.18], handles: [-0.22, 0.88], belt: 1.06, mirror: [-0.95, 1.07], trim: [3.0, 0.35] },
+    // Model 3: a low sedan with slim corner headlights and C-shaped tail lights
+    tesla: { W: 1.85, ghW: 1.52, lift: 1, r: 0.34, axles: [-1.49, 1.39], front: 'eyes', rear: 'c',
+      body: [['m', -2.27, 0.24], ['b', -2.38, 0.28, -2.38, 0.52, -2.33, 0.62], ['q', -2.27, 0.71, -2.05, 0.74], ['q', -1.45, 0.82, -0.98, 0.88], ['l', 1.30, 0.97], ['q', 1.95, 1.04, 2.30, 0.97], ['q', 2.37, 0.80, 2.33, 0.50], ['q', 2.30, 0.30, 2.20, 0.26], ['a', 1.39], ['a', -1.49], ['l', -2.27, 0.24]],
+      gh: [['m', -1.02, 0.86], ['q', -0.62, 1.18, -0.25, 1.38], ['q', 0.35, 1.46, 0.95, 1.38], ['q', 1.50, 1.24, 1.82, 1.00], ['l', -1.02, 0.86]],
+      y: { head: 0.63, intake: 0.34, plate: 0.45, badge: 0.67, rear: 0.88, text: 0.79, rplate: 0.55, diff: 0.32 },
+      doors: [-0.90, 0.15, 1.12], handles: [-0.25, 0.80], belt: 0.95, mirror: [-0.85, 0.97], trim: [2.8, 0.3] },
+    // Model S Plaid: a long liftback sedan with a lip on its tail
+    teslas: { W: 1.96, ghW: 1.58, lift: 1, r: 0.35, axles: [-1.56, 1.40], front: 'eyes', rear: 'c',
+      body: [['m', -2.42, 0.24], ['b', -2.53, 0.28, -2.53, 0.52, -2.48, 0.62], ['q', -2.40, 0.72, -2.15, 0.75], ['q', -1.55, 0.82, -1.05, 0.88], ['l', 2.05, 0.98], ['q', 2.40, 1.02, 2.47, 0.94], ['q', 2.52, 0.78, 2.48, 0.50], ['q', 2.45, 0.30, 2.35, 0.26], ['a', 1.40], ['a', -1.56], ['l', -2.42, 0.24]],
+      gh: [['m', -1.10, 0.86], ['q', -0.68, 1.18, -0.25, 1.38], ['q', 0.45, 1.46, 1.15, 1.36], ['q', 1.80, 1.20, 2.15, 0.98], ['l', -1.10, 0.86]],
+      y: { head: 0.64, intake: 0.34, plate: 0.45, badge: 0.69, rear: 0.86, text: 0.77, rplate: 0.55, diff: 0.32 },
+      doors: [-0.95, 0.20, 1.28], handles: [-0.25, 0.95], belt: 0.96, mirror: [-0.92, 0.98], trim: [3.0, 0.4] },
+    // Model X Plaid: the tall SUV with the huge windscreen sweeping up into the roof
+    teslax: { W: 2.0, ghW: 1.70, lift: 1, r: 0.38, axles: [-1.55, 1.42], front: 'eyes', rear: 'c',
+      body: [['m', -2.44, 0.30], ['b', -2.55, 0.34, -2.55, 0.66, -2.50, 0.78], ['q', -2.42, 0.90, -2.18, 0.93], ['q', -1.70, 1.00, -1.30, 1.05], ['l', 2.15, 1.12], ['q', 2.40, 1.15, 2.48, 1.06], ['q', 2.52, 0.85, 2.48, 0.55], ['q', 2.45, 0.34, 2.35, 0.30], ['a', 1.42], ['a', -1.55], ['l', -2.44, 0.30]],
+      gh: [['m', -1.36, 1.03], ['q', -0.75, 1.45, -0.10, 1.66], ['q', 0.80, 1.72, 1.55, 1.62], ['q', 2.10, 1.50, 2.32, 1.12], ['l', -1.36, 1.03]],
+      spoiler: [1.4, 1.14, 2.38], y: { head: 0.79, intake: 0.40, plate: 0.52, badge: 0.85, rear: 1.0, text: 0.90, rplate: 0.65, diff: 0.38 },
+      doors: [-1.18, -0.05, 1.22], handles: [-0.40, 0.90], belt: 1.13, mirror: [-1.20, 1.15], trim: [3.2, 0.25] },
+    // Roadster: the low two-seat supercar with a glass roof and a ducktail
+    roadster: { W: 2.0, ghW: 1.40, lift: 1, r: 0.34, axles: [-1.36, 1.30], front: 'eyes', rear: 'bar',
+      body: [['m', -2.04, 0.20], ['b', -2.15, 0.22, -2.15, 0.42, -2.10, 0.50], ['q', -2.02, 0.58, -1.75, 0.62], ['q', -1.10, 0.72, -0.55, 0.80], ['l', 1.40, 0.86], ['q', 1.95, 0.92, 2.10, 0.86], ['q', 2.15, 0.70, 2.10, 0.45], ['q', 2.08, 0.26, 1.98, 0.22], ['a', 1.30], ['a', -1.36], ['l', -2.04, 0.20]],
+      gh: [['m', -0.62, 0.78], ['q', -0.30, 1.05, 0.05, 1.18], ['q', 0.50, 1.22, 0.85, 1.12], ['q', 1.25, 0.98, 1.50, 0.85], ['l', -0.62, 0.78]],
+      y: { head: 0.53, intake: 0.27, plate: 0.36, badge: 0.57, rear: 0.78, text: 0.68, rplate: 0.46, diff: 0.26 },
+      doors: [-0.45, 0.95], handles: [0.70], belt: 0.85, mirror: [-0.50, 0.88], trim: [1.6, 0.25] }
+  };
+  const teslaPaint = {};
+  function teslaParts(g, color, metal){
+    const paint = teslaPaint[color + (metal ? 'm' : '')] || (teslaPaint[color + (metal ? 'm' : '')] = new THREE.MeshPhongMaterial({ color, shininess: metal ? 60 : 80, specular: metal ? 0x9aa3ad : 0x555555 }));
     const glass = new THREE.MeshPhongMaterial({ color: 0x0d1218, shininess: 110, specular: 0x9fb2c6 });
-    const black = mat(0x16181d), trim = mat(0x2a2d33);
-    const glow = c => new THREE.MeshBasicMaterial({ color: c });
+    const black = mat(0x16181d), trim = mat(0x2a2d33), glow = c => new THREE.MeshBasicMaterial({ color: c });
     const bx = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); g.add(o); return o; };
-    // a side profile (x along the car, nose at -x; y up) pushed out across the width
     const side = (shape, width, bevel, m) => {
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: width - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel * 0.5, bevelSegments: 5, curveSegments: 20 });
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: width - bevel * 2, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.5, bevelSegments: 5, curveSegments: 20 });
       geo.translate(0, 0, -(width - bevel * 2) / 2); geo.rotateY(-Math.PI / 2);
       const o = new THREE.Mesh(geo, m); g.add(o); return o;
     };
-    // the body, up to the window line
-    const s = new THREE.Shape();
-    s.moveTo(-2.36, Y(0.26));
-    s.bezierCurveTo(-2.47, Y(0.30), -2.47, Y(0.62), -2.42, Y(0.74));    // the round nose
-    s.quadraticCurveTo(-2.36, Y(0.84), -2.15, Y(0.87));              // up onto the hood
-    s.quadraticCurveTo(-1.60, Y(0.94), -1.12, Y(1.00));              // the hood rising to the windscreen
-    s.lineTo(2.22, Y(1.10));                                      // the window line
-    s.quadraticCurveTo(2.40, Y(1.12), 2.43, Y(1.05));                // top of the tailgate
-    s.quadraticCurveTo(2.46, Y(0.80), 2.42, Y(0.52));                // the back
-    s.quadraticCurveTo(2.40, Y(0.32), 2.30, Y(0.27));                // rear bumper
-    s.lineTo(1.96, Y(0.25));
-    s.absarc(1.52, 0.37, 0.45, -0.27, Math.PI + 0.27, false);  // rear wheel arch
-    s.lineTo(-1.08, Y(0.25));
-    s.absarc(-1.52, 0.37, 0.45, -0.27, Math.PI + 0.27, false); // front wheel arch
-    s.lineTo(-2.36, Y(0.26));
-    const body = side(s, 1.92, 0.1, paint);
-    // the greenhouse: raked windscreen, a long roof with room for the third row, sloping rear glass
-    const gh = new THREE.Shape();
-    gh.moveTo(-1.18, Y(0.98));
-    gh.quadraticCurveTo(-0.80, Y(1.30), -0.42, Y(1.55));
-    gh.quadraticCurveTo(0.30, Y(1.69), 1.40, Y(1.62));
-    gh.quadraticCurveTo(2.00, Y(1.52), 2.28, Y(1.09));
-    gh.lineTo(-1.18, Y(0.98));
-    side(gh, 1.62, 0.12, glass);
-    // a little spoiler lip on the tailgate
-    bx(1.36, 0.04, 0.16, paint, 0, Y(1.115), 2.33);
-    // Lights and badges sit right on the curved nose and tail: find where the body's surface is
-    // at each spot, so a light bar can follow the curve piece by piece.
-    g.updateMatrixWorld(true);
+    // lights and badges sit right on the curved nose and tail: find the body's surface there
+    let body = null;
     const ray = new THREE.Raycaster(), from = new THREE.Vector3(), fwd = new THREE.Vector3(0, 0, 1), aft = new THREE.Vector3(0, 0, -1);
-    const surf = (x, y, back) => { ray.set(from.set(x, y, back ? 9 : -9), back ? aft : fwd); const h = ray.intersectObject(body)[0]; return h ? h.point.z : (back ? 2.45 : -2.45); };
+    const surf = (x, y, back) => { ray.set(from.set(x, y, back ? 12 : -12), back ? aft : fwd); const h = ray.intersectObject(body)[0]; return h ? h.point.z : 0; };
     const onFront = (w, h, d, m, x, y) => bx(w, h, d, m, x, y, surf(x, y, false) - d / 2 + 0.006);
     const onBack = (w, h, d, m, x, y) => bx(w, h, d, m, x, y, surf(x, y, true) + d / 2 - 0.006);
     const strip = (fn, x0, x1, y, h, d, m, n) => { for (let i = 0; i < n; i++){ const a = x0 + (x1 - x0) * i / n, b = x0 + (x1 - x0) * (i + 1) / n; fn(b - a + 0.004, h, d, m, (a + b) / 2, y); } };
-    // FRONT: the thin full-width light bar along the nose, the headlights low in the corners,
-    // the dark intake, the plate and the T badge
-    strip(onFront, -0.8, 0.8, Y(0.79), 0.028, 0.03, glow(0xf4f8ff), 16);
-    [-1, 1].forEach(sd => { strip(onFront, sd * 0.48, sd * 0.86, Y(0.6), 0.1, 0.04, black, 4); strip(onFront, sd * 0.52, sd * 0.82, Y(0.62), 0.026, 0.05, glow(0xffffff), 3); });
-    strip(onFront, -0.56, 0.56, 0.36, 0.13, 0.05, black, 8);
-    onFront(0.44, 0.14, 0.03, mat(0xf4f4f4), 0, Y(0.48));
-    { const t = textPlane('T', 0.13, 0.13, '#d9dde3'); t.position.set(0, Y(0.71), surf(0, Y(0.71), false) - 0.008); t.rotation.y = Math.PI; g.add(t); }
-    // BACK: the full-width red light bar with C-shaped ends, TESLA, the plate and a diffuser
-    strip(onBack, -0.84, 0.84, Y(1.0), 0.05, 0.03, glow(0xd0202a), 16);
-    [-1, 1].forEach(sd => { onBack(0.05, 0.16, 0.03, glow(0xd0202a), sd * 0.82, Y(0.92)); onBack(0.12, 0.05, 0.03, glow(0xd0202a), sd * 0.76, Y(0.85)); });
-    { const t = textPlane('T E S L A', 0.8, 0.09, '#d9dde3'); t.position.set(0, Y(0.9), surf(0, Y(0.9), true) + 0.008); g.add(t); }
-    onBack(0.44, 0.14, 0.03, mat(0xf4f4f4), 0, Y(0.62));
-    strip(onBack, -0.7, 0.7, 0.34, 0.1, 0.05, black, 8);
+    const setBody = b => { body = b; g.updateMatrixWorld(true); };
+    const wheel = (sd, z, r, x, w, rimC) => {
+      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 24), black); tyre.rotation.z = Math.PI / 2; tyre.position.set(sd * x, r, z); g.add(tyre);
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.75, r * 0.75, 0.03, 24), mat(rimC || 0x4a4f57)); rim.rotation.z = Math.PI / 2; rim.position.set(sd * (x + w / 2 + 0.005), r, z); g.add(rim);
+      for (let k = 0; k < 5; k++){ const a = k / 5 * Math.PI * 2, sp = bx(0.035, r * 0.6, 0.05, mat(0x6b717a), sd * (x + w / 2 + 0.02), r + Math.cos(a) * r * 0.33, z + Math.sin(a) * r * 0.33); sp.rotation.x = a; }
+    };
+    const well = (z, r, len) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 20, 1, true, -Math.PI / 2, Math.PI), new THREE.MeshBasicMaterial({ color: 0x0a0b0d, side: THREE.DoubleSide })); o.rotation.z = Math.PI / 2; o.position.set(0, r * 0.92, z); g.add(o); };
+    return { paint, glass, black, trim, glow, bx, side, surf, onFront, onBack, strip, setBody, wheel, well };
+  }
+  function teslaCar(color, T){
+    const g = new THREE.Group(), P = teslaParts(g, color);
+    const Y = v => v <= 0.3 ? v : 0.3 + (v - 0.3) * T.lift, W = T.W, r = T.r, Ra = r + 0.09, ay = r + 0.01;
+    const path = (cmds, sh) => cmds.forEach(c => {
+      if (c[0] === 'm') sh.moveTo(c[1], Y(c[2]));
+      else if (c[0] === 'l') sh.lineTo(c[1], Y(c[2]));
+      else if (c[0] === 'q') sh.quadraticCurveTo(c[1], Y(c[2]), c[3], Y(c[4]));
+      else if (c[0] === 'b') sh.bezierCurveTo(c[1], Y(c[2]), c[3], Y(c[4]), c[5], Y(c[6]));
+      else if (c[0] === 'a'){ sh.lineTo(c[1] + Ra * Math.cos(0.27), ay - Ra * Math.sin(0.27)); sh.absarc(c[1], ay, Ra, -0.27, Math.PI + 0.27, false); }
+      return sh;
+    });
+    const s = new THREE.Shape(); path(T.body, s);
+    P.setBody(P.side(s, W, 0.1, P.paint));
+    const gh = new THREE.Shape(); path(T.gh, gh); P.side(gh, T.ghW, 0.12, P.glass);
+    if (T.spoiler) P.bx(T.spoiler[0], 0.04, 0.16, P.paint, 0, Y(T.spoiler[1]), T.spoiler[2]);
+    const L = T.y, hw = W / 2;
+    // FRONT: a full-width light bar with low headlights (Model Y), or slim headlights in the corners
+    if (T.front === 'bar'){
+      P.strip(P.onFront, -hw * 0.83, hw * 0.83, Y(L.bar), 0.028, 0.03, P.glow(0xf4f8ff), 16);
+      [-1, 1].forEach(sd => { P.strip(P.onFront, sd * hw * 0.5, sd * hw * 0.9, Y(L.head), 0.1, 0.04, P.black, 4); P.strip(P.onFront, sd * hw * 0.54, sd * hw * 0.85, Y(L.head) + 0.02, 0.026, 0.05, P.glow(0xffffff), 3); });
+    } else [-1, 1].forEach(sd => {
+      P.strip(P.onFront, sd * hw * 0.55, sd * hw * 0.92, Y(L.head), 0.09, 0.04, P.black, 4);
+      P.strip(P.onFront, sd * hw * 0.6, sd * hw * 0.9, Y(L.head) + 0.015, 0.022, 0.05, P.glow(0xffffff), 4);
+    });
+    P.strip(P.onFront, -hw * 0.58, hw * 0.58, Y(L.intake), 0.12, 0.05, P.black, 8);
+    P.onFront(0.44, 0.14, 0.03, mat(0xf4f4f4), 0, Y(L.plate));
+    { const t = textPlane('T', 0.13, 0.13, '#d9dde3'); t.position.set(0, Y(L.badge), P.surf(0, Y(L.badge), false) - 0.008); t.rotation.y = Math.PI; g.add(t); }
+    // BACK: a full-width red light bar with C-shaped ends (Model Y), or C-shaped lights in the corners
+    const red = P.glow(0xd0202a);
+    if (T.rear === 'bar') P.strip(P.onBack, -hw * 0.87, hw * 0.87, Y(L.rear), 0.05, 0.03, red, 16);
+    else [-1, 1].forEach(sd => P.strip(P.onBack, sd * hw * 0.55, sd * hw * 0.9, Y(L.rear), 0.05, 0.03, red, 4));
+    [-1, 1].forEach(sd => { P.onBack(0.05, 0.16, 0.03, red, sd * hw * 0.85, Y(L.rear) - 0.08); P.onBack(0.12, 0.05, 0.03, red, sd * hw * 0.79, Y(L.rear) - 0.15); });
+    { const t = textPlane('T E S L A', 0.8, 0.09, '#d9dde3'); t.position.set(0, Y(L.text), P.surf(0, Y(L.text), true) + 0.008); g.add(t); }
+    P.onBack(0.44, 0.14, 0.03, mat(0xf4f4f4), 0, Y(L.rplate));
+    P.strip(P.onBack, -hw * 0.73, hw * 0.73, Y(L.diff), 0.1, 0.05, P.black, 8);
     // SIDES: mirrors, door lines, flush door handles, black window trim
     [-1, 1].forEach(sd => {
-      const x = sd * 0.962;
-      bx(0.08, 0.04, 0.06, black, sd * 0.97, Y(1.06), -0.98);
-      const mir = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), paint); mir.scale.set(1.4, 0.75, 0.9); mir.position.set(sd * 1.07, Y(1.08), -0.98); g.add(mir);
-      [-1.0, 0.22, 1.32].forEach(z => bx(0.012, Y(1.02) - 0.4, 0.012, black, x, (Y(1.02) + 0.4) / 2, z));
-      [-0.18, 1.02].forEach(z => bx(0.012, 0.03, 0.17, trim, x, Y(0.93), z));
-      bx(0.012, 0.03, 3.3, black, sd * 0.82, Y(1.07), 0.5);
+      const x = sd * (hw + 0.002), top = Y(T.belt) - 0.05;
+      P.bx(0.08, 0.04, 0.06, P.black, sd * (hw + 0.01), Y(T.mirror[1]) - 0.02, T.mirror[0]);
+      const mir = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8), P.paint); mir.scale.set(1.4, 0.75, 0.9); mir.position.set(sd * (hw + 0.11), Y(T.mirror[1]), T.mirror[0]); g.add(mir);
+      T.doors.forEach(z => P.bx(0.012, top - 0.4, 0.012, P.black, x, (top + 0.4) / 2, z));
+      T.handles.forEach(z => P.bx(0.012, 0.03, 0.17, P.trim, x, top - 0.09, z));
+      P.bx(0.012, 0.03, T.trim[0], P.black, sd * (T.ghW / 2 + 0.01), Y(T.belt), T.trim[1]);
     });
-    // wheels: tyres and dark aero rims with spokes, in dark wheel wells
-    [-1.52, 1.52].forEach(z => { const well = new THREE.Mesh(new THREE.CylinderGeometry(0.41, 0.41, 1.86, 20, 1, true, -Math.PI / 2, Math.PI), new THREE.MeshBasicMaterial({ color: 0x0a0b0d, side: THREE.DoubleSide })); well.rotation.z = Math.PI / 2; well.position.set(0, 0.37, z); g.add(well); });
-    [[-1, -1.52], [1, -1.52], [-1, 1.52], [1, 1.52]].forEach(([sd, z]) => {
-      const tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.26, 24), black); tyre.rotation.z = Math.PI / 2; tyre.position.set(sd * 0.82, 0.36, z); g.add(tyre);
-      const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.03, 24), mat(0x4a4f57)); rim.rotation.z = Math.PI / 2; rim.position.set(sd * 0.955, 0.36, z); g.add(rim);
-      for (let k = 0; k < 5; k++){ const sp = bx(0.035, 0.22, 0.05, mat(0x6b717a), sd * 0.972, 0.36, z); sp.rotation.x = k / 5 * Math.PI * 2; sp.position.y += Math.cos(k / 5 * Math.PI * 2) * 0.12; sp.position.z += Math.sin(k / 5 * Math.PI * 2) * 0.12; }
+    // wheels in dark wheel wells
+    T.axles.forEach(z => P.well(z, Ra - 0.04, W - 0.06));
+    T.axles.forEach(z => [-1, 1].forEach(sd => P.wheel(sd, z, r, hw - 0.14, 0.26)));
+    P.bx(W - 0.22, 0.06, (T.axles[1] - T.axles[0]) + 1.2, P.black, 0, ay - 0.1, (T.axles[0] + T.axles[1]) / 2);   // underbody
+    return g;
+  }
+  // The Cybertruck: flat stainless-steel panels in a sharp triangle, light bars right across the
+  // front and back, square wheel arches and big off-road tyres. 5.68 m long, 2.03 m wide.
+  function cybertruck(color){
+    const g = new THREE.Group(), P = teslaParts(g, color, true), W = 2.03, hw = W / 2, r = 0.44;
+    const s = new THREE.Shape();
+    s.moveTo(-2.84, 0.48); s.lineTo(-2.86, 0.98); s.lineTo(-0.10, 1.79); s.lineTo(2.84, 1.22); s.lineTo(2.84, 0.48);
+    [1.80, -1.80].forEach(z => { s.lineTo(z + 0.62, 0.48); s.lineTo(z + 0.50, 1.0); s.lineTo(z - 0.50, 1.0); s.lineTo(z - 0.62, 0.48); });
+    s.lineTo(-2.84, 0.48);
+    P.setBody(P.side(s, W, 0.03, P.paint));
+    // the glass: the windscreen along the slope and a band of side windows
+    const gw = new THREE.Shape(); gw.moveTo(-1.62, 1.31); gw.lineTo(-0.11, 1.80); gw.lineTo(1.20, 1.535); gw.lineTo(1.24, 1.30); gw.lineTo(-1.62, 1.31);
+    P.side(gw, W + 0.01, 0, P.glass);
+    // the light bars: right across the nose, and right across the top of the tailgate
+    P.strip(P.onFront, -hw * 0.95, hw * 0.95, 0.955, 0.035, 0.03, P.glow(0xf4f8ff), 16);
+    P.strip(P.onBack, -hw * 0.95, hw * 0.95, 1.18, 0.05, 0.03, P.glow(0xd0202a), 16);
+    P.strip(P.onFront, -hw * 0.8, hw * 0.8, 0.56, 0.14, 0.05, P.black, 8);
+    P.strip(P.onBack, -hw * 0.8, hw * 0.8, 0.56, 0.14, 0.05, P.black, 8);
+    { const t = textPlane('T E S L A', 0.9, 0.1, '#2a2d33'); t.position.set(0, 1.05, P.surf(0, 1.05, true) + 0.008); g.add(t); }
+    [-1, 1].forEach(sd => {
+      [-0.85, 0.35].forEach(z => P.bx(0.012, 0.75, 0.012, P.black, sd * (hw + 0.002), 0.9, z));
+      const mir = P.bx(0.18, 0.1, 0.12, P.paint, sd * (hw + 0.12), 1.33, -1.55);
+      // black cladding round the square arches
+      [-1.80, 1.80].forEach(z => { P.bx(0.02, 0.06, 1.12, P.black, sd * (hw + 0.004), 1.0, z); [-1, 1].forEach(e => { const c = P.bx(0.02, 0.56, 0.06, P.black, sd * (hw + 0.004), 0.74, z + e * 0.56); c.rotation.x = -e * 0.22; }); });
     });
-    bx(1.7, 0.06, 4.4, black, 0, 0.27, 0);   // underbody
+    [-1.80, 1.80].forEach(z => { const o = P.bx(W - 0.06, 0.02, 1.0, new THREE.MeshBasicMaterial({ color: 0x0a0b0d }), 0, 0.99, z); });
+    [-1.80, 1.80].forEach(z => [-1, 1].forEach(sd => P.wheel(sd, z, r, hw - 0.18, 0.32, 0x5a5f66)));
+    P.bx(W - 0.3, 0.08, 4.2, P.black, 0, 0.42, 0);
     return g;
   }
   // text painted on a transparent plane (for lettering on cars)
@@ -4656,7 +4743,8 @@ function boot(hot){
     return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
   }
   function makeCar(color, taxi, model){
-    if (model && model.id === 'teslayl') return modelYL(color);
+    if (model && TESLAS[model.id]) return teslaCar(color, TESLAS[model.id]);
+    if (model && model.id === 'cyber') return cybertruck(color);
     const M = model || CAR_MODELS[0], g = new THREE.Group();
     const bx = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof c === 'number' ? mat(c) : c); m.position.set(x, y, z); g.add(m); return m; };
     const wheel = (r, x, z, w) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w || 0.3, 14), mat(DARK)); m.rotation.z = Math.PI / 2; m.position.set(x, r, z); g.add(m); return m; };
@@ -4908,6 +4996,7 @@ function boot(hot){
   function endHotel(){ hotel.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map){ o.material.map.dispose(); o.material.dispose(); } }); scene.remove(hotel); hotel = null; }
   function endDrive(){
     if (F.drive){ F.drive = false; F.ground = false; }
+    if (sfx.ev) sfx.ev(false, 0, false);
     worldCars.rent.visible = worldCars.taxi.visible = false; planeRoot.visible = true;
     if (hotel) endHotel();
     endRoute();
