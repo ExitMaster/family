@@ -130,7 +130,9 @@ kbd{
 }
 .row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
 .row label,.meta{color:var(--muted)}
-select{
+#seed{user-select:text;-webkit-user-select:text}
+#seedIn{flex:1 1 180px;min-width:0;user-select:text;-webkit-user-select:text;touch-action:auto}
+select,#seedIn{
   font-family:var(--mono);font-size:13px;color:var(--ink);background:rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.3);border-radius:4px;padding:5px 8px;
 }
@@ -295,10 +297,14 @@ select{
     </div>
     <div class="row">
       <span class="meta" id="seed"></span>
+    </div>
+    <div class="row">
+      <label for="seedIn">Seed</label>
+      <input id="seedIn" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="type a seed, or leave empty for random">
       <button id="newWorld" class="btn small" type="button">New world</button>
     </div>
     <div id="confirm" hidden>
-      <p>Delete this world and everything you built, then generate a new one?</p>
+      <p id="confirmMsg">Delete this world and everything you built, then generate a new one?</p>
       <div class="row" style="justify-content:flex-start">
         <button id="yesNew" class="btn small danger" type="button">Delete and generate</button>
         <button id="noNew" class="btn small" type="button">Keep this world</button>
@@ -1155,9 +1161,18 @@ function applySave(s) {
   }
   spawn();
 }
-function newWorld() {
+// a typed seed: whole numbers are used as they are, any other text is turned into a number
+function seedOf(text) {
+  const t = text.trim();
+  if (!t) return null;
+  if (/^-?\d+$/.test(t)) return Number(t) | 0;
+  let h = 0;
+  for (const ch of t) h = Math.imul(h, 31) + ch.codePointAt(0) | 0;
+  return h;
+}
+function newWorld(seed = null) {
   resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
-  SEED = Math.floor(Math.random() * 1e6);
+  SEED = seed === null ? Math.floor(Math.random() * 1e6) : seed;
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
   invs = {c: creativeInv(), s: Array(INV).fill(null)}; inv = invs[mode]; ensurePlane();
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false});
@@ -1346,9 +1361,17 @@ $('#bPause').addEventListener('click', pause);
 // menu
 $('#snd').addEventListener('click', toggleSound);
 $('#rd').addEventListener('change', e => { RD = +e.target.value; computeOffsets(); unloadFar(); persist(); });
-$('#newWorld').addEventListener('click', () => { $('#confirm').hidden = false; $('#yesNew').focus(); });
+$('#newWorld').addEventListener('click', () => {
+  const sd = seedOf($('#seedIn').value);
+  $('#confirmMsg').textContent = 'Delete this world and everything you built, then generate a new one' + (sd === null ? ' with a random seed?' : ` with seed ${sd}?`);
+  $('#confirm').hidden = false; $('#yesNew').focus();
+});
+$('#seedIn').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('#newWorld').click(); });
 $('#noNew').addEventListener('click', () => { $('#confirm').hidden = true; });
-$('#yesNew').addEventListener('click', () => { $('#confirm').hidden = true; newWorld(); toast('New world generated'); });
+$('#yesNew').addEventListener('click', () => {
+  $('#confirm').hidden = true; newWorld(seedOf($('#seedIn').value)); $('#seedIn').value = '';
+  toast('New world generated · seed ' + SEED);
+});
 addEventListener('visibilitychange', () => { if (document.hidden) persist(); });
 addEventListener('pagehide', persist);
 

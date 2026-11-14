@@ -94,7 +94,9 @@ build on it, fly over it. The world saves in the browser.
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
 - **Sound effects** for digging, building, footsteps, splashes, animals and explosions (all synthesized).
 - 10-minute day/night cycle with sun, moon and sunset sky.
-- **New world** in the pause menu deletes the current world and makes a new seed.
+- **New world** in the pause menu deletes the current world and makes a new one. Type a **seed** in the
+  box next to it first to get that exact world again (numbers or any word, like `castle`); leave it
+  empty for a random one. Your current seed is shown just above, so you can share it with friends.
 
 ## Saving
 
