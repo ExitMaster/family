@@ -69,6 +69,13 @@ body{
   transition:opacity .4s;opacity:0;white-space:nowrap;
 }
 #toast.on{opacity:1;transition:none}
+#tradeAsk{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;gap:10px;align-items:center;
+  background:rgba(14,18,28,.92);border:2px solid var(--gold);border-radius:8px;padding:8px 10px 8px 14px;font-family:var(--display);font-size:15px;max-width:calc(100vw - 32px)}
+#tradeAsk[hidden]{display:none}
+.tlabel{margin:10px 0 4px}
+.tgrid{margin-bottom:4px}
+#recipes .tgrid .slot{--s:clamp(24px,3.9vw,38px)}
+#tradeGo{margin-top:6px}
 
 /* touch controls */
 #joy{
@@ -215,6 +222,7 @@ select,#seedIn,.tin,#chatIn{
 <div id="friendMarks" aria-hidden="true"></div>
 <input id="chatIn" type="text" maxlength="80" autocomplete="off" placeholder="Say something, or /help · Enter sends · Esc cancels" hidden>
 <div id="toast" role="status"></div>
+<div id="tradeAsk" role="alert" hidden><span></span><button id="tradeYes" class="btn primary small" type="button">Trade (Y)</button><button id="tradeNo" class="btn small" type="button">No (N)</button></div>
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
 <canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
 <div id="hurt"></div>
@@ -992,6 +1000,8 @@ function act(button) {
     const far = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) : 5;
     const pl = planeHit(Math.min(5, far));
     if (pl) { if (button === 2) board(pl); else pickPlane(pl); return; }
+    const fr = mp.on && avatarHit(Math.min(5, far));
+    if (fr) { startTrade(fr); return; }
   }
   if (button === 2) {
     const m = mobHit(4);
@@ -1332,6 +1342,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') toggleSound();
   if (e.code === 'KeyE') openInv();
   if (e.code === 'KeyK') killKey();
+  if (e.code === 'KeyY' && tradeAsk) askYes();
+  if (e.code === 'KeyN' && tradeAsk) askNo();
   if (e.code === 'KeyT' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Slash') { e.preventDefault(); openChat(e.code === 'Slash' ? '/' : ''); return; }
   if (e.code === 'KeyV') toast('Get in your airplane first, then press V to fly to a village house');
   if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code[5] - 1);
@@ -1855,7 +1867,8 @@ function mkSlot(i) {
   if (i === sel) s.classList.add('sel');
   s.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (mode === 's') slotClick(i, e);
+    if (tradeF) offerSlot(i);
+    else if (mode === 's') slotClick(i, e);
     else if (i < 9) { sel = i; renderInv(); renderHotbar(); }
   });
   return s;
@@ -1898,7 +1911,7 @@ function renderInv() {
   if (surv) for (let i = 9; i < INV; i++) grid.append(mkSlot(i));
   else for (const id of PALETTE) {
     const b = mkBtn(id, 0);
-    b.addEventListener('click', () => { inv[sel] = {id, n: 1}; renderInv(); renderHotbar(); toast(nameOf(id)); saveDirty = true; });
+    b.addEventListener('click', () => { if (tradeF) { offerBlock(id); return; } inv[sel] = {id, n: 1}; renderInv(); renderHotbar(); toast(nameOf(id)); saveDirty = true; });
     grid.append(b);
   }
   for (let i = 0; i < 9; i++) hot.append(mkSlot(i));
@@ -1916,6 +1929,7 @@ function renderInv() {
       rec.append(b);
     }
   }
+  if (tradeF) renderTrade();
   handEl.hidden = !hand;
   if (hand) { handEl.querySelector('img').src = iconURL(hand.id); handEl.querySelector('span').textContent = hand.n > 1 ? fmtN(hand.n) : ''; }
 }
@@ -1928,6 +1942,7 @@ function openInv(trades) {
 }
 function closeInv(relock) {
   if (!invOpen) return;
+  if (tradeF) cancelTrade(); // Done calls the trade off
   invOpen = false; invUI.hidden = true; curTrades = null;
   if (hand) { addItem(hand.id, hand.n); hand = null; }
   handEl.hidden = true; renderHotbar();
@@ -3450,7 +3465,7 @@ async function mpJoinRoom() {
   const onEdit = s => mpApplyEdit(s.key, s.val());
   mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
-    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx),
+    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
   refreshMeta(); updateInfo();
@@ -3459,6 +3474,8 @@ async function mpJoinRoom() {
 function mpLeave() {
   if (!mp.on) return;
   const fb = mp.fb;
+  if (tradeF) { closeInv(false); cancelTrade(); }
+  hideAsk();
   mp.subs.forEach(u => u()); mp.subs = [];
   quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid)));
   mp.on = false; mp.sky = null; clearGhosts();
@@ -3560,7 +3577,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /trade NAME  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -3982,6 +3999,180 @@ CMDS.weather = a => {
 CMDS.rain = () => CMDS.weather('rain');
 CMDS.storm = CMDS.thunder = () => CMDS.weather('storm');
 CMDS.sun = () => CMDS.weather('clear');
+
+/* ---------- trading with friends ---------- */
+// Click a friend (left or right click, or tap) to ask them to trade. They press Y or the Trade button to say yes. You each
+// put things from your backpack on the table (in Creative, a stack of 64 of anything), and when you both press Trade the
+// two piles swap. What you put on the table leaves your backpack until the trade ends, so nothing gets copied; closing
+// the window calls the trade off and gives it back. The table lives at rooms/{CODE}/blockwood/trades/{uidA_uidB}.
+let tradeF = null, tradeAsk = null;
+const tradeAskEl = $('#tradeAsk'), declined = new Set();
+const tradeId = o => [mp.uid, o].sort().join('_');
+const tradeRef = tid => R('/trades/' + tid);
+const okItem = e => Array.isArray(e) && Number.isInteger(e[0]) && (BLOCKS[e[0]] || ITEMS[e[0]]) && Number.isInteger(e[1]) && e[1] > 0 && e[1] <= 1e5;
+const cleanOffer = o => (Array.isArray(o) ? o : o ? Object.values(o) : []).filter(okItem).slice(0, 9);
+const nameOfFriend = id => { const a = avatars.get(id); return a && a.p ? String(a.p.n || 'Friend').slice(0, 12) : 'Friend'; };
+function avatarHit(maxD) {
+  let best = null, bt = maxD;
+  for (const [id, a] of avatars) {
+    if (!a.g.visible) continue;
+    const t = rayBox([a.x - .4, a.y, a.z - .4], [a.x + .4, a.y + 1.9, a.z + .4], bt);
+    if (t >= 0 && t < bt) { bt = t; best = id; }
+  }
+  return best;
+}
+function startTrade(id) {
+  if (!mp.on || !avatars.has(id) || dead) return;
+  if (tradeF) { if (tradeF.other === id) openInv(); return; }
+  const tid = tradeId(id);
+  quiet(mp.fb.runTransaction(tradeRef(tid), cur => {
+    if (!cur || cur.d) return {u: {[mp.uid]: mp.name}, t: Date.now()};
+    cur.u = Object.assign({}, cur.u, {[mp.uid]: mp.name}); return cur;
+  }));
+  openTrade(tid, id);
+  showChat(null, `Asked ${nameOfFriend(id)} to trade…`);
+}
+function openTrade(tid, other) {
+  hideAsk();
+  declined.delete(tid);
+  tradeF = {tid, other, name: nameOfFriend(other), mine: [], theirs: [], k: {}, here: false, done: false, seen: false};
+  quiet(mp.fb.onDisconnect(tradeRef(tid)).remove());
+  if (invOpen) { invOpen = false; invUI.hidden = true; curTrades = null; }
+  openInv();
+  tone(660, 880, .12, .12, 'sine');
+}
+function showAsk(tid, other, name) {
+  tradeAsk = {tid, other};
+  tradeAskEl.querySelector('span').textContent = `${String(name || nameOfFriend(other)).slice(0, 12)} wants to trade with you`;
+  tradeAskEl.hidden = false;
+  tone(700, 1050, .1, .12, 'sine'); tone(900, 1300, .1, .1, 'sine', null, .12);
+}
+function hideAsk() { tradeAsk = null; tradeAskEl.hidden = true; }
+function askYes() {
+  if (!tradeAsk || !mp.on || dead) return;
+  const {tid, other} = tradeAsk;
+  quiet(mp.fb.update(tradeRef(tid), {['u/' + mp.uid]: mp.name}));
+  openTrade(tid, other);
+}
+function askNo() {
+  if (!tradeAsk) return;
+  declined.add(tradeAsk.tid); quiet(mp.fb.remove(tradeRef(tradeAsk.tid))); hideAsk();
+}
+$('#tradeYes').addEventListener('click', e => { e.stopPropagation(); askYes(); });
+$('#tradeNo').addEventListener('click', e => { e.stopPropagation(); askNo(); });
+for (const b of tradeAskEl.querySelectorAll('button')) b.addEventListener('pointerdown', e => e.stopPropagation());
+
+// my side of the table changed: tell the room, and both of us have to press Trade again
+function pushOffer() {
+  if (!tradeF) return;
+  quiet(mp.fb.update(tradeRef(tradeF.tid), {['o/' + mp.uid]: tradeF.mine.length ? tradeF.mine : null, k: null}));
+  tradeF.k = {};
+  renderInv(); renderHotbar(); saveDirty = true;
+  tone(600, 700, .04, .06, 'sine');
+}
+function addOffer(id, n) { // returns how many did not fit
+  const t = tradeF, e = t.mine.find(e => e[0] === id);
+  if (e) { e[1] += n; return 0; }
+  if (t.mine.length >= 9) { toast('The trade table is full'); return n; }
+  t.mine.push([id, n]); return 0;
+}
+function offerSlot(i) { // a backpack slot clicked while trading
+  const s = inv[i];
+  if (!s || !tradeF) return;
+  if (mode === 's') { inv[i] = null; const left = addOffer(s.id, s.n); if (left) inv[i] = {id: s.id, n: left}; }
+  else addOffer(s.id, 64); // Creative never runs out
+  pushOffer();
+}
+function offerBlock(id) { if (tradeF && !addOffer(id, 64)) pushOffer(); }
+function takeBack(j) {
+  const t = tradeF, e = t && t.mine[j];
+  if (!e) return;
+  t.mine.splice(j, 1);
+  if (mode === 's') { const left = addItem(e[0], e[1]); if (left) t.mine.splice(j, 0, [e[0], left]); }
+  pushOffer();
+}
+function returnOffer(t) { if (mode === 's') for (const [id, n] of t.mine) addItem(id, n); t.mine = []; renderHotbar(); }
+function tradeOk() {
+  const t = tradeF;
+  if (!t || !t.here) return;
+  if (!t.mine.length && !t.theirs.length) { toast('Put something on the table first'); return; }
+  t.k[mp.uid] = true;
+  quiet(mp.fb.update(tradeRef(t.tid), {['k/' + mp.uid]: true}));
+  renderInv();
+}
+function cancelTrade(t = tradeF) {
+  if (!t) return;
+  tradeF = null; returnOffer(t);
+  quiet(mp.fb.onDisconnect(tradeRef(t.tid)).cancel()); quiet(mp.fb.remove(tradeRef(t.tid)));
+}
+function finishTrade(v) {
+  const t = tradeF;
+  t.done = true; tradeF = null;
+  for (const [id, n] of t.theirs) addItem(id, n);
+  quiet(mp.fb.onDisconnect(tradeRef(t.tid)).cancel());
+  if (v.d && v.d[t.other]) quiet(mp.fb.remove(tradeRef(t.tid)));
+  else quiet(mp.fb.update(tradeRef(t.tid), {['d/' + mp.uid]: true}));
+  closeInv(true);
+  renderHotbar(); saveDirty = true;
+  const got = t.theirs.map(([id, n]) => `${nameOf(id).toLowerCase()} ×${n}`).join(', ');
+  showChat(null, `Traded with ${t.name}!` + (got ? ' You got ' + got : ''));
+  toast(`Traded with ${t.name}!`, 2500);
+  [523, 659, 784].forEach((f, i) => tone(f, f, .18, .12, 'triangle', null, i * .1));
+}
+function mpTrades(all) {
+  all = all || {};
+  for (const [tid, v] of Object.entries(all)) {
+    const ids = tid.split('_');
+    if (!v || !v.u || !ids.includes(mp.uid)) continue;
+    const other = ids[0] === mp.uid ? ids[1] : ids[0];
+    if (tradeF && tradeF.tid === tid) {
+      const t = tradeF; t.seen = true;
+      t.theirs = cleanOffer(v.o && v.o[other]); t.k = v.k || {}; t.here = !!v.u[other];
+      if (t.k[mp.uid] && t.k[other]) finishTrade(v);
+      else if (invOpen) renderInv();
+    } else if (v.d) { if (v.d[mp.uid] && v.d[other]) quiet(mp.fb.remove(tradeRef(tid))); }
+    else if (!v.u[mp.uid] && !tradeF && !declined.has(tid) && !(tradeAsk && tradeAsk.tid === tid) && avatars.has(other)) showAsk(tid, other, v.u[other]);
+  }
+  if (tradeAsk && !all[tradeAsk.tid]) hideAsk();
+  if (tradeF && tradeF.seen && !all[tradeF.tid]) { // the friend closed it
+    const t = tradeF; cancelTrade(t); closeInv(false);
+    toast(`${t.name} closed the trade`, 2500);
+  }
+}
+function renderTrade() {
+  const t = tradeF, rec = $('#recipes');
+  $('#invTitle').textContent = 'Trade with ' + t.name;
+  $('#craft h3').textContent = 'Trade table';
+  $('#craft').hidden = false; rec.textContent = '';
+  $('#invHint').textContent = (mode === 's' ? 'Click things in your backpack to put them on the table' : 'Click any block to put 64 of it on the table') +
+    '. Click your side of the table to take something back. When you both press Trade, you swap. Done calls it off.';
+  const side = (label, list, mine) => {
+    const h = document.createElement('p'); h.className = 'meta tlabel'; h.textContent = label;
+    const g = document.createElement('div'); g.className = 'grid tgrid';
+    for (let j = 0; j < 9; j++) {
+      const e = list[j], b = mkBtn(e && e[0], e ? e[1] : 0);
+      if (e && e[1] === 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = '1'; b.append(c); }
+      if (mine && e) b.addEventListener('pointerdown', ev => { ev.preventDefault(); takeBack(j); });
+      else b.tabIndex = -1;
+      g.append(b);
+    }
+    rec.append(h, g);
+  };
+  side('You give', t.mine, true);
+  side(t.name + (t.here ? ' gives' : ' (waiting for them to open the trade…)'), t.theirs, false);
+  const st2 = document.createElement('p'); st2.className = 'meta tlabel';
+  st2.textContent = t.k[mp.uid] ? (t.k[t.other] ? '' : `Waiting for ${t.name} to press Trade…`) : t.k[t.other] ? `${t.name} is ready! Press Trade to swap.` : '';
+  const ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn primary'; ok.id = 'tradeGo';
+  ok.textContent = t.k[mp.uid] ? 'Ready ✓' : 'Trade'; ok.disabled = !t.here || !!t.k[mp.uid];
+  ok.addEventListener('click', tradeOk);
+  rec.append(st2, ok);
+}
+CMDS.trade = a => {
+  if (!mp.on) return 'Trading works in a multiplayer room. Join one in the pause menu';
+  const list = friendList(), q = (a || '').toLowerCase(), f = q ? list.find(f => nameOfFriend(f.id).toLowerCase().startsWith(q)) : list[0];
+  if (!f) return q ? `Nobody called ${a} is in the room` : 'Nobody else is in the room yet';
+  startTrade(f.id); return null;
+};
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;

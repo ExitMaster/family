@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -128,6 +128,11 @@ joins with the same code is in the same world:
   and stays in the room for next time.
 - You see each other walking around with name tags (in the same dimension).
 - Press `T` to chat.
+- **Trade with friends**: click a friend (or type `/trade NAME`) to ask them to trade. They press `Y`
+  (or the Trade button) to say yes, `N` for no. You each click things in your backpack to put them
+  on the trade table (in Creative, a stack of 64 of any block), and when you both press **Trade**
+  the two piles swap. Click your side of the table to take something back; **Done** calls the trade
+  off and gives everything back. If either of you changes the table, you both press Trade again.
 - Everyone has the **same time of day and the same weather**. When someone sleeps, uses `/day`
   or `/night`, or changes the weather, it changes for the whole room.
 - **Find your friends**: everyone in the room has a marker with their name and distance; when
