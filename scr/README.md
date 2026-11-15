@@ -40,6 +40,19 @@ The **2026 Tesla Roadster** can **fly** 🚀 — hold **FLY** (or **Shift**) to 
 thrusters and lift off, then steer around in the air (it can soar over water, buildings
 and the new **skyscrapers** downtown). Let go to float back down.
 
+## Multiplayer
+
+Play together, like Jump: tap **👥 Multiplayer** (top left), pick a nickname and a
+room code (3–6 letters or numbers) and press **Join room**. Everyone who types the
+same room code is in the same sky. You see each other's planes, cars and ships
+with a name tag over them, and the list under the button shows who is in the room,
+what they're doing and how far away they are. Friends on their island or inside an
+airport show up in the list only.
+
+It uses the family Firebase database (Unimai Game Hub) under
+`rooms/{ROOM}/scr/{player}`, which the existing rules already allow. Jump uses
+`rooms/{ROOM}/players` and `/game`, so the two games never get in each other's way.
+
 ## Real cars
 
 **Double-tap SPACE** (out on the road) to turn on **Autopilot** 🤖 — the car drives and
