@@ -216,6 +216,15 @@ footer a{text-decoration:underline}
 .panel header h2{margin:0;font-size:20px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .panel header button{border:0;background:#2a4365;color:#fff;width:40px;height:40px;border-radius:10px;font-size:18px}
 .panel header button:hover{background:#355280}
+.ptimer{font-variant-numeric:tabular-nums;font-weight:700;background:#2a4365;border-radius:10px;padding:8px 12px;font-size:16px;white-space:nowrap}
+.ptimer.low{background:#c92a2a}
+.lock .pindots{display:flex;gap:12px;justify-content:center;margin:14px 0 4px}
+.lock .pindots i{width:16px;height:16px;border-radius:50%;border:2px solid #9fb6cf}
+.lock .pindots i.on{background:#fff;border-color:#fff}
+.lock .pinmsg{min-height:20px;color:#ff8787;font-weight:600}
+.lock .pinpad{display:grid;grid-template-columns:repeat(3,64px);gap:10px;justify-content:center;margin-top:6px}
+.lock .pinpad button{height:56px;border:0;border-radius:14px;background:#2a4365;color:#fff;font:600 22px inherit;cursor:pointer}
+.lock .pinpad button:hover{background:#355280}
 .stage{
   flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
   padding:12px; position:relative;
@@ -301,6 +310,7 @@ footer a{text-decoration:underline}
     <header>
       <div class="pe" id="pemo"></div>
       <h2 id="ptitle"></h2>
+      <span class="ptimer" id="ptimer" title="Play time left">⏱ 30:00</span>
       <button id="restart" aria-label="Restart">↻</button>
       <button id="fs" aria-label="Fullscreen">⛶</button>
       <button id="pclose" aria-label="Close">✕</button>
@@ -411,7 +421,37 @@ cats.addEventListener("click", e => {
 
 /* ---------- player modal ---------- */
 const player = $("#player"), stage = $("#stage");
-let cleanup = null, current = null;
+let cleanup = null, current = null, tTick = 0;
+/* 30-minute play limit, shared by every game. When it runs out, all games lock until the parent PIN is entered. */
+const PLAY_SECS = 30*60, PARENT_PIN = "1234", ptimer = $("#ptimer");
+const ls = { get(k, d){ try { const v = localStorage.getItem("unimai:" + k); return v === null ? d : v; } catch { return d; } },
+             set(k, v){ try { localStorage.setItem("unimai:" + k, v); } catch {} } };
+let used = +ls.get("playUsed", 0) || 0;
+const isLocked = () => ls.get("locked", "0") === "1";
+function showTime(){ const left = Math.max(0, PLAY_SECS - used);
+  ptimer.textContent = isLocked() ? "🔒 Locked" : `⏱ ${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}`;
+  ptimer.classList.toggle("low", isLocked() || left <= 60); }
+function stopTimer(){ clearInterval(tTick); tTick = 0; }
+function startTimer(){
+  stopTimer(); showTime();
+  tTick = setInterval(() => { if (document.hidden) return; used++; ls.set("playUsed", used); showTime();
+    if (used >= PLAY_SECS) { ls.set("locked", "1"); lockScreen(true); } }, 1000);
+}
+function lockScreen(justEnded){
+  stopTimer(); if (cleanup) { cleanup(); cleanup = null; } showTime();
+  const g = current; let pin = "";
+  stage.innerHTML = `<div class="soon lock"><div class="big">${justEnded ? "⏰" : "🔒"}</div>
+    <h3>${justEnded ? "Time's up!" : "Games are locked"}</h3><p>30 minutes of play is done. Ask a grown-up to enter the PIN to unlock.</p>
+    <div class="pindots"><i></i><i></i><i></i><i></i></div><div class="pinmsg"></div>
+    <div class="pinpad">${[1,2,3,4,5,6,7,8,9,"⌫",0,"✓"].map(k => `<button data-k="${k}">${k}</button>`).join("")}</div></div>`;
+  const dots = stage.querySelectorAll(".pindots i"), msg = stage.querySelector(".pinmsg");
+  const draw = () => dots.forEach((d, i) => d.classList.toggle("on", i < pin.length));
+  const submit = () => { if (pin === PARENT_PIN) { used = 0; ls.set("playUsed", 0); ls.set("locked", "0"); openGame(g); }
+    else { msg.textContent = "Wrong PIN"; pin = ""; draw(); } };
+  stage.querySelectorAll(".pinpad button").forEach(btn => btn.onclick = () => { const k = btn.dataset.k; msg.textContent = "";
+    if (k === "⌫") pin = pin.slice(0, -1); else if (k === "✓") submit(); else if (pin.length < 4) { pin += k; if (pin.length === 4) submit(); }
+    draw(); });
+}
 function openGame(g){
   current = g;
   if (cleanup) { cleanup(); cleanup = null; }
@@ -429,8 +469,10 @@ function openGame(g){
   }
   if (player.hidden) { player.hidden = false; document.body.style.overflow = "hidden"; }
   document.title = `${g.name} – unimai`;
+  isLocked() ? lockScreen(false) : startTimer();
 }
 function closeGame(){
+  stopTimer();
   if (cleanup) { cleanup(); cleanup = null; }
   stage.innerHTML = ""; player.hidden = true; current = null;
   document.body.style.overflow = ""; document.title = "unimai – Free Online Games";
