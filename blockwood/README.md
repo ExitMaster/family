@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -132,7 +132,11 @@ joins with the same code is in the same world:
   and stays in the room for next time.
 - You see each other walking around with name tags (in the same dimension).
 - Press `T` to chat.
-- **Trade with friends**: click a friend (or type `/trade NAME`) to ask them to trade. They press `Y`
+- **Fight other players**: left-click a friend to hit them (your sword's damage), or shoot them with
+  arrows. Only players in Survival get hurt. When a friend gets you, the death screen says
+  "Slain by Alice" and the chat tells the room. Type `/pvp off` to stop hurting and being hurt
+  (remembered in this browser), `/pvp on` to fight again.
+- **Trade with friends**: right-click a friend (or type `/trade NAME`) to ask them to trade. They press `Y`
   (or the Trade button) to say yes, `N` for no. You each click things in your backpack to put them
   on the trade table (in Creative, a stack of 64 of any block), and when you both press **Trade**
   the two piles swap. Click your side of the table to take something back; **Done** calls the trade

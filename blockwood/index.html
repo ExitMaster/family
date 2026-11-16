@@ -1001,7 +1001,7 @@ function act(button) {
     const pl = planeHit(Math.min(5, far));
     if (pl) { if (button === 2) board(pl); else pickPlane(pl); return; }
     const fr = mp.on && avatarHit(Math.min(5, far));
-    if (fr) { startTrade(fr); return; }
+    if (fr) { if (button === 2) startTrade(fr); else hitPlayer(fr); return; }
   }
   if (button === 2) {
     const m = mobHit(4);
@@ -2004,6 +2004,9 @@ function die() {
   dead = true; mine.on = false; held = null;
   for (const k in keys) keys[k] = false;
   deadEl.hidden = false;
+  const killer = mp.on ? killedBy() : null; lastHit = null;
+  $('#dead h1').textContent = killer ? `Slain by ${killer}` : 'You died!';
+  if (killer) quiet(mp.fb.push(R('/chat'), {n: mp.name, m: `was slain by ${killer}`, t: mp.fb.serverTimestamp()}));
   if (locked) document.exitPointerLock();
   tone(320, 60, 1.1, .4, 'sawtooth');
   $('#respawn').focus({preventScroll: true});
@@ -3285,6 +3288,11 @@ function arrowHits(a) {
     hurtMob(m, a.dmg); m.vx += a.vx / v * 4; m.vz += a.vz / v * 4; m.vy = Math.max(m.vy, 3);
     return true;
   }
+  if (mp.on) for (const [id, f] of avatars) {
+    if (!f.g.visible || !inBox(a.x, a.y, a.z, f.x, f.y, f.z, HW + .15, PHGT)) continue;
+    if (!pvpBlocked(id)) hitFriend(id, a.dmg, a.x - a.vx * .1, a.z - a.vz * .1);
+    return true;
+  }
   if (mp.on) for (const g of ghosts.values()) {
     const K = KINDS[g.kind];
     if (g.g.visible && inBox(a.x, a.y, a.z, g.x, g.y - .05, g.z, K.hw + .12, K.h + .1)) { hitGhost(g, a.dmg, a.vx, a.vz); return true; }
@@ -3398,7 +3406,7 @@ function mpOnFx(s) {
   const v = s.val() || {};
   quiet(mp.fb.remove(s.ref));
   const ok = a => Array.isArray(a) && a.every(Number.isFinite);
-  if (ok(v.h) && v.h.length === 3) hurtPlayer(Math.max(0, Math.min(20, v.h[0])), v.h[1], v.h[2]);
+  if (ok(v.h) && v.h.length === 3) { if (v.by !== undefined) hurtByFriend(v); else hurtPlayer(Math.max(0, Math.min(20, v.h[0])), v.h[1], v.h[2]); }
   else if (ok(v.a) && v.a.length === 7) shootArrow(v.a[0], v.a[1], v.a[2], v.a[3], v.a[4], v.a[5], Math.max(0, Math.min(20, v.a[6])), true);
   else if (ok(v.b) && v.b.length === 3) blast(v.b[0], v.b[1], v.b[2], false);
 }
@@ -3437,7 +3445,7 @@ async function mpJoinRoom() {
   const name = (mpName.value.trim() || 'Player' + Math.floor(Math.random() * 900 + 100)).slice(0, 12);
   if (room.length < 3 || room.length > 6) { mpStatus.textContent = 'Room codes are 3 to 6 letters or numbers, like FAM1.'; mpRoom.focus(); return; }
   mpRoom.value = room; mpName.value = name;
-  try { localStorage.setItem(MP_KEY, JSON.stringify({name, room})); } catch (e) {}
+  try { localStorage.setItem(MP_KEY, JSON.stringify({name, room, pvp})); } catch (e) {}
   mpJoin.disabled = true; mpStatus.textContent = 'Connecting…';
   let fb;
   try { fb = await firebase(); }
@@ -3498,7 +3506,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${dim}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -3561,7 +3569,7 @@ function mpTick(dt) {
   }
   if ((mp.sendT -= dt) > 0) return;
   mp.sendT = .15;
-  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s].join();
+  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v].join();
   if (sig !== mp.last) { mp.last = sig; quiet(mp.fb.update(R('/players/' + mp.uid), me)); }
 }
 /* ---------- chat ---------- */
@@ -3584,7 +3592,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /trade NAME  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4263,6 +4271,47 @@ function updatePets(dt) {
     addMob(k, s[0], s[1], s[2]); setPet(mobs[mobs.length - 1], true);
   }
 }
+
+/* ---------- fighting other players ---------- */
+// In a multiplayer room, left-click a friend to hit them (with your sword's damage) and shoot them with arrows; right-click
+// still trades. Only players in Survival get hurt. Anyone can type /pvp off to stop hurting and being hurt; it's
+// remembered in this browser. When a friend kills you, the whole room hears about it in the chat.
+let pvp = true, pvpT = 0, lastHit = null;
+try { pvp = JSON.parse(localStorage.getItem(MP_KEY) || '{}').pvp !== false; } catch (e) {}
+function savePvp() { try { const m = JSON.parse(localStorage.getItem(MP_KEY) || '{}'); m.pvp = pvp; localStorage.setItem(MP_KEY, JSON.stringify(m)); } catch (e) {} }
+function pvpBlocked(id) {
+  const a = avatars.get(id);
+  if (!pvp) return 'Fighting is off for you. Type /pvp on';
+  if (!a || !a.p) return 'They left';
+  if (a.p.v === 0) return `${nameOfFriend(id)} has fighting turned off`;
+  if (!a.p.s) return `${nameOfFriend(id)} can't be hurt right now (Creative)`;
+  return null;
+}
+function hitFriend(id, dmg, fx, fz) {
+  quiet(mp.fb.push(R('/fx/' + id), {h: [Math.min(20, dmg), +fx.toFixed(2), +fz.toFixed(2)], by: mp.name}));
+  const a = avatars.get(id);
+  if (a) burst(Math.floor(a.x), Math.floor(a.y + 1), Math.floor(a.z), 0, new THREE.Color(0xd82a2a));
+}
+function hitPlayer(id) { // left-click on a friend
+  if (pvpT > performance.now()) return;
+  pvpT = performance.now() + 450;
+  const why = pvpBlocked(id);
+  if (why) { toast(why, 2000); return; }
+  hitFriend(id, damageOf(), P.x, P.z);
+  tone(220, 110, .15, .3, 'square'); noise(.12, 'bandpass', 900, 2, .5);
+}
+// a friend hit you (h: [damage, from x, from z], by: their name)
+function hurtByFriend(v) {
+  if (!pvp) return;
+  if (typeof v.by === 'string') lastHit = {by: v.by.slice(0, 12), t: performance.now()};
+  hurtPlayer(Math.max(0, Math.min(20, v.h[0])), v.h[1], v.h[2]);
+}
+function killedBy() { return lastHit && performance.now() - lastHit.t < 6000 ? lastHit.by : null; }
+CMDS.pvp = a => {
+  const w = (a || '').toLowerCase();
+  if (w === 'on' || w === 'off') { pvp = w === 'on'; savePvp(); mp.last = ''; }
+  return pvp ? 'Fighting is ON: left-click a friend to hit them. Type /pvp off to stop' : 'Fighting is OFF: nobody can hurt you and you can\'t hurt anyone. Type /pvp on to fight';
+};
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
