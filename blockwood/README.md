@@ -108,6 +108,10 @@ build on it, fly over it. The world saves in the browser.
   angry). Right click one while holding a gold ingot to barter: they give back obsidian,
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
 - **Sound effects** for digging, building, footsteps, splashes, animals and explosions (all synthesized).
+- **Pets**: right-click a pig, sheep, cow, chicken or rabbit to make it your pet. A heart floats over
+  it and it follows you everywhere: it catches up if you run off, and comes with you through portals,
+  into multiplayer rooms and after a reload (pets are saved with your world). Right-click it again to
+  let it go. Holding an **apple** makes any animal nearby follow you.
 - 10-minute day/night cycle with sun, moon and sunset sky.
 - **Weather**: clear spells and rain take turns. On snowy ground and high mountains it snows instead,
   and roofs keep you dry. **Thunderstorms** darken the sky with lightning and thunder, and are dark
