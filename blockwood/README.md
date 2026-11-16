@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -108,6 +108,17 @@ build on it, fly over it. The world saves in the browser.
   angry). Right click one while holding a gold ingot to barter: they give back obsidian,
   glowstone, ender pearls, iron and more. **Magma cubes** hop around the Nether and attack.
 - **Sound effects** for digging, building, footsteps, splashes, animals and explosions (all synthesized).
+- **Lots more animals and monsters**: horses, donkeys, wolves, foxes, cats, pandas, bees and parrots
+  on the grass; frogs by water; goats up high; turtles on beaches; polar bears and foxes in the snow;
+  squid, dolphins and axolotls in the water. At night: spiders (they climb walls), slimes (big ones
+  split in two), witches that throw magic, bandits with crossbows and brutes with axes; husks in the
+  desert. In caves: bats, silverfish and cave spiders.
+- **The Deep Watcher**: a blind stone giant with a glowing core that very rarely lives deep in the
+  caves. It can't see you, but it hears you dig, build, run or jump (and always notices you right
+  next to it). You can hear its heartbeat when it's close. It hits very hard; sneak away slowly!
+- `/summon NAME` makes any mob in front of you (like `/summon horse` or `/summon deep watcher`);
+  `/mobs` lists every name. Summoned monsters stay even in Creative, where they can't hurt you.
+- A pet **wolf** fights monsters for you. Any animal can be a pet, even bees and parrots.
 - **Pets**: right-click a pig, sheep, cow, chicken or rabbit to make it your pet. A heart floats over
   it and it follows you everywhere: it catches up if you run off, and comes with you through portals,
   into multiplayer rooms and after a reload (pets are saved with your world). Right-click it again to

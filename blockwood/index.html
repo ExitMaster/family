@@ -994,6 +994,7 @@ function updateTarget() {
   if (target) highlight.position.set(target.x + .5, target.y + .5, target.z + .5);
 }
 function act(button) {
+  noiseAt = performance.now();
   if (dead || sleeping || riding) return;
   if (button === 2 && inv[sel] && inv[sel].id === BOW) { drawBow(); return; }
   if (button === 0 || button === 2) {
@@ -1553,11 +1554,11 @@ function trySpawn() {
     const b = getBlock(x, y, z);
     if (b === AIR) continue;
     if (b === WATERB) {
-      if (getBlock(x, y - 2, z) === WATERB) for (let k = 1 + Math.floor(Math.random() * 3); k > 0; k--) addMob('fish', x + .3 + Math.random() * .4, y - 1.4, z + .3 + Math.random() * .4);
+      if (getBlock(x, y - 2, z) === WATERB) waterSpawn(x, y, z);
       return;
     }
     if (getBlock(x, y + 1, z) !== AIR || getBlock(x, y + 2, z) !== AIR) return;
-    const kind = b === GRASS ? pickKind() : (b === SAND || b === SNOW) && Math.random() < .3 ? 'rabbit' : null;
+    const kind = landKind(b, x, y, z);
     if (!kind) return;
     addMob(kind, x + .5, y + 1, z + .5);
     if (Math.random() < .5 && getBlock(x + 1, y + 1, z) === AIR && getBlock(x + 1, y, z) !== AIR) addMob(kind, x + 1.5, y + 1, z + .5);
@@ -1594,13 +1595,14 @@ function updateMobs(dt) {
     const m = mobs[i], K = KINDS[m.kind], dx = m.x - P.x, dz = m.z - P.z;
     if (dx * dx + dz * dz > 90 * 90 || m.y < -10) { removeMob(i); continue; }
     if (K.swim) { swim(m, K, dt); continue; }
+    if (K.fly) { flyMob(m, K, dt); continue; }
     m.t -= dt; m.flee -= dt; m.hurry = 0;
     if (K.villager) villagerThink(m, dt);
     else if (K.golem) golemThink(m, K, dt);
     else if (K.neutral) neutralThink(m, K, dt);
     else if (K.hostile) {
-      if (mode !== 's' && !(mp.on && foeNear(m, 60, 99))) { removeMob(i); continue; }
-      if (K.archer) archerThink(m, K, dt); else if (K.creeper) creeperThink(m, K, dt); else zombieThink(m, dt);
+      if (mode !== 's' && !m.summoned && !(mp.on && foeNear(m, 60, 99))) { removeMob(i); continue; }
+      if (K.archer) archerThink(m, K, dt); else if (K.creeper) creeperThink(m, K, dt); else if (K.caster) witchThink(m, K, dt); else if (K.boss) watcherThink(m, K, dt); else zombieThink(m, dt);
     } else if (m.flee > 0) {
       if (m.t <= 0) { m.yaw = Math.atan2(-dx, -dz) + (Math.random() - .5) * 1.4; m.t = .7; }
       m.walk = true;
@@ -1618,7 +1620,8 @@ function updateMobs(dt) {
     const wasGround = m.ground; m.ground = false;
     let wall = false;
     for (let s = 0; s < steps; s++) { wall = moveMob(m, K, 'x', m.vx * h) || wall; wall = moveMob(m, K, 'z', m.vz * h) || wall; moveMob(m, K, 'y', m.vy * h); }
-    if (wall && m.walk && (wasGround || m.ground || inW)) m.vy = 7.5;
+    if (wall && m.walk && K.climb) m.vy = 4;
+    else if (wall && m.walk && (wasGround || m.ground || inW)) m.vy = 7.5;
     else if (K.hop && m.walk && m.ground && sp > 0) m.vy = 5;
     let dy = m.yaw - m.ry; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); m.ry += dy * Math.min(1, 6 * dt);
     const v = Math.hypot(m.vx, m.vz);
@@ -1650,6 +1653,7 @@ function killMob(m) {
   noise(.25, 'lowpass', 700, .7, .6, [m.x, m.y, m.z]);
   removeMob(i);
   if (m.pet) { const j = petKinds.indexOf(m.kind); if (j >= 0) petKinds.splice(j, 1); toast(`Your pet ${m.kind} died`, 2500); saveDirty = true; }
+  if (KINDS[m.kind].split && m.y > -10) for (const o of [-.3, .3]) addMob(KINDS[m.kind].split, m.x + o, m.y + .2, m.z - o);
   if (mode === 's' && KINDS[m.kind].drop && !m.noDrop) KINDS[m.kind].drop();
 }
 // K: instantly kill the creature you're looking at, or else the nearest one close by
@@ -2170,10 +2174,10 @@ function zombieThink(m, dt) {
   if (T) {
     const dx = T.x - m.x, dz = T.z - m.z, d = Math.hypot(dx, dz);
     m.yaw = Math.atan2(-dx, -dz); m.walk = d > .9;
-    if (d < 1.5 && Math.abs(T.y - m.y) < 1.6 && m.atk <= 0) { m.atk = 1; hitFoe(T, 3, m.x, m.z); }
-    if (Math.random() < dt * .15) KINDS.zombie.say([m.x, m.y + 1.6, m.z]);
+    if (d < 1.2 + KINDS[m.kind].hw && Math.abs(T.y - m.y) < 1.6 && m.atk <= 0) { m.atk = 1; hitFoe(T, KINDS[m.kind].dmg || 3, m.x, m.z); }
+    if (Math.random() < dt * .15) KINDS[m.kind].say([m.x, m.y + 1.6, m.z]);
   } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
-  if (dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
+  if (!KINDS[m.kind].noBurn && dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
     m.burnT = 1;
     if (m.y + 1 >= colTop(Math.floor(m.x), Math.floor(m.z))) { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xff8a20)); hurtMob(m, 3); }
   }
@@ -2188,8 +2192,7 @@ function trySpawnZombie() {
   const y = spots[Math.floor(Math.random() * spots.length)];
   if (y > colTop(x, z) && dayAmt > .3) return;
   if (torchNear(x, y, z, 10)) return;
-  const roll = Math.random();
-  addMob(roll < .3 ? 'skeleton' : roll < .6 ? 'creeper' : 'zombie', x + .5, y, z + .5);
+  addMob(pickMonster(x, y, z), x + .5, y, z + .5);
 }
 
 /* ---------- more animals ---------- */
@@ -3361,7 +3364,7 @@ function archerThink(m, K, dt) {
     }
     if (Math.random() < dt * .12) K.say([m.x, m.y + 1.6, m.z]);
   } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
-  if (dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
+  if (!KINDS[m.kind].noBurn && dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
     m.burnT = 1;
     if (m.y + 1 >= colTop(Math.floor(m.x), Math.floor(m.z))) { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xff8a20)); hurtMob(m, 3); }
   }
@@ -3602,7 +3605,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /kick NAME  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /kick NAME  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4245,6 +4248,7 @@ function togglePet(m) {
 const holdingTreat = () => !!inv[sel] && inv[sel].id === APPLE;
 // called for animals: walk after you if it's your pet, or if you're holding an apple close by
 function petThink(m, K, dt) {
+  if (m.pet && K.bite && wolfFight(m, K, dt)) return true;
   if (!m.pet && (!LAND.includes(m.kind) || !holdingTreat())) return false;
   const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
   if (!m.pet && (d > 10 || dead)) return false;
@@ -4371,6 +4375,311 @@ CMDS.unkick = async a => {
   for (const [id] of hit) quiet(mp.fb.remove(R('/kicked/' + id)));
   return 'They can come back now: ' + hit.map(([, v]) => v.n).join(', ');
 };
+
+/* ---------- more animals and monsters ---------- */
+// Grass: horses, donkeys, wolves, foxes, cats, pandas, bees and parrots (frogs by water, goats up high).
+// Beaches: turtles. Snow: polar bears, goats, foxes. Water: squid, dolphins (deep water) and axolotls.
+// Night: spiders, slimes (big ones split in two), witches, bandits with crossbows and brutes with axes; husks in the
+// desert. Caves: bats, silverfish, cave spiders, and very rarely the Deep Watcher, a blind stone giant that hunts by sound.
+// Any animal can be a pet (right-click it); a pet wolf fights monsters for you. /summon NAME makes one in front of you.
+const OFF = (c, k) => { const r = (c >> 16 & 255) * k, g = (c >> 8 & 255) * k, b = (c & 255) * k; return (r << 16) | (g << 8) | b; };
+function quad(g, c, w, h, x, z) { return [leg(g, c, w, h, -x, -z), leg(g, c, w, h, x, z), leg(g, c, w, h, x, -z), leg(g, c, w, h, -x, z)]; }
+function wing(g, c, x, y, w, d, hang) { const p = new THREE.Group(); p.position.set(x, y, 0); if (hang) part(p, c, .04, w, d, 0, -w / 2, 0); else part(p, c, w, .02, d, x > 0 ? w / 2 : -w / 2, 0, 0); g.add(p); return p; }
+function humanoid(g, skin, shirt, pants, forward, s = 1) {
+  part(g, shirt, .5 * s, .7 * s, .28 * s, 0, 1.1 * s, 0); part(g, skin, .46 * s, .46 * s, .46 * s, 0, 1.68 * s, 0); eyes(g, 1.72 * s, -.235 * s, .1 * s);
+  for (const sx of [-.36, .36]) {
+    const arm = new THREE.Group(); arm.position.set(sx * s, 1.38 * s, 0);
+    if (forward) part(arm, shirt, .2 * s, .2 * s, .66 * s, 0, 0, -.3 * s); else part(arm, shirt, .2 * s, .66 * s, .2 * s, 0, -.3 * s, 0);
+    arm.name = sx < 0 ? 'armL' : 'armR'; g.add(arm);
+  }
+  return [leg(g, pants, .22 * s, .75 * s, -.12 * s, 0), leg(g, pants, .22 * s, .75 * s, .12 * s, 0)];
+}
+const NEW_KINDS = {
+  horse: {name: 'Horse', hw: .55, h: 1.95, speed: 1.6, hp: 20, col: 0x8a5a32, hurtF: 260, build(g) {
+    const c = this.col, m = 0x3a2414;
+    part(g, c, .6, .6, 1.3, 0, 1.2, 0); part(g, c, .3, .7, .36, 0, 1.6, -.6); part(g, c, .3, .3, .62, 0, 1.95, -.85);
+    part(g, m, .08, .72, .38, 0, 1.68, -.48); part(g, m, .14, .55, .14, 0, 1.05, .72); eyes(g, 2.02, -1.165, .1);
+    return quad(g, c, .2, .9, .2, .45);
+  }, say(at) { for (let k = 0; k < 4; k++) tone(700 - k * 90, 500 - k * 60, .09, .14, 'sawtooth', at, k * .08); }},
+  donkey: {name: 'Donkey', hw: .45, h: 1.6, speed: 1.3, hp: 18, col: 0x7a6a5a, hurtF: 300, build(g) {
+    const c = this.col;
+    part(g, c, .5, .5, 1, 0, .95, 0); part(g, c, .28, .5, .3, 0, 1.25, -.5); part(g, c, .28, .28, .5, 0, 1.5, -.72);
+    part(g, c, .08, .32, .08, -.1, 1.8, -.6); part(g, c, .08, .32, .08, .1, 1.8, -.6); part(g, 0xd8d0c4, .22, .14, .06, 0, 1.42, -.97); eyes(g, 1.56, -.975, .1);
+    return quad(g, c, .18, .7, .16, .36);
+  }, say(at) { tone(500, 300, .3, .18, 'sawtooth', at); tone(300, 500, .3, .18, 'sawtooth', at, .32); }},
+  wolf: {name: 'Wolf', hw: .3, h: .85, speed: 1.9, hp: 8, col: 0xbcbcbc, hurtF: 700, bite: 4, build(g) {
+    const c = this.col, d = 0x8e8e8e;
+    part(g, c, .36, .36, .8, 0, .62, 0); part(g, c, .4, .36, .36, 0, .78, -.5); part(g, d, .18, .14, .2, 0, .72, -.76);
+    part(g, 0x141414, .08, .06, .04, 0, .78, -.87); part(g, c, .1, .12, .06, -.12, 1.01, -.5); part(g, c, .1, .12, .06, .12, 1.01, -.5);
+    part(g, d, .1, .1, .4, 0, .72, .52); eyes(g, .84, -.685, .1);
+    return quad(g, c, .14, .44, .12, .28);
+  }, say(at) { tone(620, 900, .12, .16, 'square', at); tone(700, 500, .1, .14, 'square', at, .15); }},
+  cat: {name: 'Cat', hw: .22, h: .62, speed: 1.6, hp: 8, col: 0xe0a050, hurtF: 1000, build(g) {
+    const c = this.col, s = 0xb87a30;
+    part(g, c, .28, .28, .6, 0, .42, 0); part(g, s, .29, .06, .1, 0, .54, 0); part(g, s, .29, .06, .1, 0, .54, .18);
+    part(g, c, .34, .3, .3, 0, .56, -.38); part(g, c, .08, .1, .04, -.1, .74, -.36); part(g, c, .08, .1, .04, .1, .74, -.36);
+    part(g, s, .08, .08, .5, 0, .5, .5); eyes(g, .6, -.535, .08);
+    return quad(g, c, .1, .3, .08, .2);
+  }, say(at) { tone(700, 1000, .25, .12, 'triangle', at); }},
+  fox: {name: 'Fox', hw: .25, h: .68, speed: 2, hp: 10, col: 0xe2742a, hurtF: 900, build(g) {
+    const c = this.col, w = 0xf4ece0, d = 0x3a2414;
+    part(g, c, .32, .3, .62, 0, .45, 0); part(g, c, .36, .3, .3, 0, .55, -.4); part(g, w, .18, .12, .2, 0, .5, -.6);
+    part(g, d, .1, .12, .05, -.12, .74, -.4); part(g, d, .1, .12, .05, .12, .74, -.4);
+    part(g, c, .2, .2, .46, 0, .5, .5); part(g, w, .2, .2, .12, 0, .5, .78); eyes(g, .6, -.555, .09);
+    return quad(g, d, .1, .3, .1, .22);
+  }, say(at) { tone(900, 1300, .1, .12, 'square', at); }},
+  goat: {name: 'Goat', hw: .35, h: 1.35, speed: 1.4, hp: 10, col: 0xe8e2d8, hurtF: 600, build(g) {
+    const c = this.col;
+    part(g, c, .5, .5, .8, 0, .85, 0); part(g, c, .3, .32, .36, 0, 1.15, -.5); part(g, 0xc8c0b0, .12, .2, .08, 0, .95, -.62);
+    part(g, 0x8e8a80, .08, .24, .08, -.1, 1.42, -.45); part(g, 0x8e8a80, .08, .24, .08, .1, 1.42, -.45); eyes(g, 1.2, -.685, .1);
+    return quad(g, c, .16, .6, .16, .28);
+  }, say(at) { for (let k = 0; k < 4; k++) tone(520, 480, .07, .16, 'sawtooth', at, k * .07); }},
+  panda: {name: 'Panda', hw: .5, h: 1.25, speed: .9, hp: 20, col: 0xf4f4f0, hurtF: 260, build(g) {
+    const c = this.col, k = 0x1e1e1e;
+    part(g, c, .7, .6, 1, 0, .75, 0); part(g, k, .72, .62, .3, 0, .75, -.2);
+    part(g, c, .5, .44, .4, 0, .9, -.62); part(g, k, .14, .12, .02, -.12, .94, -.825); part(g, k, .14, .12, .02, .12, .94, -.825);
+    part(g, 0xffffff, .04, .04, .02, -.1, .95, -.84); part(g, 0xffffff, .04, .04, .02, .14, .95, -.84);
+    part(g, k, .12, .12, .06, -.2, 1.16, -.6); part(g, k, .12, .12, .06, .2, 1.16, -.6); part(g, k, .14, .08, .06, 0, .82, -.83);
+    return quad(g, k, .22, .45, .2, .3);
+  }, say(at) { tone(260, 200, .25, .2, 'sawtooth', at); }},
+  turtle: {name: 'Turtle', hw: .4, h: .55, speed: .5, hp: 15, col: 0x3e7a3a, hurtF: 400, build(g) {
+    const c = this.col, sk = 0x8acb6a;
+    part(g, c, .7, .25, .8, 0, .3, 0); part(g, 0x5a9a4a, .5, .12, .6, 0, .48, 0); part(g, sk, .22, .18, .25, 0, .28, -.5); eyes(g, .32, -.626, .07);
+    return quad(g, sk, .2, .2, .32, .3);
+  }, say() {}},
+  frog: {name: 'Frog', hw: .2, h: .45, speed: 1.8, hp: 6, col: 0x6aa84a, hurtF: 900, hop: true, build(g) {
+    const c = this.col, e = 0xd8e8a0;
+    part(g, c, .36, .24, .4, 0, .2, 0); part(g, 0xc8e090, .3, .04, .3, 0, .08, -.02);
+    part(g, e, .1, .1, .1, -.1, .38, -.12); part(g, e, .1, .1, .1, .1, .38, -.12); part(g, 0x141414, .05, .05, .02, -.1, .39, -.175); part(g, 0x141414, .05, .05, .02, .1, .39, -.175);
+    return [leg(g, c, .12, .14, -.14, .12), leg(g, c, .12, .14, .14, .12), leg(g, c, .08, .1, .12, -.14), leg(g, c, .08, .1, -.12, -.14)];
+  }, say(at) { tone(180, 140, .12, .2, 'square', at); tone(200, 150, .12, .18, 'square', at, .16); }},
+  bee: {name: 'Bee', hw: .2, h: .4, speed: 2.2, hp: 6, col: 0xf2c230, hurtF: 1400, fly: true, build(g) {
+    const c = this.col, k = 0x2a2018;
+    part(g, c, .3, .3, .42, 0, .3, 0); part(g, k, .31, .31, .06, 0, .3, 0); part(g, k, .31, .31, .06, 0, .3, .14);
+    part(g, k, .24, .24, .08, 0, .3, -.24); part(g, 0x8a8a8a, .04, .04, .1, 0, .28, .26);
+    return [wing(g, 0xdfefff, -.06, .46, .22, .16), wing(g, 0xdfefff, .06, .46, .22, .16)];
+  }, say(at) { noise(.3, 'bandpass', 240, 6, .2, at); }},
+  parrot: {name: 'Parrot', hw: .18, h: .9, speed: 2, hp: 6, col: 0xd8342c, hurtF: 1500, fly: true, build(g) {
+    const c = this.col, b = 0x2a5fd0;
+    part(g, c, .22, .36, .22, 0, .5, 0); part(g, c, .2, .2, .22, 0, .78, -.06); part(g, 0xf2c230, .08, .1, .1, 0, .74, -.2); eyes(g, .82, -.175, .07);
+    part(g, b, .1, .3, .04, 0, .26, .1);
+    return [wing(g, b, -.12, .64, .28, .18, true), wing(g, b, .12, .64, .28, .18, true)];
+  }, say(at) { tone(1400, 1900, .08, .1, 'square', at); tone(1700, 1200, .1, .1, 'square', at, .1); }},
+  bat: {name: 'Bat', hw: .2, h: .5, speed: 3, hp: 4, col: 0x3a2e28, hurtF: 1800, fly: true, cave: true, build(g) {
+    const c = this.col;
+    part(g, c, .2, .22, .18, 0, .4, 0); part(g, c, .06, .1, .04, -.06, .55, -.04); part(g, c, .06, .1, .04, .06, .55, -.04); part(g, 0xd02020, .05, .04, .02, 0, .44, -.1);
+    return [wing(g, OFF(c, .8), -.1, .45, .4, .26), wing(g, OFF(c, .8), .1, .45, .4, .26)];
+  }, say(at) { tone(3200, 2600, .05, .06, 'square', at); }},
+  squid: {name: 'Squid', hw: .3, h: .7, speed: 1, hp: 10, col: 0x2a3a6a, hurtF: 500, swim: true, build(g) {
+    const c = this.col;
+    part(g, c, .5, .55, .5, 0, .5, 0); eyes(g, .5, -.255, .13);
+    const t = new THREE.Group(); t.position.set(0, .22, 0);
+    for (const [x, z] of [[-.14, -.14], [.14, -.14], [.14, .14], [-.14, .14]]) part(t, OFF(c, .8), .08, .4, .08, x, -.2, z);
+    g.add(t); return [t];
+  }, say() {}},
+  dolphin: {name: 'Dolphin', hw: .4, h: .45, speed: 3.2, hp: 10, col: 0x7a92a8, hurtF: 1200, swim: true, build(g) {
+    const c = this.col;
+    part(g, c, .4, .38, 1.1, 0, .2, 0); part(g, 0xd8e0e8, .3, .08, .9, 0, .03, 0); part(g, c, .16, .14, .3, 0, .14, -.68);
+    part(g, c, .06, .25, .25, 0, .46, .05); eyes(g, .26, -.551, .14);
+    const t = new THREE.Group(); t.position.set(0, .2, .55); part(t, c, .5, .06, .2, 0, 0, .1); g.add(t); return [t];
+  }, say(at) { for (let k = 0; k < 3; k++) tone(2200, 2800, .06, .08, 'sine', at, k * .07); }},
+  axolotl: {name: 'Axolotl', hw: .15, h: .25, speed: 1.2, hp: 6, col: 0xf2a6c8, hurtF: 1500, swim: true, build(g) {
+    const c = this.col, m = 0xd83a8a;
+    part(g, c, .2, .16, .5, 0, .1, 0); part(g, c, .26, .18, .2, 0, .12, -.32); part(g, m, .34, .06, .04, 0, .2, -.3); eyes(g, .14, -.421, .08);
+    const t = new THREE.Group(); t.position.set(0, .1, .25); part(t, c, .04, .14, .24, 0, 0, .12); g.add(t); return [t];
+  }, say() {}},
+  polarbear: {name: 'Polar bear', hw: .6, h: 1.4, speed: 1.1, fast: 2.8, hp: 30, col: 0xf2f2ec, hurtF: 220, neutral: true, dmg: 6, build(g) {
+    const c = this.col;
+    part(g, c, .7, .7, 1.2, 0, .95, 0); part(g, c, .45, .42, .45, 0, 1.05, -.75); part(g, c, .24, .18, .16, 0, .98, -1.03);
+    part(g, 0x141414, .1, .06, .02, 0, 1.02, -1.115); part(g, c, .1, .1, .06, -.16, 1.3, -.7); part(g, c, .1, .1, .06, .16, 1.3, -.7); eyes(g, 1.14, -.98, .12);
+    return quad(g, c, .26, .6, .2, .4);
+  }, say(at) { tone(140, 90, .5, .3, 'sawtooth', at); }, drop() { give(RFISH, 1 + (Math.random() < .5 ? 1 : 0)); }},
+  spider: {name: 'Spider', hw: .6, h: .9, speed: 3, hp: 16, col: 0x2a2420, hurtF: 600, hostile: true, climb: true, noBurn: true, dmg: 2, build(g) { return spiderBody(g, this.col, 1); },
+    say(at) { noise(.25, 'highpass', 2500, 1, .3, at); }},
+  cavespider: {name: 'Cave spider', hw: .4, h: .55, speed: 3.2, hp: 12, col: 0x1f4a4a, hurtF: 700, hostile: true, climb: true, noBurn: true, dmg: 2, build(g) { return spiderBody(g, this.col, .65); },
+    say(at) { noise(.2, 'highpass', 3200, 1, .25, at); }},
+  slime: {name: 'Slime', hw: .45, h: .9, speed: 1.6, hp: 12, col: 0x6abf4a, hurtF: 300, hostile: true, hop: true, noBurn: true, dmg: 2, split: 'smallslime', build(g) { return slimeBody(g, this.col, .9); },
+    say(at) { noise(.18, 'lowpass', 400, 1, .4, at); }},
+  smallslime: {name: 'Small slime', hw: .23, h: .45, speed: 1.8, hp: 4, col: 0x6abf4a, hurtF: 600, hostile: true, hop: true, noBurn: true, dmg: 1, build(g) { return slimeBody(g, this.col, .45); },
+    say(at) { noise(.12, 'lowpass', 700, 1, .3, at); }},
+  witch: {name: 'Witch', hw: .3, h: 2.3, speed: 1.6, hp: 26, col: 0x5a2e6a, hurtF: 520, hostile: true, caster: true, biped: true, noBurn: true, build(g) {
+    const legs = humanoid(g, 0x9ac08a, this.col, 0x3a2040, false);
+    part(g, 0x8aae7a, .1, .16, .1, 0, 1.62, -.27); part(g, 0x241a2a, .7, .06, .7, 0, 1.94, 0); part(g, 0x241a2a, .36, .3, .36, 0, 2.12, 0); part(g, 0x241a2a, .16, .2, .16, 0, 2.36, .04);
+    return legs;
+  }, say(at) { for (let k = 0; k < 3; k++) tone(900 - k * 150, 700 - k * 120, .08, .12, 'triangle', at, k * .09); }, drop() { if (Math.random() < .5) give(GUNPOWDER, 1); }},
+  husk: {name: 'Husk', hw: .3, h: 1.95, speed: 2.4, hp: 20, col: 0xb8a070, hurtF: 240, hostile: true, biped: true, noBurn: true, dmg: 3, build(g) { return humanoid(g, this.col, 0x7a6a4a, 0x5a4a32, true); },
+    say(at) { tone(130, 90, .6, .22, 'sawtooth', at); }, drop() { if (Math.random() < .15) give(IRONI, 1); }},
+  bandit: {name: 'Bandit', hw: .3, h: 1.95, speed: 2.2, hp: 24, col: 0x5a5e66, hurtF: 440, hostile: true, archer: true, biped: true, noBurn: true, build(g) {
+    const legs = humanoid(g, 0xc89870, this.col, 0x2e2e36, false);
+    part(g, 0x3a3e46, .5, .2, .5, 0, 1.94, .02); part(g, 0x6a4a2a, .5, .06, .1, 0, 1.25, -.24);
+    return legs;
+  }, say(at) { tone(260, 200, .2, .14, 'sawtooth', at); }, drop() { give(ARROW, 1 + Math.floor(Math.random() * 3)); if (Math.random() < .3) give(EMERALD, 1); }},
+  brute: {name: 'Brute', hw: .35, h: 2.1, speed: 2.8, hp: 28, col: 0x3a3f4a, hurtF: 300, hostile: true, biped: true, noBurn: true, dmg: 6, build(g) {
+    const legs = humanoid(g, 0xc89870, this.col, 0x2a2a30, true, 1.08), r = g.getObjectByName('armR');
+    part(r, 0x6a4a2a, .06, .06, .6, 0, .05, -.7); part(r, 0xb8b8c0, .04, .3, .22, 0, .14, -.92);
+    return legs;
+  }, say(at) { tone(180, 120, .3, .2, 'sawtooth', at); }, drop() { if (Math.random() < .4) give(EMERALD, 1); if (Math.random() < .2) give(IRONI, 2); }},
+  silverfish: {name: 'Silverfish', hw: .2, h: .3, speed: 3, hp: 6, col: 0x9a9aa2, hurtF: 1600, hostile: true, noBurn: true, dmg: 1, build(g) {
+    for (let k = 0; k < 4; k++) part(g, OFF(this.col, 1 - k * .08), .22 - k * .04, .16 - k * .02, .14, 0, .1, -.18 + k * .13);
+    eyes(g, .13, -.255, .06); return [];
+  }, say(at) { noise(.1, 'highpass', 5000, 1, .2, at); }},
+  watcher: {name: 'Deep Watcher', hw: .7, h: 3.2, speed: 1, hp: 250, col: 0x2b3036, hurtF: 90, hostile: true, boss: true, biped: true, noBurn: true, build(g) {
+    const c = this.col, moss = 0x3e5a2e, crys = 0xbfe8e0;
+    part(g, c, 1.5, 1.4, .9, 0, 2.2, 0); part(g, moss, 1.56, .3, .96, 0, 2.85, 0); part(g, c, 1.1, .5, .8, 0, 1.4, 0);
+    const core = new THREE.Mesh(boxG, new THREE.MeshBasicMaterial({color: 0xffa630})); core.name = 'core'; core.scale.set(.42, .42, .06); core.position.set(0, 2.2, -.46); g.add(core);
+    part(g, c, .8, .7, .7, 0, 3.25, -.05); part(g, OFF(c, .7), .6, .1, .02, 0, 3.15, -.405);
+    for (const [x, h] of [[-.28, .4], [0, .55], [.28, .4]]) part(g, crys, .14, h, .14, x, 3.6 + h / 2, -.05);
+    for (const sx of [-.95, .95]) { const a = new THREE.Group(); a.position.set(sx, 2.75, 0); part(a, c, .42, 1.9, .42, 0, -.95, 0); part(a, moss, .46, .3, .46, 0, -.1, 0); a.name = sx < 0 ? 'armL' : 'armR'; g.add(a); }
+    return [leg(g, c, .5, 1.15, -.35, 0), leg(g, c, .5, 1.15, .35, 0)];
+  }, say(at) { tone(70, 45, .9, .5, 'sawtooth', at); }, drop() { give(EMERALD, 6); give(IRONI, 8); }},
+};
+function spiderBody(g, c, s) {
+  part(g, c, .7 * s, .5 * s, .7 * s, 0, .6 * s, .35 * s); part(g, OFF(c, .8), .5 * s, .4 * s, .4 * s, 0, .55 * s, -.22 * s);
+  for (const x of [-.12, -.04, .04, .12]) part(g, 0xd02020, .06 * s, .06 * s, .02, x * s, .62 * s, -.425 * s);
+  const legs = [];
+  for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) legs.push(leg(g, OFF(c, .7), .07 * s, .55 * s, sx * (.42 + k * .04) * s, (-.3 + k * .22) * s));
+  return legs;
+}
+function slimeBody(g, c, s) {
+  part(g, c, s, s, s, 0, s / 2, 0); part(g, OFF(c, .7), s * .5, s * .5, s * .5, 0, s / 2, 0);
+  part(g, 0x141414, s * .14, s * .14, .02, -s * .2, s * .62, -s / 2 - .01); part(g, 0x141414, s * .14, s * .14, .02, s * .2, s * .62, -s / 2 - .01);
+  part(g, 0x2a4a1a, s * .12, s * .08, .02, 0, s * .36, -s / 2 - .01);
+  return [];
+}
+Object.assign(KINDS, NEW_KINDS);
+// any land animal can be a pet; these are the grass ones and how often they turn up
+[['horse', 1.2], ['donkey', .5], ['wolf', .8], ['fox', .6], ['cat', .5], ['panda', .2], ['bee', .7], ['parrot', .35], ['goat', 0], ['frog', 0], ['turtle', 0]]
+  .forEach(([k, w]) => { LAND.push(k); LAND_W.push(w); });
+const kindName = k => (KINDS[k] && KINDS[k].name) || petName(k);
+
+function nearWater(x, y, z) { for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) if (getBlock(x + dx, y, z + dz) === WATERB) return true; return false; }
+function landKind(b, x, y, z) {
+  const r = Math.random();
+  if (b === GRASS) return nearWater(x, y, z) && r < .25 ? 'frog' : y > WATER + 16 && r < .35 ? 'goat' : pickKind();
+  if (b === SAND) return r < .15 ? 'turtle' : r < .3 ? 'rabbit' : null;
+  if (b === SNOW) return r < .1 ? 'polarbear' : r < .3 ? 'goat' : r < .45 ? 'rabbit' : r < .55 ? 'fox' : null;
+  if (b === STONE && y > WATER + 14) return r < .2 ? 'goat' : null;
+  return null;
+}
+function waterSpawn(x, y, z) {
+  let d = 0; while (d < 8 && getBlock(x, y - d, z) === WATERB) d++;
+  const r = Math.random();
+  if (d >= 5 && r < .15) { addMob('dolphin', x + .5, y - 2, z + .5); if (Math.random() < .5) addMob('dolphin', x + .5, y - 2.5, z + 1.5); return; }
+  if (d >= 3 && r < .35) { addMob('squid', x + .5, y - 2, z + .5); return; }
+  if (r < .42) { addMob('axolotl', x + .5, y - 1.4, z + .5); return; }
+  for (let k = 1 + Math.floor(Math.random() * 3); k > 0; k--) addMob('fish', x + .3 + Math.random() * .4, y - 1.4, z + .3 + Math.random() * .4);
+}
+function pickMonster(x, y, z) {
+  const top = colTop(x, z), under = y < top - 3, r = Math.random();
+  if (y < 16 && y < top - 6 && r < .03 && !mobs.some(m => m.kind === 'watcher')) return 'watcher';
+  if (under && r < .1) return 'bat';
+  if (under && r < .16) return 'silverfish';
+  if (under && r < .24) return 'cavespider';
+  if (getBlock(x, y - 1, z) === SAND) return r < .6 ? 'husk' : r < .8 ? 'spider' : 'skeleton';
+  const q = Math.random();
+  return q < .22 ? 'zombie' : q < .4 ? 'skeleton' : q < .56 ? 'creeper' : q < .7 ? 'spider' : q < .8 ? 'slime' : q < .87 ? 'witch' : q < .94 ? 'bandit' : 'brute';
+}
+
+// flying animals: bees and parrots drift over the grass, bats flutter about in caves; pets fly after you
+function flyMob(m, K, dt) {
+  const fl = Math.floor;
+  m.t -= dt; m.flee -= dt;
+  if (m.home === undefined) m.home = m.y;
+  if (m.pet) {
+    const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
+    m.yaw = Math.atan2(-dx, -dz); m.fsp = d > 3 ? (d > 8 ? 2.2 : 1.2) : 0; m.ty = P.y + 2.2;
+  } else if (m.t <= 0) {
+    m.t = K.cave ? .4 + Math.random() : 1.5 + Math.random() * 2.5;
+    m.yaw = Math.random() * 6.283; m.fsp = Math.random() < .85 ? 1 : 0;
+    m.ty = K.cave ? m.home + (Math.random() - .5) * 4 : colTop(fl(m.x), fl(m.z)) + 2 + Math.random() * 3;
+    if (Math.random() < .2) K.say([m.x, m.y, m.z]);
+  }
+  const ty = m.ty === undefined ? m.y : m.ty, sp = K.speed * (m.flee > 0 ? 2 : m.fsp === undefined ? 1 : m.fsp), k = Math.min(1, 3 * dt);
+  m.vx += (-Math.sin(m.yaw) * sp - m.vx) * k; m.vz += (-Math.cos(m.yaw) * sp - m.vz) * k;
+  m.vy += (Math.max(-2.5, Math.min(2.5, (ty - m.y) * 1.5)) - m.vy) * k;
+  if (moveMob(m, K, 'x', m.vx * dt) | moveMob(m, K, 'z', m.vz * dt)) { m.yaw += Math.PI * (.5 + Math.random()); m.t = Math.min(m.t, .6); m.vy = 1.5; }
+  if (moveMob(m, K, 'y', m.vy * dt)) m.vy = 0;
+  let dy = m.yaw - m.ry; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); m.ry += dy * Math.min(1, 5 * dt);
+  m.ph += dt * (K.cave ? 28 : 40);
+  m.legs.forEach((l, j) => { l.rotation.z = Math.sin(m.ph) * .7 * (j % 2 ? 1 : -1); });
+  m.g.position.set(m.x, m.y + Math.sin(m.ph * .1) * .05, m.z); m.g.rotation.y = m.ry;
+}
+// a pet wolf goes after monsters near you
+function wolfFight(m, K, dt) {
+  m.atk = (m.atk || 0) - dt;
+  let foe = null, fd = 10;
+  for (const o of mobs) {
+    if (o === m || !KINDS[o.kind].hostile || o.y < -10) continue;
+    const d = Math.hypot(o.x - m.x, o.z - m.z);
+    if (d < fd && Math.abs(o.y - m.y) < 4 && Math.hypot(o.x - P.x, o.z - P.z) < 16) { fd = d; foe = o; }
+  }
+  if (!foe) return false;
+  const dx = foe.x - m.x, dz = foe.z - m.z;
+  m.yaw = Math.atan2(-dx, -dz); m.walk = fd > 1.2; m.hurry = 2;
+  if (fd < 1.7 && m.atk <= 0) { m.atk = .8; hurtMob(foe, K.bite); foe.vx += dx / (fd || 1) * 3; foe.vz += dz / (fd || 1) * 3; foe.vy = 4; K.say([m.x, m.y + .8, m.z]); }
+  return true;
+}
+// witches keep their distance and throw magic at you
+function witchThink(m, K, dt) {
+  const T = foeNear(m, 14, 8);
+  m.cast = (m.cast === undefined ? 1.5 : m.cast) - dt;
+  if (T) {
+    const dx = T.x - m.x, dz = T.z - m.z, d = Math.hypot(dx, dz);
+    m.walk = d < 4 || d > 9; m.yaw = d < 4 ? Math.atan2(dx, dz) : Math.atan2(-dx, -dz);
+    if (m.cast <= 0 && d < 11) {
+      m.cast = 2.6 + Math.random(); m.walk = false; m.yaw = Math.atan2(-dx, -dz);
+      for (let k = 1; k <= 4; k++) burst(Math.floor(m.x + dx * k / 5), Math.floor(m.y + 1.6 + (T.y - m.y) * k / 5), Math.floor(m.z + dz * k / 5), 0, new THREE.Color(0xa040e0));
+      burst(Math.floor(T.x), Math.floor(T.y + 1), Math.floor(T.z), 0, new THREE.Color(0xc060ff));
+      tone(500, 1400, .3, .16, 'sine', [m.x, m.y + 1.6, m.z]);
+      hitFoe(T, 3, m.x, m.z);
+    }
+    if (Math.random() < dt * .1) K.say([m.x, m.y + 1.8, m.z]);
+  } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
+}
+// the Deep Watcher can't see: it hears you when you dig, build, run or jump nearby, and always when you're right next to it
+let noiseAt = 0;
+function watcherThink(m, K, dt) {
+  m.atk = (m.atk || 0) - dt; m.beat = (m.beat || 0) - dt;
+  const core = m.g.getObjectByName('core');
+  if (m.beat <= 0 && Math.hypot(P.x - m.x, P.z - m.z) < 30) { m.beat = m.anger > 0 ? .55 : 1.3; tone(58, 40, .25, .45, 'sine', [m.x, m.y + 2, m.z]); m.pulse = 1; }
+  m.pulse = Math.max(0, (m.pulse || 0) - dt * 3);
+  if (core) core.scale.set(.42 + m.pulse * .14, .42 + m.pulse * .14, .06);
+  const T = foeNear(m, 40, 16);
+  if (T) {
+    const d = Math.hypot(T.x - m.x, T.z - m.z);
+    const loud = T === P ? performance.now() - noiseAt < 1200 || Math.hypot(P.vx, P.vz) > 3.4 || !P.onGround : d < 12;
+    if (d < 5 || (loud && d < 26)) {
+      if (!(m.anger > 0) && T === P) { toast('The Deep Watcher heard you…', 2500); K.say([m.x, m.y + 3, m.z]); }
+      m.anger = 10; m.tx = T.x; m.tz = T.z; m.foeT = T;
+    }
+  }
+  if (m.anger > 0) {
+    m.anger -= dt;
+    const dx = m.tx - m.x, dz = m.tz - m.z, d = Math.hypot(dx, dz);
+    m.yaw = Math.atan2(-dx, -dz); m.walk = d > 1.2; m.hurry = m.anger > 6 ? 2.8 : 1.4;
+    const F = m.foeT;
+    if (F && Math.hypot(F.x - m.x, F.z - m.z) < 2.8 && Math.abs(F.y - m.y) < 3 && m.atk <= 0) {
+      m.atk = 1.4; hitFoe(F, 14, m.x, m.z);
+      if (F === P) { P.vy = 9; P.onGround = false; shake = Math.max(shake, .6); }
+      noise(.5, 'lowpass', 300, 1, 1, [m.x, m.y + 2, m.z]);
+    }
+  } else if (m.t <= 0) { m.walk = Math.random() < .35; m.yaw = Math.random() * 6.283; m.t = 4 + Math.random() * 4; }
+  const s = m.atk > 1 ? -1.8 * Math.sin((1.4 - m.atk) / .4 * Math.PI) : Math.sin(m.ph) * .3;
+  const aL = m.g.getObjectByName('armL'), aR = m.g.getObjectByName('armR');
+  if (aL) aL.rotation.x = s; if (aR) aR.rotation.x = m.atk > 1 ? s : -Math.sin(m.ph) * .3;
+}
+CMDS.summon = a => {
+  const q = (a || '').toLowerCase().replace(/[^a-z]/g, '');
+  const kind = Object.keys(KINDS).find(k => k === q || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q);
+  if (!kind) return 'Type /summon NAME. Type /mobs to see every name';
+  if (dim === 'e' && kind !== 'watcher' && !KINDS[kind].hostile) return "Animals can't live in the End";
+  const x = P.x - Math.sin(P.yaw) * 3, z = P.z - Math.cos(P.yaw) * 3;
+  let y = Math.floor(P.y) + 1;
+  if (!KINDS[kind].fly && !KINDS[kind].swim) { while (y > 0 && !SOLID[getBlock(Math.floor(x), y - 1, Math.floor(z))]) y--; while (SOLID[getBlock(Math.floor(x), y, Math.floor(z))] && y < H - 3) y++; }
+  addMob(kind, x, y, z); mobs[mobs.length - 1].summoned = true;
+  return `${kindName(kind)} appeared` + (KINDS[kind].hostile && mode !== 's' ? ' (monsters only fight in Survival)' : '');
+};
+CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
