@@ -3459,9 +3459,17 @@ async function mpJoinRoom() {
   let meta;
   mp.subs.push(fb.onValue(fb.ref(fb.db, '.info/serverTimeOffset'), s => { mp.off = s.val() || 0; }));
   try {
-    const res = await fb.runTransaction(R('/meta'), cur => cur || {seed: SEED, made: Date.now()});
+    const res = await fb.runTransaction(R('/meta'), cur => !cur ? {seed: SEED, made: Date.now(), owner: mp.uid} : cur.owner ? cur : Object.assign(cur, {owner: mp.uid}));
     meta = res.snapshot.val();
+    const k = (await fb.get(R('/kicked/' + mp.uid))).val();
+    if (k && Date.now() + (mp.off || 0) - k.t < KICK_MS) {
+      mpJoin.disabled = false;
+      mpStatus.textContent = `${String(k.by || 'The host').slice(0, 12)} kicked you out of this room. Try again in ${Math.ceil((KICK_MS - (Date.now() + (mp.off || 0) - k.t)) / 60000)} minutes.`;
+      return;
+    }
+    if (k) quiet(fb.remove(R('/kicked/' + mp.uid)));
   } catch (e) { mpJoin.disabled = false; mpStatus.textContent = 'The room did not answer: ' + e.message; return; }
+  mp.owner = meta.owner;
   mp.on = true;
   // load the room's world
   resetWorld(); clearMobs(); edits.clear();
@@ -3480,6 +3488,8 @@ async function mpJoinRoom() {
   const onEdit = s => mpApplyEdit(s.key, s.val());
   mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
+    fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
+    fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
     fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
@@ -3493,7 +3503,7 @@ function mpLeave() {
   hideAsk();
   mp.subs.forEach(u => u()); mp.subs = [];
   quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid)));
-  mp.on = false; mp.sky = null; clearGhosts();
+  mp.on = false; mp.sky = null; mp.owner = null; clearGhosts();
   for (const a of avatars.values()) scene.remove(a.g);
   avatars.clear(); marksEl.textContent = ''; mpFriends.textContent = '';
   resetWorld(); clearMobs(); applySave(loadSaved()); // back to your own world, exactly as you left it
@@ -3520,10 +3530,10 @@ function mpApplyEdit(key, v) {
   edits.get(k).set(idxOf(x - cx * CS, y, z - cz * CS), v); // picked up when that part of the world loads
 }
 function mpPlayers(all) {
-  const names = [mp.name];
+  const names = [mp.name + (mp.owner === mp.uid ? ' (host)' : '')];
   for (const [id, p] of Object.entries(all)) {
     if (id === mp.uid || !p || typeof p.x !== 'number') continue;
-    names.push(String(p.n || '?').slice(0, 12));
+    names.push(String(p.n || '?').slice(0, 12) + (mp.owner === id ? ' (host)' : ''));
     let a = avatars.get(id);
     if (!a) { a = buildAvatar(String(p.n || '?').slice(0, 12), SHIRTS.includes(p.c) ? p.c : SHIRTS[0]); a.x = p.x; a.y = p.y; a.z = p.z; a.yaw = p.yaw || 0; avatars.set(id, a); if (Date.now() - mp.joinedAt > 3000) toast(`${p.n} joined`); }
     a.p = p; a.seen = Date.now();
@@ -3592,7 +3602,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /kick NAME  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -3611,7 +3621,7 @@ function sendChat(m) {
   if (m[0] === '/') {
     const [cmd, ...rest] = m.slice(1).trim().split(/\s+/), f = CMDS[cmd.toLowerCase()];
     const out = f ? f(rest.join(' ')) : `Unknown command ${m.slice(0, 20)}. Type /help`;
-    if (out) showChat(null, out);
+    if (out && out.then) out.then(t => t && showChat(null, t), () => {}); else if (out) showChat(null, out);
   } else if (mp.on) quiet(mp.fb.push(R('/chat'), {n: mp.name, m, t: mp.fb.serverTimestamp()}));
   else showChat(myName(), m);
 }
@@ -3755,6 +3765,12 @@ function renderFriendButtons() {
     b.type = 'button'; b.className = 'btn small'; b.textContent = 'Go to ' + a.name;
     b.addEventListener('click', () => { const msg = goToFriend(id); showChat(null, msg); toast(msg); });
     mpFriends.append(b);
+    if (isHost()) {
+      const k = document.createElement('button');
+      k.type = 'button'; k.className = 'btn small danger'; k.textContent = 'Kick ' + a.name;
+      k.addEventListener('click', () => { if (confirm(`Kick ${a.name} out of the room? They can't come back for 10 minutes.`)) { const msg = kickPlayer(id); if (msg) toast(msg); } });
+      mpFriends.append(k);
+    }
   }
 }
 function updateFriendMarks() {
@@ -4311,6 +4327,49 @@ CMDS.pvp = a => {
   const w = (a || '').toLowerCase();
   if (w === 'on' || w === 'off') { pvp = w === 'on'; savePvp(); mp.last = ''; }
   return pvp ? 'Fighting is ON: left-click a friend to hit them. Type /pvp off to stop' : 'Fighting is OFF: nobody can hurt you and you can\'t hurt anyone. Type /pvp on to fight';
+};
+
+/* ---------- the host can kick players out ---------- */
+// Whoever made the room is its host (rooms/{CODE}/blockwood/meta/owner; a room made before hosts existed gets the
+// first person to join it). The host gets a Kick button next to each player in the pause menu, or types /kick NAME.
+// A kicked player is sent back to their own world and can't come back for 10 minutes, unless the host types /unkick NAME.
+const KICK_MS = 10 * 60000;
+const isHost = () => mp.on && mp.owner === mp.uid;
+function hostName() {
+  if (!mp.owner) return null;
+  if (mp.owner === mp.uid) return mp.name;
+  const a = avatars.get(mp.owner); return a ? a.name : null;
+}
+function kickPlayer(id) {
+  if (!isHost()) { const h = hostName(); return h ? `Only the host (${h}) can kick players` : 'Only the host can kick players'; }
+  const a = avatars.get(id); if (!a) return 'They already left';
+  quiet(mp.fb.set(R('/kicked/' + id), {by: mp.name, n: a.name, t: mp.fb.serverTimestamp()}));
+  quiet(mp.fb.remove(R('/players/' + id))); quiet(mp.fb.remove(R('/mobs/' + id)));
+  quiet(mp.fb.push(R('/chat'), {n: mp.name, m: `kicked ${a.name} out of the room`, t: mp.fb.serverTimestamp()}));
+  return null;
+}
+function beKicked(v) {
+  const room = mp.room, by = String(v.by || 'The host').slice(0, 12);
+  mpLeave();
+  mpStatus.textContent = `${by} kicked you out of room ${room}. You can come back in 10 minutes.`;
+  toast(`${by} kicked you out of the room`, 4000);
+  showChat(null, `${by} kicked you out of room ${room}`);
+}
+CMDS.kick = a => {
+  if (!mp.on) return 'Kicking works in a multiplayer room';
+  const q = (a || '').toLowerCase(), f = q && friendList().find(f => f.a.name.toLowerCase().startsWith(q));
+  if (!q) return 'Type /kick NAME';
+  if (!f) return `Nobody called ${a} is in the room`;
+  return kickPlayer(f.id);
+};
+CMDS.unkick = async a => {
+  if (!mp.on) return 'Unkicking works in a multiplayer room';
+  if (!isHost()) return 'Only the host can do that';
+  const all = (await mp.fb.get(R('/kicked'))).val() || {}, q = (a || '').toLowerCase();
+  const hit = Object.entries(all).filter(([, v]) => v && (!q || String(v.n || '').toLowerCase().startsWith(q)));
+  if (!hit.length) return q ? `${a} isn't kicked out` : 'Nobody is kicked out';
+  for (const [id] of hit) quiet(mp.fb.remove(R('/kicked/' + id)));
+  return 'They can come back now: ' + hit.map(([, v]) => v.n).join(', ');
 };
 
 /* ---------- main loop ---------- */

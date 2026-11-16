@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -127,7 +127,11 @@ Play in the same world with your family, like Jetpack Jump. In the pause menu, t
 and a **room code** (3 to 6 letters or numbers, like `FAM1`) and press **Join**. Everyone who
 joins with the same code is in the same world:
 
-- The room uses the world seed of whoever made it first.
+- The room uses the world seed of whoever made it first. That player is the **host** (shown as
+  "(host)" in the player list). The host gets a **Kick** button next to each player in the pause
+  menu, or types `/kick NAME`. A kicked player goes back to their own world and can't rejoin for
+  10 minutes, unless the host types `/unkick NAME`. (Rooms made before hosts existed get the first
+  person to join them as host.)
 - Every block anyone breaks or places (TNT, portals, the OneBlock block…) shows up for everyone,
   and stays in the room for next time.
 - You see each other walking around with name tags (in the same dimension).
