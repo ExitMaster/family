@@ -119,6 +119,11 @@ body{
 #mpDock .iconbtn{pointer-events:auto;width:auto;padding:0 10px;font-size:13px}
 #mpList{font:600 12px/1.4 var(--hud);color:var(--hud-fg);background:var(--glass);border-radius:10px;padding:6px 9px}
 #mpList b{color:var(--gold)}
+#mpList{display:flex;flex-direction:column;gap:4px}
+#mpList .mpf{pointer-events:auto;cursor:pointer;border:0;border-radius:8px;background:rgba(255,255,255,.12);color:var(--hud-fg);font:600 12px/1.3 var(--hud);padding:4px 8px;text-align:left}
+#mpList .mpf.on{background:var(--gold);color:var(--ink)}
+#mpList .mpf.on b{color:var(--ink)}
+#mpWho .mpf{margin-left:6px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:600 12px var(--hud);padding:3px 8px;cursor:pointer}
 #mp{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(10,14,30,.5);padding:16px}
 #mp .box{background:var(--paper);color:var(--ink);border-radius:16px;padding:18px;width:min(360px,100%);font:500 15px/1.4 var(--hud);box-shadow:0 10px 0 rgba(0,0,0,.25)}
 #mp h2{margin:0 0 6px;font:400 24px/1.1 var(--display)}
@@ -215,7 +220,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 <div id="mp" hidden>
   <div class="box">
     <h2>Multiplayer</h2>
-    <p style="margin:0">Pick a nickname and a room code. Everyone who types the same room code is in the same sky: you see each other's planes, cars and ships.</p>
+    <p style="margin:0">Pick a nickname and a room code. Everyone who types the same room code is in the same sky: you see each other's planes, cars and ships. Tap a friend's name to <b>auto-follow</b> them; touch the controls to stop.</p>
     <input id="mpName" maxlength="14" placeholder="Nickname" autocomplete="off">
     <input id="mpRoom" maxlength="6" placeholder="ROOM" autocomplete="off">
     <div class="row"><button class="btn" id="mpJoin">Join room</button><button class="btn secondary" id="mpLeave" hidden>Leave</button></div>
@@ -3729,6 +3734,12 @@ function boot(hot){
     }
     const live = state === 'play';
     if (!live){ const a = demoInput(); ax = a.ax; ay = a.ay; }
+    // following a friend: the plane flies itself to just behind them (or circles over a car)
+    let followV = -1;
+    if (live && MP.follow && !F.drive && !F.cruise && !F.ride && !F.auto && !F.ground && F.crashT <= 0){
+      if (Math.abs(ax) > 0.5 || Math.abs(ay) > 0.5) mpFollow(null, 'You took the controls');
+      else { const f = mpFollowTarget(); if (f){ const a = followFlyInput(f); ax = a.ax; ay = a.ay; followV = a.v; } }
+    }
     // auto-land boosts on long trips, but not towards high ground
     const autoBoost = F.auto && !F.autoFinal && F.apDist > 2500 && terrainAhead() < F.y - 150;
     const boosting = !!(keys.b || F.boostHeld) || boostT > 0 || autoBoost;
@@ -3796,6 +3807,7 @@ function boot(hot){
       F.speed += (cruise - F.speed) * Math.min(1, dt * (pilot ? 0.45 : 0.8));
       F.speed -= vFwd.y * (pilot ? 24 : 14) * dt;
       F.speed = clamp(F.speed, pilot ? 10 : 30, plane.boost + 40);
+      if (followV > 0) F.speed += (clamp(followV, plane.cruise * 0.75, plane.boost) - F.speed) * Math.min(1, dt * 1.2);
       F.stalling = pilot && F.speed < stall && !F.under && vUp.y > 0.3;   // not at the top of a loop
       if (F.stalling){
         if (!F.stallFall && live){ toast('STALL! Push the nose down to pick up speed', 'warn'); sfx.warn(); }
@@ -5218,6 +5230,19 @@ function boot(hot){
           steer = -clamp(wrapA(bdir - c.yaw) * 2, -1, 1);
           const cruise = Math.min(myCar.top / 3.6 * 0.8, 42);   // faster: up to ~150 km/h
           throttle = c.speed < cruise ? 1 : 0;
+        }
+      }
+      // following a friend in the car: drive to just behind them and keep up
+      if (MP.follow && state === 'play' && !car.autopilot){
+        if (Math.abs(steer) > 0.2 || Math.abs(throttle) > 0.2) mpFollow(null, 'You took the controls');
+        else {
+          const f = mpFollowTarget();
+          if (f){
+            const tx = f.x - f.fw.x * 9, tz = f.z - f.fw.z * 9, d = Math.hypot(tx - c.x, tz - c.z);
+            steer = d > 3 ? -clamp(wrapA(Math.atan2(-(tx - c.x), -(tz - c.z)) - c.yaw) * 2, -1, 1) : 0;
+            const want = d < 4 ? 0 : Math.min(myCar.top / 3.6, (f.o.m === 'car' ? f.v : 0) + clamp((d - 4) * 0.4, 0, 30));
+            throttle = c.speed < want ? 1 : (c.speed > want + 2 && c.speed > 1 ? -0.6 : 0);
+          }
         }
       }
     }
@@ -6730,7 +6755,7 @@ function boot(hot){
     const { ref, remove } = MP.fb;
     remove(ref(MP.db, 'rooms/' + MP.room + '/scr/' + MP.uid)).catch(() => {});
     if (MP.unsub) MP.unsub();
-    MP.room = null; MP.others = {};
+    MP.room = null; MP.others = {}; MP.follow = null;
     for (const id of [...MP.ghosts.keys()]) mpDrop(id);
     $('mpJoin').hidden = false; $('mpLeave').hidden = true;
     $('mpName').disabled = $('mpRoom').disabled = false;
@@ -6769,11 +6794,54 @@ function boot(hot){
   function mpWho(){
     const ids = Object.keys(MP.others);
     const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-    $('mpWho').innerHTML = !MP.room ? '' : '<li><b>' + esc(MP.name) + '</b> (you)</li>' + ids.map(id => { const o = MP.others[id]; return '<li><b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o)) + ' ' + esc(mpWhere(o)) + '</li>'; }).join('');
+    $('mpWho').innerHTML = !MP.room ? '' : '<li><b>' + esc(MP.name) + '</b> (you)</li>' + ids.map(id => { const o = MP.others[id]; return '<li><b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o)) + ' ' + esc(mpWhere(o)) + '<button class="mpf" data-id="' + esc(id) + '">' + (MP.follow === id ? 'Stop' : 'Follow') + '</button></li>'; }).join('');
     if (!MP.room){ $('mpList').hidden = true; return; }
     $('mpList').hidden = false;
-    $('mpList').innerHTML = ids.length ? ids.slice(0, 6).map(id => { const o = MP.others[id]; const w = mpWhere(o); return '<b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o).split(' ')[0]) + (w ? ' ' + w : ''); }).join('<br>') + (ids.length > 6 ? '<br>+' + (ids.length - 6) + ' more' : '') : 'Waiting for friends…';
+    $('mpList').innerHTML = ids.length ? ids.slice(0, 6).map(id => { const o = MP.others[id], w = mpWhere(o), on = MP.follow === id; return '<button class="mpf' + (on ? ' on' : '') + '" data-id="' + esc(id) + '">' + (on ? '■ Following ' : '▶ ') + '<b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o).split(' ')[0]) + (w ? ' ' + w : '') + '</button>'; }).join('') + (ids.length > 6 ? '<span>+' + (ids.length - 6) + ' more</span>' : '') : 'Waiting for friends…';
   }
+
+  // auto-follow a friend: tap their name in the list
+  const mpFw = new THREE.Vector3();
+  function mpFollow(id, why){
+    if (id && id === MP.follow) id = null;
+    MP.follow = id || null;
+    if (id){
+      const o = MP.others[id]; MP.followName = (o && o.n) || 'friend';
+      car.autopilot = false; F.auto = false;
+      toast('Following ' + MP.followName, 'info');
+      if (o && o.x === undefined) setTimeout(() => toast(MP.followName + ' is ' + (MP_DOING[o.m] || 'away') + ' · waiting…', ''), 1300);
+    } else toast((why ? why + ' · ' : '') + 'Stopped following', 'info');
+    mpWho();
+  }
+  // where the friend I'm following is right now (null while they're somewhere I can't see)
+  function mpFollowTarget(){
+    if (!MP.room || !MP.follow) return null;
+    const o = MP.others[MP.follow];
+    if (!o){ const n = MP.followName; MP.follow = null; toast(n + ' left the room', 'warn'); mpWho(); return null; }
+    const g = MP.ghosts.get(MP.follow);
+    if (!g || !g.root.visible) return null;
+    mpFw.set(0, 0, -1).applyQuaternion(g.q);
+    return { o, g, x: g.pos.x, y: g.pos.y, z: g.pos.z, v: g.vel.length(), fw: mpFw };
+  }
+  function followFlyInput(f){
+    const gnd = Math.max(groundAt(f.x, f.z), 0), air = f.o.m === 'plane' && f.y - gnd > 15;
+    let tx, ty, tz;
+    if (air){ tx = f.x - f.fw.x * 45; ty = f.y - f.fw.y * 45 + 6; tz = f.z - f.fw.z * 45; }   // 45 m behind them
+    else { tx = f.x; ty = gnd + 90; tz = f.z; }                                              // circle over a car or ship
+    const dx = tx - F.x, dz = tz - F.z, dh = Math.hypot(dx, dz);
+    const yawT = air && dh < 25 ? Math.atan2(-f.fw.x, -f.fw.z) : Math.atan2(-dx, -dz);
+    const altT = Math.max(ty, terrainAhead() + 35, Math.max(groundAt(F.x, F.z), 0) + 30);
+    const e = wrapA(yawT - F.yaw);
+    // speed: match theirs and close the gap (slow down if I've got ahead of them)
+    let v;
+    if (dh > 1500) v = plane.boost;
+    else if (air){ const along = (tx - F.x) * f.fw.x + (ty - F.y) * f.fw.y + (tz - F.z) * f.fw.z; v = f.v + clamp(along * 0.5, -80, 400); }
+    else v = dh > 400 ? plane.boost : plane.cruise;
+    return { ax: clamp(-e * 2.5, -1, 1), ay: vUp.y < 0.5 ? 0 : pitchToward(altT), v };
+  }
+  const mpListClick = e => { const b = e.target.closest('.mpf'); if (!b) return; e.preventDefault(); b.blur(); mpFollow(b.dataset.id || null); if (!$('mp').hidden) mpClose(); };
+  $('mpList').addEventListener('click', mpListClick);
+  $('mpWho').addEventListener('click', mpListClick);
 
   // the copies of the other players
   function mpDrop(id){
