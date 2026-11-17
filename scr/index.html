@@ -123,6 +123,10 @@ body{
 #mpList .mpf{pointer-events:auto;cursor:pointer;border:0;border-radius:8px;background:rgba(255,255,255,.12);color:var(--hud-fg);font:600 12px/1.3 var(--hud);padding:4px 8px;text-align:left}
 #mpList .mpf.on{background:var(--gold);color:var(--ink)}
 #mpList .mpf.on b{color:var(--ink)}
+#mpList .mprow{display:flex;gap:4px}
+#mpList .mprow .mpf{flex:1}
+#mpList .mpt{pointer-events:auto;cursor:pointer;border:0;border-radius:8px;background:var(--coral);color:#fff;font:700 12px/1 var(--hud);padding:4px 8px}
+#mpWho .mpt{margin-left:6px;border:0;border-radius:8px;background:var(--coral);color:#fff;font:600 12px var(--hud);padding:3px 8px;cursor:pointer}
 #mpWho .mpf{margin-left:6px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:600 12px var(--hud);padding:3px 8px;cursor:pointer}
 #mp{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(10,14,30,.5);padding:16px}
 #mp .box{background:var(--paper);color:var(--ink);border-radius:16px;padding:18px;width:min(360px,100%);font:500 15px/1.4 var(--hud);box-shadow:0 10px 0 rgba(0,0,0,.25)}
@@ -220,7 +224,7 @@ kbd{font:600 12px/1 var(--hud);background:var(--paper-2);border:1px solid rgba(2
 <div id="mp" hidden>
   <div class="box">
     <h2>Multiplayer</h2>
-    <p style="margin:0">Pick a nickname and a room code. Everyone who types the same room code is in the same sky: you see each other's planes, cars and ships. Tap a friend's name to <b>auto-follow</b> them; touch the controls to stop.</p>
+    <p style="margin:0">Pick a nickname and a room code. Everyone who types the same room code is in the same sky: you see each other's planes, cars and ships. Tap a friend's name to <b>auto-follow</b> them (touch the controls to stop), or ⚡ <b>Teleport</b> to jump right next to them.</p>
     <input id="mpName" maxlength="14" placeholder="Nickname" autocomplete="off">
     <input id="mpRoom" maxlength="6" placeholder="ROOM" autocomplete="off">
     <div class="row"><button class="btn" id="mpJoin">Join room</button><button class="btn secondary" id="mpLeave" hidden>Leave</button></div>
@@ -6794,10 +6798,10 @@ function boot(hot){
   function mpWho(){
     const ids = Object.keys(MP.others);
     const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-    $('mpWho').innerHTML = !MP.room ? '' : '<li><b>' + esc(MP.name) + '</b> (you)</li>' + ids.map(id => { const o = MP.others[id]; return '<li><b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o)) + ' ' + esc(mpWhere(o)) + '<button class="mpf" data-id="' + esc(id) + '">' + (MP.follow === id ? 'Stop' : 'Follow') + '</button></li>'; }).join('');
+    $('mpWho').innerHTML = !MP.room ? '' : '<li><b>' + esc(MP.name) + '</b> (you)</li>' + ids.map(id => { const o = MP.others[id]; return '<li><b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o)) + ' ' + esc(mpWhere(o)) + '<button class="mpf" data-id="' + esc(id) + '">' + (MP.follow === id ? 'Stop' : 'Follow') + '</button><button class="mpt" data-id="' + esc(id) + '">Teleport</button></li>'; }).join('');
     if (!MP.room){ $('mpList').hidden = true; return; }
     $('mpList').hidden = false;
-    $('mpList').innerHTML = ids.length ? ids.slice(0, 6).map(id => { const o = MP.others[id], w = mpWhere(o), on = MP.follow === id; return '<button class="mpf' + (on ? ' on' : '') + '" data-id="' + esc(id) + '">' + (on ? '■ Following ' : '▶ ') + '<b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o).split(' ')[0]) + (w ? ' ' + w : '') + '</button>'; }).join('') + (ids.length > 6 ? '<span>+' + (ids.length - 6) + ' more</span>' : '') : 'Waiting for friends…';
+    $('mpList').innerHTML = ids.length ? ids.slice(0, 6).map(id => { const o = MP.others[id], w = mpWhere(o), on = MP.follow === id; return '<div class="mprow"><button class="mpf' + (on ? ' on' : '') + '" data-id="' + esc(id) + '">' + (on ? '■ Following ' : '▶ ') + '<b>' + esc(o.n || '?') + '</b> ' + esc(mpDesc(o).split(' ')[0]) + (w ? ' ' + w : '') + '</button><button class="mpt" data-id="' + esc(id) + '" aria-label="Teleport to ' + esc(o.n || 'friend') + '">⚡</button></div>'; }).join('') + (ids.length > 6 ? '<span>+' + (ids.length - 6) + ' more</span>' : '') : 'Waiting for friends…';
   }
 
   // auto-follow a friend: tap their name in the list
@@ -6839,7 +6843,42 @@ function boot(hot){
     else v = dh > 400 ? plane.boost : plane.cruise;
     return { ax: clamp(-e * 2.5, -1, 1), ay: vUp.y < 0.5 ? 0 : pitchToward(altT), v };
   }
-  const mpListClick = e => { const b = e.target.closest('.mpf'); if (!b) return; e.preventDefault(); b.blur(); mpFollow(b.dataset.id || null); if (!$('mp').hidden) mpClose(); };
+  // teleport: jump straight to a friend (just behind them, the same way round)
+  function mpTeleport(id){
+    const o = MP.others[id]; if (!o) return;
+    const nm = o.n || 'friend';
+    const g = MP.ghosts.get(id);
+    if (!g || o.x === undefined){ toast(nm + ' is ' + (MP_DOING[o.m] || 'away') + ' · can\'t teleport there', 'warn'); return; }
+    if (state !== 'play' && state !== 'paused'){ toast('Start playing first, then teleport', 'warn'); return; }
+    if (F.cruise || F.ride){ toast('Get off first, then teleport', 'warn'); return; }
+    mpFw.set(0, 0, -1).applyQuaternion(g.q);
+    const yaw = Math.atan2(-mpFw.x, -mpFw.z), fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    const x = g.tgt.x, y = g.tgt.y, z = g.tgt.z;
+    if (F.drive){
+      // in a car: park just behind them on the ground
+      const cx = x - fx * 9, cz = z - fz * 9;
+      if (onWater(cx, cz) && groundAt(cx, cz) < 0){ toast(nm + ' is over water · take a plane to get there', 'warn'); return; }
+      car.autopilot = false; car.x = cx; car.z = cz; car.yaw = yaw; car.speed = 0; car.vy = 0;
+      car.y = Math.max(groundAt(cx, cz), 0);
+    } else {
+      // in a plane: in the air just behind them (high over them if they're on the ground)
+      const gnd = Math.max(groundAt(x, z), 0), air = o.m === 'plane' && y - gnd > 15;
+      F.x = x - fx * (air ? 60 : 150); F.z = z - fz * (air ? 60 : 150);
+      F.y = air ? y + 4 : gnd + 120;
+      F.y = Math.max(F.y, Math.max(groundAt(F.x, F.z), 0) + 40);
+      Object.assign(F, { ground: false, crashT: 0, auto: false, autoFinal: false, autoBrake: false, under: false, dolphin: false, flipped: false });
+      F.speed = Math.max(F.speed, plane.cruise); F.liftT = t;
+      setLevel(yaw, 0); planeRoot.visible = true;
+      camBase.set(F.x + Math.sin(yaw) * 16, F.y + 5, F.z + Math.cos(yaw) * 16); camSnap = true;
+    }
+    fCX = fCZ = treeCX = treeCZ = roadCX = roadCZ = NaN;
+    MP.follow = null; sfx.ring();
+    toast('⚡ Teleported to ' + nm + '!', 'info'); mpWho();
+  }
+  const mpListClick = e => {
+    const tb = e.target.closest('.mpt');
+    if (tb){ e.preventDefault(); tb.blur(); if (!$('mp').hidden) mpClose(); mpTeleport(tb.dataset.id); return; }
+    const b = e.target.closest('.mpf'); if (!b) return; e.preventDefault(); b.blur(); mpFollow(b.dataset.id || null); if (!$('mp').hidden) mpClose(); };
   $('mpList').addEventListener('click', mpListClick);
   $('mpWho').addEventListener('click', mpListClick);
 

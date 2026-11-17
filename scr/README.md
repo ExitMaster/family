@@ -54,6 +54,11 @@ flies itself to just behind theirs and matches their speed (or circles over them
 they're driving), and your car drives to just behind theirs. Tap the name again, or
 touch the controls, to stop.
 
+**Teleport:** tap ⚡ next to a friend's name (or **Teleport** in the panel) to jump
+straight to them. In a car you land just behind their car; in a plane you appear in
+the air just behind theirs, or high over them if they're on the ground. (Not while
+they're on their island or inside an airport.)
+
 It uses the family Firebase database (Unimai Game Hub) under
 `rooms/{ROOM}/scr/{player}`, which the existing rules already allow. Jump uses
 `rooms/{ROOM}/players` and `/game`, so the two games never get in each other's way.
