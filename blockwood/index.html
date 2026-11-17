@@ -139,6 +139,9 @@ kbd{
 }
 .row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
 .row label,.meta{color:var(--muted)}
+.xyz{display:flex;gap:6px;flex:1 1 200px;min-width:0}
+.xyz .tin{flex:1 1 40px;min-width:0}
+#tpMsg:empty{display:none}
 #seed{user-select:text;-webkit-user-select:text}
 #seedIn,.tin{flex:1 1 140px;min-width:0;user-select:text;-webkit-user-select:text;touch-action:auto}
 .mph{margin:0;font-family:var(--display);font-size:22px;font-weight:600}
@@ -329,6 +332,16 @@ select,#seedIn,.tin,#chatIn{
       <span class="meta">Sound effects</span>
       <button id="snd" class="btn small" type="button">Sound on</button>
     </div>
+    <div class="row">
+      <span class="meta" id="spawnInfo"></span>
+      <button id="goSpawn" class="btn small" type="button">Go to spawn point</button>
+    </div>
+    <div class="row">
+      <label for="tpX">Go to</label>
+      <span class="xyz"><input id="tpX" class="tin" type="text" maxlength="9" autocomplete="off" placeholder="X"><input id="tpY" class="tin" type="text" maxlength="3" autocomplete="off" placeholder="Y (any)" aria-label="Y, can stay empty"><input id="tpZ" class="tin" type="text" maxlength="9" autocomplete="off" placeholder="Z" aria-label="Z"></span>
+      <button id="tpGo" class="btn small" type="button">Go</button>
+    </div>
+    <p class="meta" id="tpMsg" aria-live="polite" style="margin:0"></p>
     <div class="row">
       <span class="meta" id="seed"></span>
     </div>
@@ -1283,7 +1296,7 @@ function pause() {
   playing = false; held = null; overlay.hidden = false;
   for (const k in keys) keys[k] = false;
   joy.x = joy.y = 0; $('#knob').style.transform = '';
-  persist();
+  persist(); showWhere();
   $('#play').focus({preventScroll: true});
 }
 function requestLock() {
@@ -3624,7 +3637,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /kick NAME  /kill  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4857,6 +4870,51 @@ CMDS.kill = () => {
   st.hp = 0; die();
   return 'You fell over… shh, stay still and watch the animals';
 };
+
+/* ---------- travel: your spawn point, or any coordinates ---------- */
+// The pause menu has "Go to spawn point" and an X Y Z box (Y can be left empty to land on the ground there).
+// In chat: /spawn (or /home), and /tp X Z or /tp X Y Z.
+function goTo(x, y, z) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 'Type numbers for X and Z';
+  if (riding) exitPlane();
+  const fx = Math.floor(Math.max(-1e6, Math.min(1e6, x))), fz = Math.floor(Math.max(-1e6, Math.min(1e6, z)));
+  let fy;
+  if (Number.isFinite(y)) {
+    fy = Math.max(1, Math.min(H - 2, Math.floor(y)));
+    while (fy < H - 2 && (SOLID[getBlock(fx, fy, fz)] || SOLID[getBlock(fx, fy + 1, fz)])) fy++;
+  } else { const t = colTop(fx, fz); fy = t < 0 ? H - 2 : t + 1; }
+  P.x = fx + .5; P.y = fy; P.z = fz + .5; P.vx = P.vy = P.vz = 0; st.fallY = null;
+  return `Whoosh! You're at X ${fx}  Y ${fy}  Z ${fz}`;
+}
+CMDS.home = CMDS.spawn;
+const tpFriend = CMDS.tp;
+CMDS.tp = arg => {
+  const nums = (arg || '').trim().split(/[\s,]+/).filter(Boolean).map(Number);
+  if (nums.length && nums.every(Number.isFinite)) {
+    if (nums.length === 2) return goTo(nums[0], NaN, nums[1]);
+    if (nums.length === 3) return goTo(nums[0], nums[1], nums[2]);
+    return 'Type /tp X Z or /tp X Y Z, like /tp 100 -250';
+  }
+  return tpFriend(arg);
+};
+function travel(msg) { showChat(null, msg); $('#play').click(); toast(msg, 2400); }
+$('#goSpawn').addEventListener('click', () => travel(CMDS.spawn()));
+$('#tpGo').addEventListener('click', () => {
+  const v = id => { const t = $(id).value.trim(); return t === '' ? NaN : Number(t); };
+  const x = v('#tpX'), y = v('#tpY'), z = v('#tpZ');
+  if (!Number.isFinite(x) || !Number.isFinite(z)) {
+    $('#tpMsg').textContent = 'Type numbers for X and Z (Y can stay empty)';
+    (Number.isFinite(x) ? $('#tpZ') : $('#tpX')).focus();
+    return;
+  }
+  $('#tpMsg').textContent = '';
+  travel(goTo(x, y, z));
+});
+for (const id of ['#tpX', '#tpY', '#tpZ']) $(id).addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('#tpGo').click(); });
+function showWhere() {
+  const f = Math.floor;
+  $('#spawnInfo').textContent = `You're at ${f(P.x)} ${f(P.y)} ${f(P.z)} · spawn point ` + (dim === 'b' ? 'is the OneBlock' : spawnPt ? spawnPt.map(f).join(' ') : 'is where the world started');
+}
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;

@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/kill`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/tp X Y Z`, `/spawn`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/kill`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -137,6 +137,10 @@ build on it, fly over it. The world saves in the browser.
   and roofs keep you dry. **Thunderstorms** darken the sky with lightning and thunder, and are dark
   enough for monsters to come out in the daytime (sleeping through one clears it). Change it with
   `/weather clear`, `/weather rain` or `/weather storm` (or `/rain`, `/storm`, `/sun`).
+- **Travel**: the pause menu shows where you are and where your spawn point is. **Go to spawn point**
+  takes you back to your bed (or where the world started), and **Go to** takes you to any X Y Z you
+  type (leave Y empty to land on the ground there). In chat: `/spawn` (or `/home`), `/tp X Z` or
+  `/tp X Y Z`.
 - **New world** in the pause menu deletes the current world and makes a new one. Type a **seed** in the
   box next to it first to get that exact world again (numbers or any word, like `castle`); leave it
   empty for a random one. Your current seed is shown just above, so you can share it with friends.
