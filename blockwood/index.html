@@ -1197,7 +1197,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1222,6 +1222,7 @@ function spawn() {
 }
 function applySave(s) {
   chests = new Map(s && s.chests && typeof s.chests === 'object' ? Object.entries(s.chests).map(([k, v]) => [k, unpackChest(v)]) : []);
+  clonesWanted = s && s.clones > 0 ? Math.min(CLONE_MAX, s.clones | 0) : 0;
   petKinds = s && Array.isArray(s.pets) ? s.pets.filter(k => LAND.includes(k)).slice(0, PET_MAX) : [];
   edits.clear(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   if (s && typeof s.seed === 'number') {
@@ -1266,7 +1267,7 @@ function seedOf(text) {
 }
 function newWorld(seed = null) {
   chests = new Map();
-  petKinds = [];
+  petKinds = []; clonesWanted = 0;
   resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   SEED = seed === null ? Math.floor(Math.random() * 1e6) : seed;
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
@@ -1635,6 +1636,7 @@ function updateMobs(dt) {
     if (K.fly) { flyMob(m, K, dt); continue; }
     m.t -= dt; m.flee -= dt; m.hurry = 0;
     if (K.villager) villagerThink(m, dt);
+    else if (m.kind === 'clone') cloneThink(m, K, dt);
     else if (K.golem) golemThink(m, K, dt);
     else if (K.neutral) neutralThink(m, K, dt);
     else if (K.hostile) {
@@ -1690,6 +1692,7 @@ function killMob(m) {
   burst(Math.floor(m.x), Math.floor(m.y), Math.floor(m.z), 0, new THREE.Color(KINDS[m.kind].col));
   noise(.25, 'lowpass', 700, .7, .6, [m.x, m.y, m.z]);
   removeMob(i);
+  if (m.kind === 'clone' && clonesWanted > 0) clonesWanted--;
   if (m.pet) { const j = petKinds.indexOf(m.kind); if (j >= 0) petKinds.splice(j, 1); toast(`Your pet ${m.kind} died`, 2500); saveDirty = true; }
   if (KINDS[m.kind].split && m.y > -10) for (const o of [-.3, .3]) addMob(KINDS[m.kind].split, m.x + o, m.y + .2, m.z - o);
   if (mode === 's' && KINDS[m.kind].drop && !m.noDrop) KINDS[m.kind].drop();
@@ -3657,7 +3660,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -5341,6 +5344,66 @@ function rideMob(m, K, dt) {
 }
 $('#bExit').addEventListener('click', () => { if (mount) dismount(); });
 
+/* ---------- clones of you ---------- */
+// /clone makes a copy of you (/clone 5 makes five, up to 10). Clones follow you everywhere, jump when you jump, and
+// punch any monster that comes near you. /unclone sends them all home. They're saved with your world.
+const CLONE_MAX = 10;
+let clonesWanted = 0, cloneT = 0;
+function nameTag(text) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const x = c.getContext('2d'); x.font = '600 32px "Pixelify Sans", monospace';
+  const w = Math.min(250, x.measureText(text).width + 28);
+  x.fillStyle = 'rgba(0,0,0,.55)'; x.fillRect((256 - w) / 2, 8, w, 48);
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 128, 33);
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(c), depthTest: false}));
+  tag.material.fog = false; tag.scale.set(2, .5, 1); tag.renderOrder = 5;
+  return tag;
+}
+KINDS.clone = {name: 'Clone', col: 0xd8342c, hw: .3, h: 1.85, speed: 2.2, hp: 20, hurtF: 400, biped: true, bite: 4, build(g) {
+  const shirt = mp.on ? mp.color : SHIRTS[0], skin = 0xe0b48c, pants = 0x2e3a6a;
+  part(g, shirt, .5, .7, .28, 0, 1.1, 0);
+  part(g, skin, .46, .46, .46, 0, 1.68, 0); part(g, 0x3a2a1a, .48, .12, .48, 0, 1.89, 0); eyes(g, 1.72, -.235, .1);
+  const arm = sx => { const a = new THREE.Group(); a.position.set(sx, 1.42, 0); part(a, shirt, .2, .62, .2, 0, -.28, 0); part(a, skin, .2, .12, .2, 0, -.62, 0); g.add(a); return a; };
+  const tag = nameTag((mp.on ? mp.name : myName()) + ' (clone)'); tag.position.y = 2.3; g.add(tag);
+  return [leg(g, pants, .22, .75, -.12, 0), leg(g, pants, .22, .75, .12, 0), arm(.36), arm(-.36)];
+}, say(at) { tone(520, 640, .08, .1, 'triangle', at); }};
+SECRET_LINES.clone = ['Finally, I can be myself!', 'Wait… which one of us is the real one?', 'I do all the work around here'];
+function cloneThink(m, K, dt) {
+  if (wolfFight(m, K, dt)) return; // punch monsters near you
+  const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
+  if (d > 2.4) { m.yaw = Math.atan2(-dx, -dz); m.walk = true; m.hurry = d > 6 ? 2.6 : 1.5; m.t = .3; }
+  else { m.walk = false; if (m.t <= 0) { m.yaw = Math.atan2(-dx, -dz); m.t = .5; } }
+  if (!P.onGround && P.vy > 6 && m.ground) m.vy = 8.6; // copy your jumps
+}
+function updateClones(dt) {
+  if ((cloneT -= dt) > 0) return;
+  cloneT = .5;
+  let have = 0;
+  for (const m of mobs) if (m.kind === 'clone') {
+    if (++have > clonesWanted) { m.y = -50; continue; }
+    if (Math.hypot(m.x - P.x, m.z - P.z) > 24 && P.onGround && !riding && !dead) { const s = spotNear(2 + Math.random() * 2); if (s) { [m.x, m.y, m.z] = s; m.vx = m.vy = m.vz = 0; } }
+  }
+  if (!P.onGround || riding || dead || dim === 'e') return;
+  for (; have < clonesWanted; have++) { const s = spotNear(1.5 + Math.random() * 2); if (!s) return; addMob('clone', s[0], s[1], s[2]); }
+}
+CMDS.clone = a => {
+  const w = (a || '').trim().toLowerCase();
+  if (w === 'remove' || w === 'off' || w === 'none') return CMDS.unclone();
+  const n = Math.max(1, Math.min(CLONE_MAX, parseInt(w, 10) || 1)), before = clonesWanted;
+  clonesWanted = Math.min(CLONE_MAX, clonesWanted + n); saveDirty = true; cloneT = 0;
+  if (clonesWanted === before) return `You already have ${CLONE_MAX} clones. Type /unclone to send them home`;
+  burst(Math.floor(P.x), Math.floor(P.y + 1), Math.floor(P.z), 0, new THREE.Color(0x8ad8ff));
+  [523, 784, 1046].forEach((f, i) => tone(f, f, .12, .1, 'sine', null, i * .07));
+  const made = clonesWanted - before;
+  return `${made === 1 ? 'A clone of you appears' : made + ' clones of you appear'}! (${clonesWanted} now) They follow you and fight monsters. /unclone sends them home`;
+};
+CMDS.unclone = () => {
+  if (!clonesWanted) return 'You have no clones';
+  clonesWanted = 0; saveDirty = true;
+  for (const m of mobs) if (m.kind === 'clone') { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0x8ad8ff)); m.y = -50; }
+  return 'Poof! Your clones went home';
+};
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5353,7 +5416,7 @@ function loop(now) {
     updateSurvival(dt); updateMining(dt); ensureCobble();
     updateWeather(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
-    updateMobs(dt); updatePets(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
+    updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;

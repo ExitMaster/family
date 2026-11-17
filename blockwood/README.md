@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift`, `Q` or `X` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/tp X Y Z`, `/spawn`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/kill`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/tp X Y Z`, `/spawn`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/kill`, `/clone`, `/unclone`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -143,6 +143,9 @@ build on it, fly over it. The world saves in the browser.
   click things in your backpack to put them in (27 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
   Chests are saved with your world, and in a multiplayer room everyone shares them.
+- **Clone yourself**: type `/clone` (or `/clone 5`, up to 10). Clones look like you, follow you
+  everywhere, jump when you jump and punch monsters that come near you. `/unclone` sends them home.
+  They're saved with your world.
 - **Ride horses**: right-click a horse to get on. WASD rides (much faster than walking), Space jumps
   high, Shift gets off (touch: Exit button). Donkeys, zebras, camels, unicorns (fastest, highest
   jumps) and elephants can be ridden too. Hold an apple when you right-click to make one a pet
