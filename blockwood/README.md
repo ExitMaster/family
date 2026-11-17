@@ -130,6 +130,8 @@ build on it, fly over it. The world saves in the browser.
 - `/summon NAME` makes any mob in front of you (like `/summon horse` or `/summon deep watcher`), and
   `/summon 100 zombie` makes up to 100 at once, lined up in rows (summoned zombies and skeletons
   don't burn in daylight);
+  `/unsummon` makes everything you summoned disappear, `/unsummon zombie` clears every zombie near
+  you, and `/unsummon all` clears every mob near you (pets, clones and your horse stay);
   `/mobs` lists every name. Summoned monsters stay even in Creative, where they can't hurt you.
 - A pet **wolf** fights monsters for you. Any animal can be a pet, even bees and parrots.
 - **The secret life of animals**: type `/kill` (or die any other way) and the camera floats up over

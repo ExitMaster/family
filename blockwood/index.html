@@ -3660,7 +3660,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon 10 NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon 10 NAME  /unsummon  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4745,6 +4745,27 @@ CMDS.summon = a => { // /summon zombie, /summon 100 zombie or /summon zombie 100
   return (n === 1 ? `${kindName(kind)} appeared` : `${n} × ${kindName(kind).toLowerCase()} appeared`) + (KINDS[kind].hostile && mode !== 's' ? ' (monsters only fight in Survival)' : '');
 };
 CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
+// /unsummon: every mob you summoned · /unsummon zombie: every zombie near you · /unsummon all: every mob near you
+// (pets, clones and the animal you're riding always stay)
+CMDS.unsummon = a => {
+  const q = (a || '').toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, ''), all = q === 'all' || q === 'everything' || q === 'everythin';
+  let kind = null;
+  if (q && !all) {
+    kind = Object.keys(KINDS).find(k => k === q || k === q + 's' || [q, q + 's'].includes(kindName(k).toLowerCase().replace(/[^a-z]/g, '')));
+    if (!kind) return 'Type /unsummon (everything you summoned), /unsummon NAME or /unsummon all';
+  }
+  let n = 0;
+  for (const m of mobs) {
+    if (m.y < -10 || m.pet || m.ridden || m.kind === 'clone') continue;
+    if (kind ? m.kind !== kind : !all && !m.summoned) continue;
+    if ((kind || all) && Math.hypot(m.x - P.x, m.z - P.z) > 64) continue;
+    if (n++ < 30) burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xc8b8ff));
+    m.y = -50; m.noDrop = true;
+  }
+  if (!n) return kind ? `There are no ${kindName(kind).toLowerCase()}s near you` : all ? 'There are no mobs near you' : "You haven't summoned anything";
+  noise(.4, 'highpass', 2000, 1, .3); tone(900, 300, .3, .1, 'sine');
+  return `Poof! ${n} ${kind ? kindName(kind).toLowerCase() + (n > 1 ? 's' : '') : n > 1 ? 'mobs' : 'mob'} gone`;
+};
 
 /* ---------- chests ---------- */
 // Right-click a chest to open it: 54 slots of storage. Click things in your backpack to put them in, click things in the
