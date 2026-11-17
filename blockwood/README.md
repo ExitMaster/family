@@ -119,6 +119,10 @@ build on it, fly over it. The world saves in the browser.
 - `/summon NAME` makes any mob in front of you (like `/summon horse` or `/summon deep watcher`);
   `/mobs` lists every name. Summoned monsters stay even in Creative, where they can't hurt you.
 - A pet **wolf** fights monsters for you. Any animal can be a pet, even bees and parrots.
+- **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:
+  click things in your backpack to put them in (27 slots), click things in the chest to take them out.
+  In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
+  Chests are saved with your world, and in a multiplayer room everyone shares them.
 - **Pets**: right-click a pig, sheep, cow, chicken or rabbit to make it your pet. A heart floats over
   it and it follows you everywhere: it catches up if you run off, and comes with you through portals,
   into multiplayer rooms and after a reload (pets are saved with your world). Right-click it again to

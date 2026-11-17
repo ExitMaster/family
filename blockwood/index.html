@@ -368,11 +368,11 @@ let TOUCH = matchMedia('(pointer: coarse)').matches;
 
 /* ---------- blocks ---------- */
 const CS = 16, H = 64, PH = H + 2, PX = CS + 2, WATER = 26;
-const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19, BED=20, OBSIDIAN=21, PORTAL=22, NETHERRACK=23, GLOW=24, NGOLD=25, ENDSTONE=26, ENDPORTAL=27, ENDFRAME=28, EGG=29, BEDH = 9 / 16;
+const AIR=0, GRASS=1, DIRT=2, STONE=3, SAND=4, WATERB=5, LOG=6, LEAVES=7, PLANKS=8, COBBLE=9, GLASS=10, BRICK=11, BEDROCK=12, COAL=13, IRON=14, SNOW=15, TNT=16, SBRICK=17, WOOL=18, TORCH=19, BED=20, OBSIDIAN=21, PORTAL=22, NETHERRACK=23, GLOW=24, NGOLD=25, ENDSTONE=26, ENDPORTAL=27, ENDFRAME=28, EGG=29, CHEST=30, BEDH = 9 / 16;
 const T = {GRASS_TOP:0, GRASS_SIDE:1, DIRT:2, STONE:3, SAND:4, WATER:5, LOG_SIDE:6, LOG_TOP:7, LEAVES:8, PLANKS:9, COBBLE:10, GLASS:11, BRICK:12, BEDROCK:13, COAL:14,
   IRON:15, SNOW:16, SNOW_SIDE:17, TNT_SIDE:18, TNT_TOP:19, TNT_BOTTOM:20, SBRICK:21, WOOL:22, TORCH:23, BED_TOP:24, BED_SIDE:25,
   OBSIDIAN:26, PORTAL:27, NETHERRACK:28, GLOW:29, NGOLD:30,
-  ENDSTONE:31, ENDPORTAL:32, ENDFRAME:33, EGG:34};
+  ENDSTONE:31, ENDPORTAL:32, ENDFRAME:33, EGG:34, CHEST_TOP:35, CHEST_SIDE:36};
 const BLOCKS = [];
 const def = (id, n, top, bottom = top, side = top) => BLOCKS[id] = {n, t: [top, bottom, side]};
 def(GRASS, 'Grass', T.GRASS_TOP, T.DIRT, T.GRASS_SIDE);
@@ -404,6 +404,7 @@ def(ENDSTONE, 'End stone', T.ENDSTONE);
 def(ENDPORTAL, 'End portal', T.ENDPORTAL);
 def(ENDFRAME, 'End portal frame', T.ENDFRAME);
 def(EGG, 'Dragon egg', T.EGG);
+def(CHEST, 'Chest', T.CHEST_TOP, T.CHEST_TOP, T.CHEST_SIDE);
 
 const NB = 32, SOLID = new Uint8Array(NB), TRANSP = new Uint8Array(NB), AOS = new Uint8Array(NB);
 for (let i = 1; i < NB; i++) { SOLID[i] = i !== WATERB ? 1 : 0; AOS[i] = (i !== WATERB && i !== GLASS) ? 1 : 0; }
@@ -531,6 +532,13 @@ tile(T.ENDFRAME, () => (x, y, r) => {
   return (x === 0 || y === 0 || x === 15 || y === 15) ? J([150, 160, 120], r, 10) : J([196, 206, 160], r, 14);
 });
 tile(T.EGG, () => (x, y, r) => r() < .2 ? J([100, 40, 150], r, 20) : J([18, 10, 26], r, 10));
+const chestWood = (x, y, r) => (x === 0 || y === 0 || x === 15 || y === 15) ? J([84, 54, 26], r, 8) : (y % 5 === 4 ? J([128, 86, 40], r, 8) : J([168, 116, 58], r, 16));
+tile(T.CHEST_TOP, () => chestWood);
+tile(T.CHEST_SIDE, () => (x, y, r) => {
+  if (x >= 6 && x <= 9 && y >= 4 && y <= 8) return (x === 6 || x === 9 || y === 4 || y === 8) ? J([60, 60, 66], r, 6) : J([206, 206, 212], r, 10); // latch
+  if (y === 5 || y === 6) return J([70, 44, 20], r, 8); // where the lid opens
+  return chestWood(x, y, r);
+});
 
 // average colour per tile (for break particles)
 const TILE_AVG = [];
@@ -690,6 +698,7 @@ function setBlock(x, y, z, b) {
   const cx = Math.floor(x / CS), cz = Math.floor(z / CS), lx = x - cx * CS, lz = z - cz * CS;
   const c = getChunk(cx, cz), i = idxOf(lx, y, lz), old = c.data[i];
   if (old === b) return false;
+  if (old === CHEST && !mp.applying) chestBroken(x, y, z);
   c.data[i] = b;
   if (LIGHT[old] || LIGHT[b]) {
     if (LIGHT[b]) c.torches.add(i); else c.torches.delete(i);
@@ -1014,6 +1023,7 @@ function act(button) {
     if (!m && gv && LAND.includes(gv.kind)) { toast(`That ${gv.kind} lives in a friend's game`); return; }
   }
   if (button === 2 && target && target.b === BED) { useBed(target.x, target.y, target.z); return; }
+  if (button === 2 && target && target.b === CHEST) { openChest(target.x, target.y, target.z); return; }
   if (button === 0 && dim === 'e' && endHit()) return;
   const s = inv[sel];
   if (button === 0) {
@@ -1165,7 +1175,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1189,6 +1199,7 @@ function spawn() {
   P.x = 8.5; P.z = 8.5; P.y = H - 4; P.fly = true;
 }
 function applySave(s) {
+  chests = new Map(s && s.chests && typeof s.chests === 'object' ? Object.entries(s.chests).map(([k, v]) => [k, unpackChest(v)]) : []);
   petKinds = s && Array.isArray(s.pets) ? s.pets.filter(k => LAND.includes(k)).slice(0, PET_MAX) : [];
   edits.clear(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   if (s && typeof s.seed === 'number') {
@@ -1232,6 +1243,7 @@ function seedOf(text) {
   return h;
 }
 function newWorld(seed = null) {
+  chests = new Map();
   petKinds = [];
   resetWorld(); edits.clear(); clearMobs(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   SEED = seed === null ? Math.floor(Math.random() * 1e6) : seed;
@@ -1879,6 +1891,7 @@ function mkSlot(i) {
   s.addEventListener('pointerdown', e => {
     e.preventDefault();
     if (tradeF) offerSlot(i);
+    else if (chestF) toChest(i);
     else if (mode === 's') slotClick(i, e);
     else if (i < 9) { sel = i; renderInv(); renderHotbar(); }
   });
@@ -1922,7 +1935,7 @@ function renderInv() {
   if (surv) for (let i = 9; i < INV; i++) grid.append(mkSlot(i));
   else for (const id of PALETTE) {
     const b = mkBtn(id, 0);
-    b.addEventListener('click', () => { if (tradeF) { offerBlock(id); return; } inv[sel] = {id, n: 1}; renderInv(); renderHotbar(); toast(nameOf(id)); saveDirty = true; });
+    b.addEventListener('click', () => { if (tradeF) { offerBlock(id); return; } if (chestF) { blockToChest(id); return; } inv[sel] = {id, n: 1}; renderInv(); renderHotbar(); toast(nameOf(id)); saveDirty = true; });
     grid.append(b);
   }
   for (let i = 0; i < 9; i++) hot.append(mkSlot(i));
@@ -1941,6 +1954,7 @@ function renderInv() {
     }
   }
   if (tradeF) renderTrade();
+  if (chestF) renderChest();
   handEl.hidden = !hand;
   if (hand) { handEl.querySelector('img').src = iconURL(hand.id); handEl.querySelector('span').textContent = hand.n > 1 ? fmtN(hand.n) : ''; }
 }
@@ -1954,6 +1968,7 @@ function openInv(trades) {
 function closeInv(relock) {
   if (!invOpen) return;
   if (tradeF) cancelTrade(); // Done calls the trade off
+  if (chestF) closeChest();
   invOpen = false; invUI.hidden = true; curTrades = null;
   if (hand) { addItem(hand.id, hand.n); hand = null; }
   handEl.hidden = true; renderHotbar();
@@ -3475,7 +3490,7 @@ async function mpJoinRoom() {
   mp.owner = meta.owner;
   mp.on = true;
   // load the room's world
-  resetWorld(); clearMobs(); edits.clear();
+  resetWorld(); clearMobs(); edits.clear(); chests = new Map(); chestF = null;
   SEED = meta.seed | 0; dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0; spawnPt = null; P.fly = false;
   spawn(); renderHotbar();
   const me = R('/players/' + mp.uid);
@@ -3493,7 +3508,7 @@ async function mpJoinRoom() {
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
-    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())),
+    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
   refreshMeta(); updateInfo();
@@ -4680,6 +4695,95 @@ CMDS.summon = a => {
   return `${kindName(kind)} appeared` + (KINDS[kind].hostile && mode !== 's' ? ' (monsters only fight in Survival)' : '');
 };
 CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
+
+/* ---------- chests ---------- */
+// Right-click a chest to open it: 27 slots of storage. Click things in your backpack to put them in, click things in the
+// chest to take them out (in Creative, clicking any block puts 64 of it in). Breaking a chest gives you what was inside.
+// Chests are saved with your world; in a multiplayer room they live at rooms/{CODE}/blockwood/chests, shared by everyone.
+const CHEST_N = 27;
+let chests = new Map(), chestF = null;
+HARD[CHEST] = 1.5; MAT[CHEST] = 'wood';
+RECIPES.push([CHEST, 1, [[PLANKS, 8]]]);
+const chestKey = (x, y, z) => `${dim}_${x}_${y}_${z}`;
+const packChest = a => a.some(Boolean) ? a.map(s => s ? [s.id, s.n] : 0) : null;
+function unpackChest(a) {
+  const out = Array(CHEST_N).fill(null);
+  (Array.isArray(a) ? a : a ? Object.values(a) : []).slice(0, CHEST_N).forEach((s, i) => { if (Array.isArray(s) && validId(s[0])) out[i] = {id: s[0], n: Math.max(1, Math.min(1e5, s[1] | 0))}; });
+  return out;
+}
+function storeChest() { // the open chest changed
+  const k = chestF.key, packed = packChest(chestF.items);
+  if (packed) chests.set(k, chestF.items); else chests.delete(k);
+  saveDirty = true;
+  if (mp.on) quiet(mp.fb.set(R('/chests/' + k), packed));
+  renderInv(); renderHotbar();
+  tone(600, 700, .04, .06, 'sine');
+}
+function openChest(x, y, z) {
+  if (invOpen) return;
+  const key = chestKey(x, y, z);
+  chestF = {key, items: (chests.get(key) || Array(CHEST_N).fill(null)).slice()};
+  openInv();
+  if (!invOpen) { chestF = null; return; }
+  noise(.25, 'lowpass', 500, 2, .35); tone(180, 140, .2, .12, 'triangle');
+}
+function closeChest() { chestF = null; noise(.15, 'lowpass', 400, 2, .3); }
+function addToChest(id, n) {
+  const a = chestF.items;
+  for (let i = 0; i < CHEST_N && n > 0; i++) { const s = a[i]; if (s && s.id === id && s.n < maxOf(id)) { const k = Math.min(n, maxOf(id) - s.n); s.n += k; n -= k; } }
+  for (let i = 0; i < CHEST_N && n > 0; i++) if (!a[i]) { const k = Math.min(n, maxOf(id)); a[i] = {id, n: k}; n -= k; }
+  return n;
+}
+function toChest(i) { // a backpack slot clicked while the chest is open
+  const s = inv[i];
+  if (!s) return;
+  if (mode !== 's') { if (addToChest(s.id, 64) === 64) toast('The chest is full'); storeChest(); return; }
+  const left = addToChest(s.id, s.n);
+  if (left === s.n) { toast('The chest is full'); return; }
+  inv[i] = left ? {id: s.id, n: left} : null;
+  storeChest();
+}
+function blockToChest(id) { if (addToChest(id, 64) === 64) toast('The chest is full'); storeChest(); }
+function fromChest(j) {
+  const e = chestF.items[j];
+  if (!e) return;
+  const left = addItem(e.id, e.n);
+  if (left === e.n) { toast('Backpack full'); return; }
+  chestF.items[j] = left ? {id: e.id, n: left} : null;
+  storeChest();
+}
+function renderChest() {
+  const rec = $('#recipes');
+  $('#invTitle').textContent = 'Chest';
+  $('#craft h3').textContent = 'In the chest';
+  $('#craft').hidden = false; rec.textContent = '';
+  $('#invHint').textContent = (mode === 's' ? 'Click things in your backpack to put them in the chest' : 'Click any block to put 64 of it in the chest') +
+    '. Click things in the chest to take them out.';
+  const g = document.createElement('div'); g.className = 'grid tgrid';
+  chestF.items.forEach((e, j) => {
+    const b = mkBtn(e && e.id, e ? e.n : 0);
+    if (e && e.n === 1) { const c = document.createElement('span'); c.className = 'cnt'; c.textContent = '1'; b.append(c); }
+    if (e) b.addEventListener('pointerdown', ev => { ev.preventDefault(); fromChest(j); });
+    g.append(b);
+  });
+  rec.append(g);
+}
+// breaking a chest (setBlock calls this) gives you what was inside
+function chestBroken(x, y, z) {
+  const key = chestKey(x, y, z), a = chests.get(key);
+  if (chestF && chestF.key === key) closeInv(false);
+  if (!a) return;
+  chests.delete(key); saveDirty = true;
+  if (mp.on) quiet(mp.fb.remove(R('/chests/' + key)));
+  let lost = 0;
+  for (const s of a) if (s) lost += addItem(s.id, s.n);
+  renderHotbar(); if (invOpen) renderInv();
+  toast(lost ? 'Your backpack is full: some things from the chest were lost' : 'You picked up everything in the chest', 2200);
+}
+function mpChests(all) {
+  chests = new Map(Object.entries(all || {}).filter(([k]) => /^[oneb]_-?\d+_\d+_-?\d+$/.test(k)).map(([k, v]) => [k, unpackChest(v)]));
+  if (chestF) { chestF.items = (chests.get(chestF.key) || Array(CHEST_N).fill(null)).slice(); if (invOpen) renderInv(); }
+}
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
