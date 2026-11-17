@@ -3473,12 +3473,49 @@ function boot(hot){
   const parkIM = (geo, m, n) => { const im = new THREE.InstancedMesh(geo, m, n); im.frustumCulled = false; im.count = 0; free.add(im); return im; };
   const parkSlab = parkIM(parkSlabGeo, new THREE.MeshLambertMaterial({ color: 0x33373e }), PARK_MAX);
   const parkTop = parkIM(parkTopGeo, new THREE.MeshLambertMaterial({ map: parkTex }), PARK_MAX);
-  const parkBody = parkIM(new THREE.BoxGeometry(1.9, 0.8, 4.3), new THREE.MeshLambertMaterial({ color: 0xffffff }), PARK_MAX * STALLS * 2);
-  const parkCab = parkIM(new THREE.BoxGeometry(1.62, 0.62, 2.2), new THREE.MeshLambertMaterial({ color: 0x2a3446 }), PARK_MAX * STALLS * 2);
+  // the parked cars are the real car models (the same ones that drive round town), each
+  // squashed into one mesh painted white and drawn many times over, with its own paint colour
+  const PARK_IDS = ['rental', 'mini', 'beetle', 'fiat', 'smart', 'prius', 'mustang', 'jeep', 'defender', 'f150', 'vwbus', 'p911', 'gclass', 'rolls'];
+  let parkTpl = null, parkPending = false;
+  const parkShadow = parkIM(new THREE.PlaneGeometry(2.3, 4.9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }), PARK_MAX * STALLS * 2);
+  function carToGeometry(group){
+    group.updateMatrixWorld(true);
+    const pos = [], nor = [], col = [], c = new THREE.Color();
+    group.traverse(o => {
+      if (!o.isMesh || !o.visible) return;
+      const m = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (m.opacity !== undefined && m.opacity < 0.3) return;
+      let g = o.geometry.clone().applyMatrix4(o.matrixWorld);
+      if (g.index) g = g.toNonIndexed();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      c.copy(m.color || c.set(0xffffff));
+      const P = g.attributes.position, N = g.attributes.normal;
+      for (let i = 0; i < P.count; i++){ pos.push(P.getX(i), P.getY(i), P.getZ(i)); nor.push(N.getX(i), N.getY(i), N.getZ(i)); col.push(c.r, c.g, c.b); }
+      g.dispose();
+    });
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    return out;
+  }
+  function ensureParkTpl(){
+    if (parkTpl) return true;
+    try {
+      const tpl = PARK_IDS.map(id => {
+        const grp = makeCar(0xffffff, false, carModel(id));
+        const geo = carToGeometry(grp);
+        grp.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+        const im = parkIM(geo, new THREE.MeshLambertMaterial({ vertexColors: true }), PARK_MAX * STALLS * 2);
+        im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(PARK_MAX * STALLS * 2 * 3).fill(1), 3);
+        return im;
+      });
+      parkTpl = tpl; return true;
+    } catch(e){ parkPending = true; return false; }   // the car models aren't ready yet: try again next frame
+  }
   const parkPole = parkIM(new THREE.CylinderGeometry(0.12, 0.12, 5, 8).translate(0, 2.5, 0), new THREE.MeshLambertMaterial({ color: 0xc9d2dc }), PARK_MAX);
   const parkSign = parkIM(new THREE.BoxGeometry(2.6, 2.6, 0.2), new THREE.MeshLambertMaterial({ map: pSignTex }), PARK_MAX);
-  const PARK_COLS = [0xe8432e, 0xf4f1ea, 0x1b2340, 0x3fa9f5, 0x50555c, 0xffd23d, 0x7fd1a6, 0x8a8f99, 0xd98f0f, 0x111111];
-  parkBody.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(PARK_MAX * STALLS * 2 * 3).fill(1), 3);
+  const PARK_COLS = [0xf4f4f2, 0xf4f4f2, 0x111214, 0x111214, 0x9aa0a8, 0x9aa0a8, 0x50555c, 0xb3202a, 0x1d3f8f, 0x3a6fb8, 0x2f5d3a, 0xd9cdb4, 0x7a1f2b, 0xe8e2d0, 0x3d3f44];
   function tryParkLot(x, z, cx, cz, hh){
     if (parkLots.length >= PARK_MAX || Math.hypot(x - cx, z - cz) > 1800) return;
     let lo = 1e9, hi = -1e9;
@@ -3491,13 +3528,18 @@ function boot(hot){
     const L = { x, z, y: hi + 0.12, lo, x0: x - PW / 2, x1: x + PW / 2, z0: z - PD / 2, z1: z + PD / 2, cars: [], empty: [] };
     for (const sgn of [-1, 1]) for (let i = 0; i < STALLS; i++){
       const sx = x - 22.5 + i * 3, sz = z + sgn * 10, r = hash2(Math.round(sx * 3.1), Math.round(sz * 1.7 + hh * 999));
-      if (r < 0.62) L.cars.push({ x: sx, z: sz, c: PARK_COLS[Math.floor(r * 1000) % PARK_COLS.length], off: sgn * 0.35 });
+      if (r < 0.62){
+        const r2 = hash2(Math.round(sx * 5.3) + 17, Math.round(sz * 2.9) - 41);
+        // most cars park nose in (facing the aisle); a few backed in
+        L.cars.push({ x: sx, z: sz, c: PARK_COLS[Math.floor(r * 1000) % PARK_COLS.length], m: Math.floor(r2 * 997) % PARK_IDS.length, yaw: (sgn < 0 ? Math.PI : 0) + (r2 < 0.22 ? Math.PI : 0) + (r2 - 0.5) * 0.06 });
+      }
       else L.empty.push({ x: sx, z: sz, key: Math.round(sx) + ',' + Math.round(sz) });
     }
     parkLots.push(L);
   }
   function finishParkLots(){
     const o = new THREE.Object3D(), col = new THREE.Color();
+    const tplOk = ensureParkTpl(), tplN = PARK_IDS.map(() => 0);
     let nc = 0;
     parkLots.forEach((L, i) => {
       o.rotation.set(0, 0, 0);
@@ -3507,15 +3549,16 @@ function boot(hot){
       o.position.set(L.x0 + 0.8, L.y + 5.6, L.z0 + 0.8); o.rotation.y = Math.PI / 2; o.updateMatrix(); parkSign.setMatrixAt(i, o.matrix);
       o.rotation.set(0, 0, 0);
       for (const k of L.cars){
-        o.position.set(k.x, L.y + 0.62, k.z); o.updateMatrix(); parkBody.setMatrixAt(nc, o.matrix); parkBody.setColorAt(nc, col.setHex(k.c));
-        o.position.set(k.x, L.y + 1.32, k.z + k.off); o.updateMatrix(); parkCab.setMatrixAt(nc, o.matrix);
+        o.rotation.set(0, k.yaw, 0); o.position.set(k.x, L.y + 0.06, k.z); o.updateMatrix(); parkShadow.setMatrixAt(nc, o.matrix);
+        if (tplOk){ o.position.y = L.y; o.updateMatrix(); const im = parkTpl[k.m], j = tplN[k.m]++; im.setMatrixAt(j, o.matrix); im.setColorAt(j, col.setHex(k.c)); }
         nc++;
       }
+      o.rotation.set(0, 0, 0);
     });
     parkSlab.count = parkTop.count = parkPole.count = parkSign.count = parkLots.length;
-    parkBody.count = parkCab.count = nc;
-    [parkSlab, parkTop, parkPole, parkSign, parkBody, parkCab].forEach(m => m.instanceMatrix.needsUpdate = true);
-    parkBody.instanceColor.needsUpdate = true;
+    parkShadow.count = nc;
+    [parkSlab, parkTop, parkPole, parkSign, parkShadow].forEach(m => m.instanceMatrix.needsUpdate = true);
+    if (tplOk) parkTpl.forEach((im, k) => { im.count = tplN[k]; im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; });
   }
   const parkAt = (x, z) => { for (const L of parkLots) if (x > L.x0 && x < L.x1 && z > L.z0 && z < L.z1) return L; return null; };
   function parkHit(x, z){
@@ -6781,6 +6824,7 @@ function boot(hot){
     if (dt > 0.05) dt = 0.05;
     syncJump();
     try { mpTick(dt); } catch(e){ console.warn('multiplayer', e); }
+    if (parkPending){ parkPending = false; finishParkLots(); }
     if (state === 'ride'){ updateRide(dt); renderer.render(rideScene, camera); return; }
     if (state === 'island'){ updateIsland(dt); renderer.render(isleScene, camera); return; }
     if (state !== 'paused') updateFree(dt);
