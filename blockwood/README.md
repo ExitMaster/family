@@ -143,6 +143,10 @@ build on it, fly over it. The world saves in the browser.
   click things in your backpack to put them in (27 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
   Chests are saved with your world, and in a multiplayer room everyone shares them.
+- **Ride horses**: right-click a horse to get on. WASD rides (much faster than walking), Space jumps
+  high, Shift gets off (touch: Exit button). Donkeys, zebras, camels, unicorns (fastest, highest
+  jumps) and elephants can be ridden too. Hold an apple when you right-click to make one a pet
+  instead. Friends in a room see you sitting up on it.
 - **Pets**: right-click a pig, sheep, cow, chicken or rabbit to make it your pet. A heart floats over
   it and it follows you everywhere: it catches up if you run off, and comes with you through portals,
   into multiplayer rooms and after a reload (pets are saved with your world). Right-click it again to

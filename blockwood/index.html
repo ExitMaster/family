@@ -961,7 +961,7 @@ function physics(dt) {
   const wx = ix * c - iz * s, wz = -ix * s - iz * c;
   const sprint = !P.fly && (keys.ShiftLeft || keys.ShiftRight) && !(mode === 's' && st.food <= 6);
   const jump = keys.Space || keys.touchJump, down = keys.ShiftLeft || keys.ShiftRight || keys.touchDown;
-  const speed = P.fly ? 11 : inWater ? 3 : sprint ? 5.8 : 4.3;
+  const speed = P.fly ? 11 : inWater ? 3 : mount ? RIDE[mount.kind].speed : sprint ? 5.8 : 4.3;
   const acc = P.fly ? 8 : P.onGround ? 14 : inWater ? 6 : 5;
   const k = Math.min(1, acc * dt);
   P.vx += (wx * speed - P.vx) * k; P.vz += (wz * speed - P.vz) * k;
@@ -974,7 +974,7 @@ function physics(dt) {
     P.vy = Math.max(-3.5, Math.min(3.5, P.vy));
   } else {
     P.vy -= 30 * dt;
-    if (jump && P.onGround) { P.vy = 8.6; exhaust(sprint ? .2 : .05); }
+    if (jump && P.onGround) { P.vy = mount ? RIDE[mount.kind].jump : 8.6; exhaust(sprint ? .2 : .05); }
     P.vy = Math.max(P.vy, st.noFall ? -16 : -55);
   }
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(P.vx), Math.abs(P.vy), Math.abs(P.vz)) * dt / .3));
@@ -1040,6 +1040,7 @@ function act(button) {
     const gv = !m && mp.on && ghostHit(4);
     if (gv && gv.kind === 'villager') { talk(gv); return; }
     if (m && m.kind === 'piglin') { barter(m); return; }
+    if (m && RIDE[m.kind] && !holdingTreat()) { mountUp(m); return; }
     if (m && LAND.includes(m.kind)) { togglePet(m); return; }
     if (!m && gv && LAND.includes(gv.kind)) { toast(`That ${gv.kind} lives in a friend's game`); return; }
   }
@@ -1185,7 +1186,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1358,6 +1359,7 @@ addEventListener('keydown', e => {
   if (!playing) return;
   if (invOpen) { if (!e.repeat && (e.code === 'KeyE' || e.code === 'Escape')) closeInv(e.code === 'KeyE'); return; }
   if (dead && !ghost) return;
+  if (mount && e.code.startsWith('Shift') && !e.repeat) { dismount(); return; }
   if (riding) {
     if ((e.code.startsWith('Shift') || e.code === 'KeyQ' || e.code === 'KeyX') && !e.repeat) { exitPlane(); return; }
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -1627,6 +1629,7 @@ function updateMobs(dt) {
   const fl = Math.floor;
   for (let i = mobs.length - 1; i >= 0; i--) {
     const m = mobs[i], K = KINDS[m.kind], dx = m.x - P.x, dz = m.z - P.z;
+    if (m.ridden) { if (m === mount) { rideMob(m, K, dt); continue; } m.ridden = false; }
     if (dx * dx + dz * dz > 90 * 90 || m.y < -10) { removeMob(i); continue; }
     if (K.swim) { swim(m, K, dt); continue; }
     if (K.fly) { flyMob(m, K, dt); continue; }
@@ -1669,6 +1672,7 @@ function mobHit(maxD) {
   let best = null, bt = maxD;
   const o = [cam.position.x, cam.position.y, cam.position.z], d = [dirV.x, dirV.y, dirV.z];
   for (const m of mobs) {
+    if (m.ridden) continue;
     const K = KINDS[m.kind], mn = [m.x - K.hw, m.y, m.z - K.hw], mx = [m.x + K.hw, m.y + K.h, m.z + K.hw];
     let t0 = 0, t1 = bt, ok = true;
     for (let a = 0; a < 3 && ok; a++) {
@@ -2043,6 +2047,7 @@ function hurtPlayer(dmg, fx, fz) {
 }
 let deadAt = 0;
 function die() {
+  if (mount) dismount();
   dead = true; deadAt = performance.now(); mine.on = false; held = null;
   for (const k in keys) keys[k] = false;
   deadEl.hidden = false;
@@ -2581,6 +2586,7 @@ function planeHits(x, y, z) {
   return false;
 }
 function board(pl) {
+  if (mount) dismount();
   riding = pl; P.fly = false; P.yaw = pl.yaw; P.pitch = -.1;
   mine.on = false; held = null;
   $('#bExit').hidden = $('#bLand').hidden = false;
@@ -2765,7 +2771,7 @@ function chaseCam() {
   const cp = Math.cos(P.pitch), f = [-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp];
   cam.position.set(riding.x - f[0] * 9, riding.y + 3.2 - f[1] * 9, riding.z - f[2] * 9);
 }
-$('#bExit').addEventListener('click', exitPlane);
+$('#bExit').addEventListener('click', () => { if (riding) exitPlane(); });
 $('#bLand').addEventListener('click', autoLand);
 
 /* ---------- the Nether ---------- */
@@ -3562,7 +3568,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${dim}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -3623,10 +3629,12 @@ function mpTick(dt) {
     a.head.rotation.x = Math.max(-1, Math.min(1, p.pitch || 0));
     a.g.position.set(a.x, a.y, a.z); a.g.rotation.y = a.yaw;
     avatarState(a, p.k || 0);
+    if (p.r > 0) { a.g.position.y += p.r - .55; a.legs[0].rotation.set(-1.2, 0, .3); a.legs[1].rotation.set(-1.2, 0, -.3); }
+    else { a.legs[0].rotation.z = a.legs[1].rotation.z = 0; }
   }
   if ((mp.sendT -= dt) > 0) return;
   mp.sendT = .15;
-  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v, me.k].join();
+  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v, me.k, me.r].join();
   if (sig !== mp.last) { mp.last = sig; quiet(mp.fb.update(R('/players/' + mp.uid), me)); }
 }
 /* ---------- chat ---------- */
@@ -5289,6 +5297,50 @@ function swimHunt(m, K, dt) {
   return true;
 }
 
+/* ---------- riding horses (and a few other big animals) ---------- */
+// Right-click a horse to get on (hold an apple to make it a pet instead). WASD rides, Space jumps, Shift gets off
+// (touch: the Exit button). Donkeys, zebras, camels, unicorns and even elephants can be ridden too.
+const RIDE = {horse: {speed: 9, jump: 11.5}, unicorn: {speed: 11, jump: 13}, zebra: {speed: 9, jump: 11}, donkey: {speed: 6.5, jump: 9.5},
+  camel: {speed: 6, jump: 9}, elephant: {speed: 5, jump: 8.6}};
+let mount = null, mountFly = false;
+const rideOff = () => mount ? KINDS[mount.kind].h * .62 : 0;
+function mountUp(m) {
+  if (dead || riding || mount) return;
+  mount = m; m.ridden = true; m.walk = false; m.flee = 0;
+  mountFly = P.fly; P.fly = false; P.vx = P.vy = P.vz = 0;
+  P.x = m.x; P.z = m.z; P.y = m.y + .05; P.yaw = m.ry; mine.on = false; held = null;
+  $('#bExit').hidden = false;
+  KINDS[m.kind].say([m.x, m.y + 1.5, m.z]);
+  toast(`Riding the ${kindName(m.kind).toLowerCase()}! ` + (TOUCH ? 'Exit button gets off' : 'WASD rides · Space jumps · Shift gets off'), 3500);
+  updateInfo();
+}
+function dismount() {
+  const m = mount;
+  if (!m) return;
+  mount = null; m.ridden = false; m.t = 2;
+  // step off to the side
+  const sx = Math.cos(P.yaw) * 1.1, sz = -Math.sin(P.yaw) * 1.1;
+  for (const k of [1, -1]) {
+    const x = P.x + sx * k, z = P.z + sz * k;
+    if (!SOLID[getBlock(Math.floor(x), Math.floor(P.y + .1), Math.floor(z))] && !SOLID[getBlock(Math.floor(x), Math.floor(P.y + 1.1), Math.floor(z))]) { P.x = x; P.z = z; break; }
+  }
+  P.fly = mountFly && mode === 'c'; st.fallY = null;
+  if (!riding) $('#bExit').hidden = true;
+  updateInfo();
+}
+// the animal you're on goes wherever you go
+function rideMob(m, K, dt) {
+  m.x = P.x; m.y = P.y; m.z = P.z; m.vx = P.vx; m.vz = P.vz;
+  const v = Math.hypot(P.vx, P.vz), want = v > .5 ? Math.atan2(-P.vx, -P.vz) : P.yaw;
+  let dy = want - m.ry; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); m.ry += dy * Math.min(1, 8 * dt); m.yaw = m.ry;
+  m.ph += dt * v * 2.2;
+  const sw = Math.sin(m.ph) * Math.min(.8, v * .12);
+  m.legs.forEach((l, j) => { l.rotation.x = (K.biped ? j % 2 === 0 : j < 2) ? sw : -sw; });
+  if (v > 2 && P.onGround && (m.clop = (m.clop || 0) - dt * v) <= 0) { m.clop = 3; noise(.06, 'bandpass', 900, 3, .25, [m.x, m.y, m.z]); }
+  m.g.position.set(m.x, m.y, m.z); m.g.rotation.y = m.ry;
+}
+$('#bExit').addEventListener('click', () => { if (mount) dismount(); });
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5308,7 +5360,8 @@ function loop(now) {
   }
   updateChunks();
   if (frame % 60 === 0) unloadFar();
-  cam.position.set(P.x, P.y + EYE, P.z);
+  if (mount && !mobs.includes(mount)) dismount();
+  cam.position.set(P.x, P.y + EYE + rideOff(), P.z);
   if (shake > 0) {
     shake = Math.max(0, shake - dt * 1.5);
     cam.position.x += (Math.random() - .5) * shake * .6; cam.position.y += (Math.random() - .5) * shake * .6;
