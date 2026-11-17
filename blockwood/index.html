@@ -211,6 +211,10 @@ select,#seedIn,.tin,#chatIn{
 #handIcon span{position:absolute;right:-2px;bottom:-4px;font-weight:600;text-shadow:0 1px 0 #000}
 #dead{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:12px;padding:0 16px calc(9vh + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(120,0,0,0) 35%,rgba(120,0,0,.55));text-align:center;pointer-events:none}
 #dead>*{pointer-events:auto}
+#ghostBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:6;display:flex;gap:10px;align-items:center;max-width:calc(100vw - 32px);
+  background:rgba(40,60,90,.75);border:2px solid #b8d8ff;border-radius:8px;padding:6px 8px 6px 12px;font-size:13px;color:#e8f2ff}
+#ghostBar[hidden]{display:none}
+body.ghost::after{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(180,210,255,0) 55%,rgba(170,200,255,.35))}
 #dead .secret{margin:0;font-family:var(--display);font-size:17px;color:var(--gold);text-shadow:0 2px 0 #000}
 #dead h1{margin:0;font-family:var(--display);font-size:clamp(40px,10vw,64px);text-shadow:0 4px 0 #000}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}}
@@ -261,11 +265,12 @@ select,#seedIn,.tin,#chatIn{
   </div>
 </div>
 <div id="handIcon" hidden><img alt=""><span></span></div>
+<div id="ghostBar" hidden><span>👻 Ghost mode · the animals can't see you · WASD to fly, Space up, Shift down · Esc to stop</span><button id="ghostRespawn" class="btn small primary" type="button">Respawn</button></div>
 <div id="dead" hidden>
   <h1>You died!</h1>
   <p class="lede">Your backpack is safe. You'll start again at your spawn point.</p>
   <p class="secret">Shh… the animals think you're gone. Watch what they get up to!</p>
-  <button id="respawn" class="btn primary" type="button">Respawn</button>
+  <div class="row" style="justify-content:center"><button id="respawn" class="btn primary" type="button">Respawn</button><button id="secretGo" class="btn" type="button">Live secret life 👻</button></div>
 </div>
 
 <div id="overlay">
@@ -1312,6 +1317,7 @@ $('#play').addEventListener('click', () => {
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
   if (locked) startPlaying(false);
+  else if (ghost) endGhost();
   else if (playing && !dragMode && !invOpen && !dead) pause();
 });
 document.addEventListener('pointerlockerror', () => startPlaying(true));
@@ -1330,7 +1336,7 @@ document.addEventListener('mousemove', e => {
 });
 let mdrag = null;
 canvas.addEventListener('mousedown', e => {
-  if (!playing || invOpen || dead) return;
+  if (!playing || invOpen || (dead && !ghost)) return;
   if (locked) { act(e.button); if (e.button === 0 && mode === 's') mine.on = true; else held = {b: e.button, t: .3}; }
   else if (dragMode) { mdrag = {b: e.button, dist: 0}; if (e.button === 0 && mode === 's') mine.on = true; }
   else requestLock();
@@ -1351,7 +1357,7 @@ let lastSpace = 0;
 addEventListener('keydown', e => {
   if (!playing) return;
   if (invOpen) { if (!e.repeat && (e.code === 'KeyE' || e.code === 'Escape')) closeInv(e.code === 'KeyE'); return; }
-  if (dead) return;
+  if (dead && !ghost) return;
   if (riding) {
     if (e.code.startsWith('Shift') && !e.repeat) exitPlane();
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -1380,7 +1386,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyT' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Slash') { e.preventDefault(); openChat(e.code === 'Slash' ? '/' : ''); return; }
   if (e.code === 'KeyV') toast('Get in your airplane first, then press V to fly to a village house');
   if (/^Digit[1-9]$/.test(e.code)) selectSlot(+e.code[5] - 1);
-  if (e.code === 'Escape' && !locked) pause();
+  if (e.code === 'Escape' && !locked) { if (ghost) endGhost(); else pause(); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; held = null; mine.on = false; });
@@ -1401,7 +1407,7 @@ function enableTouch() {
 canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'mouse') return;
   if (!TOUCH) enableTouch();
-  if (!playing || invOpen || dead) return;
+  if (!playing || invOpen || (dead && !ghost)) return;
   const t = {x: e.clientX, y: e.clientY, t: performance.now(), dist: 0, mining: false, timer: 0};
   if (mode === 's' && tmode === 0) t.timer = setTimeout(() => { if (t.dist < 10 && touchLook.get(e.pointerId) === t) { t.mining = true; mine.on = true; } }, 220);
   touchLook.set(e.pointerId, t);
@@ -2035,8 +2041,9 @@ function hurtPlayer(dmg, fx, fz) {
   }
   if (st.hp <= 0) die();
 }
+let deadAt = 0;
 function die() {
-  dead = true; mine.on = false; held = null;
+  dead = true; deadAt = performance.now(); mine.on = false; held = null;
   for (const k in keys) keys[k] = false;
   deadEl.hidden = false;
   const killer = mp.on ? killedBy() : null; lastHit = null;
@@ -2044,10 +2051,13 @@ function die() {
   if (killer) quiet(mp.fb.push(R('/chat'), {n: mp.name, m: `was slain by ${killer}`, t: mp.fb.serverTimestamp()}));
   if (locked) document.exitPointerLock();
   tone(320, 60, 1.1, .4, 'sawtooth');
-  $('#respawn').focus({preventScroll: true});
+  // focus Respawn a moment later, so the Enter that sent /kill doesn't press it straight away
+  setTimeout(() => { if (dead && !ghost) $('#respawn').focus({preventScroll: true}); }, 500);
   secretGuests();
 }
 function respawn() {
+  if (ghost) endGhost();
+  if (ghostFly !== null) { P.fly = ghostFly; ghostFly = null; $('#bDown').hidden = !P.fly; }
   dead = false; deadEl.hidden = true;
   if (dim !== 'o' && dim !== 'b') switchDim('o');
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false, inv: 1});
@@ -2056,7 +2066,7 @@ function respawn() {
   if (!TOUCH && !dragMode) requestLock();
   saveDirty = true;
 }
-$('#respawn').addEventListener('click', respawn);
+$('#respawn').addEventListener('click', () => { if (performance.now() - deadAt > 600) respawn(); });
 function survivalMove(dt, inWater, sprint) {
   if (P.onGround) exhaust(Math.hypot(P.vx, P.vz) * dt * (sprint ? .1 : .01));
   if (P.onGround || inWater) {
@@ -4916,6 +4926,33 @@ function showWhere() {
   $('#spawnInfo').textContent = `You're at ${f(P.x)} ${f(P.y)} ${f(P.z)} · spawn point ` + (dim === 'b' ? 'is the OneBlock' : spawnPt ? spawnPt.map(f).join(' ') : 'is where the world started');
 }
 
+/* ---------- ghost mode: live the secret life ---------- */
+// On the death screen, "Live secret life" turns you into a ghost: you fly around (Space up, Shift down) from where the
+// camera was, and the animals keep doing their secret things because they can't see you. Esc (or the Respawn button in
+// the ghost bar) brings the death screen back.
+let ghost = false, ghostFly = null;
+function startGhost() {
+  if (!dead || ghost) return;
+  ghost = true; if (ghostFly === null) ghostFly = P.fly;
+  const d = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+  P.x = cam.position.x; P.y = cam.position.y - EYE; P.z = cam.position.z;
+  P.yaw = Math.atan2(-d.x, -d.z); P.pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+  P.fly = true; P.vx = P.vy = P.vz = 0;
+  deadEl.hidden = true; $('#ghostBar').hidden = false; document.body.classList.add('ghost');
+  $('#bDown').hidden = false;
+  if (!TOUCH && !dragMode) requestLock();
+  toast("You're a ghost! Fly around and watch: the animals can't see you", 3500);
+  tone(500, 900, .5, .1, 'sine'); tone(750, 1300, .5, .08, 'sine', null, .15);
+}
+function endGhost() {
+  if (!ghost) return;
+  ghost = false; $('#ghostBar').hidden = true; document.body.classList.remove('ghost');
+  if (dead) { deadEl.hidden = false; $('#respawn').focus({preventScroll: true}); }
+}
+$('#secretGo').addEventListener('click', startGhost);
+$('#ghostRespawn').addEventListener('click', () => { endGhost(); respawn(); });
+for (const b of [$('#ghostRespawn')]) b.addEventListener('pointerdown', e => e.stopPropagation());
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -4924,7 +4961,7 @@ function loop(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; frame++;
   if (playing) {
     if (riding && !dead) flyPlane(dt);
-    else if (!dead && !sleeping) physics(dt);
+    else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
     updateWeather(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
@@ -4942,7 +4979,7 @@ function loop(now) {
   }
   cam.rotation.set(P.pitch, P.yaw, 0);
   if (riding) chaseCam();
-  else if (dead && playing) deadCam(dt);
+  else if (dead && playing && !ghost) deadCam(dt);
   cam.updateMatrixWorld();
   const hw = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)) === WATERB;
   if (hw !== headInWater) { headInWater = hw; tintEl.hidden = !hw; }

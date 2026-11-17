@@ -124,6 +124,8 @@ build on it, fly over it. The world saves in the browser.
   and cats walk around on two legs like people, cows dance, sheep jump, chickens fly loops, rabbits
   bounce sky-high, monsters wiggle, and they chat about it. Press Respawn and they all freeze back
   to normal.
+  Press **Live secret life 👻** to become a ghost and fly around among them (WASD, Space up,
+  Shift down); they can't see you. Esc brings the death screen back.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:
   click things in your backpack to put them in (27 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
