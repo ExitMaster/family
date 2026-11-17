@@ -63,6 +63,14 @@ It uses the family Firebase database (Unimai Game Hub) under
 `rooms/{ROOM}/scr/{player}`, which the existing rules already allow. Jump uses
 `rooms/{ROOM}/players` and `/game`, so the two games never get in each other's way.
 
+## Parking lots
+
+Some empty city blocks, and spots round the airports, are car parks: grey asphalt with
+white bays, a dashed yellow line down the middle, a blue **P** sign and rows of parked
+cars in all colours. Drive in and stop neatly in an empty bay, straight in (forwards
+or backwards), for a **Perfect parking! +250** bonus, once per bay. Parked cars are
+solid: bump one at speed and you pay the repair fee.
+
 ## Real cars
 
 **Double-tap SPACE** (out on the road) to turn on **Autopilot** 🤖 — the car drives and
@@ -123,7 +131,7 @@ your island**, and in a **rocky hill** next to your house in the world. They onl
 
 - a **treasure chest** with 10,000 points in it (once a day),
 - the secret **Sky Rocket** car (650 km/h), which then shows up in your garage,
-- the secret **Rainbow Comet** plane (rainbow-coloured, Mach 1.67 on boost, easy to land), which then shows up in the planes on the start card.
+- the secret **Rainbow Comet** plane (rainbow-coloured with a "THE ULTRAMAX" name tag, Mach 1.67 on boost, easy to land), which then shows up in the planes on the start card.
 
 The code **changes every time you load the game**, so you can't just remember it. To find it,
 open the browser's **DevTools** (press **F12**) and read it in the **Console** — the real
