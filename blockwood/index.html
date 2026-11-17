@@ -206,7 +206,9 @@ select,#seedIn,.tin,#chatIn{
 #handIcon{position:fixed;width:36px;height:36px;pointer-events:none;transform:translate(-50%,-50%);z-index:5}
 #handIcon img{width:100%;height:100%;image-rendering:pixelated}
 #handIcon span{position:absolute;right:-2px;bottom:-4px;font-weight:600;text-shadow:0 1px 0 #000}
-#dead{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(120,0,0,.45);text-align:center}
+#dead{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:12px;padding:0 16px calc(9vh + env(safe-area-inset-bottom,0px));background:linear-gradient(rgba(120,0,0,0) 35%,rgba(120,0,0,.55));text-align:center;pointer-events:none}
+#dead>*{pointer-events:auto}
+#dead .secret{margin:0;font-family:var(--display);font-size:17px;color:var(--gold);text-shadow:0 2px 0 #000}
 #dead h1{margin:0;font-family:var(--display);font-size:clamp(40px,10vw,64px);text-shadow:0 4px 0 #000}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}}
 </style>
@@ -259,6 +261,7 @@ select,#seedIn,.tin,#chatIn{
 <div id="dead" hidden>
   <h1>You died!</h1>
   <p class="lede">Your backpack is safe. You'll start again at your spawn point.</p>
+  <p class="secret">Shh… the animals think you're gone. Watch what they get up to!</p>
   <button id="respawn" class="btn primary" type="button">Respawn</button>
 </div>
 
@@ -2029,6 +2032,7 @@ function die() {
   if (locked) document.exitPointerLock();
   tone(320, 60, 1.1, .4, 'sawtooth');
   $('#respawn').focus({preventScroll: true});
+  secretGuests();
 }
 function respawn() {
   dead = false; deadEl.hidden = true;
@@ -3620,7 +3624,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /kick NAME  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /trade NAME  /pvp on|off  /kick NAME  /kill  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /spawn  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4785,6 +4789,75 @@ function mpChests(all) {
   if (chestF) { chestF.items = (chests.get(chestF.key) || Array(CHEST_N).fill(null)).slice(); if (invOpen) renderInv(); }
 }
 
+/* ---------- the secret life of animals ---------- */
+// /kill knocks you out on the spot. While you're dead the camera floats up and circles where you fell, and the animals,
+// thinking you're gone, stop pretending: pigs (and horses, wolves, cats…) walk on two legs like people, cows dance,
+// sheep jump in time, chickens fly loops, rabbits bounce sky-high, monsters wiggle, and everyone chats. The moment you
+// respawn they all drop back to normal.
+let secretT = 0, secretChat = 0, deadAng = 0;
+const UPRIGHT = new Set(['pig', 'horse', 'donkey', 'goat', 'wolf', 'cat', 'fox', 'panda', 'polarbear']);
+const SECRET_LINES = {
+  pig: ['Is the human gone? Everybody stand up!', 'Ahh, walking on two legs is SO much comfier', '"Oink" just means "hello" in human', 'Quick, someone fetch my hat'],
+  cow: ['Dance party! Moo-sic on!', 'Spin, spin, spin!', 'I have been practising this all week'],
+  sheep: ['Jump! Jump! Jump!', 'Nobody tell the human we can almost fly'],
+  chicken: ['Wheeee!', 'We are secretly eagles', 'Chickens rule the sky tonight'],
+  horse: ['Finally I can stretch my back legs', 'Who wants a piggyback? Oh wait'],
+  wolf: ['Awoo! Paws up!', 'Pretending to be a dog is hard work'],
+  cat: ['I knocked three things off a table today', 'Humans think we nap all day. We do.'],
+  rabbit: ['BOING!', 'To the moon!'],
+  villager: ['Hmm! The animals are at it again', 'Hrmm… nobody will believe me'],
+  zombie: ['Braaains… I mean, nice dance moves'], skeleton: ['I have no body to dance with… wait'], creeper: ['Sss… shake it!'],
+  fox: ['Shh, I am a very sneaky dancer'], goat: ['I can stand on ONE leg, watch'], panda: ['Rolling is my favourite dance'],
+};
+const secretLift = k => KINDS[k].hw * 1.25 + .03;
+function secretLife(dt) {
+  secretT += dt;
+  for (const m of mobs) {
+    const g = m.g;
+    if (!dead) { if (m.secret) { m.secret = false; g.rotation.x = g.rotation.z = 0; } continue; }
+    if (Math.hypot(m.x - P.x, m.z - P.z) > 32) continue;
+    const t = secretT + m.id * .7, K = KINDS[m.kind];
+    m.secret = true; g.rotation.order = 'YXZ';
+    if (UPRIGHT.has(m.kind)) {
+      g.rotation.x = Math.PI / 2 * .92; g.rotation.z = Math.sin(t * 6) * .14;
+      g.position.y = m.y + secretLift(m.kind) + Math.abs(Math.sin(t * 6)) * .06;
+    } else if (m.kind === 'cow') { g.rotation.y = t * 4; g.position.y = m.y + Math.abs(Math.sin(t * 5)) * .6; }
+    else if (m.kind === 'sheep') g.position.y = m.y + Math.abs(Math.sin(secretT * 3)) * 1.3;
+    else if (m.kind === 'chicken') { g.position.set(m.x + Math.cos(t * 2) * 1.6, m.y + 2.2 + Math.sin(t * 3) * .3, m.z + Math.sin(t * 2) * 1.6); g.rotation.y = -t * 2; g.rotation.z = .4; }
+    else if (m.kind === 'rabbit' || m.kind === 'frog') g.position.y = m.y + Math.abs(Math.sin(t * 4)) * 2.2;
+    else if (m.kind === 'villager') { g.rotation.y = m.ry + Math.sin(t * 4) * .9; g.position.y = m.y + Math.abs(Math.sin(t * 8)) * .15; }
+    else if (K.hostile) { g.rotation.z = Math.sin(t * 5) * .25; g.position.y = m.y + Math.abs(Math.sin(t * 10)) * .1; }
+    else if (!K.swim && !K.fly) g.position.y = m.y + Math.abs(Math.sin(t * 5)) * .25;
+    if (UPRIGHT.has(m.kind) && !m.walk && m.t > 1.5) m.t = .2; // keep strolling about
+  }
+  if (dead && (secretChat -= dt) <= 0) {
+    secretChat = 2.2 + Math.random() * 2.5;
+    const near = mobs.filter(m => SECRET_LINES[m.kind] && m.y > -10 && Math.hypot(m.x - P.x, m.z - P.z) < 24);
+    if (near.length) { const m = near[Math.floor(Math.random() * near.length)], L = SECRET_LINES[m.kind]; showChat(kindName(m.kind), L[Math.floor(Math.random() * L.length)]); }
+  }
+}
+// when you die, a few animals sneak over to see if the coast is clear
+function secretGuests() {
+  secretT = 0; secretChat = 1.2; deadAng = P.yaw + Math.PI;
+  if (dim !== 'o' && dim !== 'b') return;
+  const near = mobs.filter(m => !KINDS[m.kind].hostile && m.y > -10 && Math.hypot(m.x - P.x, m.z - P.z) < 16).length;
+  for (const k of ['pig', 'pig', 'cow', 'sheep', 'chicken'].slice(0, Math.max(0, 5 - near))) { const s = spotNear(3 + Math.random() * 3); if (s) addMob(k, s[0], s[1], s[2]); }
+}
+// the camera floats over the spot where you fell
+function deadCam(dt) {
+  deadAng += dt * .22;
+  const cx = P.x + Math.sin(deadAng) * 7, cz = P.z + Math.cos(deadAng) * 7;
+  let cy = P.y + 3.6;
+  for (let k = 0; k < 10 && SOLID[getBlock(Math.floor(cx), Math.floor(cy), Math.floor(cz))]; k++) cy += 1;
+  cam.position.set(cx, cy, cz); cam.lookAt(P.x, P.y + .8, P.z);
+}
+CMDS.kill = () => {
+  if (dead) return null;
+  if (riding) exitPlane();
+  st.hp = 0; die();
+  return 'You fell over… shh, stay still and watch the animals';
+};
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -4797,7 +4870,7 @@ function loop(now) {
     updateSurvival(dt); updateMining(dt); ensureCobble();
     updateWeather(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
-    updateMobs(dt); updatePets(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
+    updateMobs(dt); updatePets(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
   } else if (!everPlayed && !reduceMotion) {
     P.yaw += dt * .04;
@@ -4811,6 +4884,7 @@ function loop(now) {
   }
   cam.rotation.set(P.pitch, P.yaw, 0);
   if (riding) chaseCam();
+  else if (dead && playing) deadCam(dt);
   cam.updateMatrixWorld();
   const hw = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)) === WATERB;
   if (hw !== headInWater) { headInWater = hw; tintEl.hidden = !hw; }

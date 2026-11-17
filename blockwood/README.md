@@ -21,7 +21,7 @@ build on it, fly over it. The world saves in the browser.
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
 | Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
-| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
+| Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/kill`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
 | Sleep | right click a bed at night to skip to morning (also sets your respawn point) |
@@ -119,6 +119,11 @@ build on it, fly over it. The world saves in the browser.
 - `/summon NAME` makes any mob in front of you (like `/summon horse` or `/summon deep watcher`);
   `/mobs` lists every name. Summoned monsters stay even in Creative, where they can't hurt you.
 - A pet **wolf** fights monsters for you. Any animal can be a pet, even bees and parrots.
+- **The secret life of animals**: type `/kill` (or die any other way) and the camera floats up over
+  the spot where you fell. Thinking you're gone, the animals stop pretending: pigs, horses, wolves
+  and cats walk around on two legs like people, cows dance, sheep jump, chickens fly loops, rabbits
+  bounce sky-high, monsters wiggle, and they chat about it. Press Respawn and they all freeze back
+  to normal.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:
   click things in your backpack to put them in (27 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
