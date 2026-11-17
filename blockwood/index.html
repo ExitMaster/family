@@ -4747,10 +4747,10 @@ CMDS.summon = a => { // /summon zombie, /summon 100 zombie or /summon zombie 100
 CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
 
 /* ---------- chests ---------- */
-// Right-click a chest to open it: 27 slots of storage. Click things in your backpack to put them in, click things in the
+// Right-click a chest to open it: 54 slots of storage. Click things in your backpack to put them in, click things in the
 // chest to take them out (in Creative, clicking any block puts 64 of it in). Breaking a chest gives you what was inside.
 // Chests are saved with your world; in a multiplayer room they live at rooms/{CODE}/blockwood/chests, shared by everyone.
-const CHEST_N = 27;
+const CHEST_N = 54;
 let chests = new Map(), chestF = null;
 HARD[CHEST] = 1.5; MAT[CHEST] = 'wood';
 RECIPES.push([CHEST, 1, [[PLANKS, 8]]]);

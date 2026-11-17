@@ -142,7 +142,7 @@ build on it, fly over it. The world saves in the browser.
   In a multiplayer room your friends see you lying where you fell, and as a see-through floating
   ghost while you fly around.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:
-  click things in your backpack to put them in (27 slots), click things in the chest to take them out.
+  click things in your backpack to put them in (54 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
   Chests are saved with your world, and in a multiplayer room everyone shares them.
 - **Clone yourself**: type `/clone` (or `/clone 5`, up to 10). Clones look like you, follow you
