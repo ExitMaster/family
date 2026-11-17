@@ -3660,7 +3660,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon 10 NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4727,16 +4727,22 @@ function watcherThink(m, K, dt) {
   const aL = m.g.getObjectByName('armL'), aR = m.g.getObjectByName('armR');
   if (aL) aL.rotation.x = s; if (aR) aR.rotation.x = m.atk > 1 ? s : -Math.sin(m.ph) * .3;
 }
-CMDS.summon = a => {
-  const q = (a || '').toLowerCase().replace(/[^a-z]/g, '');
-  const kind = Object.keys(KINDS).find(k => k === q || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q);
-  if (!kind) return 'Type /summon NAME. Type /mobs to see every name';
+CMDS.summon = a => { // /summon zombie, /summon 100 zombie or /summon zombie 100
+  const num = ((a || '').match(/\d+/) || [])[0], n = Math.max(1, Math.min(100, num ? parseInt(num, 10) : 1));
+  const q = (a || '').toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, '');
+  const kind = Object.keys(KINDS).find(k => k === q || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q)
+    || Object.keys(KINDS).find(k => k === q + 's' || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q + 's');
+  if (!kind) return 'Type /summon NAME or /summon 100 NAME. Type /mobs to see every name';
   if (dim === 'e' && kind !== 'watcher' && !KINDS[kind].hostile) return "Animals can't live in the End";
-  const x = P.x - Math.sin(P.yaw) * 3, z = P.z - Math.cos(P.yaw) * 3;
-  let y = Math.floor(P.y) + 1;
-  if (!KINDS[kind].fly && !KINDS[kind].swim) { while (y > 0 && !SOLID[getBlock(Math.floor(x), y - 1, Math.floor(z))]) y--; while (SOLID[getBlock(Math.floor(x), y, Math.floor(z))] && y < H - 3) y++; }
-  addMob(kind, x, y, z); mobs[mobs.length - 1].summoned = true;
-  return `${kindName(kind)} appeared` + (KINDS[kind].hostile && mode !== 's' ? ' (monsters only fight in Survival)' : '');
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), sx = Math.cos(P.yaw), sz = -Math.sin(P.yaw), gap = Math.max(1.2, KINDS[kind].hw * 2.6);
+  for (let i = 0; i < n; i++) {
+    const row = Math.floor(i / 10), col = i % 10, across = n === 1 ? 0 : (col - (Math.min(n, 10) - 1) / 2) * gap;
+    const x = P.x + fx * (3 + row * gap) + sx * across, z = P.z + fz * (3 + row * gap) + sz * across;
+    let y = Math.floor(P.y) + 1;
+    if (!KINDS[kind].fly && !KINDS[kind].swim) { while (y > 0 && !SOLID[getBlock(Math.floor(x), y - 1, Math.floor(z))]) y--; while (SOLID[getBlock(Math.floor(x), y, Math.floor(z))] && y < H - 3) y++; }
+    addMob(kind, x, y, z); mobs[mobs.length - 1].summoned = true;
+  }
+  return (n === 1 ? `${kindName(kind)} appeared` : `${n} × ${kindName(kind).toLowerCase()} appeared`) + (KINDS[kind].hostile && mode !== 's' ? ' (monsters only fight in Survival)' : '');
 };
 CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
 
