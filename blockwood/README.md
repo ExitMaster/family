@@ -20,7 +20,7 @@ build on it, fly over it. The world saves in the browser.
 | Backpack & crafting | `E` (touch: Bag button) |
 | Eat | right click while holding food (Survival) |
 | Trade | right click a villager (Survival) |
-| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift` to get out (touch: stick up to speed up, Exit button) |
+| Airplane | place it, right click to get in; `W` speeds up, `S` slows down, arrow keys steer (`←` `→` turn, `↑` climb, `↓` dive) or look where you want to fly, `V` autopilots to the nearest villager's house and lands by the door (touch: Land button), `Shift`, `Q` or `X` to get out (touch: stick up to speed up, Exit button) |
 | Chat | `T`, `Enter` or `/` (touch: 💬 button). In a multiplayer room everyone sees it. Commands: `/help`, `/find`, `/tp NAME`, `/tp X Y Z`, `/spawn`, `/trade NAME`, `/pvp on|off`, `/kick NAME`, `/kill`, `/summon NAME`, `/mobs`, `/day`, `/night`, `/weather rain|storm|clear`, `/seed`, `/spawn`, `/fly`, `/clear` |
 | Bow | hold right click to pull back, let go to shoot (longer pull = faster, harder arrow) |
 | Ender pearl | right click to teleport to where you look |
@@ -126,6 +126,8 @@ build on it, fly over it. The world saves in the browser.
   to normal.
   Press **Live secret life 👻** to become a ghost and fly around among them (WASD, Space up,
   Shift down); they can't see you. Esc brings the death screen back.
+  In a multiplayer room your friends see you lying where you fell, and as a see-through floating
+  ghost while you fly around.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:
   click things in your backpack to put them in (27 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.

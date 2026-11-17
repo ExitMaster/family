@@ -1185,7 +1185,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1359,7 +1359,7 @@ addEventListener('keydown', e => {
   if (invOpen) { if (!e.repeat && (e.code === 'KeyE' || e.code === 'Escape')) closeInv(e.code === 'KeyE'); return; }
   if (dead && !ghost) return;
   if (riding) {
-    if (e.code.startsWith('Shift') && !e.repeat) exitPlane();
+    if ((e.code.startsWith('Shift') || e.code === 'KeyQ' || e.code === 'KeyX') && !e.repeat) { exitPlane(); return; }
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
     if (e.code === 'KeyM' && !e.repeat) toggleSound();
     if (e.code === 'KeyV' && !e.repeat) autoLand();
@@ -3334,7 +3334,7 @@ function arrowHits(a) {
     return true;
   }
   if (mp.on) for (const [id, f] of avatars) {
-    if (!f.g.visible || !inBox(a.x, a.y, a.z, f.x, f.y, f.z, HW + .15, PHGT)) continue;
+    if (!f.g.visible || (f.p && f.p.k === 2) || !inBox(a.x, a.y, a.z, f.x, f.y, f.z, HW + .15, PHGT)) continue;
     if (!pvpBlocked(id)) hitFriend(id, a.dmg, a.x - a.vx * .1, a.z - a.vz * .1);
     return true;
   }
@@ -3561,7 +3561,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${dim}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -3621,10 +3621,11 @@ function mpTick(dt) {
     a.legs[0].rotation.x = sw; a.legs[1].rotation.x = -sw; a.arms[0].rotation.x = -sw; a.arms[1].rotation.x = sw;
     a.head.rotation.x = Math.max(-1, Math.min(1, p.pitch || 0));
     a.g.position.set(a.x, a.y, a.z); a.g.rotation.y = a.yaw;
+    avatarState(a, p.k || 0);
   }
   if ((mp.sendT -= dt) > 0) return;
   mp.sendT = .15;
-  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v].join();
+  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v, me.k].join();
   if (sig !== mp.last) { mp.last = sig; quiet(mp.fb.update(R('/players/' + mp.uid), me)); }
 }
 /* ---------- chat ---------- */
@@ -4092,6 +4093,7 @@ function avatarHit(maxD) {
   let best = null, bt = maxD;
   for (const [id, a] of avatars) {
     if (!a.g.visible) continue;
+    if (a.p && a.p.k === 2) continue; // ghosts can't be clicked
     const t = rayBox([a.x - .4, a.y, a.z - .4], [a.x + .4, a.y + 1.9, a.z + .4], bt);
     if (t >= 0 && t < bt) { bt = t; best = id; }
   }
@@ -4346,6 +4348,7 @@ function pvpBlocked(id) {
   if (!pvp) return 'Fighting is off for you. Type /pvp on';
   if (!a || !a.p) return 'They left';
   if (a.p.v === 0) return `${nameOfFriend(id)} has fighting turned off`;
+  if (a.p.k) return `${nameOfFriend(id)} is ${a.p.k === 2 ? 'a ghost' : 'knocked out'} right now`;
   if (!a.p.s) return `${nameOfFriend(id)} can't be hurt right now (Creative)`;
   return null;
 }
@@ -4952,6 +4955,23 @@ function endGhost() {
 $('#secretGo').addEventListener('click', startGhost);
 $('#ghostRespawn').addEventListener('click', () => { endGhost(); respawn(); });
 for (const b of [$('#ghostRespawn')]) b.addEventListener('pointerdown', e => e.stopPropagation());
+
+/* ---------- friends who are knocked out or ghosts ---------- */
+// A friend who died lies on the ground where they fell; one who pressed "Live secret life" floats about as a see-through
+// ghost (k in their player data: 1 knocked out, 2 ghost). Arrows and clicks go straight through ghosts.
+const GHOST_MAT = new THREE.MeshLambertMaterial({color: 0xdfeaff, emissive: 0x30405a, transparent: true, opacity: .42, depthWrite: false});
+function avatarState(a, k) {
+  if (a.k !== k) {
+    a.k = k;
+    a.g.traverse(o => { if (!o.isMesh) return; if (!o.userData.orig) o.userData.orig = o.material; o.material = k === 2 ? GHOST_MAT : o.userData.orig; });
+  }
+  a.g.rotation.order = 'YXZ';
+  a.g.rotation.z = k === 1 ? Math.PI / 2 : 0;
+  if (k === 2) {
+    a.g.position.y += .3 + Math.sin(performance.now() / 420 + a.x) * .15;
+    a.legs[0].rotation.x = .35; a.legs[1].rotation.x = .2; a.arms[0].rotation.x = a.arms[1].rotation.x = -.5;
+  }
+}
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
