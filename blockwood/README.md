@@ -128,7 +128,8 @@ build on it, fly over it. The world saves in the browser.
   caves. It can't see you, but it hears you dig, build, run or jump (and always notices you right
   next to it). You can hear its heartbeat when it's close. It hits very hard; sneak away slowly!
 - `/summon NAME` makes any mob in front of you (like `/summon horse` or `/summon deep watcher`), and
-  `/summon 100 zombie` makes up to 100 at once, lined up in rows;
+  `/summon 100 zombie` makes up to 100 at once, lined up in rows (summoned zombies and skeletons
+  don't burn in daylight);
   `/mobs` lists every name. Summoned monsters stay even in Creative, where they can't hurt you.
 - A pet **wolf** fights monsters for you. Any animal can be a pet, even bees and parrots.
 - **The secret life of animals**: type `/kill` (or die any other way) and the camera floats up over

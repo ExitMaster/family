@@ -2227,7 +2227,7 @@ function zombieThink(m, dt) {
     if (d < 1.2 + KINDS[m.kind].hw && Math.abs(T.y - m.y) < 1.6 && m.atk <= 0) { m.atk = 1; hitFoe(T, KINDS[m.kind].dmg || 3, m.x, m.z); }
     if (Math.random() < dt * .15) KINDS[m.kind].say([m.x, m.y + 1.6, m.z]);
   } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
-  if (!KINDS[m.kind].noBurn && dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
+  if (!KINDS[m.kind].noBurn && !m.summoned && dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
     m.burnT = 1;
     if (m.y + 1 >= colTop(Math.floor(m.x), Math.floor(m.z))) { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xff8a20)); hurtMob(m, 3); }
   }
@@ -3416,7 +3416,7 @@ function archerThink(m, K, dt) {
     }
     if (Math.random() < dt * .12) K.say([m.x, m.y + 1.6, m.z]);
   } else if (m.t <= 0) { m.walk = Math.random() < .4; m.yaw = Math.random() * 6.283; m.t = 3 + Math.random() * 4; }
-  if (!KINDS[m.kind].noBurn && dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
+  if (!KINDS[m.kind].noBurn && !m.summoned && dayAmt > .5 && (m.burnT = (m.burnT || 0) - dt) <= 0) {
     m.burnT = 1;
     if (m.y + 1 >= colTop(Math.floor(m.x), Math.floor(m.z))) { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xff8a20)); hurtMob(m, 3); }
   }
