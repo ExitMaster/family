@@ -113,6 +113,17 @@ build on it, fly over it. The world saves in the browser.
   squid, dolphins and axolotls in the water. At night: spiders (they climb walls), slimes (big ones
   split in two), witches that throw magic, bandits with crossbows and brutes with axes; husks in the
   desert. In caves: bats, silverfish and cave spiders.
+- **67 more**: deer, bison, brown bears, elephants, giraffes, zebras, lions, tigers, hippos, rhinos,
+  raccoons, skunks, hedgehogs, mice, squirrels, beavers, otters, boars, alpacas, capybaras, red pandas,
+  koalas, sloths, snakes, dogs (a pet dog fights monsters too), peacocks, ducks, geese, turkeys,
+  unicorns (rare), snails, ladybugs, owls, eagles, crows, butterflies, dragonflies, fairies and
+  dragonlings (both rare, and both can be pets) on the grass; camels, cheetahs, kangaroos,
+  tortoises, lizards, armadillos, ostriches and crabs on sand; moose, reindeer, arctic foxes and
+  penguins in the snow; sharks (they chase swimmers) and whales in deep water, and octopuses,
+  jellyfish, seals, pufferfish and clownfish. At night: goblins, orcs, trolls, imps and flying
+  wraiths, with mummies and scorpions in the desert and yetis in the snow. And deep in caves,
+  watch out for chests with teeth: mimics. Lions, tigers, bears, bison, boars, geese, hippos,
+  rhinos, cheetahs and snakes only fight back if you hit them.
 - **The Deep Watcher**: a blind stone giant with a glowing core that very rarely lives deep in the
   caves. It can't see you, but it hears you dig, build, run or jump (and always notices you right
   next to it). You can hear its heartbeat when it's close. It hits very hard; sneak away slowly!

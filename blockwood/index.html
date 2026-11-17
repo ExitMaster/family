@@ -2286,7 +2286,8 @@ function swim(m, K, dt) {
   m.t -= dt; m.flee -= dt;
   if (getBlock(fl(m.x), fl(m.y + .12), fl(m.z)) === WATERB) {
     m.dry = 0;
-    if (m.t <= 0) { m.yaw = Math.random() * 6.283; m.ty = (Math.random() - .5) * .8; m.t = 1 + Math.random() * 3; }
+    if (K.bite && swimHunt(m, K, dt)) { /* chasing you */ }
+    else if (m.t <= 0) { m.yaw = Math.random() * 6.283; m.ty = (Math.random() - .5) * .8; m.t = 1 + Math.random() * 3; }
     const sp = K.speed * (m.flee > 0 ? 2.2 : 1), k = Math.min(1, 3 * dt);
     m.vx += (-Math.sin(m.yaw) * sp - m.vx) * k; m.vz += (-Math.cos(m.yaw) * sp - m.vz) * k; m.vy += ((m.ty || 0) - m.vy) * k;
     const nx = m.x + m.vx * dt, ny = m.y + m.vy * dt, nz = m.z + m.vz * dt;
@@ -4630,7 +4631,9 @@ function flyMob(m, K, dt) {
   const fl = Math.floor;
   m.t -= dt; m.flee -= dt;
   if (m.home === undefined) m.home = m.y;
-  if (m.pet) {
+  if (K.hostile && flyHunt(m, K, dt)) {
+    if (m.y < -10) return;
+  } else if (m.pet) {
     const dx = P.x - m.x, dz = P.z - m.z, d = Math.hypot(dx, dz);
     m.yaw = Math.atan2(-dx, -dz); m.fsp = d > 3 ? (d > 8 ? 2.2 : 1.2) : 0; m.ty = P.y + 2.2;
   } else if (m.t <= 0) {
@@ -4971,6 +4974,319 @@ function avatarState(a, k) {
     a.g.position.y += .3 + Math.sin(performance.now() / 420 + a.x) * .15;
     a.legs[0].rotation.x = .35; a.legs[1].rotation.x = .2; a.arms[0].rotation.x = a.arms[1].rotation.x = -.5;
   }
+}
+
+/* ---------- 67 more animals and monsters ---------- */
+// Built from a few body shapes: four-legged animals (mobQ), two-legged birds (mobB2), fliers (mobF), swimmers (mobS) and humanoid
+// monsters (mobHM), plus a handful of one-offs. Each one says where it spawns (sp) and how often (w).
+const MORE = {};
+const dk = (c, k = .7) => OFF(c, k);
+function mobQ(o, ex) { // four legs
+  const lh = o.lh, bh = o.bh, neck = o.neck || 0, hy = lh + bh * .75 + neck + o.hh * .2, hz = -(o.bd / 2 + o.hd * .35);
+  const a = {lh, bh, top: lh + bh, hy, hz, front: hz - o.hd / 2, back: o.bd / 2, hh: o.hh, hw: o.hw, bw: o.bw, bd: o.bd, by: lh + bh / 2};
+  return {col: o.c, hw: Math.max(.12, Math.max(o.bw, o.hw) / 2 + .02), h: Math.max(a.top, hy + o.hh / 2) + (o.xh || 0), build(g) {
+    part(g, o.c, o.bw, bh, o.bd, 0, a.by, 0);
+    if (neck) part(g, o.nc || o.hc || o.c, o.hw * .62, neck + bh * .45, o.hd * .55, 0, lh + bh * .6 + neck / 2, hz + o.hd * .15);
+    part(g, o.hc || o.c, o.hw, o.hh, o.hd, 0, hy, hz);
+    eyes(g, hy + o.hh * .15, a.front - .01, o.hw * .28);
+    if (ex) ex(g, a);
+    return quad(g, o.lc || o.c, o.lw, lh, o.bw / 2 - o.lw / 2, o.bd / 2 - o.lw / 2 - .02);
+  }};
+}
+function mobB2(o, ex) { // two legs: birds and the like
+  const lh = o.lh, by = lh + o.bh / 2, neck = o.neck || 0, hy = lh + o.bh + o.hh / 2 - .04 + neck, hz = -o.bd * .32;
+  const a = {lh, by, top: lh + o.bh, hy, hz, front: hz - o.hd / 2, back: o.bd / 2, bw: o.bw, bh: o.bh, bd: o.bd};
+  return {col: o.c, biped: true, hw: Math.max(.12, o.bw / 2 + .02), h: hy + o.hh / 2 + (o.xh || 0), build(g) {
+    part(g, o.c, o.bw, o.bh, o.bd, 0, by, 0);
+    if (neck) part(g, o.nc || o.hc || o.c, o.hw * .55, neck + .1, o.hd * .55, 0, lh + o.bh + neck / 2 - .05, hz);
+    part(g, o.hc || o.c, o.hw, o.hh, o.hd, 0, hy, hz); eyes(g, hy + o.hh * .12, a.front - .01, o.hw * .3);
+    if (o.beak) part(g, o.beak, o.hw * .4, o.hh * .25, o.hd * .45, 0, hy - o.hh * .1, a.front - o.hd * .2);
+    part(g, o.wc || dk(o.c), .04, o.bh * .7, o.bd * .7, -(o.bw / 2 + .02), by, 0); part(g, o.wc || dk(o.c), .04, o.bh * .7, o.bd * .7, o.bw / 2 + .02, by, 0);
+    if (ex) ex(g, a);
+    return [leg(g, o.lc || 0xe8a030, o.lw || .06, lh, -o.bw / 4, 0), leg(g, o.lc || 0xe8a030, o.lw || .06, lh, o.bw / 4, 0)];
+  }};
+}
+function mobF(o, ex) { // fliers
+  const y = .4;
+  return {col: o.c, fly: true, hw: Math.max(.12, o.bw / 2 + .02), h: y + o.bh / 2 + o.hh + .05, build(g) {
+    part(g, o.c, o.bw, o.bh, o.bd, 0, y, 0);
+    if (o.hh) { part(g, o.hc || o.c, o.hw, o.hh, o.hd, 0, y + o.bh * .3, -o.bd / 2 - o.hd * .3); eyes(g, y + o.bh * .35, -o.bd / 2 - o.hd * .8 - .01, o.hw * .3); }
+    if (o.beak) part(g, o.beak, .06, .05, .1, 0, y + o.bh * .2, -o.bd / 2 - o.hd * .8 - .05);
+    if (ex) ex(g, y);
+    return [wing(g, o.wc || o.c, -o.bw / 2, y + o.bh * .2, o.ww, o.wd), wing(g, o.wc || o.c, o.bw / 2, y + o.bh * .2, o.ww, o.wd)];
+  }};
+}
+function mobS(o, ex) { // swimmers
+  return {col: o.c, swim: true, hw: Math.max(.12, o.bw / 2), h: o.bh + .05, build(g) {
+    part(g, o.c, o.bw, o.bh, o.bd, 0, o.bh / 2, 0); eyes(g, o.bh * .6, -o.bd / 2 - .01, o.bw * .3);
+    if (ex) ex(g);
+    const t = new THREE.Group(); t.position.set(0, o.bh / 2, o.bd / 2); part(t, o.tc || o.c, o.tw || o.bw * .8, o.th || .06, o.td || o.bd * .25, 0, 0, (o.td || o.bd * .25) / 2); g.add(t);
+    return [t];
+  }};
+}
+function mobHM(o, ex) { // humanoid monsters
+  const s = o.s || 1;
+  return {col: o.shirt, biped: true, hw: .3 * s, h: 1.95 * s + (o.xh || 0), build(g) {
+    const legs = humanoid(g, o.skin, o.shirt, o.pants, o.fwd !== false, s);
+    if (ex) ex(g, s);
+    return legs;
+  }};
+}
+const def2 = (k, o) => { MORE[k] = Object.assign({hurtF: 500, speed: 1.2, hp: 10, say(at) { tone(this.vf || 500, (this.vf || 500) * .72, .2, .14, this.vt || 'triangle', at); }}, o); };
+const meatDrop = (id, n) => function () { give(id, n + (Math.random() < .5 ? 1 : 0)); };
+
+// grassland, forest and river animals
+def2('deer', {name: 'Deer', speed: 2, sp: 'grass', w: 1, vf: 900, drop: meatDrop(BEEF, 1), ...mobQ({c: 0x9a6a3a, bw: .4, bh: .45, bd: .9, hw: .3, hh: .3, hd: .4, lw: .12, lh: .7, neck: .2}, (g, a) => {
+  for (const s of [-1, 1]) { part(g, 0x5a3a1a, .04, .3, .04, s * .1, a.hy + .28, a.hz); part(g, 0x5a3a1a, .18, .04, .04, s * .16, a.hy + .4, a.hz); }
+  part(g, 0xf0e8d8, .1, .12, .06, 0, a.top - .05, a.back + .02); })});
+def2('bison', {name: 'Bison', speed: 1.2, hp: 30, neutral: true, dmg: 5, fast: 2.6, sp: 'grass', w: .5, vf: 120, vt: 'sawtooth', drop: meatDrop(BEEF, 2), ...mobQ({c: 0x5a3a22, bw: .75, bh: .8, bd: 1.3, hw: .5, hh: .5, hd: .5, lw: .22, lh: .6}, (g, a) => {
+  part(g, 0x3a2414, .78, .45, .6, 0, a.top + .12, -.2); for (const s of [-1, 1]) part(g, 0xe8e2d0, .08, .16, .08, s * .28, a.hy + .2, a.hz); })});
+def2('elephant', {name: 'Elephant', speed: .9, hp: 60, sp: 'grass', w: .15, vf: 300, vt: 'sawtooth', ...mobQ({c: 0x8a8a92, bw: 1.2, bh: 1.1, bd: 1.8, hw: .8, hh: .8, hd: .6, lw: .38, lh: .9}, (g, a) => {
+  for (const s of [-1, 1]) { part(g, 0x7a7a82, .06, .65, .6, s * .45, a.hy, a.hz + .25); part(g, 0xf4f0e0, .08, .08, .4, s * .22, a.hy - .35, a.front - .15); }
+  part(g, 0x8a8a92, .2, .8, .2, 0, a.hy - .5, a.front - .08); })});
+def2('giraffe', {name: 'Giraffe', speed: 1.3, hp: 20, sp: 'grass', w: .2, vf: 300, ...mobQ({c: 0xe0b050, bw: .6, bh: .6, bd: 1, hw: .3, hh: .3, hd: .45, lw: .16, lh: 1.3, neck: 1.3}, (g, a) => {
+  for (let k = 0; k < 6; k++) part(g, 0x8a5a22, .62, .14, .14, 0, a.lh + .12 + (k % 2) * .3, -.35 + k * .14);
+  for (const s of [-1, 1]) part(g, 0x8a5a22, .05, .14, .05, s * .08, a.hy + .22, a.hz); })});
+def2('zebra', {name: 'Zebra', speed: 1.8, hp: 18, sp: 'grass', w: .5, vf: 700, vt: 'sawtooth', ...mobQ({c: 0xf4f4f0, bw: .5, bh: .55, bd: 1.1, hw: .28, hh: .3, hd: .55, lw: .16, lh: .85, neck: .4}, (g, a) => {
+  for (let k = 0; k < 5; k++) part(g, 0x1e1e1e, .52, .57, .06, 0, a.by, -.4 + k * .2);
+  part(g, 0x1e1e1e, .06, .5, .3, 0, a.hy - .2, a.hz + .2); })});
+def2('lion', {name: 'Lion', speed: 1.2, hp: 24, neutral: true, dmg: 6, fast: 3.4, sp: 'grass', w: .25, vf: 110, vt: 'sawtooth', ...mobQ({c: 0xd8a050, bw: .5, bh: .5, bd: 1.1, hw: .4, hh: .4, hd: .4, lw: .16, lh: .55}, (g, a) => {
+  part(g, 0x8a5a22, .62, .62, .26, 0, a.hy, a.hz + .12); part(g, 0xd8a050, .06, .06, .5, 0, a.top - .1, a.back + .25); })});
+def2('tiger', {name: 'Tiger', speed: 1.2, hp: 24, neutral: true, dmg: 6, fast: 3.6, sp: 'grass', w: .2, vf: 120, vt: 'sawtooth', ...mobQ({c: 0xe8862a, bw: .5, bh: .5, bd: 1.2, hw: .4, hh: .38, hd: .4, lw: .16, lh: .55}, (g, a) => {
+  for (let k = 0; k < 5; k++) part(g, 0x1e1e1e, .52, .52, .05, 0, a.by + .01, -.45 + k * .22);
+  part(g, 0xf4f0e0, .3, .12, .06, 0, a.hy - .12, a.front - .01); })});
+def2('hippo', {name: 'Hippo', speed: .8, hp: 40, neutral: true, dmg: 7, fast: 2.2, sp: 'grass', w: .2, vf: 90, vt: 'sawtooth', ...mobQ({c: 0x8a7a8a, bw: .9, bh: .7, bd: 1.4, hw: .7, hh: .5, hd: .7, lw: .26, lh: .35}, (g, a) => {
+  for (const s of [-1, 1]) { part(g, 0x2a2a2a, .08, .06, .02, s * .15, a.hy + .05, a.front - .01); part(g, 0x8a7a8a, .1, .1, .06, s * .25, a.hy + .3, a.hz + .2); } })});
+def2('rhino', {name: 'Rhino', speed: 1, hp: 40, neutral: true, dmg: 7, fast: 3, sp: 'grass', w: .2, vf: 100, vt: 'sawtooth', ...mobQ({c: 0x7a7a7a, bw: .8, bh: .7, bd: 1.5, hw: .5, hh: .45, hd: .6, lw: .26, lh: .5}, (g, a) => {
+  part(g, 0xd8d0c0, .12, .35, .12, 0, a.hy + .3, a.front + .08); part(g, 0xd8d0c0, .08, .18, .08, 0, a.hy + .26, a.front + .32); })});
+def2('bear', {name: 'Brown bear', speed: 1.1, hp: 30, neutral: true, dmg: 6, fast: 3, sp: 'grass', w: .3, vf: 110, vt: 'sawtooth', drop: meatDrop(RFISH, 1), ...mobQ({c: 0x6a4428, bw: .7, bh: .7, bd: 1.2, hw: .45, hh: .42, hd: .45, lw: .26, lh: .55}, (g, a) => {
+  part(g, 0x8a6a48, .24, .18, .16, 0, a.hy - .06, a.front - .06); part(g, 0x1e1e1e, .1, .06, .02, 0, a.hy - .02, a.front - .15);
+  for (const s of [-1, 1]) part(g, 0x6a4428, .1, .1, .06, s * .16, a.hy + .25, a.hz); })});
+def2('raccoon', {name: 'Raccoon', speed: 1.6, hp: 6, sp: 'grass', w: .5, vf: 1100, ...mobQ({c: 0x8a8a8a, bw: .3, bh: .26, bd: .5, hw: .3, hh: .26, hd: .26, lw: .08, lh: .2}, (g, a) => {
+  part(g, 0x1e1e1e, .31, .08, .02, 0, a.hy + .04, a.front - .005);
+  for (let k = 0; k < 3; k++) part(g, k % 2 ? 0x1e1e1e : 0x8a8a8a, .12, .12, .13, 0, a.top - .06, a.back + .07 + k * .13); })});
+def2('skunk', {name: 'Skunk', speed: 1.2, hp: 6, sp: 'grass', w: .4, vf: 1000, ...mobQ({c: 0x1e1e1e, bw: .3, bh: .25, bd: .5, hw: .26, hh: .22, hd: .24, lw: .08, lh: .15}, (g, a) => {
+  part(g, 0xf4f4f4, .1, .02, .5, 0, a.top + .01, 0); part(g, 0x1e1e1e, .2, .45, .2, 0, a.top + .15, a.back + .05); part(g, 0xf4f4f4, .21, .1, .21, 0, a.top + .34, a.back + .05); })});
+def2('hedgehog', {name: 'Hedgehog', speed: .9, hp: 4, sp: 'grass', w: .5, vf: 1600, ...mobQ({c: 0x8a6a4a, hc: 0xc8a888, bw: .3, bh: .2, bd: .4, hw: .18, hh: .16, hd: .18, lw: .06, lh: .08}, (g, a) => {
+  part(g, 0x4a3a2a, .36, .14, .44, 0, a.top + .02, .02); })});
+def2('mouse', {name: 'Mouse', speed: 2.4, hp: 2, sp: 'grass', w: .5, vf: 2600, vt: 'square', ...mobQ({c: 0x9a9aa2, bw: .14, bh: .12, bd: .24, hw: .12, hh: .1, hd: .12, lw: .04, lh: .05}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0xe8b0b0, .07, .07, .02, s * .06, a.hy + .07, a.hz); part(g, 0xe8b0b0, .02, .02, .3, 0, a.lh + .05, a.back + .15); })});
+def2('squirrel', {name: 'Squirrel', speed: 2.6, hp: 3, hop: true, sp: 'grass', w: .6, vf: 2000, vt: 'square', ...mobQ({c: 0xb8662a, bw: .16, bh: .16, bd: .3, hw: .14, hh: .14, hd: .14, lw: .05, lh: .1}, (g, a) => {
+  part(g, 0xb8662a, .16, .4, .14, 0, a.top + .12, a.back + .06); })});
+def2('beaver', {name: 'Beaver', speed: 1, hp: 8, sp: 'grass', w: .3, vf: 700, ...mobQ({c: 0x6a4426, bw: .34, bh: .28, bd: .5, hw: .26, hh: .22, hd: .24, lw: .08, lh: .1}, (g, a) => {
+  part(g, 0x3a2a1a, .22, .04, .32, 0, a.lh, a.back + .16); part(g, 0xf4f0d0, .07, .07, .02, 0, a.hy - .08, a.front - .01); })});
+def2('otter', {name: 'Otter', speed: 1.6, hp: 8, sp: 'grass', w: .3, vf: 1400, ...mobQ({c: 0x6a4a2a, hc: 0x8a6a4a, bw: .26, bh: .22, bd: .6, hw: .22, hh: .2, hd: .22, lw: .07, lh: .12}, (g, a) => {
+  part(g, 0x6a4a2a, .1, .08, .36, 0, a.lh + .1, a.back + .18); })});
+def2('boar', {name: 'Boar', speed: 1.3, hp: 14, neutral: true, dmg: 3, fast: 3, sp: 'grass', w: .4, vf: 260, vt: 'sawtooth', drop: meatDrop(PORK, 1), ...mobQ({c: 0x4a3424, bw: .45, bh: .45, bd: .8, hw: .36, hh: .34, hd: .36, lw: .12, lh: .3}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0xf4f0e0, .04, .12, .04, s * .1, a.hy - .04, a.front - .02); part(g, 0x2a1a10, .08, .1, .64, 0, a.top + .03, 0); })});
+def2('alpaca', {name: 'Alpaca', speed: 1.3, hp: 14, sp: 'grass', w: .4, vf: 800, ...mobQ({c: 0xf0e6d4, bw: .45, bh: .45, bd: .7, hw: .26, hh: .26, hd: .3, lw: .14, lh: .6, neck: .5}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0xf0e6d4, .06, .14, .04, s * .08, a.hy + .18, a.hz); part(g, 0xfff8ec, .3, .12, .3, 0, a.hy + .14, a.hz + .02); })});
+def2('capybara', {name: 'Capybara', speed: .9, hp: 10, sp: 'grass', w: .4, vf: 500, ...mobQ({c: 0x8a6a42, bw: .5, bh: .45, bd: .8, hw: .36, hh: .34, hd: .4, lw: .14, lh: .25}, (g, a) => {
+  part(g, 0x3a2a1a, .14, .08, .02, 0, a.hy - .06, a.front - .01); })});
+def2('redpanda', {name: 'Red panda', speed: 1.4, hp: 8, sp: 'grass', w: .3, vf: 1300, ...mobQ({c: 0xc8502a, lc: 0x2a1a1a, bw: .3, bh: .28, bd: .55, hw: .3, hh: .26, hd: .26, lw: .1, lh: .2}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0xf4f0e8, .08, .08, .02, s * .1, a.hy - .05, a.front - .01);
+  for (let k = 0; k < 3; k++) part(g, k % 2 ? 0x8a3a1a : 0xc8502a, .13, .13, .14, 0, a.top - .06, a.back + .07 + k * .14); })});
+def2('koala', {name: 'Koala', speed: .6, hp: 8, sp: 'grass', w: .2, vf: 300, vt: 'sawtooth', ...mobQ({c: 0x9a9aa2, bw: .36, bh: .36, bd: .4, hw: .34, hh: .3, hd: .3, lw: .12, lh: .2}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0xc8c8d0, .16, .16, .04, s * .19, a.hy + .14, a.hz); part(g, 0x2a2a2a, .1, .12, .04, 0, a.hy - .03, a.front - .01); })});
+def2('sloth', {name: 'Sloth', speed: .25, hp: 8, sp: 'grass', w: .2, vf: 400, ...mobQ({c: 0x8a7a5a, bw: .4, bh: .3, bd: .6, hw: .28, hh: .26, hd: .26, lw: .1, lh: .3}, (g, a) => {
+  part(g, 0xd8c8a0, .2, .16, .02, 0, a.hy, a.front - .005); })});
+def2('snake', {name: 'Snake', col: 0x4a8a3a, hw: .15, h: .2, speed: 1.2, hp: 8, neutral: true, dmg: 2, fast: 2.6, sp: 'grass', w: .3, hurtF: 900, build(g) {
+  for (let k = 0; k < 6; k++) part(g, k % 2 ? 0x4a8a3a : 0x6aa84a, .14, .12, .2, Math.sin(k) * .08, .06, -.5 + k * .2);
+  part(g, 0x4a8a3a, .18, .12, .22, 0, .08, -.66); eyes(g, .12, -.775, .05); part(g, 0xd02020, .02, .02, .1, 0, .06, -.82);
+  return [];
+}, say(at) { noise(.4, 'highpass', 4000, 1, .25, at); }});
+def2('dog', {name: 'Dog', speed: 2, hp: 12, bite: 4, sp: 'grass', w: .6, vf: 500, vt: 'square', ...mobQ({c: 0xc89a5a, bw: .32, bh: .32, bd: .7, hw: .32, hh: .3, hd: .32, lw: .12, lh: .4}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0x7a5a32, .08, .18, .1, s * .17, a.hy + .02, a.hz + .02);
+  part(g, 0xb08a4a, .16, .12, .14, 0, a.hy - .08, a.front - .06); part(g, 0x1e1e1e, .06, .05, .03, 0, a.hy - .04, a.front - .14);
+  part(g, 0xc89a5a, .08, .08, .3, 0, a.top, a.back + .14); part(g, 0xd82a2a, .34, .06, .1, 0, a.hy - .18, a.hz + .1); })});
+def2('peacock', {name: 'Peacock', speed: 1, hp: 8, sp: 'grass', w: .2, vf: 1200, vt: 'square', ...mobB2({c: 0x2a5ac8, beak: 0xc8c8a0, lc: 0x8a8a7a, bw: .3, bh: .3, bd: .45, hw: .16, hh: .16, hd: .18, lh: .35, neck: .25}, (g, a) => {
+  part(g, 0x2a8a5a, 1, .8, .04, 0, a.by + .42, a.back + .05);
+  for (let k = 0; k < 5; k++) part(g, 0xf2c230, .1, .1, .02, -.4 + k * .2, a.by + .62 - Math.abs(k - 2) * .06, a.back + .08);
+  part(g, 0x2a5ac8, .04, .14, .04, 0, a.hy + .15, a.hz); })});
+def2('duck', {name: 'Duck', speed: 1, hp: 4, sp: 'grass', w: .5, vf: 600, vt: 'square', drop: meatDrop(RCHICK, 0), ...mobB2({c: 0x8a7a6a, hc: 0x2a6a3a, beak: 0xe8b030, bw: .3, bh: .26, bd: .45, hw: .18, hh: .18, hd: .22, lh: .12, neck: .05})});
+def2('goose', {name: 'Goose', speed: 1.1, hp: 8, neutral: true, dmg: 2, fast: 2.6, sp: 'grass', w: .4, vf: 500, vt: 'sawtooth', drop: meatDrop(RCHICK, 0), ...mobB2({c: 0xf0f0ea, beak: 0xe8802a, lc: 0xe8802a, bw: .34, bh: .3, bd: .5, hw: .16, hh: .16, hd: .22, lh: .2, neck: .3})});
+def2('turkey', {name: 'Turkey', speed: 1, hp: 8, sp: 'grass', w: .4, vf: 700, vt: 'square', drop: meatDrop(RCHICK, 1), ...mobB2({c: 0x5a3a22, hc: 0x8aa0c8, beak: 0xd8c08a, bw: .4, bh: .4, bd: .45, hw: .14, hh: .16, hd: .16, lh: .3, neck: .2}, (g, a) => {
+  part(g, 0x8a5a2a, .7, .6, .04, 0, a.by + .25, a.back + .03); part(g, 0xd02020, .05, .12, .04, 0, a.hy - .12, a.front - .02); })});
+def2('unicorn', {name: 'Unicorn', col: 0xf8f4ff, hw: .55, h: 2.35, speed: 1.8, hp: 24, sp: 'grass', w: .05, hurtF: 400, build(g) {
+  const legs = KINDS.horse.build.call({col: 0xf8f4ff}, g);
+  part(g, 0xf2c230, .06, .42, .06, 0, 2.27, -.98); part(g, 0xd88ad8, .1, .74, .4, 0, 1.68, -.48); part(g, 0x8ad8f0, .16, .55, .16, 0, 1.05, .72);
+  return legs;
+}, say(at) { [880, 1100, 1320].forEach((f, i) => tone(f, f, .15, .1, 'sine', at, i * .08)); }});
+def2('snail', {name: 'Snail', col: 0xa0703a, hw: .16, h: .5, speed: .2, hp: 4, sp: 'grass', w: .4, hurtF: 1200, build(g) {
+  part(g, 0xc8b890, .16, .1, .5, 0, .05, -.05); part(g, 0xa0703a, .3, .3, .3, 0, .28, .05); part(g, 0xc89a5a, .16, .16, .32, 0, .28, .05);
+  for (const s of [-1, 1]) { part(g, 0xc8b890, .03, .16, .03, s * .05, .18, -.26); part(g, 0x1e1e1e, .05, .05, .05, s * .05, .27, -.26); }
+  return [];
+}, say() {}});
+def2('ladybug', {name: 'Ladybug', col: 0xd82a2a, hw: .14, h: .2, speed: .8, hp: 1, sp: 'grass', w: .5, hurtF: 2000, build(g) {
+  part(g, 0xd82a2a, .2, .1, .24, 0, .1, 0); part(g, 0x1e1e1e, .12, .08, .08, 0, .08, -.15);
+  for (const [x, z] of [[-.05, -.05], [.05, .04], [-.05, .07], [.06, -.06]]) part(g, 0x1e1e1e, .04, .02, .04, x, .155, z);
+  return [];
+}, say() {}});
+// desert and beach
+def2('camel', {name: 'Camel', speed: 1.2, hp: 20, sp: 'sand', w: 1, vf: 260, vt: 'sawtooth', ...mobQ({c: 0xc89a5a, bw: .6, bh: .5, bd: 1.2, hw: .3, hh: .3, hd: .5, lw: .16, lh: 1, neck: .5}, (g, a) => {
+  part(g, 0xc89a5a, .4, .35, .35, 0, a.top + .15, -.25); part(g, 0xc89a5a, .4, .35, .35, 0, a.top + .15, .3); })});
+def2('cheetah', {name: 'Cheetah', speed: 1.4, hp: 14, neutral: true, dmg: 4, fast: 5, sp: 'sand', w: .4, vf: 900, ...mobQ({c: 0xe8c070, bw: .35, bh: .38, bd: 1, hw: .3, hh: .28, hd: .3, lw: .1, lh: .65}, (g, a) => {
+  for (let k = 0; k < 8; k++) part(g, 0x2a1a10, .06, .06, .06, (k % 2 ? .18 : -.18), a.by + (k % 3) * .08 - .06, -.4 + k * .11);
+  part(g, 0xe8c070, .06, .06, .6, 0, a.top - .1, a.back + .3); })});
+def2('kangaroo', {name: 'Kangaroo', speed: 2.4, hp: 16, hop: true, sp: 'sand', w: .6, vf: 400, ...mobB2({c: 0xb87a4a, lc: 0xb87a4a, lw: .14, bw: .4, bh: .7, bd: .4, hw: .24, hh: .26, hd: .32, lh: .5, wc: 0xa06a3a}, (g, a) => {
+  for (const s of [-1, 1]) part(g, 0xb87a4a, .06, .16, .06, s * .08, a.hy + .2, a.hz); part(g, 0xb87a4a, .14, .14, .6, 0, a.lh + .1, a.back + .25); })});
+def2('tortoise', {name: 'Tortoise', speed: .3, hp: 20, sp: 'sand', w: .5, vf: 200, ...mobQ({c: 0x6a5a3a, hc: 0x8a9a6a, lc: 0x8a9a6a, bw: .5, bh: .25, bd: .6, hw: .18, hh: .16, hd: .2, lw: .14, lh: .15}, (g, a) => {
+  part(g, 0x8a7040, .6, .3, .7, 0, a.top + .05, 0); part(g, 0xa08850, .4, .1, .5, 0, a.top + .22, 0); })});
+def2('lizard', {name: 'Lizard', speed: 2.4, hp: 3, sp: 'sand', w: .8, vf: 2000, ...mobQ({c: 0x6aa04a, bw: .16, bh: .1, bd: .4, hw: .14, hh: .1, hd: .16, lw: .05, lh: .06}, (g, a) => {
+  part(g, 0x6aa04a, .06, .06, .4, 0, a.lh + .04, a.back + .2); })});
+def2('armadillo', {name: 'Armadillo', speed: 1.2, hp: 8, sp: 'sand', w: .5, vf: 900, ...mobQ({c: 0xb8a090, bw: .3, bh: .25, bd: .5, hw: .16, hh: .14, hd: .2, lw: .06, lh: .08}, (g, a) => {
+  for (let k = 0; k < 4; k++) part(g, 0x8a7a6a, .32, .04, .04, 0, a.top + .01, -.18 + k * .12); })});
+def2('ostrich', {name: 'Ostrich', speed: 3, hp: 14, sp: 'sand', w: .5, vf: 300, vt: 'sawtooth', ...mobB2({c: 0x2a2420, hc: 0xd8a0a0, nc: 0xd8a0a0, lc: 0xd8a0a0, lw: .08, beak: 0xd8c08a, bw: .5, bh: .45, bd: .7, hw: .16, hh: .16, hd: .22, lh: .9, neck: .7}, (g, a) => {
+  part(g, 0xf4f4f0, .3, .2, .1, 0, a.by + .1, a.back + .02); })});
+def2('crab', {name: 'Crab', col: 0xd8442a, hw: .3, h: .35, speed: 1.2, hp: 6, sp: 'sand', w: .6, hurtF: 1200, build(g) {
+  const c = 0xd8442a;
+  part(g, c, .5, .16, .36, 0, .2, 0);
+  for (const s of [-1, 1]) { part(g, c, .14, .12, .16, s * .34, .22, -.2); part(g, c, .03, .14, .03, s * .08, .34, -.14); part(g, 0x1e1e1e, .05, .05, .05, s * .08, .42, -.14); }
+  return quad(g, dk(c), .04, .14, .2, .12);
+}, say() {}});
+// snow
+def2('moose', {name: 'Moose', speed: 1.3, hp: 25, sp: 'snow', w: .6, vf: 150, vt: 'sawtooth', drop: meatDrop(BEEF, 2), ...mobQ({c: 0x4a3020, bw: .7, bh: .7, bd: 1.3, hw: .38, hh: .45, hd: .7, lw: .2, lh: 1, neck: .1}, (g, a) => {
+  part(g, 0xb89a6a, .95, .08, .32, 0, a.hy + .36, a.hz + .1); for (const s of [-1, 1]) part(g, 0xb89a6a, .06, .25, .06, s * .3, a.hy + .5, a.hz + .1); })});
+def2('reindeer', {name: 'Reindeer', speed: 1.8, hp: 14, sp: 'snow', w: .8, vf: 800, drop: meatDrop(BEEF, 1), ...mobQ({c: 0x7a5a3a, bw: .45, bh: .5, bd: 1, hw: .3, hh: .32, hd: .42, lw: .13, lh: .75, neck: .2}, (g, a) => {
+  for (const s of [-1, 1]) { part(g, 0xd8c8a0, .04, .4, .04, s * .12, a.hy + .34, a.hz); part(g, 0xd8c8a0, .22, .04, .04, s * .2, a.hy + .5, a.hz); part(g, 0xd8c8a0, .04, .16, .04, s * .28, a.hy + .58, a.hz); }
+  part(g, 0xd82a2a, .1, .08, .04, 0, a.hy - .06, a.front - .02); part(g, 0xf4f0e8, .46, .2, .3, 0, a.by + .05, -.32); })});
+def2('arcticfox', Object.assign({}, NEW_KINDS.fox, {name: 'Arctic fox', col: 0xf4f4f0, sp: 'snow', w: .8}));
+def2('penguin', {name: 'Penguin', speed: .8, hp: 8, sp: 'snow', w: .8, vf: 700, vt: 'square', ...mobB2({c: 0x1e1e2a, beak: 0xe8a030, wc: 0x1e1e2a, bw: .4, bh: .6, bd: .35, hw: .3, hh: .26, hd: .28, lh: .12, lw: .08}, (g, a) => {
+  part(g, 0xf4f4f4, .3, .5, .02, 0, a.by, -a.bd / 2 - .01); })});
+// fliers
+def2('owl', {name: 'Owl', speed: 2, hp: 6, sp: 'grass', w: .3, vf: 400, vt: 'sine', ...mobF({c: 0x8a6a4a, hc: 0x9a7a5a, beak: 0xe8b030, bw: .3, bh: .36, bd: .28, hw: .3, hh: .26, hd: .26, ww: .4, wd: .26}, (g, y) => {
+  for (const s of [-1, 1]) part(g, 0xf2c230, .1, .1, .02, s * .07, y + .34, -.44); })});
+def2('eagle', {name: 'Eagle', speed: 3, hp: 10, sp: 'grass', w: .2, vf: 1600, vt: 'sawtooth', ...mobF({c: 0x4a3020, hc: 0xf4f4f0, beak: 0xf2c230, bw: .3, bh: .26, bd: .5, hw: .2, hh: .2, hd: .24, ww: .9, wd: .34})});
+def2('crow', {name: 'Crow', speed: 2.6, hp: 4, sp: 'grass', w: .4, vf: 600, vt: 'sawtooth', ...mobF({c: 0x1a1a22, beak: 0x2a2a2a, bw: .2, bh: .2, bd: .34, hw: .16, hh: .16, hd: .16, ww: .4, wd: .22})});
+def2('butterfly', {name: 'Butterfly', speed: 1.2, hp: 1, sp: 'grass', w: .7, vf: 2000, vt: 'sine', ...mobF({c: 0x1e1e1e, wc: 0xf08a2a, bw: .04, bh: .04, bd: .22, hh: 0, ww: .26, wd: .26})});
+def2('dragonfly', {name: 'Dragonfly', speed: 2.6, hp: 1, sp: 'grass', w: .3, vf: 3000, vt: 'sine', ...mobF({c: 0x2a8a9a, wc: 0xd8f0f8, bw: .05, bh: .05, bd: .5, hh: 0, ww: .3, wd: .1})});
+def2('fairy', {name: 'Fairy', col: 0xffb8e0, fly: true, hw: .14, h: .7, speed: 1.6, hp: 6, sp: 'grass', w: .08, hurtF: 1800, build(g) {
+  part(g, 0xffd8ec, .14, .26, .1, 0, .4, 0); part(g, 0xffe0c8, .14, .14, .14, 0, .6, 0); part(g, 0xf2c230, .16, .06, .16, 0, .69, 0);
+  const glow = new THREE.Mesh(boxG, new THREE.MeshBasicMaterial({color: 0xfff4a0})); glow.scale.setScalar(.05); glow.position.set(0, .2, -.06); g.add(glow);
+  return [wing(g, 0xe0f0ff, -.06, .48, .26, .2), wing(g, 0xe0f0ff, .06, .48, .26, .2)];
+}, say(at) { [1600, 2000, 2400].forEach((f, i) => tone(f, f, .08, .06, 'sine', at, i * .06)); }});
+def2('dragonling', {name: 'Dragonling', col: 0x4a9a4a, fly: true, hw: .3, h: .8, speed: 2, hp: 16, sp: 'grass', w: .05, hurtF: 600, build(g) {
+  const c = 0x4a9a4a;
+  part(g, c, .3, .3, .55, 0, .4, 0); part(g, 0xd85a3a, .22, .1, .45, 0, .26, 0); part(g, c, .26, .24, .3, 0, .55, -.38); eyes(g, .6, -.535, .07);
+  for (const s of [-1, 1]) part(g, 0xf4f0d0, .04, .12, .04, s * .08, .72, -.32);
+  part(g, c, .1, .1, .5, 0, .4, .5);
+  return [wing(g, 0x6aba6a, -.15, .5, .5, .4), wing(g, 0x6aba6a, .15, .5, .5, .4)];
+}, say(at) { noise(.3, 'bandpass', 900, 2, .3, at); tone(300, 600, .2, .1, 'sawtooth', at); }});
+// water
+def2('shark', {name: 'Shark', speed: 2.6, hp: 20, bite: 4, sp: 'deepwater', w: .4, ...mobS({c: 0x7a8a9a, bw: .5, bh: .5, bd: 1.6, tw: .1, th: .5, td: .3}, g => {
+  part(g, 0x7a8a9a, .08, .35, .3, 0, .62, .05); part(g, 0xd8e0e8, .4, .1, 1.2, 0, .04, 0); part(g, 0xf4f4f4, .3, .04, .02, 0, .14, -.81); })});
+def2('whale', {name: 'Whale', speed: 1.2, hp: 80, sp: 'deepwater', w: .15, vf: 80, vt: 'sine', ...mobS({c: 0x3a4a6a, bw: 1.6, bh: 1.4, bd: 3.6, tw: 1.6, th: .12, td: .6}, g => {
+  part(g, 0xc8d0d8, 1.3, .2, 3, 0, .08, 0); })});
+def2('octopus', {name: 'Octopus', col: 0xc84a6a, swim: true, hw: .3, h: .7, speed: 1, hp: 10, sp: 'water', w: .4, build(g) {
+  part(g, 0xc84a6a, .5, .5, .5, 0, .5, 0); eyes(g, .5, -.255, .12);
+  const t = new THREE.Group(); t.position.set(0, .25, 0);
+  for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283; part(t, 0xb83a5a, .07, .4, .07, Math.cos(a) * .2, -.2, Math.sin(a) * .2); }
+  g.add(t); return [t];
+}, say() {}});
+def2('jellyfish', {name: 'Jellyfish', col: 0xd8a0e8, swim: true, hw: .25, h: .8, speed: .4, hp: 4, sp: 'water', w: .5, build(g) {
+  part(g, 0xd8a0e8, .5, .3, .5, 0, .6, 0); part(g, 0xe8c0f0, .4, .1, .4, 0, .42, 0);
+  const t = new THREE.Group(); t.position.set(0, .4, 0);
+  for (const [x, z] of [[-.12, -.12], [.12, -.12], [.12, .12], [-.12, .12], [0, 0]]) part(t, 0xe8c0f0, .03, .4, .03, x, -.2, z);
+  g.add(t); return [t];
+}, say() {}});
+def2('seal', {name: 'Seal', speed: 2, hp: 10, sp: 'water', w: .5, vf: 600, vt: 'square', drop: meatDrop(RFISH, 0), ...mobS({c: 0x7a7a82, bw: .4, bh: .35, bd: 1, tw: .4, td: .2}, g => {
+  for (const s of [-1, 1]) part(g, 0x6a6a72, .2, .04, .16, s * .26, .1, -.2); })});
+def2('pufferfish', {name: 'Pufferfish', speed: 1, hp: 4, sp: 'water', w: .5, ...mobS({c: 0xf2c230, bw: .35, bh: .35, bd: .35, tw: .12, th: .14, td: .1}, g => {
+  for (const [x, y, z] of [[.2, .2, 0], [-.2, .2, 0], [0, .38, 0], [0, .2, .2], [.2, .3, .1], [-.2, .1, .1]]) part(g, 0xf4f0d0, .05, .05, .05, x, y, z); })});
+def2('clownfish', {name: 'Clownfish', speed: 1.6, hp: 2, sp: 'water', w: .6, ...mobS({c: 0xe8702a, bw: .12, bh: .2, bd: .36, tw: .04, th: .16, td: .1}, g => {
+  for (const z of [-.1, .06]) part(g, 0xf4f4f4, .13, .21, .04, 0, .1, z); })});
+// monsters
+def2('goblin', {name: 'Goblin', speed: 3, hp: 12, hostile: true, noBurn: true, dmg: 2, sp: 'night', w: 1, vf: 900, vt: 'square', drop() { if (Math.random() < .3) give(EMERALD, 1); }, ...mobHM({skin: 0x6aa04a, shirt: 0x6a4a2a, pants: 0x3a2a1a, s: .7}, (g, s) => {
+  for (const x of [-1, 1]) part(g, 0x6aa04a, .1 * s, .1 * s, .06, x * .28 * s, 1.74 * s, 0); })});
+def2('orc', {name: 'Orc', speed: 2.4, hp: 30, hostile: true, noBurn: true, dmg: 5, sp: 'night', w: .6, vf: 150, vt: 'sawtooth', drop() { if (Math.random() < .4) give(IRONI, 1); }, ...mobHM({skin: 0x5a7a3a, shirt: 0x6a6a72, pants: 0x3a2a1a, s: 1.15}, (g, s) => {
+  for (const x of [-1, 1]) part(g, 0xf4f0d0, .05, .1, .05, x * .1 * s, 1.52 * s, -.24 * s); })});
+def2('troll', {name: 'Troll', speed: 1.6, hp: 60, hostile: true, noBurn: true, dmg: 8, sp: 'night', w: .2, vf: 70, vt: 'sawtooth', drop() { give(IRONI, 2); if (Math.random() < .5) give(EMERALD, 2); }, ...mobHM({skin: 0x7a8a6a, shirt: 0x5a4a32, pants: 0x3a3022, s: 1.6}, (g, s) => {
+  part(g, 0x6a7a5a, .12 * s, .14 * s, .12 * s, 0, 1.62 * s, -.28 * s); })});
+def2('imp', {name: 'Imp', speed: 2.6, hp: 12, hostile: true, caster: true, noBurn: true, sp: 'night', w: .3, vf: 1200, vt: 'square', ...mobHM({skin: 0xc83a2a, shirt: 0xa02a1a, pants: 0x5a1a10, s: .6, fwd: false}, (g, s) => {
+  for (const x of [-1, 1]) part(g, 0x1e1e1e, .06, .14, .06, x * .14 * s, 1.98 * s, 0); part(g, 0xa02a1a, .05, .05, .4, 0, .9 * s, .25); })});
+def2('mummy', {name: 'Mummy', speed: 1.8, hp: 22, hostile: true, noBurn: true, dmg: 3, sp: 'nightSand', w: 1, vf: 110, vt: 'sawtooth', ...mobHM({skin: 0xd8ccb0, shirt: 0xd8ccb0, pants: 0xc8bca0}, g => {
+  for (let k = 0; k < 4; k++) part(g, 0xb8ac90, .52, .04, .3, 0, .85 + k * .18, 0); part(g, 0x1e1e1e, .3, .06, .02, 0, 1.72, -.235); })});
+def2('scorpion', {name: 'Scorpion', col: 0x5a3a1a, hw: .35, h: .7, speed: 2.6, hp: 14, hostile: true, noBurn: true, dmg: 3, sp: 'nightSand', w: 1, hurtF: 900, build(g) {
+  const c = 0x5a3a1a;
+  part(g, c, .5, .18, .6, 0, .2, 0);
+  for (let k = 0; k < 4; k++) part(g, OFF(c, 1 - k * .08), .12, .12, .14, 0, .28 + k * .12, .35 + k * .06 - (k > 2 ? .1 : 0));
+  part(g, 0xd8a030, .06, .1, .06, 0, .7, .4);
+  for (const s of [-1, 1]) { part(g, c, .1, .08, .26, s * .22, .2, -.42); part(g, c, .14, .1, .1, s * .26, .22, -.58); }
+  eyes(g, .25, -.305, .06);
+  return quad(g, dk(c), .04, .16, .24, .2);
+}, say(at) { noise(.2, 'highpass', 3000, 1, .3, at); }});
+def2('yeti', {name: 'Yeti', speed: 2.6, hp: 40, hostile: true, noBurn: true, dmg: 6, sp: 'nightSnow', w: 1, vf: 90, vt: 'sawtooth', ...mobHM({skin: 0x8a9aaa, shirt: 0xf0f4f8, pants: 0xe0e8f0, s: 1.3}, (g, s) => {
+  part(g, 0xf0f4f8, .5 * s, .14 * s, .5 * s, 0, 1.95 * s, 0); })});
+def2('wraith', {name: 'Wraith', col: 0x2a2a3a, fly: true, hostile: true, noBurn: true, hw: .3, h: 1.8, speed: 2.4, hp: 16, dmg: 3, sp: 'night', w: .3, hurtF: 300, build(g) {
+  part(g, 0x2a2a3a, .5, 1.1, .4, 0, .9, 0); part(g, 0x1a1a24, .4, .4, .4, 0, 1.6, 0); part(g, 0x3a3a4a, .7, .3, .5, 0, .35, 0);
+  for (const s of [-1, 1]) { const e = new THREE.Mesh(boxG, new THREE.MeshBasicMaterial({color: 0x7af0ff})); e.scale.set(.08, .05, .02); e.position.set(s * .08, 1.62, -.21); g.add(e); }
+  return [wing(g, 0x2a2a3a, -.25, 1.25, .6, .3, true), wing(g, 0x2a2a3a, .25, 1.25, .6, .3, true)];
+}, say(at) { tone(300, 150, .8, .12, 'sine', at); noise(.6, 'bandpass', 600, 4, .15, at); }});
+def2('mimic', {name: 'Mimic', col: 0xa8743a, hw: .45, h: .95, speed: 1.6, hp: 30, hostile: true, noBurn: true, hop: true, dmg: 5, sp: 'cave', w: 1, hurtF: 300, build(g) {
+  part(g, 0xa8743a, .9, .5, .9, 0, .25, 0); part(g, 0xa8743a, .9, .3, .9, 0, .72, .05); part(g, 0x5a3a1a, .92, .06, .92, 0, .5, 0);
+  part(g, 0xc8c8d0, .14, .16, .04, 0, .6, -.46);
+  for (let k = 0; k < 6; k++) { part(g, 0xf4f0e0, .08, .1, .04, -.35 + k * .14, .53, -.44); part(g, 0xf4f0e0, .08, .1, .04, -.35 + k * .14, .62, -.4); }
+  part(g, 0xd84a6a, .3, .06, .3, 0, .52, -.25);
+  return [];
+}, say(at) { noise(.25, 'lowpass', 500, 2, .5, at); tone(120, 80, .2, .2, 'square', at); }, drop() { give(EMERALD, 3); if (Math.random() < .5) give(IRONI, 3); }});
+Object.assign(KINDS, MORE);
+// any animal that isn't a monster or a fighter can be a pet; spawn lists by place
+const SPAWNS = {};
+for (const [k, K] of Object.entries(MORE)) {
+  if (!K.hostile && !K.neutral && !K.swim) LAND.push(k), LAND_W.push(0);
+  if (K.sp) (SPAWNS[K.sp] = SPAWNS[K.sp] || []).push([k, K.w || 1]);
+  if (!K.hostile && !K.fly && !K.swim && K.hw >= .15 && !K.biped) UPRIGHT.add(k);
+}
+function pickSp(tag) {
+  const list = SPAWNS[tag]; if (!list) return null;
+  let r = Math.random() * list.reduce((s, e) => s + e[1], 0);
+  for (const [k, w] of list) if ((r -= w) < 0) return k;
+  return list[0][0];
+}
+{
+  const oldLand = landKind, oldWater = waterSpawn, oldMonster = pickMonster;
+  landKind = (b, x, y, z) => {
+    const r = Math.random();
+    if (b === GRASS && r < .4) return pickSp('grass');
+    if (b === SAND && r < .5) return pickSp('sand');
+    if (b === SNOW && r < .5) return pickSp('snow');
+    return oldLand(b, x, y, z);
+  };
+  waterSpawn = (x, y, z) => {
+    let d = 0; while (d < 8 && getBlock(x, y - d, z) === WATERB) d++;
+    if (Math.random() < .4) {
+      const k = pickSp(d >= 6 && Math.random() < .5 ? 'deepwater' : 'water');
+      if (k && KINDS[k].h < d - .3) { addMob(k, x + .5, y + 1 - d + .2, z + .5); return; }
+    }
+    oldWater(x, y, z);
+  };
+  pickMonster = (x, y, z) => {
+    const r = Math.random(), below = getBlock(x, y - 1, z), under = y < colTop(x, z) - 3;
+    if (under && r < .04) return 'mimic';
+    if (!under && r < .4) { const k = pickSp(below === SAND ? 'nightSand' : below === SNOW ? 'nightSnow' : 'night'); if (k) return k; }
+    return oldMonster(x, y, z);
+  };
+}
+// monsters that fly (wraiths) swoop at whoever is closest
+function flyHunt(m, K, dt) {
+  if (mode !== 's' && !m.summoned && !(mp.on && foeNear(m, 60, 99))) { m.y = -50; return true; }
+  const T = foeNear(m, 18, 14);
+  if (!T) return false;
+  const dx = T.x - m.x, dz = T.z - m.z, d = Math.hypot(dx, dz);
+  m.yaw = Math.atan2(-dx, -dz); m.fsp = d > 1.1 ? 1.3 : 0; m.ty = T.y + 1; m.t = .5;
+  m.atk = (m.atk || 0) - dt;
+  if (d < 1.6 && Math.abs(T.y + 1 - m.y) < 1.8 && m.atk <= 0) { m.atk = 1.2; hitFoe(T, K.dmg || 3, m.x, m.z); K.say([m.x, m.y + 1, m.z]); }
+  return true;
+}
+// sharks go after you when you're swimming close by
+function swimHunt(m, K, dt) {
+  if (mode !== 's' || dead || getBlock(Math.floor(P.x), Math.floor(P.y + .5), Math.floor(P.z)) !== WATERB) return false;
+  const dx = P.x - m.x, dy = P.y + .6 - m.y, dz = P.z - m.z, d = Math.hypot(dx, dz);
+  if (d > 12) return false;
+  m.yaw = Math.atan2(-dx, -dz); m.ty = Math.max(-1.5, Math.min(1.5, dy * 1.5)); m.t = .3;
+  m.atk = (m.atk || 0) - dt;
+  if (Math.hypot(d, dy) < 1.8 && m.atk <= 0) { m.atk = 1.2; hurtPlayer(K.bite, m.x, m.z); }
+  return true;
 }
 
 /* ---------- main loop ---------- */
