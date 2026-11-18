@@ -427,7 +427,7 @@ def(ENDFRAME, 'End portal frame', T.ENDFRAME);
 def(EGG, 'Dragon egg', T.EGG);
 def(CHEST, 'Chest', T.CHEST_TOP, T.CHEST_TOP, T.CHEST_SIDE);
 
-const NB = 32, SOLID = new Uint8Array(NB), TRANSP = new Uint8Array(NB), AOS = new Uint8Array(NB);
+const NB = 256, SOLID = new Uint8Array(NB), TRANSP = new Uint8Array(NB), AOS = new Uint8Array(NB);
 for (let i = 1; i < NB; i++) { SOLID[i] = i !== WATERB ? 1 : 0; AOS[i] = (i !== WATERB && i !== GLASS) ? 1 : 0; }
 TRANSP[AIR] = TRANSP[WATERB] = TRANSP[GLASS] = TRANSP[LEAVES] = TRANSP[TORCH] = TRANSP[BED] = TRANSP[PORTAL] = TRANSP[ENDPORTAL] = 1;
 SOLID[TORCH] = AOS[TORCH] = AOS[BED] = SOLID[PORTAL] = AOS[PORTAL] = SOLID[ENDPORTAL] = AOS[ENDPORTAL] = 0;
@@ -435,8 +435,8 @@ const LIGHT = new Uint8Array(NB); // blocks that give off light
 LIGHT[TORCH] = LIGHT[GLOW] = LIGHT[PORTAL] = LIGHT[ENDPORTAL] = 1;
 const DEFAULT_HOTBAR = [GRASS, DIRT, STONE, COBBLE, PLANKS, LOG, GLASS, TORCH, TNT];
 
-/* ---------- textures (procedural 16px tiles in an 8x8 atlas) ---------- */
-const ATL = 8, atlas = document.createElement('canvas');
+/* ---------- textures (procedural 16px tiles in a 16x16 atlas) ---------- */
+const ATL = 16, atlas = document.createElement('canvas');
 atlas.width = atlas.height = ATL * 16;
 const actx = atlas.getContext('2d');
 function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; }; }
@@ -561,6 +561,121 @@ tile(T.CHEST_SIDE, () => (x, y, r) => {
   return chestWood(x, y, r);
 });
 
+/* ---------- lots more blocks ---------- */
+// New blocks use ids 128 and up (ids 64–127 are items). Their textures are drawn by small pattern makers below.
+let tNext = 37, bNext = 128;
+const B2 = {}, BGROUP = {wood: [], leaves: [], glass: [], wool: [], stone: [], ore: [], metal: [], light: []};
+const tileOf = factory => { const i = tNext++; tile(i, factory); return i; };
+const dimC = (c, k) => c.map(v => v * k);
+const spotsOf = (r, n, sz) => { const s = new Set(); for (let k = 0; k < n; k++) { let x = 1 + Math.floor(r() * 14), y = 1 + Math.floor(r() * 14); for (let j = 0; j < sz; j++) { s.add(x + y * 16); x = Math.max(0, Math.min(15, x + Math.floor(r() * 3) - 1)); y = Math.max(0, Math.min(15, y + Math.floor(r() * 3) - 1)); } } return s; };
+const plainT = (c, amt = 18, c2 = null, p2 = .15) => () => (x, y, r) => c2 && r() < p2 ? J(c2, r, amt) : J(c, r, amt);
+const oreT = c => r => { const s = spotsOf(r, 4, 4); return (x, y, r) => s.has(x + y * 16) ? J(c, r, 30) : stonePx(x, y, r); };
+const plankT = c => () => { const seams = [3, 11, 6, 14], d = dimC(c, .62), m = dimC(c, .72); return (x, y, r) => y % 4 === 3 ? J(d, r, 10) : x === seams[y >> 2] ? J(m, r, 10) : J(c, r, 16); };
+const logSideT = (c, birch) => r => { const marks = spotsOf(r, 6, 3); return (x, y, r) => birch ? (marks.has(x + y * 16) ? J([40, 40, 40], r, 10) : J(c, r, 12)) : (x % 4 === 0 ? J(dimC(c, .7), r, 10) : J(c, r, 18)); };
+const logTopT = (bark, ring) => () => (x, y, r) => { const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return d > 6.6 ? J(bark, r, 12) : Math.floor(d) % 2 ? J(dimC(ring, .85), r, 10) : J(ring, r, 12); };
+const leavesT = c => () => (x, y, r) => r() < .2 ? [0, 0, 0, 0] : (r() < .2 ? J(dimC(c, .7), r, 20) : J(c, r, 30));
+const bricksT = (c, m) => () => (x, y, r) => y % 4 === 3 || (x + ((y >> 2) % 2) * 4) % 8 === 7 ? J(m, r, 8) : J(c, r, 16);
+const bigBricksT = (c, m, moss, crack) => () => (x, y, r) => {
+  if (crack && ((x === 4 + (y >> 2) && y < 12) || (x === 11 - (y >> 3) && y > 6))) return J([60, 60, 62], r, 6);
+  if (y % 8 === 7 || (x + (y >> 3) * 4) % 8 === 7) return J(m, r, 8);
+  return moss && r() < .28 ? J([78, 120, 50], r, 20) : J(c, r, 14);
+};
+const bandsT = c => () => (x, y, r) => y % 5 === 4 ? J(dimC(c, .82), r, 8) : J(c, r, 10);
+const metalT = c => () => (x, y, r) => x === 0 || y === 0 || x === 15 || y === 15 ? J(dimC(c, .7), r, 6) : (x === 1 || y === 1) ? J(dimC(c, 1.15), r, 6) : J(c, r, 8);
+const glassT = c => () => (x, y) => x === 0 || y === 0 || x === 15 || y === 15 ? [...c, 255] : (x + y) % 3 === 0 ? [...dimC(c, 1.1), 255] : [0, 0, 0, 0];
+const woolT = c => () => (x, y, r) => J((x + y * 3) % 7 === 0 ? dimC(c, .9) : c, r, 10);
+const veinsT = (c, v) => r => { const s = new Set(); for (let n = 0; n < 2; n++) { let x = Math.floor(r() * 16); for (let y = 0; y < 16; y++) { s.add(x + y * 16); x = (x + (r() < .5 ? -1 : 1) + 16) % 16; } } return (x, y, r) => s.has(x + y * 16) ? J(v, r, 10) : J(c, r, 8); };
+function nb(key, name, top, bottom = top, side = top, group) { const id = bNext++; B2[key] = id; def(id, name, top, bottom, side); if (group) BGROUP[group].push(id); return id; }
+const one = (key, name, factory, group) => { const t = tileOf(factory); return nb(key, name, t, t, t, group); };
+
+// wood: log, planks and leaves for six more kinds of tree
+for (const [k, n, bark, ring, plank, leaf, birch] of [
+  ['birch', 'Birch', [216, 214, 204], [210, 190, 140], [196, 178, 122], [110, 150, 70], true],
+  ['spruce', 'Spruce', [70, 50, 32], [140, 110, 70], [110, 80, 48], [50, 88, 56]],
+  ['jungle', 'Jungle', [96, 74, 40], [170, 130, 80], [160, 112, 76], [48, 140, 32]],
+  ['acacia', 'Acacia', [100, 96, 88], [180, 96, 52], [176, 92, 50], [100, 130, 40]],
+  ['darkoak', 'Dark oak', [58, 42, 24], [100, 74, 44], [72, 50, 30], [40, 92, 28]],
+  ['cherry', 'Cherry', [60, 34, 40], [200, 140, 140], [222, 170, 160], [240, 170, 200]]]) {
+  const side = tileOf(logSideT(bark, birch)), top = tileOf(logTopT(bark, ring));
+  nb(k + '_log', n + ' log', top, top, side, 'wood');
+  one(k + '_planks', n + ' planks', plankT(plank), 'wood');
+  one(k + '_leaves', n + ' leaves', leavesT(leaf), 'leaves');
+}
+// stone, sand and earth
+one('granite', 'Granite', plainT([150, 104, 86], 20, [180, 130, 110], .3), 'stone');
+one('diorite', 'Diorite', plainT([206, 206, 204], 14, [80, 80, 84], .12), 'stone');
+one('andesite', 'Andesite', plainT([130, 132, 132], 16, [104, 106, 106], .3), 'stone');
+one('slate', 'Slate', bandsT([72, 72, 80]), 'stone');
+one('basalt', 'Basalt', () => (x, y, r) => x % 4 === 0 ? J([50, 50, 54], r, 8) : J([74, 74, 78], r, 12), 'stone');
+one('marble', 'Marble', veinsT([236, 234, 228], [170, 170, 176]), 'stone');
+{ const t = tileOf(plainT([222, 206, 156], 8)), s = tileOf(bandsT([216, 200, 150])); nb('sandstone', 'Sandstone', t, t, s, 'stone'); }
+one('red_sand', 'Red sand', plainT([190, 100, 50], 20));
+{ const t = tileOf(plainT([186, 100, 52], 8)), s = tileOf(bandsT([180, 96, 48])); nb('red_sandstone', 'Red sandstone', t, t, s, 'stone'); }
+one('gravel', 'Gravel', plainT([128, 122, 120], 30, [86, 80, 78], .35));
+one('clay', 'Clay', plainT([160, 166, 178], 10));
+one('mud', 'Mud', plainT([70, 56, 48], 12, [56, 44, 38], .3));
+one('mossy_cobble', 'Mossy cobblestone', r => { const m = spotsOf(r, 7, 6); return (x, y, r) => m.has(x + y * 16) ? J([78, 120, 50], r, 20) : (x % 5 === 0 || y % 5 === 0 ? J([96, 96, 98], r, 10) : J([132, 132, 134], r, 20)); }, 'stone');
+one('mossy_sbrick', 'Mossy stone bricks', bigBricksT([128, 128, 130], [90, 90, 92], true), 'stone');
+one('cracked_sbrick', 'Cracked stone bricks', bigBricksT([126, 126, 128], [90, 90, 92], false, true), 'stone');
+one('smooth_stone', 'Smooth stone', () => (x, y, r) => x === 0 || y === 0 || x === 15 || y === 15 ? J([130, 130, 132], r, 6) : J([164, 164, 166], r, 8), 'stone');
+one('terracotta', 'Terracotta', plainT([152, 94, 66], 10), 'stone');
+// ores and blocks of metal and gems
+for (const [k, n, c] of [['gold', 'Gold', [240, 200, 60]], ['diamond', 'Diamond', [90, 220, 220]], ['emerald', 'Emerald', [40, 190, 90]],
+  ['ruby', 'Ruby', [210, 30, 50]], ['lapis', 'Lapis', [40, 70, 190]], ['copper', 'Copper', [210, 120, 76]]]) {
+  one(k + '_ore', n + ' ore', oreT(c), 'ore');
+  one(k + '_block', 'Block of ' + n.toLowerCase(), metalT(c), 'metal');
+}
+one('iron_block', 'Block of iron', metalT([220, 220, 222]), 'metal');
+one('coal_block', 'Block of coal', metalT([36, 36, 40]), 'metal');
+// colours
+for (const [k, n, c] of [['orange', 'Orange', [235, 125, 40]], ['magenta', 'Magenta', [190, 70, 200]], ['lightblue', 'Light blue', [110, 160, 225]],
+  ['yellow', 'Yellow', [235, 205, 50]], ['lime', 'Lime', [120, 200, 50]], ['pink', 'Pink', [235, 145, 175]], ['gray', 'Gray', [70, 70, 74]],
+  ['lightgray', 'Light gray', [158, 158, 152]], ['cyan', 'Cyan', [40, 135, 150]], ['purple', 'Purple', [125, 55, 185]], ['blue', 'Blue', [50, 65, 165]],
+  ['brown', 'Brown', [115, 75, 45]], ['green', 'Green', [80, 105, 40]], ['red', 'Red', [165, 45, 40]], ['black', 'Black', [25, 25, 30]]])
+  one(k + '_wool', n + ' wool', woolT(c), 'wool');
+for (const [k, n, c] of [['red', 'Red', [200, 60, 60]], ['orange', 'Orange', [230, 140, 50]], ['yellow', 'Yellow', [230, 210, 70]],
+  ['green', 'Green', [90, 170, 70]], ['blue', 'Blue', [70, 110, 210]], ['purple', 'Purple', [150, 80, 200]]])
+  one(k + '_glass', n + ' stained glass', glassT(c), 'glass');
+// handy and natural blocks
+{
+  const plk = T.PLANKS;
+  const books = r => { const cols = [[150, 40, 40], [40, 70, 140], [60, 120, 60], [160, 130, 50], [110, 60, 130]], pick = Array.from({length: 32}, () => cols[Math.floor(r() * 5)]);
+    return (x, y, r) => y === 0 || y === 7 || y === 8 || y === 15 || x === 0 || x === 15 ? J([170, 136, 84], r, 14) : J(pick[(x >> 1) + (y > 7 ? 16 : 0)], r, 12); };
+  nb('bookshelf', 'Bookshelf', plk, plk, tileOf(books));
+  const ctTop = tileOf(() => (x, y, r) => x % 5 === 0 || y % 5 === 0 ? J([90, 60, 34], r, 8) : J([176, 140, 88], r, 14));
+  const ctSide = tileOf(() => (x, y, r) => (y > 2 && y < 9 && (x === 3 || x === 4 || x === 11)) || (y === 3 && x > 2 && x < 7) ? J([120, 120, 124], r, 8) : y % 4 === 3 ? J([102, 78, 46], r, 10) : J([170, 136, 84], r, 16));
+  nb('crafting_table', 'Crafting table', ctTop, plk, ctSide);
+  const fTop = tileOf(() => (x, y, r) => x === 0 || y === 0 || x === 15 || y === 15 ? J([96, 96, 98], r, 6) : J([134, 134, 136], r, 14));
+  const fSide = tileOf(() => (x, y, r) => x > 3 && x < 12 && y > 7 && y < 14 ? (y > 11 ? J([240, 140, 40], r, 30) : J([24, 22, 22], r, 6)) : x === 0 || y === 0 || x === 15 || y === 15 ? J([96, 96, 98], r, 6) : J([134, 134, 136], r, 14));
+  nb('furnace', 'Furnace', fTop, fTop, fSide);
+  const pTop = tileOf(() => (x, y, r) => x > 6 && x < 9 && y > 6 && y < 9 ? J([70, 110, 40], r, 10) : J([220, 130, 30], r, 14));
+  const pSide = tileOf(() => (x, y, r) => x % 4 === 0 ? J([180, 100, 20], r, 10) : J([224, 134, 32], r, 16));
+  nb('pumpkin', 'Pumpkin', pTop, pTop, pSide);
+  const face = (x, y) => ((y === 4 || y === 5) && ((x > 2 && x < 6) || (x > 9 && x < 13))) || (y > 8 && y < 12 && x > 2 && x < 13 && !(y === 9 && (x === 5 || x === 10)));
+  nb('jack_o_lantern', "Jack o'lantern", pTop, pTop, tileOf(() => (x, y, r) => face(x, y) ? J([255, 220, 90], r, 20) : x % 4 === 0 ? J([180, 100, 20], r, 10) : J([224, 134, 32], r, 16)), 'light');
+  const mTop = tileOf(() => (x, y, r) => J(Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)) > 5 ? [90, 150, 40] : [120, 170, 60], r, 14));
+  nb('melon', 'Melon', mTop, mTop, tileOf(() => (x, y, r) => x % 4 < 2 ? J([60, 120, 30], r, 10) : J([110, 170, 50], r, 14)));
+  const hTop = tileOf(() => (x, y, r) => J(r() < .3 ? [180, 150, 40] : [220, 190, 70], r, 16));
+  nb('hay', 'Hay bale', hTop, hTop, tileOf(() => (x, y, r) => y === 3 || y === 12 ? J([140, 60, 30], r, 8) : J(x % 2 ? [220, 190, 70] : [200, 170, 55], r, 12)));
+  const cTop = tileOf(() => (x, y, r) => J(Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)) < 4 ? [120, 170, 70] : [70, 130, 50], r, 12));
+  nb('cactus', 'Cactus', cTop, cTop, tileOf(() => (x, y, r) => (x === 3 || x === 12) && y % 4 === 1 ? [230, 230, 200] : x % 5 === 0 ? J([40, 100, 30], r, 8) : J([70, 140, 50], r, 14)));
+  one('ice', 'Ice', () => (x, y, r) => (x + y * 2) % 11 === 0 ? J([230, 245, 255], r, 6) : J([150, 195, 245], r, 10));
+  one('packed_ice', 'Packed ice', () => (x, y, r) => (x * 3 + y) % 13 === 0 ? J([90, 130, 200], r, 6) : J([130, 170, 230], r, 10));
+  one('sponge', 'Sponge', r => { const h = spotsOf(r, 10, 2); return (x, y, r) => h.has(x + y * 16) ? J([150, 140, 40], r, 10) : J([220, 210, 90], r, 14); });
+  one('lamp', 'Glowing lamp', () => (x, y, r) => x === 0 || y === 0 || x === 15 || y === 15 || x === 7 || y === 7 ? J([120, 80, 40], r, 8) : J([255, 222, 140], r, 14), 'light');
+  one('quartz', 'Quartz block', () => (x, y, r) => x === 0 || y === 0 ? J([250, 248, 244], r, 4) : J([232, 226, 218], r, 6));
+  one('nether_bricks', 'Nether bricks', bricksT([70, 28, 32], [36, 14, 18]), 'stone');
+  one('red_mushroom', 'Red mushroom block', r => { const s = spotsOf(r, 5, 3); return (x, y, r) => s.has(x + y * 16) ? J([240, 236, 230], r, 6) : J([190, 40, 40], r, 14); });
+  one('brown_mushroom', 'Brown mushroom block', plainT([150, 110, 80], 12));
+  one('moss', 'Moss block', plainT([90, 130, 50], 24, [70, 110, 40], .3));
+  nb('snow_block', 'Snow block', T.SNOW, T.SNOW, T.SNOW);
+}
+// how they look and behave
+const LEAFY = new Uint8Array(NB); LEAFY[LEAVES] = 1;
+for (const id of BGROUP.leaves) TRANSP[id] = LEAFY[id] = 1;
+for (const id of BGROUP.glass) { TRANSP[id] = 1; AOS[id] = 0; }
+for (const id of BGROUP.light) LIGHT[id] = 1;
+
 // average colour per tile (for break particles)
 const TILE_AVG = [];
 {
@@ -664,7 +779,7 @@ function genData(cx, cz) {
       let b;
       if (y === 0 || (y === 1 && hash3(wx, 1, wz) < .5)) b = BEDROCK;
       else if (y >= 2 && y <= caveTop && caveAt(wx, y, wz)) continue;
-      else if (y < h - 3) b = (y < h - 5 && hash3(wx, y, wz) < .012) ? COAL : (y < 34 && hash3(wx, y, wz, 43) < .007) ? IRON : (y < 7 && hash3(wx, y, wz, 59) < .03) ? OBSIDIAN : STONE;
+      else if (y < h - 3) b = (y < h - 5 && hash3(wx, y, wz) < .012) ? COAL : (y < 34 && hash3(wx, y, wz, 43) < .007) ? IRON : (y < 7 && hash3(wx, y, wz, 59) < .03) ? OBSIDIAN : underStone(wx, y, wz);
       else if (y < h) b = peak ? STONE : beach ? SAND : DIRT;
       else if (y === h) b = peak ? (h > WATER + 21 ? SNOW : STONE) : beach ? SAND : GRASS;
       else if (y <= WATER) b = WATERB;
@@ -680,19 +795,27 @@ function genData(cx, cz) {
   };
   for (let tz = -2; tz < CS + 2; tz++) for (let tx = -2; tx < CS + 2; tx++) {
     const wx = ox + tx, wz = oz + tz;
-    if (!treeAt(wx, wz)) continue;
+    if (!treeAt(wx, wz)) { // now and then a pumpkin or melon on the grass, or a cactus on the beach
+      const hp = hash2(wx, wz, 501);
+      if (hp < .004) {
+        const h2 = hg[(tx + 2) + (tz + 2) * W];
+        if (h2 > WATER + 1 && h2 <= WATER + 17 && hp < .002) put(tx, h2 + 1, tz, hp < .0012 ? B2.pumpkin : B2.melon, true);
+        else if (h2 === WATER + 1) for (let k = 1; k <= 1 + Math.floor(hp * 700); k++) put(tx, h2 + k, tz, B2.cactus, true);
+      }
+      continue;
+    }
     const h = hg[(tx + 2) + (tz + 2) * W];
     if (h <= WATER + 1 || h > WATER + 17) continue;
-    const th = 4 + Math.floor(hash2(wx, wz, 7) * 3);
+    const th = 4 + Math.floor(hash2(wx, wz, 7) * 3), [tLog, tLeaf] = treeKind(wx, wz, h);
     for (let dy = th - 2; dy <= th + 1; dy++) {
       const r = dy >= th ? 1 : 2;
       for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
         if (r === 2 && Math.abs(dx) === 2 && Math.abs(dz) === 2 && hash2(wx * 5 + dx, wz * 5 + dz, dy) < .6) continue;
         if (dy === th + 1 && dx && dz) continue;
-        put(tx + dx, h + dy, tz + dz, LEAVES, true);
+        put(tx + dx, h + dy, tz + dz, tLeaf, true);
       }
     }
-    for (let dy = 1; dy <= th; dy++) put(tx, h + dy, tz, LOG, false);
+    for (let dy = 1; dy <= th; dy++) put(tx, h + dy, tz, tLog, false);
   }
   buildVillages(cx, cz, put);
   const e = edits.get(ck(cx, cz));
@@ -786,7 +909,7 @@ function drawFace(b, nb) {
   if (nb === AIR) return true;
   if (b === WATERB) return false;
   if (nb === WATERB) return true;
-  if (TRANSP[nb]) return nb !== b || b === LEAVES;
+  if (TRANSP[nb]) return nb !== b || LEAFY[b];
   return false;
 }
 function buildChunk(c) {
@@ -1066,7 +1189,7 @@ function act(button) {
     if (s && s.id === PLANE) { placePlane(target.px + .5, target.py, target.pz + .5); return; }
     if (s && s.id === FLINT) { useFlint(); return; }
     if (s && s.id === ENDEYE) { useEye(); return; }
-    if (!s || s.id >= 64) return;
+    if (!s || !isBlock(s.id)) return;
     const {px, py, pz} = target, b = s.id;
     if (py < 0 || py >= H) return;
     if (SOLID[b] && px + 1 > P.x - HW && px < P.x + HW && pz + 1 > P.z - HW && pz < P.z + HW && py + 1 > P.y && py < P.y + PHGT) return;
@@ -1808,9 +1931,10 @@ item(IPICK, 'Iron pickaxe', pick('#eeeeee', '#a8a8a8'), {pick: 3, dmg: 4, max: 1
 item(WSWORD, 'Wooden sword', sword('#b08a52', '#7a5a32'), {dmg: 4, max: 1});
 item(SSWORD, 'Stone sword', sword('#9a9a9a', '#5e5e5e'), {dmg: 5, max: 1});
 item(ISWORD, 'Iron sword', sword('#eeeeee', '#a8a8a8'), {dmg: 7, max: 1});
-const nameOf = id => id < 64 ? BLOCKS[id].n : ITEMS[id].n;
-const maxOf = id => id < 64 ? 64 : ITEMS[id].max || 64;
-const validId = id => (id > 0 && id < 64 && BLOCKS[id]) || ITEMS[id];
+const isBlock = id => id > 0 && (id < 64 || id >= 128) && !!BLOCKS[id];
+const nameOf = id => isBlock(id) ? BLOCKS[id].n : ITEMS[id].n;
+const maxOf = id => isBlock(id) ? 64 : ITEMS[id].max || 64;
+const validId = id => isBlock(id) || ITEMS[id];
 const PALETTE = [...BLOCKS.keys()].filter(i => BLOCKS[i]).concat(Object.keys(ITEMS).map(Number));
 function outline(c) {
   const g = c.getContext('2d'), im = g.getImageData(0, 0, 16, 16), d = im.data, a = i => d[i * 4 + 3];
@@ -1833,7 +1957,7 @@ function iconURL(id) {
     rects(g, '#a0262a', [[5, 7, 10, 1]]); rects(g, '#f2f2ee', [[1, 5, 4, 3]]);
     outline(c); url = c.toDataURL();
   }
-  else if (id < 64) url = blockIcon(id);
+  else if (isBlock(id)) url = blockIcon(id);
   else { const c = document.createElement('canvas'); c.width = c.height = 16; ITEMS[id].draw(c.getContext('2d')); outline(c); url = c.toDataURL(); }
   return iconCache[id] = url;
 }
@@ -4732,7 +4856,8 @@ CMDS.summon = a => { // /summon zombie, /summon 100 zombie or /summon zombie 100
   const q = (a || '').toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, '');
   const kind = Object.keys(KINDS).find(k => k === q || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q)
     || Object.keys(KINDS).find(k => k === q + 's' || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q + 's');
-  if (!kind) return 'Type /summon NAME or /summon 100 NAME. Type /mobs to see every name';
+  if (/^(house|tower|lookout|lookouttower|stonetower|castle)$/.test(q)) { buildTower(); return 'A stone lookout tower appeared! Go in the door and jump up the spiral stairs to the top'; }
+  if (!kind) return 'Type /summon NAME or /summon 100 NAME (or /summon house). Type /mobs to see every name';
   if (dim === 'e' && kind !== 'watcher' && !KINDS[kind].hostile) return "Animals can't live in the End";
   const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), sx = Math.cos(P.yaw), sz = -Math.sin(P.yaw), gap = Math.max(1.2, KINDS[kind].hw * 2.6);
   for (let i = 0; i < n; i++) {
@@ -5430,6 +5555,88 @@ CMDS.unclone = () => {
   for (const m of mobs) if (m.kind === 'clone') { burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0x8ad8ff)); m.y = -50; }
   return 'Poof! Your clones went home';
 };
+
+/* ---------- more blocks: crafting, hardness and where they're found ---------- */
+for (const id of [...BGROUP.wood, B2.bookshelf, B2.crafting_table]) { MAT[id] = 'wood'; HARD[id] = 1.4; }
+for (const id of BGROUP.leaves) { HARD[id] = .2; DROP[id] = 0; }
+for (const id of BGROUP.glass) { MAT[id] = 'glass'; HARD[id] = .3; DROP[id] = 0; }
+for (const id of BGROUP.wool) { MAT[id] = 'cloth'; HARD[id] = .6; }
+for (const id of BGROUP.stone) HARD[id] = 1.5;
+for (const id of BGROUP.ore) { HARD[id] = 3; NEED[id] = 2; }
+for (const id of BGROUP.metal) { HARD[id] = 4; NEED[id] = 2; }
+for (const k of ['red_sand', 'gravel', 'clay', 'mud', 'moss']) { MAT[B2[k]] = 'sand'; HARD[B2[k]] = .6; }
+for (const k of ['ice', 'packed_ice']) { MAT[B2[k]] = 'glass'; HARD[B2[k]] = .5; }
+for (const k of ['pumpkin', 'jack_o_lantern', 'melon', 'hay', 'cactus', 'sponge', 'red_mushroom', 'brown_mushroom', 'snow_block']) HARD[B2[k]] = .8;
+for (const k of ['birch', 'spruce', 'jungle', 'acacia', 'darkoak', 'cherry']) RECIPES.push([B2[k + '_planks'], 4, [[B2[k + '_log'], 1]]]);
+RECIPES.push([B2.crafting_table, 1, [[PLANKS, 4]]], [B2.furnace, 1, [[COBBLE, 8]]], [B2.bookshelf, 1, [[PLANKS, 6], [WOOL, 3]]],
+  [B2.sandstone, 1, [[SAND, 4]]], [B2.iron_block, 1, [[IRONI, 9]]], [B2.gold_block, 1, [[GOLDI, 9]]], [B2.coal_block, 1, [[COALI, 9]]],
+  [B2.jack_o_lantern, 1, [[B2.pumpkin, 1], [TORCH, 1]]], [B2.smooth_stone, 1, [[STONE, 1], [COALI, 1]]], [B2.lamp, 1, [[GLOW, 1], [IRONI, 1]]]);
+// deep underground: new ores, and patches of granite, diorite and andesite; slate near the bottom
+function underStone(wx, y, wz) {
+  const r = hash3(wx, y, wz, 71);
+  if (y < 12 && r < .0016) return B2.diamond_ore;
+  if (y < 16 && r > .9978) return B2.ruby_ore;
+  if (y < 22 && r > .4 && r < .4025) return B2.gold_ore;
+  if (y < 26 && r > .6 && r < .6022) return B2.lapis_ore;
+  if (y < 30 && r > .7 && r < .7010) return B2.emerald_ore;
+  if (y < 40 && r > .2 && r < .2065) return B2.copper_ore;
+  const g = hash3(wx >> 2, y >> 2, wz >> 2, 77);
+  if (g < .05) return B2.granite;
+  if (g < .09) return B2.diorite;
+  if (g < .13) return B2.andesite;
+  return y < 10 ? B2.slate : STONE;
+}
+// which tree grows where: spruce up high, birch, dark oak and cherry groves, oak everywhere else
+function treeKind(wx, wz, h) {
+  if (h > WATER + 12) return [B2.spruce_log, B2.spruce_leaves];
+  const s = vnoise(wx / 90, wz / 90, 400);
+  if (s < .3) return [B2.birch_log, B2.birch_leaves];
+  if (s > .78) return [B2.cherry_log, B2.cherry_leaves];
+  if (s > .7) return [B2.darkoak_log, B2.darkoak_leaves];
+  return [LOG, LEAVES];
+}
+
+/* ---------- /summon house: a stone lookout tower ---------- */
+// A 5×5 stone-brick tower 14 blocks high in front of you, door facing you, windows on every side, a spiral stair inside
+// (jump up each step), and a 7×7 lookout platform with battlements and torches on top.
+function buildTower() {
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+  const ax = Math.abs(fx) > Math.abs(fz) ? Math.sign(fx) : 0, az = ax ? 0 : Math.sign(fz);
+  const cx = Math.floor(P.x + ax * 6), cz = Math.floor(P.z + az * 6), TH = 14, SB = SBRICK;
+  let gy = Math.floor(P.y);
+  while (gy > 1 && !SOLID[getBlock(cx, gy - 1, cz)]) gy--;
+  while (gy < H - TH - 4 && SOLID[getBlock(cx, gy, cz)]) gy++;
+  gy = Math.min(gy, H - TH - 4);
+  const set = (dx, y, dz, b) => setBlock(cx + dx, y, cz + dz, b);
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+    for (let y = gy; y <= gy + TH + 2; y++) set(dx, y, dz, AIR);
+    if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2) { // foundation down to the ground
+      set(dx, gy - 1, dz, Math.abs(dx) < 2 && Math.abs(dz) < 2 ? B2.smooth_stone : SB);
+      for (let y = gy - 2; y >= Math.max(1, gy - 8) && !SOLID[getBlock(cx + dx, y, cz + dz)]; y--) set(dx, y, dz, SB);
+    }
+  }
+  for (let y = gy; y < gy + TH; y++) {
+    const h = y - gy;
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+      if (Math.abs(dx) !== 2 && Math.abs(dz) !== 2) continue;
+      const window = (dx === 0 || dz === 0) && (h === 4 || h === 8 || h === 11);
+      set(dx, y, dz, window ? GLASS : h % 5 === 2 && (dx + dz) % 2 ? B2.mossy_sbrick : SB);
+    }
+    set(0, y, 0, SB); // the middle pillar
+  }
+  set(-ax * 2, gy, -az * 2, AIR); set(-ax * 2, gy + 1, -az * 2, AIR); // the door, facing you
+  // spiral stair around the pillar, starting next to the door
+  const ring = [[1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1]], e = ring.findIndex(([x, z]) => x === -ax && z === -az);
+  for (let k = 1; k < TH; k++) { const [x, z] = ring[(e + k) % 8]; set(x, gy + k - 1, z, B2.smooth_stone); }
+  // lookout platform, battlements and torches
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+    const edge = Math.abs(dx) === 3 || Math.abs(dz) === 3;
+    if (edge) { set(dx, gy + TH - 1, dz, SB); if ((dx + dz) % 2 === 0) set(dx, gy + TH, dz, SB); }
+  }
+  for (const [dx, dz] of [[-3, -3], [3, -3], [3, 3], [-3, 3]]) set(dx, gy + TH + 1, dz, TORCH);
+  set(-ax, gy + 2, -az, AIR); setBlock(cx - ax * 3, gy + 2, cz - az * 3, TORCH); // a torch by the door
+  noise(1, 'lowpass', 600, 1, .6); [392, 523, 659, 784].forEach((f, i) => tone(f, f, .2, .1, 'triangle', null, i * .1));
+}
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;

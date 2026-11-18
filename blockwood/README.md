@@ -143,6 +143,18 @@ build on it, fly over it. The world saves in the browser.
   Shift down); they can't see you. Esc brings the death screen back.
   In a multiplayer room your friends see you lying where you fell, and as a see-through floating
   ghost while you fly around.
+- **88 more blocks**: birch, spruce, jungle, acacia, dark oak and cherry logs, planks and leaves;
+  granite, diorite, andesite, slate, basalt, marble, sandstone, red sand and red sandstone, gravel,
+  clay, mud, mossy cobblestone, mossy and cracked stone bricks, smooth stone, terracotta, nether
+  bricks; gold, diamond, emerald, ruby, lapis and copper ores with matching blocks (plus blocks of
+  iron and coal); 15 colours of wool and 6 of stained glass; bookshelf, crafting table, furnace,
+  pumpkin, jack o'lantern (glows), melon, hay bale, cactus, ice, packed ice, sponge, glowing lamp,
+  quartz, mushroom blocks, moss and snow block. Spruce grows on hills, and there are birch, dark oak
+  and cherry groves; pumpkins and melons grow on the grass and cactus on beaches; the new ores and
+  stones are underground (diamonds and rubies deepest). New recipes: planks from every log, crafting
+  table, furnace, bookshelf, sandstone, smooth stone, jack o'lantern, lamp, and iron/gold/coal blocks.
+- **`/summon house`** builds a stone lookout tower in front of you: a door facing you, windows,
+  a spiral stair inside (jump up each step) and a lookout platform with battlements and torches.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:
   click things in your backpack to put them in (54 slots), click things in the chest to take them out.
   In Creative, clicking any block puts 64 of it in. Breaking a chest gives you everything inside.
