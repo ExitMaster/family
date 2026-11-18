@@ -153,6 +153,14 @@ build on it, fly over it. The world saves in the browser.
   and cherry groves; pumpkins and melons grow on the grass and cactus on beaches; the new ores and
   stones are underground (diamonds and rubies deepest). New recipes: planks from every log, crafting
   table, furnace, bookshelf, sandstone, smooth stone, jack o'lantern, lamp, and iron/gold/coal blocks.
+- **The knife** (craft: 1 iron ingot + 1 stick, or pick it in Creative): hold it and right-click a block to
+  cut it open and see what's inside. Wool hides a sheep, logs hide sticks (or a squirrel), leaves hide
+  apples or birds, grass and dirt hide little critters, sand hides crabs, stone hides treasure, ores
+  hide ingots or a whole gem block, a dragon egg hatches a pet baby dragon, a pumpkin becomes a jack
+  o'lantern, ice has a frozen fish, bookshelves hold secret notes, TNT… goes boom. And **obsidian hides
+  a dream portal**: hold any block and right-click the portal to put it inside, then right-click it
+  with an empty hand to visit **a whole world made of that block** (gold, wool, glass, TNT…). A
+  portal next to where you arrive takes you home (so does `/spawn`). Pets and clones come along.
 - **`/summon house`** builds a stone lookout tower in front of you: a door facing you, windows,
   a spiral stair inside (jump up each step) and a lookout platform with battlements and torches.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:

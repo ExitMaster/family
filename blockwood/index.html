@@ -670,6 +670,12 @@ for (const [k, n, c] of [['red', 'Red', [200, 60, 60]], ['orange', 'Orange', [23
   one('moss', 'Moss block', plainT([90, 130, 50], 24, [70, 110, 40], .3));
   nb('snow_block', 'Snow block', T.SNOW, T.SNOW, T.SNOW);
 }
+one('dream_portal', 'Dream portal', r => { const st = spotsOf(r, 8, 1); return (x, y, r) => {
+  if (x === 0 || y === 0 || x === 15 || y === 15) return J([24, 14, 40], r, 6);
+  if (st.has(x + y * 16)) return [255, 255, 255];
+  const a = Math.atan2(y - 7.5, x - 7.5) * 3 + Math.hypot(x - 7.5, y - 7.5) * .9;
+  return J([120 + 100 * Math.sin(a), 120 + 100 * Math.sin(a + 2.1), 140 + 100 * Math.sin(a + 4.2)], r, 10);
+}; }, 'light');
 // how they look and behave
 const LEAFY = new Uint8Array(NB); LEAFY[LEAVES] = 1;
 for (const id of BGROUP.leaves) TRANSP[id] = LEAFY[id] = 1;
@@ -762,13 +768,14 @@ function treeAt(x, z) {
 const chunks = new Map();
 const edits = new Map(); // chunkKey -> Map(index -> block)
 let dim = 'o'; // 'o' overworld, 'n' the Nether, 'e' the End, 'b' the OneBlock world (its chunks and edits are kept apart by key)
-const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : 0);
+const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : d === 'w' ? 4e8 + dreamMat * 1e8 : 0);
 const idxOf = (x, y, z) => y + H * (x + CS * z);
 
 function genData(cx, cz) {
   if (dim === 'n') return genNether(cx, cz);
   if (dim === 'e') return genEnd(cx, cz);
   if (dim === 'b') return genOneBlock(cx, cz);
+  if (dim === 'w') return genDream(cx, cz);
   const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS, W = CS + 4;
   const hg = new Int16Array(W * W);
   for (let z = 0; z < W; z++) for (let x = 0; x < W; x++) hg[x + z * W] = heightAt(ox + x - 2, oz + z - 2);
@@ -857,7 +864,7 @@ function setBlock(x, y, z, b) {
   if (dz) markDirty(cx, cz + dz);
   if (dx && dz) markDirty(cx + dx, cz + dz);
   saveDirty = true;
-  if (mp.on && !mp.applying) mpSendEdit(x, y, z, b);
+  if (mp.on && !mp.applying && dim !== 'w') mpSendEdit(x, y, z, b);
   if (dim === 'b' && b === AIR && x === 0 && y === OB_Y && z === 0 && !mp.applying) nextOneBlock();
   return true;
 }
@@ -1168,7 +1175,9 @@ function act(button) {
     if (!m && gv && LAND.includes(gv.kind)) { toast(`That ${gv.kind} lives in a friend's game`); return; }
   }
   if (button === 2 && target && target.b === BED) { useBed(target.x, target.y, target.z); return; }
-  if (button === 2 && target && target.b === CHEST) { openChest(target.x, target.y, target.z); return; }
+  if (button === 2 && target && target.b === CHEST && !(inv[sel] && inv[sel].id === KNIFE)) { openChest(target.x, target.y, target.z); return; }
+  if (button === 2 && target && target.b === B2.dream_portal) { useDreamPortal(target); return; }
+  if (button === 2 && target && inv[sel] && inv[sel].id === KNIFE) { cutOpen(target); return; }
   if (button === 0 && dim === 'e' && endHit()) return;
   const s = inv[sel];
   if (button === 0) {
@@ -1309,7 +1318,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1318,9 +1327,9 @@ let lastSave = 0;
 function serialize() {
   const e = {};
   for (const [k, m] of edits) e[k] = [...m];
-  return {seed: SEED, edits: e, p: [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
+  return {seed: SEED, edits: e, p: dim === 'w' ? [...(dreamHome || spawnPt || [P.x, H - 2, P.z]), P.yaw, P.pitch] : [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim, planesX: planeStash, end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), dim: dim === 'w' ? 'o' : dim, planesX: planeStash, dreams: Object.fromEntries(dreamPortals), end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1344,6 +1353,8 @@ function spawn() {
   P.x = 8.5; P.z = 8.5; P.y = H - 4; P.fly = true;
 }
 function applySave(s) {
+  dreamPortals.clear();
+  if (s && s.dreams && typeof s.dreams === 'object') for (const [k, v] of Object.entries(s.dreams)) if (Number.isInteger(v) && (v === -1 || isBlock(v))) dreamPortals.set(k, v);
   chests = new Map(s && s.chests && typeof s.chests === 'object' ? Object.entries(s.chests).map(([k, v]) => [k, unpackChest(v)]) : []);
   clonesWanted = s && s.clones > 0 ? Math.min(CLONE_MAX, s.clones | 0) : 0;
   petKinds = s && Array.isArray(s.pets) ? s.pets.filter(k => LAND.includes(k)).slice(0, PET_MAX) : [];
@@ -3784,7 +3795,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon 10 NAME  /unsummon  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon 10 NAME  /unsummon  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -5637,6 +5648,117 @@ function buildTower() {
   set(-ax, gy + 2, -az, AIR); setBlock(cx - ax * 3, gy + 2, cz - az * 3, TORCH); // a torch by the door
   noise(1, 'lowpass', 600, 1, .6); [392, 523, 659, 784].forEach((f, i) => tone(f, f, .2, .1, 'triangle', null, i * .1));
 }
+
+/* ---------- the knife: cut blocks open and see what's inside ---------- */
+// Hold the knife and right-click a block to cut it open. Logs hide sticks (and sometimes a squirrel), wool hides a sheep,
+// a dragon egg hatches a dragonling, stone hides ores, ores hide ingots or a whole gem block, ice has a frozen fish,
+// a pumpkin becomes a jack o'lantern, TNT… goes boom. And obsidian hides a dream portal: put any block into it
+// (right-click the portal holding that block), then right-click it again to visit a whole world made of that block.
+const KNIFE = 92;
+item(KNIFE, 'Knife', g => { diag(g, '#e8e8ee', 7, 7, 6, 1, -1); diag(g, '#9a9aa6', 8, 8, 5, 1, -1, 1); diag(g, '#5a3a1a', 3, 11, 4, 1, -1); }, {dmg: 3, max: 1});
+PALETTE.push(KNIFE);
+RECIPES.push([KNIFE, 1, [[IRONI, 1], [STICK, 1]]]);
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+function insideOf(b) {
+  const L = (...a) => a.includes(b);
+  if (b === OBSIDIAN) return {portal: true, msg: 'A dream portal was hiding inside the obsidian! Hold any block and right-click the portal to put it in'};
+  if (b === EGG) return {mob: 'dragonling', msg: 'The egg hatched… a baby dragon!'};
+  if (b === TNT) return {boom: true, msg: 'Uh oh…'};
+  if (b === WOOL || BGROUP.wool.includes(b)) return {mob: 'sheep', msg: 'A sheep was hiding in the wool!'};
+  if (b === B2.hay) return {mob: 'mouse', msg: 'A mouse was living in the hay!'};
+  if (b === LEAVES || BGROUP.leaves.includes(b)) return Math.random() < .5 ? {items: [[APPLE, 1]], msg: 'An apple!'} : {mob: pickOne(['parrot', 'bee', 'butterfly', 'crow']), msg: 'Something flew out of the leaves!'};
+  if (b === LOG || BGROUP.wood.includes(b) && BLOCKS[b].n.endsWith('log')) return Math.random() < .3 ? {mob: 'squirrel', items: [[STICK, 2]], msg: 'A squirrel lived in this log!'} : {items: [[STICK, 4]], msg: 'Sticks inside!'};
+  if (L(GRASS, DIRT, B2.moss, B2.mud)) return {mob: pickOne(['ladybug', 'snail', 'frog', 'mouse']), msg: 'Something was living in the ground!'};
+  if (L(SAND, B2.red_sand)) return {mob: pickOne(['crab', 'lizard', 'tortoise']), msg: 'Something was buried in the sand!'};
+  if (L(STONE, B2.granite, B2.diorite, B2.andesite, B2.slate, B2.basalt, B2.marble)) return {items: [pickOne([[COALI, 2], [RAWIRON, 1], [GOLDI, 1], [EMERALD, 1], [B2.diamond_block, 1]])], msg: 'Treasure in the stone!'};
+  if (b === COBBLE) return {items: [[B2.gravel, 2]], msg: 'Just gravel inside'};
+  if (b === COAL) return {items: [[COALI, 3]], msg: 'Lots of coal!'};
+  if (b === IRON) return {items: [[IRONI, 2]], msg: 'Shiny iron ingots!'};
+  if (L(B2.gold_ore, NGOLD)) return {items: [[GOLDI, 2]], msg: 'Gold ingots!'};
+  if (b === B2.emerald_ore) return {items: [[EMERALD, 2]], msg: 'Emeralds!'};
+  for (const k of ['diamond', 'ruby', 'lapis', 'copper']) if (b === B2[k + '_ore']) return {items: [[B2[k + '_block'], 1]], msg: `A whole block of ${k}!`};
+  if (b === B2.pumpkin) return {become: B2.jack_o_lantern, msg: "You carved a jack o'lantern!"};
+  if (b === B2.melon) return {items: [[APPLE, 3]], msg: 'Sweet and juicy!'};
+  if (L(B2.ice, B2.packed_ice)) return {items: [[RFISH, 1]], msg: 'A fish frozen in the ice!'};
+  if (L(SNOW, B2.snow_block)) return {mob: pickOne(['penguin', 'arcticfox']), msg: 'Something popped out of the snow!'};
+  if (L(GLOW, B2.lamp)) return {mob: 'fairy', msg: 'A fairy was making the light!'};
+  if (L(B2.red_mushroom, B2.brown_mushroom)) return {mob: 'frog', msg: 'A frog was hiding under the mushroom!'};
+  if (L(B2.cactus, B2.sponge)) return {become: WATERB, msg: 'Water came pouring out!'};
+  if (b === B2.bookshelf) return {msg: pickOne(['A secret note: "The animals dance when you are not looking."', 'A secret note: "Dig straight down at the bottom of the world…"', 'A secret note: "Diamonds hide in the deepest stone."', 'A secret note: "Cut open obsidian. Trust me."'])};
+  if (b === B2.crafting_table) return {items: [[WPICK, 1], [STICK, 2]], msg: 'Someone left their tools inside!'};
+  if (b === B2.furnace) return {items: [[COALI, 2], [CPORK, 1]], msg: 'Something was cooking!'};
+  if (b === BEDROCK) return {nope: true, msg: 'Too hard! The knife just bounces off'};
+  return {msg: `Nothing inside — just ${BLOCKS[b].n.toLowerCase()} all the way through`};
+}
+function cutOpen(t) {
+  const b = t.b, r = insideOf(b), at = [t.x + .5, t.y + .5, t.z + .5];
+  showChat(null, r.msg); toast(r.msg, 2600);
+  if (r.nope) { tone(1200, 900, .08, .15, 'square'); return; }
+  noise(.25, 'highpass', 2500, 1, .5, at); tone(900, 1400, .12, .1, 'triangle', at);
+  burst(t.x, t.y, t.z, b);
+  if (r.portal) { setBlock(t.x, t.y, t.z, B2.dream_portal); return; }
+  if (r.boom) { setBlock(t.x, t.y, t.z, AIR); igniteTNT(t.x, t.y, t.z, .6); return; }
+  if (r.become !== undefined) { setBlock(t.x, t.y, t.z, r.become); return; }
+  if (!r.mob && !r.items) return;
+  setBlock(t.x, t.y, t.z, AIR);
+  if (r.items) for (const [id, n] of r.items) give(id, n);
+  if (r.mob && KINDS[r.mob]) { addMob(r.mob, t.x + .5, t.y + (KINDS[r.mob].fly ? .5 : 0), t.z + .5); const m = mobs[mobs.length - 1]; m.summoned = true; if (r.mob === 'dragonling' && petKinds.length < PET_MAX) togglePet(m); }
+}
+
+/* ---------- dream worlds ---------- */
+// Each one is a dimension ('w') made of a single block, kept apart from the others by the block's id (dreamMat).
+// You arrive next to a dream portal that takes you home. Saving while you're in one saves you back at home.
+let dreamMat = STONE, dreamHome = null;
+const dreamPortals = new Map(); // `${place}_${x}_${y}_${z}` -> block put inside (-1 = the way home)
+const dreamKey = (x, y, z) => `${dim}${dim === 'w' ? dreamMat : ''}_${x}_${y}_${z}`;
+const NO_DREAM = new Set([PORTAL, ENDPORTAL, TORCH, BED]);
+function genDream(cx, cz) {
+  const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS, m = dreamMat, under = LIGHT[m] ? STONE : m;
+  for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+    const wx = ox + x, wz = oz + z, h = Math.min(H - 12, heightAt(wx, wz)), base = H * (x + CS * z);
+    d[base] = BEDROCK;
+    for (let y = 1; y <= h; y++) d[base + y] = y >= h - 1 ? m : under;
+    if (hash2(wx, wz, 611) < .006) { const n = 3 + Math.floor(hash2(wx, wz, 612) * 6); for (let k = 1; k <= n; k++) d[base + h + k] = m; }
+  }
+  const e = edits.get(ck(cx, cz));
+  if (e) for (const [i, b] of e) d[i] = b;
+  return d;
+}
+function useDreamPortal(t) {
+  const key = dreamKey(t.x, t.y, t.z), mat = dreamPortals.get(key), s = inv[sel];
+  if (mat === -1) { leaveDream(); return; }
+  if (s && isBlock(s.id) && s.id !== B2.dream_portal) {
+    if (NO_DREAM.has(s.id)) { toast("The portal won't take that one. Try another block"); return; }
+    dreamPortals.set(key, s.id); saveDirty = true;
+    if (mode === 's') use1(sel);
+    burst(t.x, t.y, t.z, s.id); tone(500, 1000, .4, .12, 'sine');
+    toast(`The portal swirls with ${nameOf(s.id).toLowerCase()}! Right-click it with an empty hand to go in`, 3500);
+    return;
+  }
+  if (mat) enterDream(mat); else toast('Hold any block and right-click the portal to put it inside', 3000);
+}
+function enterDream(mat) {
+  if (riding) exitPlane();
+  if (mount) dismount();
+  if (dim === 'o') dreamHome = [P.x, P.y + .1, P.z];
+  else if (dim !== 'w') dreamHome = spawnPt ? [...spawnPt] : null;
+  if (dim === 'w') { clearMobs(); resetWorld(); dreamMat = mat; } else { dreamMat = mat; switchDim('w'); }
+  const y = Math.max(1, colTop(8, 8) + 1);
+  P.x = 8.5; P.y = y; P.z = 8.5; P.vx = P.vy = P.vz = 0; P.fly = false; st.fallY = null; st.noFall = false;
+  if (!SOLID[getBlock(10, y - 1, 8)]) setBlock(10, y - 1, 8, mat);
+  setBlock(10, y, 8, B2.dream_portal); setBlock(10, y + 1, 8, AIR);
+  dreamPortals.set(dreamKey(10, y, 8), -1);
+  noise(1.2, 'lowpass', 900, 1, .8, null, 200); [523, 659, 784, 1046].forEach((f, i) => tone(f, f, .25, .1, 'sine', null, i * .12));
+  toast(`Welcome to a world made of ${nameOf(mat).toLowerCase()}! Right-click the portal next to you to go home`, 4500);
+  refreshMeta(); updateInfo();
+}
+function leaveDream() {
+  if (dim !== 'w') return;
+  switchDim('o');
+  if (dreamHome) { [P.x, P.y, P.z] = dreamHome; P.vx = P.vy = P.vz = 0; st.fallY = null; } else CMDS.spawn();
+  toast('Back home', 2000); refreshMeta(); updateInfo();
+}
+DIM_NAME.w = 'a dream world';
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
