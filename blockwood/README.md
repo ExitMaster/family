@@ -128,7 +128,8 @@ build on it, fly over it. The world saves in the browser.
   caves. It can't see you, but it hears you dig, build, run or jump (and always notices you right
   next to it). You can hear its heartbeat when it's close. It hits very hard; sneak away slowly!
 - `/summon NAME` makes any mob in front of you (like `/summon horse` or `/summon deep watcher`), and
-  `/summon 100 zombie` makes up to 100 at once, lined up in rows (summoned zombies and skeletons
+  `/summon 100 zombie` makes up to 1000 at once, lined up in rows; `/summon 1000 every monster`
+  mixes every kind of monster (`every animal` and `everything` work too), but that many can be slow (summoned zombies and skeletons
   don't burn in daylight);
   `/unsummon` makes everything you summoned disappear, `/unsummon zombie` clears every zombie near
   you, and `/unsummon all` clears every mob near you (pets, clones and your horse stay);
@@ -161,6 +162,8 @@ build on it, fly over it. The world saves in the browser.
   a dream portal**: hold any block and right-click the portal to put it inside, then right-click it
   with an empty hand to visit **a whole world made of that block** (gold, wool, glass, TNT…). A
   portal next to where you arrive takes you home (so does `/spawn`). Pets and clones come along.
+  In a multiplayer room, friends can come too: through your portal, or with `/tp NAME`. Everyone
+  in a dream world sees each other and what they build, and `/find` says which world you're in.
 - **`/summon house`** builds a stone lookout tower in front of you: a door facing you, windows,
   a spiral stair inside (jump up each step) and a lookout platform with battlements and torches.
 - **Chests**: craft one from 8 oak planks (or pick it in Creative). Right-click a chest to open it:

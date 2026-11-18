@@ -768,7 +768,9 @@ function treeAt(x, z) {
 const chunks = new Map();
 const edits = new Map(); // chunkKey -> Map(index -> block)
 let dim = 'o'; // 'o' overworld, 'n' the Nether, 'e' the End, 'b' the OneBlock world (its chunks and edits are kept apart by key)
-const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : d === 'w' ? 4e8 + dreamMat * 1e8 : 0);
+const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : d === 'w' ? 4e8 + dreamMat * 1e8 : d[0] === 'w' ? 4e8 + d.slice(1) * 1e8 : 0);
+// the world you're in as a short name: o, n, e, b, or w + the block a dream world is made of (w216)
+function here() { return dim === 'w' ? 'w' + dreamMat : dim; }
 const idxOf = (x, y, z) => y + H * (x + CS * z);
 
 function genData(cx, cz) {
@@ -864,7 +866,7 @@ function setBlock(x, y, z, b) {
   if (dz) markDirty(cx, cz + dz);
   if (dx && dz) markDirty(cx + dx, cz + dz);
   saveDirty = true;
-  if (mp.on && !mp.applying && dim !== 'w') mpSendEdit(x, y, z, b);
+  if (mp.on && !mp.applying) mpSendEdit(x, y, z, b);
   if (dim === 'b' && b === AIR && x === 0 && y === OB_Y && z === 0 && !mp.applying) nextOneBlock();
   return true;
 }
@@ -3566,7 +3568,7 @@ function foeNear(m, range, dyMax) {
   if (mode === 's' && !dead && Math.abs(P.y - m.y) < dyMax) { const d = Math.hypot(P.x - m.x, P.z - m.z); if (d < bd) { bd = d; best = P; } }
   if (mp.on) for (const [id, a] of avatars) {
     const p = a.p;
-    if (!p || p.d !== dim || !p.s || Date.now() - a.seen > 10000 || Math.abs(a.y - m.y) >= dyMax) continue;
+    if (!p || p.d !== here() || !p.s || Date.now() - a.seen > 10000 || Math.abs(a.y - m.y) >= dyMax) continue;
     const d = Math.hypot(a.x - m.x, a.z - m.z);
     if (d < bd) { bd = d; best = a; a.uid = id; }
   }
@@ -3576,7 +3578,7 @@ function foeNear(m, range, dyMax) {
 function foeOf(m) {
   if (!m.foe) return mode === 's' && !dead ? P : null;
   const a = avatars.get(m.foe);
-  if (a && a.p && a.p.d === dim && a.p.s) { a.uid = m.foe; return a; }
+  if (a && a.p && a.p.d === here() && a.p.s) { a.uid = m.foe; return a; }
   return null;
 }
 function hitFoe(T, dmg, fx, fz) {
@@ -3586,7 +3588,7 @@ function hitFoe(T, dmg, fx, fz) {
 // tell friends nearby about an arrow or a blast; each game works out the damage to its own player
 function mpFx(v, x, z, range) {
   if (!mp.on) return;
-  for (const [id, a] of avatars) if (a.p && a.p.d === dim && Math.hypot(a.x - x, a.z - z) < range) quiet(mp.fb.push(R('/fx/' + id), v));
+  for (const [id, a] of avatars) if (a.p && a.p.d === here() && Math.hypot(a.x - x, a.z - z) < range) quiet(mp.fb.push(R('/fx/' + id), v));
 }
 function mobArrow(x, y, z, vx, vy, vz, dmg) {
   shootArrow(x, y, z, vx, vy, vz, dmg, true);
@@ -3662,7 +3664,7 @@ async function mpJoinRoom() {
   mp.owner = meta.owner;
   mp.on = true;
   // load the room's world
-  resetWorld(); clearMobs(); edits.clear(); chests = new Map(); chestF = null;
+  resetWorld(); clearMobs(); edits.clear(); chests = new Map(); chestF = null; dreamPortals.clear();
   SEED = meta.seed | 0; dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0; spawnPt = null; P.fly = false;
   spawn(); renderHotbar();
   const me = R('/players/' + mp.uid);
@@ -3681,6 +3683,7 @@ async function mpJoinRoom() {
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
     fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
+    fb.onValue(R('/dreams'), s => { for (const [k, v] of Object.entries(s.val() || {})) if (Number.isInteger(v) && (v === -1 || isBlock(v))) dreamPortals.set(k, v); }),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
   refreshMeta(); updateInfo();
@@ -3706,16 +3709,17 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: dim, s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
-function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${dim}_${x}_${y}_${z}`), b)); }
+function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${here()}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
-  const m = /^([oneb])_(-?\d+)_(\d+)_(-?\d+)$/.exec(key);
+  const m = /^([oneb]|w\d{1,3})_(-?\d+)_(\d+)_(-?\d+)$/.exec(key);
   if (!m || !Number.isInteger(v) || v < 0 || v >= NB || (v && !BLOCKS[v])) return;
   const d = m[1], x = +m[2], y = +m[3], z = +m[4];
   if (y >= H) return;
   const cx = Math.floor(x / CS), cz = Math.floor(z / CS), k = ck(cx, cz, d);
-  if (d === dim && chunks.has(k)) { mp.applying = true; setBlock(x, y, z, v); mp.applying = false; return; }
+  if (d[0] === 'w' && !isBlock(+d.slice(1))) return;
+  if (d === here() && chunks.has(k)) { mp.applying = true; setBlock(x, y, z, v); mp.applying = false; return; }
   if (!edits.has(k)) edits.set(k, new Map());
   edits.get(k).set(idxOf(x - cx * CS, y, z - cz * CS), v); // picked up when that part of the world loads
 }
@@ -3755,7 +3759,7 @@ function mpTick(dt) {
   updateGhosts(dt);
   if ((mp.mobT -= dt) <= 0) { mp.mobT = .25; mpPublishMobs(); }
   for (const a of avatars.values()) {
-    const p = a.p, vis = !!p && p.d === dim && Date.now() - a.seen < 60000;
+    const p = a.p, vis = !!p && p.d === here() && Date.now() - a.seen < 60000;
     a.g.visible = vis;
     if (!vis) continue;
     if (Math.hypot(p.x - a.x, p.z - a.z) > 10) { a.x = p.x; a.y = p.y; a.z = p.z; }
@@ -3922,7 +3926,7 @@ function compass(dx, dz) {
   return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.floor(a / 45)];
 }
 function friendList() {
-  return [...avatars.entries()].filter(([, a]) => a.p).map(([id, a]) => ({id, a, d: Math.hypot(a.p.x - P.x, a.p.y - P.y, a.p.z - P.z), here: a.p.d === dim}))
+  return [...avatars.entries()].filter(([, a]) => a.p).map(([id, a]) => ({id, a, d: Math.hypot(a.p.x - P.x, a.p.y - P.y, a.p.z - P.z), here: a.p.d === here()}))
     .sort((u, v) => (v.here - u.here) || (u.d - v.d));
 }
 function goToFriend(id) {
@@ -3930,7 +3934,7 @@ function goToFriend(id) {
   if (!a || !a.p) return 'That friend is not in the room any more';
   const p = a.p;
   if (riding) exitPlane();
-  if (p.d !== dim && DIM_NAME[p.d]) switchDim(p.d);
+  if (p.d !== here()) { if (/^w\d+$/.test(p.d) && isBlock(+p.d.slice(1))) enterDream(+p.d.slice(1)); else if (DIM_NAME[p.d]) switchDim(p.d); }
   P.x = p.x + .8; P.y = p.y; P.z = p.z + .8; P.vx = P.vy = P.vz = 0; st.fallY = null; st.noFall = true;
   for (let i = 0; i < 12 && collides(); i++) P.y += 1;
   noise(.8, 'bandpass', 500, 1.2, .8, null, 1800);
@@ -3941,7 +3945,7 @@ CMDS.find = () => {
   if (!mp.on) return 'Join a multiplayer room (pause menu) to find friends';
   const fr = friendList();
   if (!fr.length) return 'Nobody else is in the room yet';
-  for (const {a, d, here} of fr.slice(0, 6)) showChat(null, here ? `${a.name}: ${Math.round(d)} blocks ${compass(a.p.x - P.x, a.p.z - P.z)}` : `${a.name} is in ${DIM_NAME[a.p.d] || 'another world'}`);
+  for (const {a, d, here} of fr.slice(0, 6)) showChat(null, here ? `${a.name}: ${Math.round(d)} blocks ${compass(a.p.x - P.x, a.p.z - P.z)}` : `${a.name} is in ${/^w\d+$/.test(a.p.d) && isBlock(+a.p.d.slice(1)) ? 'a world made of ' + nameOf(+a.p.d.slice(1)).toLowerCase() : DIM_NAME[a.p.d] || 'another world'}`);
   return '/tp NAME takes you to a friend';
 };
 CMDS.tp = arg => {
@@ -3973,7 +3977,7 @@ function updateFriendMarks() {
     let el = marksEl.querySelector(`[data-id="${CSS.escape(id)}"]`);
     if (!el) { el = document.createElement('div'); el.className = 'fmark'; el.dataset.id = id; el.innerHTML = '<span class="arr">▲</span><span class="lab"></span>'; marksEl.append(el); }
     const p = a.p;
-    if (!p || p.d !== dim) { el.hidden = true; continue; }
+    if (!p || p.d !== here()) { el.hidden = true; continue; }
     const d = Math.hypot(p.x - P.x, p.y - P.y, p.z - P.z);
     fv.set(a.x, a.y + 2.7, a.z).applyMatrix4(cam.matrixWorldInverse); // camera space: x right, y up, in front means z < 0
     const lx = fv.x, ly = fv.y, ahead = fv.z < -.1;
@@ -4001,7 +4005,7 @@ let mobSeq = 0;
 const ghosts = new Map();
 function mpLeader(fight) { // fight: only count players monsters can go after
   if (!mp.on) return true;
-  for (const [id, a] of avatars) if (a.p && a.p.d === dim && (!fight || a.p.s) && id < mp.uid && Math.hypot(a.p.x - P.x, a.p.z - P.z) < 80) return false;
+  for (const [id, a] of avatars) if (a.p && a.p.d === here() && (!fight || a.p.s) && id < mp.uid && Math.hypot(a.p.x - P.x, a.p.z - P.z) < 80) return false;
   return true;
 }
 function mpPublishMobs() {
@@ -4013,7 +4017,7 @@ function mpPublishMobs() {
   const sig = Object.keys(m).length ? JSON.stringify(m) : '';
   if (sig === mp.mobSig) return;
   mp.mobSig = sig;
-  quiet(mp.fb.set(R('/mobs/' + mp.uid), sig ? {d: dim, m} : null));
+  quiet(mp.fb.set(R('/mobs/' + mp.uid), sig ? {d: here(), m} : null));
 }
 function mpGhosts(all) {
   const seen = new Set();
@@ -4041,7 +4045,7 @@ function clearGhosts() { for (const [key, g] of ghosts) dropGhost(key, g); }
 function updateGhosts(dt) {
   const k = Math.min(1, 10 * dt);
   for (const g of ghosts.values()) {
-    g.g.visible = g.d === dim && !g.dead;
+    g.g.visible = g.d === here() && !g.dead;
     if (!g.g.visible) continue;
     if (Math.hypot(g.tx - g.x, g.tz - g.z) > 8) { g.x = g.tx; g.y = g.ty; g.z = g.tz; }
     const ox = g.x, oz = g.z;
@@ -4862,23 +4866,38 @@ function watcherThink(m, K, dt) {
   const aL = m.g.getObjectByName('armL'), aR = m.g.getObjectByName('armR');
   if (aL) aL.rotation.x = s; if (aR) aR.rotation.x = m.atk > 1 ? s : -Math.sin(m.ph) * .3;
 }
-CMDS.summon = a => { // /summon zombie, /summon 100 zombie or /summon zombie 100
-  const num = ((a || '').match(/\d+/) || [])[0], n = Math.max(1, Math.min(100, num ? parseInt(num, 10) : 1));
+CMDS.summon = a => { // /summon zombie, /summon 100 zombie, /summon zombie 100, /summon 1000 every monster
+  const num = ((a || '').match(/\d+/) || [])[0];
   const q = (a || '').toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, '');
-  const kind = Object.keys(KINDS).find(k => k === q || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q)
-    || Object.keys(KINDS).find(k => k === q + 's' || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q + 's');
   if (/^(house|tower|lookout|lookouttower|stonetower|castle)$/.test(q)) { buildTower(); return 'A stone lookout tower appeared! Go in the door and jump up the spiral stairs to the top'; }
-  if (!kind) return 'Type /summon NAME or /summon 100 NAME (or /summon house). Type /mobs to see every name';
-  if (dim === 'e' && kind !== 'watcher' && !KINDS[kind].hostile) return "Animals can't live in the End";
-  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), sx = Math.cos(P.yaw), sz = -Math.sin(P.yaw), gap = Math.max(1.2, KINDS[kind].hw * 2.6);
+  const groups = {
+    monster: Object.keys(KINDS).filter(k => KINDS[k].hostile),
+    animal: Object.keys(KINDS).filter(k => !KINDS[k].hostile && !KINDS[k].villager && !KINDS[k].golem && k !== 'clone'),
+    mob: Object.keys(KINDS).filter(k => k !== 'clone'),
+  };
+  const gm = /^(every|all)(monster|animal|mob|thing|one)$/.exec(q) || (q === 'everything' || q === 'everyone' ? [0, 0, 'mob'] : null);
+  let kinds;
+  if (gm) kinds = groups[gm[2] === 'thing' || gm[2] === 'one' ? 'mob' : gm[2]];
+  else {
+    const kind = Object.keys(KINDS).find(k => k === q || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q)
+      || Object.keys(KINDS).find(k => k === q + 's' || kindName(k).toLowerCase().replace(/[^a-z]/g, '') === q + 's');
+    if (!kind) return 'Type /summon NAME, /summon 100 NAME, /summon every monster or /summon house. Type /mobs to see every name';
+    kinds = [kind];
+  }
+  if (dim === 'e') kinds = kinds.filter(k => KINDS[k].hostile || k === 'watcher');
+  if (!kinds.length) return "Animals can't live in the End";
+  const n = Math.max(1, Math.min(1000, num ? parseInt(num, 10) : gm ? kinds.length : 1));
+  const cols = Math.max(10, Math.ceil(Math.sqrt(n))), fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), sx = Math.cos(P.yaw), sz = -Math.sin(P.yaw);
+  const gap = Math.max(1.3, ...kinds.map(k => Math.min(2.6, KINDS[k].hw * 2.6)));
   for (let i = 0; i < n; i++) {
-    const row = Math.floor(i / 10), col = i % 10, across = n === 1 ? 0 : (col - (Math.min(n, 10) - 1) / 2) * gap;
+    const kind = kinds[i % kinds.length], K = KINDS[kind], row = Math.floor(i / cols), col = i % cols, across = n === 1 ? 0 : (col - (Math.min(n, cols) - 1) / 2) * gap;
     const x = P.x + fx * (3 + row * gap) + sx * across, z = P.z + fz * (3 + row * gap) + sz * across;
     let y = Math.floor(P.y) + 1;
-    if (!KINDS[kind].fly && !KINDS[kind].swim) { while (y > 0 && !SOLID[getBlock(Math.floor(x), y - 1, Math.floor(z))]) y--; while (SOLID[getBlock(Math.floor(x), y, Math.floor(z))] && y < H - 3) y++; }
+    if (!K.fly && !K.swim) { while (y > 0 && !SOLID[getBlock(Math.floor(x), y - 1, Math.floor(z))]) y--; while (SOLID[getBlock(Math.floor(x), y, Math.floor(z))] && y < H - 3) y++; }
     addMob(kind, x, y, z); mobs[mobs.length - 1].summoned = true;
   }
-  return (n === 1 ? `${kindName(kind)} appeared` : `${n} × ${kindName(kind).toLowerCase()} appeared`) + (KINDS[kind].hostile && mode !== 's' ? ' (monsters only fight in Survival)' : '');
+  const what = kinds.length > 1 ? `${n} mobs (${kinds.length} kinds)` : n === 1 ? kindName(kinds[0]) : `${n} × ${kindName(kinds[0]).toLowerCase()}`;
+  return `${what} appeared` + (n > 300 ? ' (that many can make the game slow; /unsummon clears them)' : '') + (kinds.some(k => KINDS[k].hostile) && mode !== 's' ? ' (monsters only fight in Survival)' : '');
 };
 CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
 // /unsummon: every mob you summoned · /unsummon zombie: every zombie near you · /unsummon all: every mob near you
@@ -4911,7 +4930,7 @@ const CHEST_N = 54;
 let chests = new Map(), chestF = null;
 HARD[CHEST] = 1.5; MAT[CHEST] = 'wood';
 RECIPES.push([CHEST, 1, [[PLANKS, 8]]]);
-const chestKey = (x, y, z) => `${dim}_${x}_${y}_${z}`;
+const chestKey = (x, y, z) => `${here()}_${x}_${y}_${z}`;
 const packChest = a => a.some(Boolean) ? a.map(s => s ? [s.id, s.n] : 0) : null;
 function unpackChest(a) {
   const out = Array(CHEST_N).fill(null);
@@ -4988,7 +5007,7 @@ function chestBroken(x, y, z) {
   toast(lost ? 'Your backpack is full: some things from the chest were lost' : 'You picked up everything in the chest', 2200);
 }
 function mpChests(all) {
-  chests = new Map(Object.entries(all || {}).filter(([k]) => /^[oneb]_-?\d+_\d+_-?\d+$/.test(k)).map(([k, v]) => [k, unpackChest(v)]));
+  chests = new Map(Object.entries(all || {}).filter(([k]) => /^([oneb]|w\d{1,3})_-?\d+_\d+_-?\d+$/.test(k)).map(([k, v]) => [k, unpackChest(v)]));
   if (chestF) { chestF.items = (chests.get(chestF.key) || Array(CHEST_N).fill(null)).slice(); if (invOpen) renderInv(); }
 }
 
@@ -5710,7 +5729,7 @@ function cutOpen(t) {
 // You arrive next to a dream portal that takes you home. Saving while you're in one saves you back at home.
 let dreamMat = STONE, dreamHome = null;
 const dreamPortals = new Map(); // `${place}_${x}_${y}_${z}` -> block put inside (-1 = the way home)
-const dreamKey = (x, y, z) => `${dim}${dim === 'w' ? dreamMat : ''}_${x}_${y}_${z}`;
+const dreamKey = (x, y, z) => `${here()}_${x}_${y}_${z}`;
 const NO_DREAM = new Set([PORTAL, ENDPORTAL, TORCH, BED]);
 function genDream(cx, cz) {
   const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS, m = dreamMat, under = LIGHT[m] ? STONE : m;
@@ -5730,6 +5749,7 @@ function useDreamPortal(t) {
   if (s && isBlock(s.id) && s.id !== B2.dream_portal) {
     if (NO_DREAM.has(s.id)) { toast("The portal won't take that one. Try another block"); return; }
     dreamPortals.set(key, s.id); saveDirty = true;
+    if (mp.on) quiet(mp.fb.set(R('/dreams/' + key), s.id));
     if (mode === 's') use1(sel);
     burst(t.x, t.y, t.z, s.id); tone(500, 1000, .4, .12, 'sine');
     toast(`The portal swirls with ${nameOf(s.id).toLowerCase()}! Right-click it with an empty hand to go in`, 3500);
@@ -5748,6 +5768,7 @@ function enterDream(mat) {
   if (!SOLID[getBlock(10, y - 1, 8)]) setBlock(10, y - 1, 8, mat);
   setBlock(10, y, 8, B2.dream_portal); setBlock(10, y + 1, 8, AIR);
   dreamPortals.set(dreamKey(10, y, 8), -1);
+  if (mp.on) quiet(mp.fb.set(R('/dreams/' + dreamKey(10, y, 8)), -1));
   noise(1.2, 'lowpass', 900, 1, .8, null, 200); [523, 659, 784, 1046].forEach((f, i) => tone(f, f, .25, .1, 'sine', null, i * .12));
   toast(`Welcome to a world made of ${nameOf(mat).toLowerCase()}! Right-click the portal next to you to go home`, 4500);
   refreshMeta(); updateInfo();
