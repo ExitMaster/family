@@ -133,6 +133,8 @@ build on it, fly over it. The world saves in the browser.
   don't burn in daylight);
   `/unsummon` makes everything you summoned disappear, `/unsummon zombie` clears every zombie near
   you, and `/unsummon all` clears every mob near you (pets, clones and your horse stay);
+  `/no more silverfish` makes a mob vanish and never appear again (remembered in this browser, in every
+  world); `/yes more silverfish` brings it back, and `/no more` lists them;
   `/mobs` lists every name. Summoned monsters stay even in Creative, where they can't hurt you.
 - A pet **wolf** fights monsters for you. Any animal can be a pet, even bees and parrots.
 - **The secret life of animals**: type `/kill` (or die any other way) and the camera floats up over

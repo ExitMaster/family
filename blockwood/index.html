@@ -1710,10 +1710,14 @@ const KINDS = {
 };
 const mobs = [];
 let spawnT = 1;
+// mobs you've said /no more to (kept in this browser, for every world): they never appear again
+const NOMORE_KEY = 'blockwood.nomore', noMore = new Set();
+try { for (const k of JSON.parse(localStorage.getItem(NOMORE_KEY) || '[]')) if (typeof k === 'string') noMore.add(k); } catch (e) {}
 function addMob(kind, x, y, z) {
   const g = new THREE.Group(), legs = KINDS[kind].build(g);
   scene.add(g);
   mobs.push({id: ++mobSeq, kind, g, legs, x, y, z, vx: 0, vy: 0, vz: 0, yaw: Math.random() * 6.28, ry: 0, t: 0, walk: false, flee: 0, hp: KINDS[kind].hp, ph: 0, ground: false});
+  if (noMore.has(kind)) { const m = mobs[mobs.length - 1]; m.y = -50; m.noDrop = true; g.visible = false; } // gone before it's ever seen
 }
 function removeMob(i) { scene.remove(mobs[i].g); mobs.splice(i, 1); }
 function clearMobs() { clearPlanes(); clearArrows(); while (mobs.length) removeMob(0); for (const e of tnts) scene.remove(e.m); tnts.length = 0; }
@@ -3809,7 +3813,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /no more NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -4055,7 +4059,7 @@ function clearGhosts() { for (const [key, g] of ghosts) dropGhost(key, g); }
 function updateGhosts(dt) {
   const k = Math.min(1, 10 * dt);
   for (const g of ghosts.values()) {
-    g.g.visible = g.d === here() && !g.dead;
+    g.g.visible = g.d === here() && !g.dead && !noMore.has(g.kind);
     if (!g.g.visible) continue;
     if (Math.hypot(g.tx - g.x, g.tz - g.z) > 8) { g.x = g.tx; g.y = g.ty; g.z = g.tz; }
     const ox = g.x, oz = g.z;
@@ -4490,7 +4494,7 @@ function updatePets(dt) {
   if (!P.onGround || riding || dead) return;
   const need = {};
   for (const k of petKinds) need[k] = (need[k] || 0) + 1;
-  for (const k in need) for (let n = have[k] || 0; n < need[k]; n++) {
+  for (const k in need) if (!noMore.has(k)) for (let n = have[k] || 0; n < need[k]; n++) {
     const s = spotNear(2 + Math.random() * 2);
     if (!s) return;
     addMob(k, s[0], s[1], s[2]); setPet(mobs[mobs.length - 1], true);
@@ -4894,6 +4898,9 @@ CMDS.summon = a => { // /summon zombie, /summon 100 zombie, /summon zombie 100, 
     if (!kind) return 'Type /summon NAME, /summon 100 NAME, /summon every monster or /summon house. Type /mobs to see every name';
     kinds = [kind];
   }
+  const banned = kinds.filter(k => noMore.has(k));
+  kinds = kinds.filter(k => !noMore.has(k));
+  if (!kinds.length) return `You said no more ${kindName(banned[0]).toLowerCase()}. Type /yes more ${kindName(banned[0]).toLowerCase()} to let it come back`;
   if (dim === 'e') kinds = kinds.filter(k => KINDS[k].hostile || k === 'watcher');
   if (!kinds.length) return "Animals can't live in the End";
   const n = Math.max(1, Math.min(1000, num ? parseInt(num, 10) : gm ? kinds.length : 1));
@@ -4909,6 +4916,32 @@ CMDS.summon = a => { // /summon zombie, /summon 100 zombie, /summon zombie 100, 
   const what = kinds.length > 1 ? `${n} mobs (${kinds.length} kinds)` : n === 1 ? kindName(kinds[0]) : `${n} × ${kindName(kinds[0]).toLowerCase()}`;
   return `${what} appeared` + (n > 300 ? ' (that many can make the game slow; /unsummon clears them)' : '') + (kinds.some(k => KINDS[k].hostile) && mode !== 's' ? ' (monsters only fight in Survival)' : '');
 };
+// /no more silverfish: that mob never appears again (and the ones around vanish). /yes more silverfish undoes it.
+function kindOf(a) {
+  const q = (a || '').toLowerCase().replace(/[^a-z]/g, '').replace(/s$/, '');
+  return Object.keys(KINDS).find(k => k === q || k === q + 's' || [q, q + 's'].includes(kindName(k).toLowerCase().replace(/[^a-z]/g, ''))) || null;
+}
+function saveNoMore() { try { localStorage.setItem(NOMORE_KEY, JSON.stringify([...noMore])); } catch (e) {} }
+CMDS.nomore = a => {
+  if (!(a || '').trim()) return noMore.size ? 'No more: ' + [...noMore].map(kindName).join(', ') + '. Type /yes more NAME to bring one back' : 'Type /no more NAME, like /no more silverfish';
+  const kind = kindOf(a);
+  if (!kind) return `There's no mob called ${a.trim()}. Type /mobs to see every name`;
+  noMore.add(kind); saveNoMore();
+  let n = 0;
+  for (const m of mobs) if (m.kind === kind && m.y > -10) { if (n++ < 30) burst(Math.floor(m.x), Math.floor(m.y + 1), Math.floor(m.z), 0, new THREE.Color(0xc8b8ff)); m.y = -50; m.noDrop = true; }
+  if (kind === 'clone') clonesWanted = 0;
+  const pi = petKinds.filter(k => k !== kind); if (pi.length !== petKinds.length) { petKinds = pi; saveDirty = true; }
+  return `No more ${kindName(kind).toLowerCase()}! ${n ? `${n} vanished, and` : 'From now on'} they'll never appear again. (/yes more ${kindName(kind).toLowerCase()} brings them back)`;
+};
+CMDS.yesmore = a => {
+  const kind = kindOf(a);
+  if (!kind || !noMore.has(kind)) return noMore.size ? 'You can bring back: ' + [...noMore].map(kindName).join(', ') : "You haven't said no more to anything";
+  noMore.delete(kind); saveNoMore();
+  return `${kindName(kind)} can appear again`;
+};
+// "/no more silverfish" and "/yes more silverfish" (with spaces) work too
+CMDS.no = a => /^\s*more\b/i.test(a || '') ? CMDS.nomore((a || '').replace(/^\s*more/i, '')) : 'Did you mean /no more NAME?';
+CMDS.yes = a => /^\s*more\b/i.test(a || '') ? CMDS.yesmore((a || '').replace(/^\s*more/i, '')) : 'Did you mean /yes more NAME?';
 CMDS.mobs = () => 'Mobs: ' + Object.keys(KINDS).map(kindName).join(', ');
 // /unsummon: every mob you summoned · /unsummon zombie: every zombie near you · /unsummon all: every mob near you
 // (pets, clones and the animal you're riding always stay)
@@ -5576,6 +5609,7 @@ function updateClones(dt) {
     if (Math.hypot(m.x - P.x, m.z - P.z) > 24 && P.onGround && !riding && !dead) { const s = spotNear(2 + Math.random() * 2); if (s) { [m.x, m.y, m.z] = s; m.vx = m.vy = m.vz = 0; } }
   }
   if (!P.onGround || riding || dead || dim === 'e') return;
+  if (noMore.has('clone')) return;
   for (; have < clonesWanted; have++) { const s = spotNear(1.5 + Math.random() * 2); if (!s) return; addMob('clone', s[0], s[1], s[2]); }
 }
 CMDS.clone = a => {
