@@ -217,6 +217,9 @@ joins with the same code is in the same world:
   arrows. Only players in Survival get hurt. When a friend gets you, the death screen says
   "Slain by Alice" and the chat tells the room. Type `/pvp off` to stop hurting and being hurt
   (remembered in this browser), `/pvp on` to fight again.
+- **Give lives**: type `/life NAME` (or right-click a friend who got knocked out) to give a friend a
+  life. If they're down, lying on the ground or flying around as a ghost, they get up right where they
+  are; if they're fine, they get full hearts and food. `/life` on its own gives you one. It's free.
 - **Trade with friends**: right-click a friend (or type `/trade NAME`) to ask them to trade. They press `Y`
   (or the Trade button) to say yes, `N` for no. You each click things in your backpack to put them
   on the trade table (in Creative, a stack of 64 of any block), and when you both press **Trade**

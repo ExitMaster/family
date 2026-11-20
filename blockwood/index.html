@@ -1168,7 +1168,7 @@ function act(button) {
     const pl = planeHit(Math.min(5, far));
     if (pl) { if (button === 2) board(pl); else pickPlane(pl); return; }
     const fr = mp.on && avatarHit(Math.min(5, far));
-    if (fr) { if (button === 2) startTrade(fr); else hitPlayer(fr); return; }
+    if (fr) { const fp = avatars.get(fr).p; if (button === 2 && fp && fp.k) { const msg = giveLife(fr); showChat(null, msg); toast(msg); } else if (button === 2) startTrade(fr); else hitPlayer(fr); return; }
   }
   if (button === 2) {
     const m = mobHit(4);
@@ -3605,6 +3605,7 @@ function mpOnFx(s) {
   if (ok(v.h) && v.h.length === 3) { if (v.by !== undefined) hurtByFriend(v); else hurtPlayer(Math.max(0, Math.min(20, v.h[0])), v.h[1], v.h[2]); }
   else if (ok(v.a) && v.a.length === 7) shootArrow(v.a[0], v.a[1], v.a[2], v.a[3], v.a[4], v.a[5], Math.max(0, Math.min(20, v.a[6])), true);
   else if (ok(v.b) && v.b.length === 3) blast(v.b[0], v.b[1], v.b[2], false);
+  else if (v.life === 1) gotLife(typeof v.by === 'string' ? v.by.slice(0, 12) : 'A friend');
 }
 
 /* ---------- multiplayer (same Firebase rooms as Jetpack Jump) ---------- */
@@ -3808,7 +3809,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /clone  /unclone  /summon 10 NAME  /unsummon  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -5833,6 +5834,40 @@ mpShare.addEventListener('click', async () => {
   } catch (e) { mpStatus.textContent = 'Could not share right now. Check the internet, or open the game at unimai.net/blockwood/.'; }
   mpShare.disabled = false;
 });
+
+/* ---------- giving lives ---------- */
+// /life NAME (or right-click a friend who got knocked out) gives them a life: if they're down — lying on the ground or
+// flying about as a ghost — they get up right where they are, and if they're fine they get full hearts and food.
+// /life on its own gives you a life. It's free, as many as you like.
+function heartsAt(x, y, z) { for (let k = 0; k < 4; k++) burst(Math.floor(x), Math.floor(y + 1 + k * .3), Math.floor(z), 0, new THREE.Color(k % 2 ? 0xff5a6a : 0xff9aa8)); }
+function gotLife(by) {
+  if (dead) {
+    if (ghost) endGhost();
+    if (ghostFly !== null) { P.fly = ghostFly; ghostFly = null; $('#bDown').hidden = !P.fly; }
+    dead = false; deadEl.hidden = true;
+    for (let i = 0; i < 12 && collides(); i++) P.y += 1;
+    if (!TOUCH && !dragMode) requestLock();
+  }
+  Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: true, inv: 2});
+  heartsAt(P.x, P.y, P.z);
+  [523, 659, 784, 1046].forEach((f, i) => tone(f, f, .18, .12, 'sine', null, i * .09));
+  toast(by ? `${by} gave you a life! ♥` : 'You got a life! ♥', 3000);
+  saveDirty = true;
+}
+function giveLife(id) {
+  const a = avatars.get(id);
+  if (!a || !a.p) return 'They left the room';
+  quiet(mp.fb.push(R('/fx/' + id), {life: 1, by: mp.name}));
+  heartsAt(a.x, a.y, a.z); tone(660, 990, .25, .1, 'sine');
+  return a.p.k ? `You gave ${a.name} a life — they're back up! ♥` : `You gave ${a.name} a life: full hearts! ♥`;
+}
+CMDS.life = CMDS.givelife = CMDS.heal = CMDS.revive = a => {
+  const q = (a || '').trim().toLowerCase();
+  if (!q || q === 'me' || q === myName().toLowerCase()) { gotLife(null); return null; }
+  if (!mp.on) return 'Giving lives to friends works in a multiplayer room. Type /life on its own to give yourself one';
+  const f = friendList().find(f => f.a.name.toLowerCase().startsWith(q));
+  return f ? giveLife(f.id) : `Nobody called ${a} is in the room`;
+};
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
