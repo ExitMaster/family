@@ -200,6 +200,10 @@ Play in the same world with your family, like Jetpack Jump. In the pause menu, t
 and a **room code** (3 to 6 letters or numbers, like `FAM1`) and press **Join**. Everyone who
 joins with the same code is in the same world:
 
+- **Share my world** (pause menu) shows friends what you built: it makes a new room with a copy of
+  your own world (every block you changed, your chests and dream portals) and tells you its code.
+  Any brand-new room you make starts as a copy of your world the same way. It's a copy, so what
+  happens in the room doesn't change the world saved in your browser.
 - The room uses the world seed of whoever made it first. That player is the **host** (shown as
   "(host)" in the player list). The host gets a **Kick** button next to each player in the pause
   menu, or types `/kick NAME`. A kicked player goes back to their own world and can't rejoin for
