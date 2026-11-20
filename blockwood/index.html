@@ -1324,7 +1324,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? '  · flying' : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -3824,7 +3824,7 @@ const CMDS = {
     P.vx = P.vy = P.vz = 0; st.fallY = null;
     return 'Back to your spawn point';
   },
-  fly: () => { if (mode !== 'c') return 'Flying only works in Creative'; toggleFly(); return P.fly ? 'Flying' : 'Walking'; },
+  fly: () => { if (mode !== 'c') return startSurvFly(); toggleFly(); return P.fly ? 'Flying' : 'Walking'; },
   clear: () => { chatLog.textContent = ''; return null; },
 };
 function sendChat(m) {
@@ -5903,6 +5903,32 @@ CMDS.life = CMDS.givelife = CMDS.heal = CMDS.revive = a => {
   return f ? giveLife(f.id) : `Nobody called ${a} is in the room`;
 };
 
+/* ---------- /fly in Survival: 30 seconds of flying ---------- */
+// Space goes up, Shift goes down. A warning comes at 5 seconds, and when time's up you float down safely.
+let flyLeft = 0, flyWarned = false;
+function startSurvFly() {
+  if (dead) return null;
+  if (riding) exitPlane();
+  if (mount) dismount();
+  flyLeft = 30; flyWarned = false;
+  P.fly = true; P.vy = Math.max(P.vy, 2); st.fallY = null;
+  $('#bFly').classList.add('on'); $('#bDown').hidden = false;
+  [523, 784, 1046].forEach((f, i) => tone(f, f, .12, .1, 'sine', null, i * .07));
+  return 'You can fly for 30 seconds! Space goes up, Shift goes down';
+}
+function updateSurvFly(dt) {
+  if (flyLeft <= 0) return;
+  if (mode === 'c' || dead) { flyLeft = 0; return; }
+  flyLeft -= dt;
+  if (flyLeft <= 5 && !flyWarned) { flyWarned = true; toast('5 seconds of flying left!', 2000); tone(880, 660, .2, .1, 'square'); }
+  if (flyLeft <= 0) {
+    flyLeft = 0; P.fly = false; st.noFall = true; st.fallY = null; // float down without getting hurt
+    $('#bFly').classList.remove('on'); $('#bDown').hidden = true;
+    toast('Flying time is up! /fly to fly again', 2500);
+  }
+  if (frame % 20 === 0) updateInfo();
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5913,7 +5939,7 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt);
+    updateWeather(dt); updateSurvFly(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();

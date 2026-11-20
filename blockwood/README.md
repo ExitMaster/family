@@ -219,6 +219,8 @@ joins with the same code is in the same world:
   arrows. Only players in Survival get hurt. When a friend gets you, the death screen says
   "Slain by Alice" and the chat tells the room. Type `/pvp off` to stop hurting and being hurt
   (remembered in this browser), `/pvp on` to fight again.
+- **`/fly` in Survival** lets you fly for 30 seconds (Space up, Shift down; the info line counts down,
+  you get a warning at 5 seconds, and you float down safely when time's up). Type it again for more.
 - **Give lives**: type `/life NAME` (or right-click a friend who got knocked out) to give a friend a
   life. If they're down, lying on the ground or flying around as a ghost, they get up right where they
   are; if they're fine, they get full hearts and food. `/life` on its own gives you one. It's free.
