@@ -1097,7 +1097,7 @@ function physics(dt) {
   const wx = ix * c - iz * s, wz = -ix * s - iz * c;
   const sprint = !P.fly && (keys.ShiftLeft || keys.ShiftRight) && !(mode === 's' && st.food <= 6);
   const jump = keys.Space || keys.touchJump, down = keys.ShiftLeft || keys.ShiftRight || keys.touchDown;
-  const speed = P.fly ? 11 : inWater ? 3 : mount ? RIDE[mount.kind].speed : sprint ? 5.8 : 4.3;
+  const speed = (P.fly ? 11 : inWater ? 3 : mount ? RIDE[mount.kind].speed : sprint ? 5.8 : 4.3) * speedMul;
   const acc = P.fly ? 8 : P.onGround ? 14 : inWater ? 6 : 5;
   const k = Math.min(1, acc * dt);
   P.vx += (wx * speed - P.vx) * k; P.vz += (wz * speed - P.vz) * k;
@@ -1110,7 +1110,7 @@ function physics(dt) {
     P.vy = Math.max(-3.5, Math.min(3.5, P.vy));
   } else {
     P.vy -= 30 * dt;
-    if (jump && P.onGround) { P.vy = mount ? RIDE[mount.kind].jump : 8.6; exhaust(sprint ? .2 : .05); }
+    if (jump && P.onGround) { P.vy = (mount ? RIDE[mount.kind].jump : 8.6) * Math.sqrt(jumpMul); exhaust(sprint ? .2 : .05); }
     P.vy = Math.max(P.vy, st.noFall ? -16 : -55);
   }
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(P.vx), Math.abs(P.vy), Math.abs(P.vz)) * dt / .3));
@@ -1324,7 +1324,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -2183,7 +2183,7 @@ function drawStats() {
 }
 function exhaust(x) { if (mode === 's') st.ex += x; }
 function hurtPlayer(dmg, fx, fz) {
-  if (mode !== 's' || dead || st.inv > 0) return;
+  if (mode !== 's' || dead || st.inv > 0 || godMode) return;
   st.hp = Math.max(0, st.hp - dmg); st.inv = .5;
   hurtEl.classList.add('on'); setTimeout(() => hurtEl.classList.remove('on'), 120);
   tone(240, 120, .22, .35, 'square');
@@ -2225,13 +2225,14 @@ function survivalMove(dt, inWater, sprint) {
   if (P.onGround || inWater) {
     if (st.fallY !== null && !st.noFall && !inWater) {
       const f = st.fallY - P.y;
-      if (f > 3.5) hurtPlayer(Math.round(f - 3));
+      if (f > 3.5 && jumpMul <= 1) hurtPlayer(Math.round(f - 3));
     }
     st.fallY = null;
   } else st.fallY = st.fallY === null ? P.y : Math.max(st.fallY, P.y);
 }
 function updateSurvival(dt) {
   if (mode !== 's' || dead) return;
+  if (godMode) { st.food = 20; st.air = 10; }
   st.inv -= dt;
   exhaust(dt * .02);
   while (st.ex >= 4) { st.ex -= 4; st.food = Math.max(0, st.food - 1); }
@@ -3813,7 +3814,7 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /no more NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Admin commands: type /admin. Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /no more NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
@@ -5928,6 +5929,55 @@ function updateSurvFly(dt) {
   }
   if (frame % 20 === 0) updateInfo();
 }
+
+/* ---------- admin commands (they work in Survival too) ---------- */
+// /give NAME 64 · /gamemode creative|survival · /god · /feed · /time day|noon|night|midnight · /setspawn
+// /speed 1-5 · /jump 1-5 · /top · /clearbag · /admin lists them
+let godMode = false, speedMul = 1, jumpMul = 1;
+function idByName(text) {
+  const q = (text || '').toLowerCase().replace(/[^a-z]/g, ''), all = PALETTE.filter(id => validId(id));
+  const n = id => nameOf(id).toLowerCase().replace(/[^a-z]/g, '');
+  const words = ((text || '').toLowerCase().match(/[a-z]+/g) || []).map(w => w.replace(/s$/, '')).filter(w => w !== 'of');
+  const hasAll = id => { const nw = nameOf(id).toLowerCase().match(/[a-z]+/g) || []; return words.length && words.every(w => nw.some(x => x === w || x.replace(/s$/, '') === w)); };
+  return all.find(id => n(id) === q) || all.find(id => n(id) === q.replace(/s$/, '')) || all.find(hasAll) || all.find(id => n(id).startsWith(q)) || all.find(id => n(id).includes(q)) || null;
+}
+const ADMIN = {
+  give: a => {
+    const num = ((a || '').match(/\d+/) || [])[0], name = (a || '').replace(/\d+/g, '').trim();
+    if (!name) return 'Type /give NAME COUNT, like /give diamond block 64 or /give iron sword';
+    const id = idByName(name);
+    if (!id) return `There's nothing called ${name}`;
+    const n = Math.max(1, Math.min(4000, num ? parseInt(num, 10) : (maxOf(id) > 1 ? 64 : 1)));
+    give(id, n);
+    return `Gave you ${n} × ${nameOf(id).toLowerCase()}`;
+  },
+  gamemode: a => {
+    const w = (a || '').trim().toLowerCase(), m = /^(c|1|creative)/.test(w) ? 'c' : /^(s|0|survival)/.test(w) ? 's' : null;
+    if (!m) return 'Type /gamemode creative or /gamemode survival';
+    setMode(m); const sel = $('#gm'); if (sel) sel.value = m;
+    return m === 'c' ? 'Creative mode' : 'Survival mode';
+  },
+  god: () => { godMode = !godMode; if (godMode) Object.assign(st, {hp: 20, food: 20, air: 10}); updateInfo(); return godMode ? 'God mode ON: nothing can hurt you. Type /god again to turn it off' : 'God mode off'; },
+  feed: () => { st.food = 20; st.ex = 0; return 'Yum! Your food is full'; },
+  time: a => {
+    const w = (a || '').trim().toLowerCase().replace(/^set\s+/, ''), t = {day: .02, morning: .02, noon: .25, afternoon: .38, sunset: .47, night: .6, midnight: .75}[w];
+    if (t === undefined) return 'Type /time day, /time noon, /time sunset, /time night or /time midnight';
+    setTod(t); return `It's ${w} now`;
+  },
+  setspawn: () => { spawnPt = [P.x, P.y, P.z]; saveDirty = true; return `Your spawn point is here now (${[P.x, P.y, P.z].map(Math.floor).join(' ')})`; },
+  speed: a => { const v = parseFloat(a); if (!(v >= 1 && v <= 5)) return 'Type /speed 1 (normal) up to /speed 5 (super fast)'; speedMul = v; updateInfo(); return v === 1 ? 'Normal speed' : `Speed × ${v}!`; },
+  jump: a => { const v = parseFloat(a); if (!(v >= 1 && v <= 5)) return 'Type /jump 1 (normal) up to /jump 5 (super high, and no fall damage)'; jumpMul = v; updateInfo(); return v === 1 ? 'Normal jumps' : `Jumps × ${v}! You won't get hurt landing`; },
+  top: () => {
+    if (riding) exitPlane();
+    const x = Math.floor(P.x), z = Math.floor(P.z), t = colTop(x, z);
+    if (t < 0) return 'There is no ground above you here';
+    P.y = t + 1; P.vy = 0; st.fallY = null;
+    return 'Up to the top!';
+  },
+  clearbag: () => { for (let i = 0; i < INV; i++) inv[i] = null; ensurePlane(); renderHotbar(); saveDirty = true; return 'Your backpack is empty now'; },
+  admin: () => 'Admin commands (they work in Survival too): /give NAME 64  /gamemode creative|survival  /god  /feed  /life  /fly  /time day|noon|night  /setspawn  /speed 1-5  /jump 1-5  /top  /clearbag  /summon  /unsummon  /kill',
+};
+Object.assign(CMDS, ADMIN, {gm: ADMIN.gamemode, creative: () => ADMIN.gamemode('creative'), survival: () => ADMIN.gamemode('survival')});
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;

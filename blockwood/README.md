@@ -219,6 +219,11 @@ joins with the same code is in the same world:
   arrows. Only players in Survival get hurt. When a friend gets you, the death screen says
   "Slain by Alice" and the chat tells the room. Type `/pvp off` to stop hurting and being hurt
   (remembered in this browser), `/pvp on` to fight again.
+- **Admin commands** (they work in Survival too; `/admin` lists them): `/give NAME 64` (any block or
+  item, like `/give diamond block 64` or `/give iron sword`), `/gamemode creative|survival` (or `/gm c`,
+  `/gm s`), `/god` (nothing can hurt you, and you never get hungry), `/feed`, `/time day|noon|sunset|night|midnight`,
+  `/setspawn`, `/speed 1-5`, `/jump 1-5` (high jumps don't hurt when you land), `/top` (up onto the
+  highest block above you) and `/clearbag`.
 - **`/fly` in Survival** lets you fly for 30 seconds (Space up, Shift down; the info line counts down,
   you get a warning at 5 seconds, and you float down safely when time's up). Type it again for more.
 - **Give lives**: type `/life NAME` (or right-click a friend who got knocked out) to give a friend a
