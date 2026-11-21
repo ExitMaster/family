@@ -117,6 +117,7 @@ body{
 @keyframes pulse{to{transform:scale(1.08)}}
 #mpDock{position:fixed;left:12px;top:100px;z-index:25;display:flex;flex-direction:column;gap:6px;align-items:flex-start;pointer-events:none;max-width:62vw}
 #mpDock .iconbtn{pointer-events:auto;width:auto;padding:0 10px;font-size:13px}
+#mpDock.side{left:auto;right:12px;top:62px;align-items:flex-end}
 #mpList{font:600 12px/1.4 var(--hud);color:var(--hud-fg);background:var(--glass);border-radius:10px;padding:6px 9px}
 #mpList b{color:var(--gold)}
 #mpList{display:flex;flex-direction:column;gap:4px}
@@ -6824,6 +6825,7 @@ function boot(hot){
     if (dt > 0.05) dt = 0.05;
     syncJump();
     try { mpTick(dt); } catch(e){ console.warn('multiplayer', e); }
+    { const side = state === 'ride' || state === 'island'; if (side !== MP.side){ MP.side = side; $('mpDock').classList.toggle('side', side); } }
     if (parkPending){ parkPending = false; finishParkLots(); }
     if (state === 'ride'){ updateRide(dt); renderer.render(rideScene, camera); return; }
     if (state === 'island'){ updateIsland(dt); renderer.render(isleScene, camera); return; }
@@ -6913,7 +6915,12 @@ function boot(hot){
   // what I'm doing right now, in a few small numbers
   function mpMine(){
     if (state === 'island') return { m: 'isle' };
-    if (state === 'ride') return { m: 'pax' };
+    if (state === 'ride'){
+      const w = rideWhere();
+      if (!w || ride.ui) return { m: 'pax', w: w || '' };
+      if (ride.seated){ const li = Math.max(0, LETTERS.indexOf(ride.letter)); return { m: 'pax', w, x: r1(CX + SEATX[li]), y: 0, z: r1(rowZ(ride.row)), yw: 0, st: 1 }; }
+      return { m: 'pax', w, x: Math.round(ride.x * 100) / 100, y: r1(ride.h || 0), z: Math.round(ride.z * 100) / 100, yw: r3(ride.yaw) };
+    }
     if (state === 'attract') return { m: 'menu' };
     if (F.drive) return { m: 'car', k: car.taxi ? 'taxi' : myCar.id, c: car.taxi ? 0xffd23d : RENT_COLS[rentCol], x: r1(car.x), y: r1(car.y || 0), z: r1(car.z), yw: r3(car.yaw), s: r1(car.speed) };
     if (F.cruise) return { m: 'ship', x: r1(cruise.x), y: 0, z: r1(cruise.z), yw: r3(cruise.yaw), s: r1(cruise.speed) };
@@ -6923,14 +6930,27 @@ function boot(hot){
     }
     return { m: 'menu' };
   }
+  // where I am inside the airport / plane / hotel scene: friends with the same answer see
+  // each other walking about (or sitting in their seats)
+  function rideWhere(){
+    if (state !== 'ride') return null;
+    const nm = a => (a && a.name) || '';
+    if (ride.room || ride.hbath){ const h = ride.hotelSpot; return (ride.hbath ? 'bath:' : 'hotel:') + (h ? Math.round(h.sx) + ',' + Math.round(h.sz) : ''); }
+    if (ride.inCabin) return 'cabin:' + nm(ride.from) + ':' + (ride.plane ? ride.plane.id : '');
+    if (ride.hall || ride.curb) return 'arrivals:' + nm(ride.to || ride.from);
+    return 'terminal:' + nm(ride.from);
+  }
+  const paxPlace = w => !w ? 'at the airport' : w.startsWith('hotel') || w.startsWith('bath') ? 'at the hotel' : w.startsWith('cabin') ? 'on a plane at ' + w.split(':')[1] : 'at ' + (w.split(':')[1] || 'the airport');
   const MP_DOING = { plane: '✈️', car: '🚗', ship: '🚢', isle: '🏝️ on their island', pax: '🧳 at the airport', menu: '⏸ in the menu' };
   function mpDesc(o){
     if (o.m === 'plane'){ const d = PLANES.find(p => p.id === o.p); return '✈️ ' + (d ? d.name : 'plane'); }
     if (o.m === 'car') return '🚗 ' + (o.k === 'taxi' ? 'Taxi' : carModel(o.k).n);
+    if (o.m === 'pax') return (o.w && (o.w.startsWith('hotel') || o.w.startsWith('bath')) ? '🛏️ ' : o.w && o.w.startsWith('cabin') ? '💺 ' : '🧳 ') + paxPlace(o.w);
     return MP_DOING[o.m] || '';
   }
   function mpWhere(o){
     if (o.x === undefined) return '';
+    if (o.m === 'pax') return state === 'ride' && rideWhere() === o.w ? '· here with you!' : '';
     const me = F.drive ? car : F.cruise ? cruise : F;
     const d = Math.hypot(o.x - me.x, o.z - me.z);
     return d < 1000 ? Math.round(d) + ' m' : (d / 1000).toFixed(1) + ' km';
@@ -6963,7 +6983,7 @@ function boot(hot){
     const o = MP.others[MP.follow];
     if (!o){ const n = MP.followName; MP.follow = null; toast(n + ' left the room', 'warn'); mpWho(); return null; }
     const g = MP.ghosts.get(MP.follow);
-    if (!g || !g.root.visible) return null;
+    if (!g || !g.root.visible || o.m === 'pax') return null;
     mpFw.set(0, 0, -1).applyQuaternion(g.q);
     return { o, g, x: g.pos.x, y: g.pos.y, z: g.pos.z, v: g.vel.length(), fw: mpFw };
   }
@@ -6988,6 +7008,7 @@ function boot(hot){
     const o = MP.others[id]; if (!o) return;
     const nm = o.n || 'friend';
     const g = MP.ghosts.get(id);
+    if (o.m === 'pax'){ toast(nm + ' is ' + paxPlace(o.w) + ' · can\'t teleport there', 'warn'); return; }
     if (!g || o.x === undefined){ toast(nm + ' is ' + (MP_DOING[o.m] || 'away') + ' · can\'t teleport there', 'warn'); return; }
     if (state !== 'play' && state !== 'paused'){ toast('Start playing first, then teleport', 'warn'); return; }
     if (F.cruise || F.ride){ toast('Get off first, then teleport', 'warn'); return; }
@@ -7025,7 +7046,7 @@ function boot(hot){
   // the copies of the other players
   function mpDrop(id){
     const g = MP.ghosts.get(id); if (!g) return;
-    free.remove(g.root);
+    if (g.root.parent) g.root.parent.remove(g.root);
     if (!g.shared) g.root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     if (g.tag){ g.tag.material.map.dispose(); g.tag.material.dispose(); }
     MP.ghosts.delete(id);
@@ -7040,12 +7061,17 @@ function boot(hot){
       const parts = buildPlane(def, inner); g.sp = parts.sp; g.gp = parts.gp; tagY = def.nameTag ? 8 : 6;
     } else if (o.m === 'car'){
       inner.add(o.k === 'taxi' ? makeCar(0xffd23d, true) : makeCar(o.c || 0x3fa9f5, false, carModel(o.k))); tagY = 3.4;
+    } else if (o.m === 'pax'){
+      // a friend on foot: a person with their own shirt colour (picked from their id)
+      let hsh = 0; for (const ch of id) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+      const pp = makePerson(SHIRTS[hsh % SHIRTS.length], [0x2a4f9a, 0x2a2f45, 0x5a4a3a, 0x3a5a3a][(hsh >> 3) % 4], SKIN[(hsh >> 5) % 4], [0x5a3a1a, 0x1a1a1a, 0xc8a050, 0x8a3a1a][(hsh >> 7) % 4]);
+      inner.add(pp); g.person = pp; tagY = 2.35;
     } else if (o.m === 'ship'){
       inner.add(ship.clone()); g.shared = true; tagY = 40;
       inner.traverse(c => { c.visible = true; });
     }
     g.tag = nameTag(o.n || 'friend', 0, tagY, 0); root.add(g.tag);
-    free.add(root); MP.ghosts.set(id, g);
+    (o.m === 'pax' ? rideScene : free).add(root); MP.ghosts.set(id, g);
     return g;
   }
   function mpTick(dt){
@@ -7057,7 +7083,7 @@ function boot(hot){
       const mine = mpMine();
       MP.sendT = mine.x === undefined ? 1 : 0.15;
       const { ref, update, serverTimestamp } = MP.fb;
-      const clear = { p: null, k: null, c: null, x: null, y: null, z: null, q: null, yw: null, s: null, g: null };
+      const clear = { p: null, k: null, c: null, x: null, y: null, z: null, q: null, yw: null, s: null, g: null, w: null, st: null };
       update(ref(MP.db, 'rooms/' + MP.room + '/scr/' + MP.uid), Object.assign(clear, mine, { n: MP.name, t: serverTimestamp() })).catch(() => {});
     }
     MP.listT -= dt; if (MP.listT <= 0){ MP.listT = 1; mpWho(); }
@@ -7066,6 +7092,7 @@ function boot(hot){
     for (const id in MP.others){
       const o = MP.others[id];
       if (!o || o.x === undefined || (o.t && o.t < stale)) continue;
+      if (o.m === 'pax' && (state !== 'ride' || rideWhere() !== o.w)) continue;
       seen.add(id);
       const key = o.m + ':' + (o.p || o.k || '') + ':' + (o.c || '') + ':' + (o.n || '');
       let g = MP.ghosts.get(id);
@@ -7073,9 +7100,9 @@ function boot(hot){
       if (g.tgt.x !== o.x || g.tgt.y !== o.y || g.tgt.z !== o.z){
         const sec = Math.max(0.05, (now - g.recv) / 1000);
         g.vel.set(o.x - g.tgt.x, o.y - g.tgt.y, o.z - g.tgt.z).divideScalar(sec);
-        if (g.vel.length() > 600) g.vel.set(0, 0, 0), g.pos.set(o.x, o.y, o.z);   // a teleport, not a flight
+        if (g.vel.length() > (o.m === 'pax' ? 15 : 600)) g.vel.set(0, 0, 0), g.pos.set(o.x, o.y, o.z);   // a teleport, not a flight
         g.tgt.set(o.x, o.y, o.z); g.recv = now;
-      }
+      } else if (now - g.recv > 400) g.vel.set(0, 0, 0);   // they've stopped: don't keep guessing ahead
       if (o.q) g.tq.set(o.q[0], o.q[1], o.q[2], o.q[3]).normalize(); else g.tq.setFromAxisAngle(THREE.Object3D.DefaultUp, o.yw || 0);
       const ahead = Math.min((now - g.recv) / 1000, 0.6);
       const want = MP.tmp.copy(g.tgt).addScaledVector(g.vel, ahead);
@@ -7083,6 +7110,13 @@ function boot(hot){
       g.q.slerp(g.tq, 1 - Math.exp(-dt * 10));
       g.root.position.copy(g.pos); g.inner.quaternion.copy(g.q);
       for (const sp of g.sp) sp.o.rotation[sp.axis] += dt * sp.rate;
+      if (g.person){
+        const u = g.person.userData;
+        animPerson(g.person, !o.st && g.pos.distanceTo(MP.tmp) > 0.08, dt);
+        if (o.st){ u.L.rotation.x = u.R.rotation.x = 1.45; u.AL.rotation.x = u.AR.rotation.x = 0.5; g.person.position.y = -0.42; }
+        else g.person.position.y = 0;
+        if (g.pos.distanceTo(MP.tmp) > 30) g.pos.copy(MP.tmp);   // they went to another part of the airport
+      }
       for (const p of g.gp) p.visible = !!o.g;
       g.root.visible = true;
     }
