@@ -67,7 +67,9 @@ It uses the family Firebase database (Unimai Game Hub) under
 
 Some empty city blocks, and spots round the airports, are car parks: grey asphalt with
 white bays, a dashed yellow line down the middle, a blue **P** sign and rows of parked
-cars in all colours. Drive in and stop neatly in an empty bay, straight in (forwards
+cars: the real car models from town (Minis, Beetles, Priuses, Mustangs, Jeeps, F-150s,
+VW buses, G-Classes and more) in everyday colours, mostly nose-in, each with a
+shadow under it. Drive in and stop neatly in an empty bay, straight in (forwards
 or backwards), for a **Perfect parking! +250** bonus, once per bay. Parked cars are
 solid: bump one at speed and you pay the repair fee.
 
