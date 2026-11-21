@@ -196,6 +196,10 @@ build on it, fly over it. The world saves in the browser.
   box next to it first to get that exact world again (numbers or any word, like `castle`); leave it
   empty for a random one. Your current seed is shown just above, so you can share it with friends.
 
+- **Play-time limit**: when the name in the Multiplayer "Your name" box is **Aiden**, the game can be
+  played for 13 minutes a day (counted only while playing, kept in this browser). The info line shows
+  the minutes left, a warning comes 1 minute before, and then the game stops until the next day.
+
 ## Multiplayer
 
 Play in the same world with your family, like Jetpack Jump. In the pause menu, type **your name**

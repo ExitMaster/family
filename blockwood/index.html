@@ -277,6 +277,7 @@ body.ghost::after{content:"";position:fixed;inset:0;pointer-events:none;backgrou
   <div class="card" id="card">
     <h1>Blockwood</h1>
     <p class="lede">An endless voxel world of hills, lakes and oak forests. Dig it up, build on it, fly over it. Your world saves in this browser.</p>
+    <p id="timeUp" class="lede" hidden style="color:var(--gold);font-weight:600"></p>
     <button id="play" class="btn primary" type="button">Play</button>
 
     <dl class="keys" id="keysDesk">
@@ -1324,7 +1325,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1432,6 +1433,7 @@ function toggleSound() {
 const overlay = $('#overlay');
 let playing = false, everPlayed = false, dragMode = false, locked = false, held = null;
 function startPlaying(drag) {
+  if (timeIsUp()) { showTimeUp(); if (locked) document.exitPointerLock(); return; }
   if (playing) { dragMode = dragMode || drag; return; }
   dragMode = drag; playing = true; everPlayed = true; overlay.hidden = true;
   $('#confirm').hidden = true;
@@ -5979,6 +5981,40 @@ const ADMIN = {
 };
 Object.assign(CMDS, ADMIN, {gm: ADMIN.gamemode, creative: () => ADMIN.gamemode('creative'), survival: () => ADMIN.gamemode('survival')});
 
+/* ---------- play-time limit: Aiden gets 13 minutes a day ---------- */
+// When the name in the Multiplayer "Your name" box is Aiden (any capitals), the game counts playing time and stops at
+// 13 minutes; it starts again the next day. A 1-minute warning comes first, and the info line shows what's left.
+const LIMIT_KEY = 'blockwood.limit', LIMIT_SECS = 13 * 60;
+const limitedName = () => (mp.on ? mp.name : mpName.value).trim().toLowerCase() === 'aiden';
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+let limitUse = {day: today(), used: 0}, limitSaveT = 0, limitWarned = false;
+try { const v = JSON.parse(localStorage.getItem(LIMIT_KEY) || 'null'); if (v && v.day === today() && v.used >= 0) limitUse = v; } catch (e) {}
+function limitLeft() { if (limitUse.day !== today()) { limitUse = {day: today(), used: 0}; limitWarned = false; } return Math.max(0, LIMIT_SECS - limitUse.used); }
+const timeIsUp = () => limitedName() && limitLeft() <= 0;
+function saveLimit() { try { localStorage.setItem(LIMIT_KEY, JSON.stringify(limitUse)); } catch (e) {} }
+function showTimeUp() {
+  const el = $('#timeUp');
+  el.textContent = "Time's up for today, Aiden! You've played your 13 minutes. Come back tomorrow.";
+  el.hidden = false;
+}
+function updateLimit(dt) {
+  if (!limitedName()) return;
+  limitLeft();
+  limitUse.used += dt;
+  if ((limitSaveT -= dt) <= 0) { limitSaveT = 5; saveLimit(); }
+  const left = limitLeft();
+  if (left <= 60 && !limitWarned) { limitWarned = true; toast('1 minute of playing left today!', 3000); tone(880, 660, .25, .12, 'square'); }
+  if (frame % 60 === 0) updateInfo();
+  if (left <= 0) {
+    saveLimit(); persist();
+    if (locked) document.exitPointerLock();
+    pause(); showTimeUp();
+    tone(523, 262, .6, .15, 'triangle');
+  }
+}
+if (timeIsUp()) showTimeUp();
+mpName.addEventListener('input', () => { $('#timeUp').hidden = !timeIsUp(); });
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5989,7 +6025,7 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
