@@ -49,6 +49,12 @@ with a name tag over them, and the list under the button shows who is in the roo
 what they're doing and how far away they are. Friends on their island or inside an
 airport show up in the list only.
 
+
+**Indoors together:** friends in the same airport terminal (or arrivals hall), on the
+same plane type at the same airport, or in the same hotel room see each other as people
+walking about, with name tags, and a friend who has sat down shows up in their seat.
+The list says *here with you!* when you're in the same place.
+
 **Auto-follow:** tap a friend's name in the list (or **Follow** in the panel). Your plane
 flies itself to just behind theirs and matches their speed (or circles over them if
 they're driving), and your car drives to just behind theirs. Tap the name again, or
