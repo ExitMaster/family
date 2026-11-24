@@ -204,7 +204,10 @@ build on it, fly over it. The world saves in the browser.
   ground, and in a lava sea at the bottom of the Nether. Walking into it in Survival burns you fast, and you
   stay on fire for a few seconds after (jump in water or stand in the rain to put it out). Most mobs burn in it
   too, but not Nether mobs like magma cubes. Water touching lava turns it into **obsidian**; lava poured next to
-  water cools into cobblestone. Craft a **Bucket** from 3 iron ingots (or buy one from a smith) and right-click
+  water cools into cobblestone. Lava **flows** like in Minecraft: it pours down off edges first, and on flat
+  ground spreads up to 3 blocks from its source, getting thinner each block. Dig next to cave lava and it runs
+  in; take the source away (scoop it up or cover it) and the flow dries up. Flowing lava that reaches water
+  turns into cobblestone (stone if it lands on water). Craft a **Bucket** from 3 iron ingots (or buy one from a smith) and right-click
   lava or water to scoop it up, then right-click again to pour it. Lava and the buckets are in the Creative
   inventory, and `/give lava` works too.
 
