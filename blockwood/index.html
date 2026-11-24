@@ -35,6 +35,8 @@ body{
 }
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none}
 #tint{position:fixed;inset:0;background:rgba(30,70,170,.38);pointer-events:none}
+#tint.lava{background:rgba(240,90,10,.78)}
+#fire{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 120%,rgba(255,120,20,.55),rgba(255,60,0,.15) 45%,transparent 70%);opacity:0;transition:opacity .2s}
 
 #info{
   position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));
@@ -224,6 +226,7 @@ body.ghost::after{content:"";position:fixed;inset:0;pointer-events:none;backgrou
 
 <canvas id="game" tabindex="-1" aria-label="Blockwood game view"></canvas>
 <div id="tint" hidden></div>
+<div id="fire"></div>
 <div id="info" aria-live="off"></div>
 <div id="cross" aria-hidden="true"></div>
 <div id="charge" hidden><i></i></div>
@@ -681,11 +684,20 @@ one('dream_portal', 'Dream portal', r => { const st = spotsOf(r, 8, 1); return (
   const a = Math.atan2(y - 7.5, x - 7.5) * 3 + Math.hypot(x - 7.5, y - 7.5) * .9;
   return J([120 + 100 * Math.sin(a), 120 + 100 * Math.sin(a + 2.1), 140 + 100 * Math.sin(a + 4.2)], r, 10);
 }; }, 'light');
+// lava: hot, glowing and runny. You can walk (slowly) into it, and it burns.
+one('lava', 'Lava', () => (x, y, r) => {
+  const v = Math.sin(x * .8 + Math.sin(y * .6) * 2.2) + Math.sin(y * .9 - x * .35 + 1.3);
+  return v > 1.1 ? J([255, 236, 120], r, 14) : v > -.3 ? J([250, 140, 26], r, 18) : J([206, 64, 12], r, 14);
+});
+const LAVA = B2.lava;
 // how they look and behave
 const LEAFY = new Uint8Array(NB); LEAFY[LEAVES] = 1;
 for (const id of BGROUP.leaves) TRANSP[id] = LEAFY[id] = 1;
 for (const id of BGROUP.glass) { TRANSP[id] = 1; AOS[id] = 0; }
 for (const id of BGROUP.light) LIGHT[id] = 1;
+SOLID[LAVA] = AOS[LAVA] = 0;
+const GLOWS = new Uint8Array(NB); GLOWS[LAVA] = 1; // bright by itself, without lighting up what's around (a lava lake would be far too many lights)
+const LIQUID = new Uint8Array(NB); LIQUID[WATERB] = LIQUID[LAVA] = 1;
 
 // average colour per tile (for break particles)
 const TILE_AVG = [];
@@ -792,7 +804,7 @@ function genData(cx, cz) {
     for (let y = 0; y < H; y++) {
       let b;
       if (y === 0 || (y === 1 && hash3(wx, 1, wz) < .5)) b = BEDROCK;
-      else if (y >= 2 && y <= caveTop && caveAt(wx, y, wz)) continue;
+      else if (y >= 2 && y <= caveTop && caveAt(wx, y, wz)) { if (y <= 6) d[base + y] = LAVA; continue; }
       else if (y < h - 3) b = (y < h - 5 && hash3(wx, y, wz) < .012) ? COAL : (y < 34 && hash3(wx, y, wz, 43) < .007) ? IRON : (y < 7 && hash3(wx, y, wz, 59) < .03) ? OBSIDIAN : underStone(wx, y, wz);
       else if (y < h) b = peak ? STONE : beach ? SAND : DIRT;
       else if (y === h) b = peak ? (h > WATER + 21 ? SNOW : STONE) : beach ? SAND : GRASS;
@@ -815,6 +827,15 @@ function genData(cx, cz) {
         const h2 = hg[(tx + 2) + (tz + 2) * W];
         if (h2 > WATER + 1 && h2 <= WATER + 17 && hp < .002) put(tx, h2 + 1, tz, hp < .0012 ? B2.pumpkin : B2.melon, true);
         else if (h2 === WATER + 1) for (let k = 1; k <= 1 + Math.floor(hp * 700); k++) put(tx, h2 + k, tz, B2.cactus, true);
+      } else if (hp < .0047 && tx >= 1 && tz >= 1 && tx < CS + 1 && tz < CS + 1) { // a little lava pool on flat ground
+        const h2 = hg[(tx + 2) + (tz + 2) * W];
+        let flat = h2 > WATER + 2;
+        for (let dz = -1; dz <= 1 && flat; dz++) for (let dx = -1; dx <= 1; dx++) if (hg[(tx + 2 + dx) + (tz + 2 + dz) * W] !== h2) flat = false;
+        if (flat) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+          put(tx + dx, h2, tz + dz, (dx || dz) && hash2(wx + dx, wz + dz, 503) < .3 ? STONE : LAVA);
+          put(tx + dx, h2 - 1, tz + dz, STONE);
+          put(tx + dx, h2 + 1, tz + dz, AIR);
+        }
       }
       continue;
     }
@@ -921,6 +942,8 @@ function fillPad(cx, cz) {
 }
 function drawFace(b, nb) {
   if (nb === AIR) return true;
+  if (b === LAVA) return nb !== LAVA && (TRANSP[nb] || !SOLID[nb]);
+  if (nb === LAVA) return b !== LAVA; // the sides above a lava top, which sits a little low
   if (b === WATERB) return false;
   if (nb === WATERB) return true;
   if (TRANSP[nb]) return nb !== b || LEAFY[b];
@@ -945,7 +968,7 @@ function buildChunk(c) {
         for (let k = 0; k < 4; k++) {
           const cv = F.c[k];
           let yy = y + cv[1];
-          if (isW && cv[1] === 1 && pad[pi + 1] !== WATERB) yy -= .12;
+          if ((isW || b === LAVA) && cv[1] === 1 && pad[pi + 1] !== b) yy -= .12;
           g.p.push(ox + x + cv[0], yy, oz + z + cv[2]);
           let a = 3, sl = 1;
           if (!isW) {
@@ -956,7 +979,7 @@ function buildChunk(c) {
           ao[k] = a;
           const l = F.shade * AOL[a];
           g.c.push(l, l, l);
-          if (!isW) g.l.push(sl, LIGHT[b] ? 1 : near.length ? torchLight(near, ox + x + cv[0], yy, oz + z + cv[2], F.n) : 0);
+          if (!isW) g.l.push(GLOWS[b] ? 1 : sl, LIGHT[b] || GLOWS[b] ? 1 : near.length ? torchLight(near, ox + x + cv[0], yy, oz + z + cv[2], F.n) : 0);
           g.u.push(k === 0 || k === 3 ? uv[0] : uv[1], k < 2 ? uv[2] : uv[3]);
         }
         if (ao[0] + ao[2] >= ao[1] + ao[3]) g.i.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
@@ -1090,7 +1113,7 @@ function moveAxis(a, d) {
 }
 function physics(dt) {
   const fl = Math.floor;
-  const inWater = getBlock(fl(P.x), fl(P.y + .4), fl(P.z)) === WATERB;
+  const inB = getBlock(fl(P.x), fl(P.y + .4), fl(P.z)), inWater = LIQUID[inB] === 1, inLava = inB === LAVA || getBlock(fl(P.x), fl(P.y + .05), fl(P.z)) === LAVA;
   let ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x;
   let iz = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y;
   const len = Math.hypot(ix, iz); if (len > 1) { ix /= len; iz /= len; }
@@ -1098,7 +1121,7 @@ function physics(dt) {
   const wx = ix * c - iz * s, wz = -ix * s - iz * c;
   const sprint = !P.fly && (keys.ShiftLeft || keys.ShiftRight) && !(mode === 's' && st.food <= 6);
   const jump = keys.Space || keys.touchJump, down = keys.ShiftLeft || keys.ShiftRight || keys.touchDown;
-  const speed = (P.fly ? 11 : inWater ? 3 : mount ? RIDE[mount.kind].speed : sprint ? 5.8 : 4.3) * speedMul;
+  const speed = (P.fly ? 11 : inLava ? 1.6 : inWater ? 3 : mount ? RIDE[mount.kind].speed : sprint ? 5.8 : 4.3) * speedMul;
   const acc = P.fly ? 8 : P.onGround ? 14 : inWater ? 6 : 5;
   const k = Math.min(1, acc * dt);
   P.vx += (wx * speed - P.vx) * k; P.vz += (wz * speed - P.vz) * k;
@@ -1108,7 +1131,7 @@ function physics(dt) {
   } else if (inWater) {
     P.vy -= 9 * dt;
     if (jump) P.vy += 24 * dt;
-    P.vy = Math.max(-3.5, Math.min(3.5, P.vy));
+    P.vy = Math.max(-3.5, Math.min(inLava ? 2 : 3.5, P.vy));
   } else {
     P.vy -= 30 * dt;
     if (jump && P.onGround) { P.vy = (mount ? RIDE[mount.kind].jump : 8.6) * Math.sqrt(jumpMul); exhaust(sprint ? .2 : .05); }
@@ -1122,6 +1145,7 @@ function physics(dt) {
   if (P.y < -4) { if (dim === 'e' || dim === 'b') voidFall(); else otherSide(); }
   portalCheck(dt);
   if (mode === 's') survivalMove(dt, inWater, sprint);
+  lavaTouch(dt, inLava, inB === WATERB);
   if (P.onGround || inWater || P.fly) st.noFall = false;
   if (inWater && !wasWater && P.vy < -3) noise(.5, 'lowpass', 1400, .7, .7, null, 300);
   wasWater = inWater;
@@ -1145,7 +1169,7 @@ function raycast(o, d, maxD) {
   let px = x, py = y, pz = z;
   for (let i = 0; i < 64; i++) {
     const b = getBlock(x, y, z);
-    if (b !== AIR && b !== WATERB && b !== PORTAL && b !== ENDPORTAL) return {x, y, z, px, py, pz, b};
+    if (b !== AIR && b !== WATERB && b !== LAVA && b !== PORTAL && b !== ENDPORTAL) return {x, y, z, px, py, pz, b};
     px = x; py = y; pz = z;
     if (tmx < tmy && tmx < tmz) { if (tmx > maxD) break; x += sx; tmx += tdx; }
     else if (tmy < tmz) { if (tmy > maxD) break; y += sy; tmy += tdy; }
@@ -1194,6 +1218,7 @@ function act(button) {
     const gh = mp.on && ghostHit(Math.min(4, reach));
     if (gh) { hitGhost(gh, mode === 'c' ? 5 : damageOf()); exhaust(.1); return; }
   }
+  if (button === 2 && s && BUCKETS.includes(s.id)) { useBucket(s); return; }
   if (button === 2 && s && s.id === PEARL) { throwPearl(); return; }
   if (button === 2 && s && ITEMS[s.id] && ITEMS[s.id].food) { eat(s); return; }
   if (!target) return;
@@ -1210,7 +1235,7 @@ function act(button) {
     if (py < 0 || py >= H) return;
     if (SOLID[b] && px + 1 > P.x - HW && px < P.x + HW && pz + 1 > P.z - HW && pz < P.z + HW && py + 1 > P.y && py < P.y + PHGT) return;
     if (b === TORCH && !SOLID[getBlock(px, py - 1, pz)]) { toast('Torches need a block under them'); return; }
-    if (setBlock(px, py, pz, b)) { blockSfx('place', b, px, py, pz); if (mode === 's') use1(sel); }
+    if (setBlock(px, py, pz, b)) { blockSfx('place', b, px, py, pz); if (mode === 's') use1(sel); liquidsMeet(px, py, pz); }
   } else if (button === 1) {
     if (target.b === BEDROCK) return;
     const at = inv.slice(0, 9).findIndex(t => t && t.id === target.b);
@@ -2951,7 +2976,7 @@ function genNether(cx, cz) {
       if (y === 0 || y === H - 1 || (y === 1 && hash3(wx, 1, wz) < .5) || (y === H - 2 && hash3(wx, H - 2, wz) < .5)) { d[base + y] = BEDROCK; continue; }
       const e = y < 28 ? (28 - y) / 26 : (y - 28) / (H - 30);
       const n = vnoise3(wx / 20, y / 11, wz / 20, 1200) * .7 + vnoise3(wx / 7, y / 7, wz / 7, 1300) * .3;
-      if (n + e * e * .95 < .66) continue;
+      if (n + e * e * .95 < .66) { if (y <= 9) d[base + y] = LAVA; continue; }
       d[base + y] = hash3(wx, y, wz, 77) < .02 ? NGOLD : NETHERRACK;
     }
     for (let y = H - 3; y > 30; y--) {
@@ -6015,6 +6040,92 @@ function updateLimit(dt) {
 if (timeIsUp()) showTimeUp();
 mpName.addEventListener('input', () => { $('#timeUp').hidden = !timeIsUp(); });
 
+
+/* ---------- lava ---------- */
+// Lava burns you (and keeps you on fire for a few seconds after), burns most mobs, and turns to obsidian when water touches it.
+// A bucket (3 iron ingots) scoops up lava or water and pours it out again.
+let onFire = 0, fireTick = 0, headInLava = false, mobLavaT = 0;
+const fireEl = $('#fire');
+const FIREPROOF = new Set(['magma', 'blaze', 'strider', 'ghast', 'wither_skeleton', 'wither', 'dragon', 'clone']);
+function lavaTouch(dt, inLava, inW) {
+  if (inLava) {
+    onFire = 4;
+    if ((fireTick -= dt) <= 0) { fireTick = .5; hurtPlayer(3); if (mode === 's' && !godMode) tone(120, 60, .2, .18, 'sawtooth'); }
+  } else if (inW || (weather !== 'clear' && !snowy && dim === 'o' && P.y + 1 >= colTop(Math.floor(P.x), Math.floor(P.z)))) {
+    if (onFire > 0) noise(.3, 'highpass', 3000, 1, .25);
+    onFire = 0;
+  } else if (onFire > 0) {
+    onFire -= dt;
+    if ((fireTick -= dt) <= 0) { fireTick = 1; hurtPlayer(1); }
+  }
+  const showFire = onFire > 0 && mode === 's' && !godMode && !dead;
+  fireEl.style.opacity = showFire ? .6 + .4 * Math.sin(performance.now() / 70) ** 2 : 0;
+}
+function updateLavaMobs(dt) {
+  if ((mobLavaT -= dt) > 0) return;
+  mobLavaT = .5;
+  for (const m of mobs.slice()) {
+    if (FIREPROOF.has(m.kind) || !m.g || m.hp <= 0) continue;
+    const fl = Math.floor;
+    if (getBlock(fl(m.x), fl(m.y + .2), fl(m.z)) !== LAVA) continue;
+    burst(fl(m.x), fl(m.y + 1), fl(m.z), 0, new THREE.Color(0xff8a20));
+    hurtMob(m, 4);
+  }
+}
+const sizzle = (x, y, z) => { noise(.6, 'highpass', 2500, 1, .3); burst(x, y, z, 0, new THREE.Color(0xdddddd)); };
+// water next to lava makes obsidian; lava poured next to water cools into cobblestone
+function liquidsMeet(x, y, z) {
+  const b = getBlock(x, y, z), N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  if (b === WATERB) {
+    let n = 0;
+    for (const [dx, dy, dz] of N) if (getBlock(x + dx, y + dy, z + dz) === LAVA) { setBlock(x + dx, y + dy, z + dz, OBSIDIAN); n++; }
+    if (n) { sizzle(x, y, z); toast('The water turned the lava into obsidian!'); }
+  } else if (b === LAVA && N.some(([dx, dy, dz]) => getBlock(x + dx, y + dy, z + dz) === WATERB)) {
+    setBlock(x, y, z, COBBLE); sizzle(x, y, z); toast('The lava cooled into cobblestone');
+  }
+}
+const BUCKET = 93, LAVA_BUCKET = 94, WATER_BUCKET = 95, BUCKETS = [BUCKET, LAVA_BUCKET, WATER_BUCKET];
+const bucketT = fill => g => {
+  rects(g, '#8e8e94', [[3, 4, 10, 1], [3, 5, 1, 2], [12, 5, 1, 2], [4, 7, 1, 5], [11, 7, 1, 5], [5, 12, 6, 1]]);
+  rects(g, '#cfcfd6', [[4, 5, 8, 2], [5, 7, 6, 5]]);
+  rects(g, '#ffffff', [[5, 8, 1, 3]]);
+  if (fill) rects(g, fill[0], [[4, 5, 8, 2]]), rects(g, fill[1], [[6, 5, 3, 1]]);
+};
+item(BUCKET, 'Bucket', bucketT(null), {max: 16});
+item(LAVA_BUCKET, 'Lava bucket', bucketT(['#f07a14', '#ffe27a']), {max: 1});
+item(WATER_BUCKET, 'Water bucket', bucketT(['#2c62c4', '#8ab8ff']), {max: 1});
+PALETTE.push(BUCKET, LAVA_BUCKET, WATER_BUCKET);
+RECIPES.push([BUCKET, 1, [[IRONI, 3]]]);
+PROFS.smith.trades.push([BUCKET, 1, [[EMERALD, 1]]]);
+// the first water or lava you're looking at (the normal aim goes straight through liquids)
+function liquidHit(maxD) {
+  const o = cam.position, d = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), fl = Math.floor;
+  for (let t = .2; t <= maxD; t += .1) {
+    const x = fl(o.x + d.x * t), y = fl(o.y + d.y * t), z = fl(o.z + d.z * t), b = getBlock(x, y, z);
+    if (LIQUID[b]) return {x, y, z, b};
+    if (SOLID[b]) return null;
+  }
+  return null;
+}
+function useBucket(s) {
+  if (s.id === BUCKET) {
+    const h = liquidHit(5);
+    if (!h) { toast('Look at some lava or water to fill the bucket'); return; }
+    setBlock(h.x, h.y, h.z, AIR);
+    const full = h.b === LAVA ? LAVA_BUCKET : WATER_BUCKET;
+    if (s.n > 1) { s.n--; give(full, 1); } else inv[sel] = {id: full, n: 1};
+    noise(.25, 'lowpass', 900, 1, .4);
+    renderHotbar(); saveDirty = true;
+    return;
+  }
+  if (!target) return;
+  const {px, py, pz} = target, b = s.id === LAVA_BUCKET ? LAVA : WATERB;
+  if (py < 0 || py >= H || !setBlock(px, py, pz, b)) return;
+  noise(.3, 'lowpass', b === LAVA ? 500 : 1400, .8, .5);
+  if (mode === 's') { inv[sel] = {id: BUCKET, n: 1}; renderHotbar(); saveDirty = true; }
+  liquidsMeet(px, py, pz);
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6025,7 +6136,7 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
@@ -6044,8 +6155,9 @@ function loop(now) {
   if (riding) chaseCam();
   else if (dead && playing && !ghost) deadCam(dt);
   cam.updateMatrixWorld();
-  const hw = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)) === WATERB;
-  if (hw !== headInWater) { headInWater = hw; tintEl.hidden = !hw; }
+  const hb = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)), hw = hb === WATERB, hl = hb === LAVA;
+  if (hw !== headInWater) { headInWater = hw; tintEl.hidden = !hw && !hl; }
+  if (hl !== headInLava) { headInLava = hl; tintEl.classList.toggle('lava', hl); tintEl.hidden = !hw && !hl; }
   updateTarget();
   updateSky();
   if (frame % 2 === 0) updateFriendMarks();

@@ -200,6 +200,14 @@ build on it, fly over it. The world saves in the browser.
   played for 13 minutes a day (counted only while playing, kept in this browser). The info line shows
   the minutes left, a warning comes 1 minute before, and then the game stops until the next day.
 
+- **Lava**: glowing orange lava sits in pools deep in caves (near the bedrock), in the odd small pool on flat
+  ground, and in a lava sea at the bottom of the Nether. Walking into it in Survival burns you fast, and you
+  stay on fire for a few seconds after (jump in water or stand in the rain to put it out). Most mobs burn in it
+  too, but not Nether mobs like magma cubes. Water touching lava turns it into **obsidian**; lava poured next to
+  water cools into cobblestone. Craft a **Bucket** from 3 iron ingots (or buy one from a smith) and right-click
+  lava or water to scoop it up, then right-click again to pour it. Lava and the buckets are in the Creative
+  inventory, and `/give lava` works too.
+
 ## Multiplayer
 
 Play in the same world with your family, like Jetpack Jump. In the pause menu, type **your name**
