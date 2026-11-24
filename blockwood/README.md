@@ -203,19 +203,8 @@ build on it, fly over it. The world saves in the browser.
 - **Flowing water**: water flows like in Minecraft too. It pours down off edges as a waterfall, and on flat
   ground spreads up to 7 blocks from its source, getting shallower each block. Dig next to the sea or a lake and
   it runs into the hole; take the source away and the flow dries up. Two water blocks with a one-block gap
-  between them fill it with a new water block, so you can make endless water. Running water puts out flowing
-  lava (cobblestone), still lava (obsidian), and lava it lands on (stone).
-
-- **Lava**: glowing orange lava sits in pools deep in caves (near the bedrock), in the odd small pool on flat
-  ground, and in a lava sea at the bottom of the Nether. Walking into it in Survival burns you fast, and you
-  stay on fire for a few seconds after (jump in water or stand in the rain to put it out). Most mobs burn in it
-  too, but not Nether mobs like magma cubes. Water touching lava turns it into **obsidian**; lava poured next to
-  water cools into cobblestone. Lava **flows** like in Minecraft: it pours down off edges first, and on flat
-  ground spreads up to 3 blocks from its source, getting thinner each block. Dig next to cave lava and it runs
-  in; take the source away (scoop it up or cover it) and the flow dries up. Flowing lava that reaches water
-  turns into cobblestone (stone if it lands on water). Craft a **Bucket** from 3 iron ingots (or buy one from a smith) and right-click
-  lava or water to scoop it up, then right-click again to pour it. Lava and the buckets are in the Creative
-  inventory, and `/give lava` works too.
+  between them fill it with a new water block, so you can make endless water. Craft a **Bucket** from 3 iron
+  ingots (or buy one from a smith) and right-click water to scoop it up, then right-click again to pour it.
 
 ## Multiplayer
 
