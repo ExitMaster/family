@@ -200,6 +200,12 @@ build on it, fly over it. The world saves in the browser.
   played for 13 minutes a day (counted only while playing, kept in this browser). The info line shows
   the minutes left, a warning comes 1 minute before, and then the game stops until the next day.
 
+- **Flowing water**: water flows like in Minecraft too. It pours down off edges as a waterfall, and on flat
+  ground spreads up to 7 blocks from its source, getting shallower each block. Dig next to the sea or a lake and
+  it runs into the hole; take the source away and the flow dries up. Two water blocks with a one-block gap
+  between them fill it with a new water block, so you can make endless water. Running water puts out flowing
+  lava (cobblestone), still lava (obsidian), and lava it lands on (stone).
+
 - **Lava**: glowing orange lava sits in pools deep in caves (near the bedrock), in the odd small pool on flat
   ground, and in a lava sea at the bottom of the Nether. Walking into it in Survival burns you fast, and you
   stay on fire for a few seconds after (jump in water or stand in the rain to put it out). Most mobs burn in it

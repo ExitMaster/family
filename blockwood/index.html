@@ -693,6 +693,10 @@ const LAVA = B2.lava;
 // flowing lava: levels 3 (next to a source), 2 and 1 (thinnest), and falling lava pouring down off an edge
 { const t = BLOCKS[LAVA].t[0]; for (const k of ['lava_flow1', 'lava_flow2', 'lava_flow3', 'lava_fall']) nb(k, 'Flowing lava', t, t, t); }
 const LFLOW = [0, B2.lava_flow1, B2.lava_flow2, B2.lava_flow3], LFALL = B2.lava_fall, LAVA_FLOWS = [LFLOW[1], LFLOW[2], LFLOW[3], LFALL];
+// flowing water: levels 7 (next to a source) down to 1, and falling water
+for (let i = 1; i <= 7; i++) nb('water_flow' + i, 'Flowing water', T.WATER);
+nb('water_fall', 'Flowing water', T.WATER);
+const WFLOW = [0, 1, 2, 3, 4, 5, 6, 7].map(i => i ? B2['water_flow' + i] : 0), WFALL = B2.water_fall, WATER_FLOWS = [...WFLOW.slice(1), WFALL];
 // how they look and behave
 const LEAFY = new Uint8Array(NB); LEAFY[LEAVES] = 1;
 for (const id of BGROUP.leaves) TRANSP[id] = LEAFY[id] = 1;
@@ -700,25 +704,31 @@ for (const id of BGROUP.glass) { TRANSP[id] = 1; AOS[id] = 0; }
 for (const id of BGROUP.light) LIGHT[id] = 1;
 const GLOWS = new Uint8Array(NB); // bright by itself, without lighting up what's around (a lava lake would be far too many lights)
 const LIQUID = new Uint8Array(NB); LIQUID[WATERB] = 1;
-const IS_LAVA = new Uint8Array(NB), IS_FLOW = new Uint8Array(NB), LEVEL = new Uint8Array(NB);
+const IS_LAVA = new Uint8Array(NB), IS_WATER = new Uint8Array(NB), IS_FLOW = new Uint8Array(NB), LEVEL = new Uint8Array(NB);
 const LAVA_DROP = new Float32Array(NB); // how far below the top of its block the lava's surface sits
 for (const id of [LAVA, ...LAVA_FLOWS]) { SOLID[id] = AOS[id] = 0; GLOWS[id] = LIQUID[id] = IS_LAVA[id] = 1; }
 for (const id of LAVA_FLOWS) IS_FLOW[id] = 1;
 LEVEL[LAVA] = LEVEL[LFALL] = 4; LEVEL[LFLOW[3]] = 3; LEVEL[LFLOW[2]] = 2; LEVEL[LFLOW[1]] = 1;
 LAVA_DROP[LAVA] = .12; LAVA_DROP[LFLOW[3]] = .3; LAVA_DROP[LFLOW[2]] = .5; LAVA_DROP[LFLOW[1]] = .7;
-// Lava flows like Minecraft's: any block change next to lava wakes the cells around it, and every lava tick each woken
-// cell works out what it should be. Lava falls first; only lava that can't fall spreads sideways, one level thinner
-// each block (3 blocks from a source). When the source goes, the flow dries up again.
-const lavaQ = new Set();
+const WATER_DROP = new Float32Array(NB);
+IS_WATER[WATERB] = 1; WATER_DROP[WATERB] = .12; LEVEL[WATERB] = LEVEL[WFALL] = 8;
+for (const id of WATER_FLOWS) { SOLID[id] = AOS[id] = 0; TRANSP[id] = LIQUID[id] = IS_WATER[id] = IS_FLOW[id] = 1; }
+for (let i = 1; i <= 7; i++) { LEVEL[WFLOW[i]] = i; WATER_DROP[WFLOW[i]] = .2 + (7 - i) * .11; }
+// Lava and water flow like Minecraft's: any block change next to them wakes the cells around it, and every tick each
+// woken cell works out what it should be. Liquid falls first; only liquid that can't fall spreads sideways, one level
+// thinner each block (lava 3 blocks from a source, water 7). When the source goes, the flow dries up again.
+const lavaQ = new Set(), waterQ = new Set();
 let lavaQDim = 'o';
 function lavaPoke(x, y, z, old, b) {
   if (mp.applying) return; // whoever made the change runs the flow and shares the result
-  let near = IS_LAVA[old] || IS_LAVA[b];
-  if (!near) for (const [dx, dy, dz] of N6) if (IS_LAVA[getBlock(x + dx, y + dy, z + dz)]) { near = true; break; }
-  if (!near) return;
-  if (lavaQDim !== here()) { lavaQ.clear(); lavaQDim = here(); }
-  lavaQ.add(x + ',' + y + ',' + z);
-  for (const [dx, dy, dz] of N6) lavaQ.add((x + dx) + ',' + (y + dy) + ',' + (z + dz));
+  let lava = IS_LAVA[old] || IS_LAVA[b], water = IS_WATER[old] || IS_WATER[b];
+  for (const [dx, dy, dz] of N6) { const n = getBlock(x + dx, y + dy, z + dz); if (IS_LAVA[n]) lava = 1; else if (IS_WATER[n]) water = 1; }
+  if (!lava && !water) return;
+  if (lavaQDim !== here()) { lavaQ.clear(); waterQ.clear(); lavaQDim = here(); }
+  for (const q of lava && water ? [lavaQ, waterQ] : [lava ? lavaQ : waterQ]) {
+    q.add(x + ',' + y + ',' + z);
+    for (const [dx, dy, dz] of N6) q.add((x + dx) + ',' + (y + dy) + ',' + (z + dz));
+  }
 }
 const N6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -965,12 +975,13 @@ function fillPad(cx, cz) {
   }
 }
 const lavaTop = b => 1 - LAVA_DROP[b];
+const waterTop = b => 1 - WATER_DROP[b];
 function drawFace(b, nb) {
   if (nb === AIR) return true;
+  if (IS_WATER[b]) return IS_WATER[nb] === 1 && waterTop(nb) < waterTop(b);
+  if (IS_WATER[nb]) return true;
   if (IS_LAVA[b]) return IS_LAVA[nb] ? lavaTop(nb) < lavaTop(b) : (TRANSP[nb] || !SOLID[nb]);
   if (IS_LAVA[nb]) return true; // the sides above a lava top, which sits low
-  if (b === WATERB) return false;
-  if (nb === WATERB) return true;
   if (TRANSP[nb]) return nb !== b || LEAFY[b];
   return false;
 }
@@ -985,7 +996,7 @@ function buildChunk(c) {
       if (!b) continue;
       if (b === TORCH) { emitTorch(o, ox + x, y, oz + z); continue; }
       if (b === BED) { emitBed(o, ox + x, y, oz + z, litAt(pi), near.length ? torchLight(near, ox + x + .5, y + 1, oz + z + .5, [0, 1, 0]) : 0); continue; }
-      const isW = b === WATERB, g = isW ? w : o, tiles = BLOCKS[b].t;
+      const isW = IS_WATER[b] === 1, g = isW ? w : o, tiles = BLOCKS[b].t;
       for (let f = 0; f < 6; f++) {
         const ni = pi + NOFF[f];
         if (!drawFace(b, pad[ni])) continue;
@@ -993,7 +1004,7 @@ function buildChunk(c) {
         for (let k = 0; k < 4; k++) {
           const cv = F.c[k];
           let yy = y + cv[1];
-          if (isW && cv[1] === 1 && pad[pi + 1] !== b) yy -= .12;
+          if (isW && cv[1] === 1 && !IS_WATER[pad[pi + 1]]) yy -= WATER_DROP[b];
           else if (IS_LAVA[b] && cv[1] === 1 && !IS_LAVA[pad[pi + 1]]) yy -= LAVA_DROP[b];
           g.p.push(ox + x + cv[0], yy, oz + z + cv[2]);
           let a = 3, sl = 1;
@@ -1171,7 +1182,7 @@ function physics(dt) {
   if (P.y < -4) { if (dim === 'e' || dim === 'b') voidFall(); else otherSide(); }
   portalCheck(dt);
   if (mode === 's') survivalMove(dt, inWater, sprint);
-  lavaTouch(dt, inLava, inB === WATERB);
+  lavaTouch(dt, inLava, IS_WATER[inB] === 1);
   if (P.onGround || inWater || P.fly) st.noFall = false;
   if (inWater && !wasWater && P.vy < -3) noise(.5, 'lowpass', 1400, .7, .7, null, 300);
   wasWater = inWater;
@@ -1850,7 +1861,7 @@ function updateMobs(dt) {
     }
     const sp = m.walk ? (m.angry > 0 && K.fast ? K.fast : K.speed * (m.flee > 0 ? 2.4 : m.hurry || 1)) : 0, k = Math.min(1, 8 * dt);
     m.vx += (-Math.sin(m.yaw) * sp - m.vx) * k; m.vz += (-Math.cos(m.yaw) * sp - m.vz) * k;
-    const inW = getBlock(fl(m.x), fl(m.y + .3), fl(m.z)) === WATERB;
+    const inW = IS_WATER[getBlock(fl(m.x), fl(m.y + .3), fl(m.z))] === 1;
     m.vy = inW ? Math.min(m.vy + 16 * dt, 2) : Math.max(m.vy - 30 * dt, K.flutter ? -2.5 : -40);
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(m.vx), Math.abs(m.vy), Math.abs(m.vz)) * dt / .3)), h = dt / steps;
     const wasGround = m.ground; m.ground = false;
@@ -1958,7 +1969,7 @@ function explode(cx, cy, cz) {
     const x = fx + dx, y = fy + dy, z = fz + dz;
     if (Math.hypot(x + .5 - cx, y + .5 - cy, z + .5 - cz) > R - Math.random() * .9) continue;
     const b = getBlock(x, y, z);
-    if (b === AIR || b === BEDROCK || b === WATERB || b === OBSIDIAN || b === ENDFRAME || b === PORTAL || b === ENDPORTAL) continue;
+    if (b === AIR || b === BEDROCK || LIQUID[b] || b === OBSIDIAN || b === ENDFRAME || b === PORTAL || b === ENDPORTAL) continue;
     setBlock(x, y, z, AIR);
     if (b === TNT) igniteTNT(x, y, z, .4 + Math.random() * .6);
     else if (n++ % 6 === 0) burst(x, y, z, b);
@@ -2783,7 +2794,7 @@ function planeHits(x, y, z) {
   const fl = Math.floor;
   for (let by = fl(y); by <= fl(y + 1.3); by++) for (let bz = fl(z - 1.1); bz <= fl(z + 1.1); bz++) for (let bx = fl(x - 1.1); bx <= fl(x + 1.1); bx++) {
     const b = getBlock(bx, by, bz);
-    if (SOLID[b] || b === WATERB) return true;
+    if (SOLID[b] || IS_WATER[b]) return true;
   }
   return false;
 }
@@ -2834,7 +2845,7 @@ function engineOff() {
 /* V: autopilot to the nearest villager's house; lands by the door and lets you out on the doorstep */
 const DOOR = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 function groundAt(x, z) {
-  for (let y = H - 1; y > 0; y--) { const b = getBlock(x, y, z); if (SOLID[b] && b !== LEAVES) return y + 1; if (b === WATERB) return -1; }
+  for (let y = H - 1; y > 0; y--) { const b = getBlock(x, y, z); if (SOLID[b] && b !== LEAVES) return y + 1; if (IS_WATER[b]) return -1; }
   return -1;
 }
 function landingSpot(hs) {
@@ -5570,7 +5581,7 @@ function flyHunt(m, K, dt) {
 }
 // sharks go after you when you're swimming close by
 function swimHunt(m, K, dt) {
-  if (mode !== 's' || dead || getBlock(Math.floor(P.x), Math.floor(P.y + .5), Math.floor(P.z)) !== WATERB) return false;
+  if (mode !== 's' || dead || !IS_WATER[getBlock(Math.floor(P.x), Math.floor(P.y + .5), Math.floor(P.z))]) return false;
   const dx = P.x - m.x, dy = P.y + .6 - m.y, dz = P.z - m.z, d = Math.hypot(dx, dz);
   if (d > 12) return false;
   m.yaw = Math.atan2(-dx, -dz); m.ty = Math.max(-1.5, Math.min(1.5, dy * 1.5)); m.t = .3;
@@ -6098,53 +6109,65 @@ function updateLavaMobs(dt) {
     hurtMob(m, 4);
   }
 }
-// lava ticks: every .5 s in the Overworld, faster in the Nether (like Minecraft)
-let lavaT = 0;
-const lavaPass = b => b === AIR || b === TORCH || IS_FLOW[b] === 1;
-function lavaCell(x, y, z) {
+// liquid ticks: water every .25 s, lava every .5 s (faster in the Nether), like Minecraft
+const LAVA_F = {is: IS_LAVA, src: LAVA, fall: LFALL, flow: LFLOW, max: 3, q: lavaQ, t: 0, rate: () => dim === 'n' ? .25 : .5};
+const WATER_F = {is: IS_WATER, src: WATERB, fall: WFALL, flow: WFLOW, max: 7, q: waterQ, t: 0, rate: () => .25, infinite: true};
+function fluidCell(F, x, y, z) {
   const b = getBlock(x, y, z);
-  if (b !== AIR && b !== TORCH && !IS_FLOW[b]) return;
+  if (b !== AIR && b !== TORCH && !(IS_FLOW[b] && F.is[b])) return;
+  const pass = c => c === AIR || c === TORCH || (IS_FLOW[c] && F.is[c]) === 1, below = getBlock(x, y - 1, z);
   let want = AIR;
-  if (IS_LAVA[getBlock(x, y + 1, z)]) want = LFALL;
+  if (F.is[getBlock(x, y + 1, z)]) want = F.fall;
   else {
-    let lv = 0;
-    for (const [dx, , dz] of N6) {
-      if (!dx && !dz) continue;
+    let lv = 0, srcs = 0;
+    for (const [dx, dy, dz] of N6) {
+      if (dy) continue;
       const n = getBlock(x + dx, y, z + dz);
-      if (!IS_LAVA[n] || lavaPass(getBlock(x + dx, y - 1, z + dz))) continue; // that lava pours down instead of spreading
-      lv = Math.max(lv, n === LAVA || n === LFALL ? 3 : LEVEL[n] - 1);
+      if (!F.is[n]) continue;
+      if (n === F.src) srcs++;
+      if (pass(getBlock(x + dx, y - 1, z + dz))) continue; // that one pours down instead of spreading
+      lv = Math.max(lv, n === F.src || n === F.fall ? F.max : LEVEL[n] - 1);
     }
-    if (lv > 0) want = LFLOW[lv];
+    // two water sources side by side fill the gap between them with a new source (endless water)
+    if (F.infinite && srcs >= 2 && (SOLID[below] || below === F.src)) want = F.src;
+    else if (lv > 0) want = F.flow[lv];
   }
   if (b === TORCH && want === AIR) return;
-  if (want !== AIR && N6.some(([dx, dy, dz]) => getBlock(x + dx, y + dy, z + dz) === WATERB)) {
-    want = getBlock(x, y - 1, z) === WATERB ? STONE : COBBLE;
-    if (Math.hypot(x - P.x, y - P.y, z - P.z) < 24) sizzle(x, y, z);
+  if (want !== AIR) {
+    if (F === LAVA_F) {
+      if (N6.some(([dx, dy, dz]) => IS_WATER[getBlock(x + dx, y + dy, z + dz)])) { want = IS_WATER[below] ? STONE : COBBLE; sizzleNear(x, y, z); }
+    } else for (const [dx, dy, dz] of N6) { // water running into lava cools it
+      const n = getBlock(x + dx, y + dy, z + dz);
+      if (IS_LAVA[n]) { setBlock(x + dx, y + dy, z + dz, n === LAVA ? OBSIDIAN : dy === -1 ? STONE : COBBLE); sizzleNear(x + dx, y + dy, z + dz); }
+    }
   }
   if (want !== b) setBlock(x, y, z, want);
 }
-function updateLava(dt) {
-  if (!lavaQ.size || (lavaT -= dt) > 0) return;
-  lavaT = dim === 'n' ? .25 : .5;
-  if (lavaQDim !== here()) { lavaQ.clear(); return; }
-  const now = [...lavaQ].slice(0, 800);
-  for (const k of now) lavaQ.delete(k);
-  for (const k of now) {
-    const [x, y, z] = k.split(',').map(Number);
-    if (y < 1 || y >= H || !chunks.has(ck(Math.floor(x / CS), Math.floor(z / CS)))) continue;
-    lavaCell(x, y, z);
+const sizzleNear = (x, y, z) => { if (Math.hypot(x - P.x, y - P.y, z - P.z) < 24) sizzle(x, y, z); };
+function updateFluids(dt) {
+  if (lavaQDim !== here()) { lavaQ.clear(); waterQ.clear(); return; }
+  for (const F of [WATER_F, LAVA_F]) {
+    if (!F.q.size || (F.t -= dt) > 0) continue;
+    F.t = F.rate();
+    const now = [...F.q].slice(0, 800);
+    for (const k of now) F.q.delete(k);
+    for (const k of now) {
+      const [x, y, z] = k.split(',').map(Number);
+      if (y < 1 || y >= H || !chunks.has(ck(Math.floor(x / CS), Math.floor(z / CS)))) continue;
+      fluidCell(F, x, y, z);
+    }
   }
 }
 const sizzle = (x, y, z) => { noise(.6, 'highpass', 2500, 1, .3); burst(x, y, z, 0, new THREE.Color(0xdddddd)); };
 // water next to lava makes obsidian; lava poured next to water cools into cobblestone
 function liquidsMeet(x, y, z) {
   const b = getBlock(x, y, z), N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-  if (b === WATERB) {
+  if (IS_WATER[b]) {
     let n = 0;
     let o = 0;
     for (const [dx, dy, dz] of N) { const nb = getBlock(x + dx, y + dy, z + dz); if (IS_LAVA[nb]) { setBlock(x + dx, y + dy, z + dz, nb === LAVA ? OBSIDIAN : COBBLE); n++; if (nb === LAVA) o++; } }
     if (n) { sizzle(x, y, z); toast(o ? 'The water turned the lava into obsidian!' : 'The water cooled the lava into cobblestone'); }
-  } else if (b === LAVA && N.some(([dx, dy, dz]) => getBlock(x + dx, y + dy, z + dz) === WATERB)) {
+  } else if (b === LAVA && N.some(([dx, dy, dz]) => IS_WATER[getBlock(x + dx, y + dy, z + dz)])) {
     setBlock(x, y, z, COBBLE); sizzle(x, y, z); toast('The lava cooled into cobblestone');
   }
 }
@@ -6200,7 +6223,7 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateLava(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
@@ -6219,7 +6242,7 @@ function loop(now) {
   if (riding) chaseCam();
   else if (dead && playing && !ghost) deadCam(dt);
   cam.updateMatrixWorld();
-  const hb = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)), hw = hb === WATERB, hl = IS_LAVA[hb] === 1;
+  const hb = getBlock(Math.floor(cam.position.x), Math.floor(cam.position.y), Math.floor(cam.position.z)), hw = IS_WATER[hb] === 1, hl = IS_LAVA[hb] === 1;
   if (hw !== headInWater) { headInWater = hw; tintEl.hidden = !hw && !hl; }
   if (hl !== headInLava) { headInLava = hl; tintEl.classList.toggle('lava', hl); tintEl.hidden = !hw && !hl; }
   updateTarget();
