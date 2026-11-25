@@ -329,6 +329,10 @@ body.ghost::after{content:"";position:fixed;inset:0;pointer-events:none;backgrou
       <button id="obBtn" class="btn small" type="button">Play OneBlock</button>
     </div>
     <div class="row">
+      <span class="meta">ASMR mode: run up a giant tower of butter squishies, clicky keyboards and 왁뿌볼s</span>
+      <button id="asmrBtn" class="btn small" type="button">ASMR mode</button>
+    </div>
+    <div class="row">
       <label for="rd">View distance</label>
       <select id="rd">
         <option value="3">3 chunks (fastest)</option>
@@ -684,6 +688,34 @@ one('dream_portal', 'Dream portal', r => { const st = spotsOf(r, 8, 1); return (
   const a = Math.atan2(y - 7.5, x - 7.5) * 3 + Math.hypot(x - 7.5, y - 7.5) * .9;
   return J([120 + 100 * Math.sin(a), 120 + 100 * Math.sin(a + 2.1), 140 + 100 * Math.sin(a + 4.2)], r, 10);
 }; }, 'light');
+// ASMR blocks: soft, squishy and clicky, each with its own sound when you step on, place or break them
+{
+  const face = (x, y) => ((x === 5 || x === 10) && (y === 6 || y === 7)) || (y === 10 && x >= 6 && x <= 9) || ((x === 5 || x === 10) && y === 9);
+  const bTop = tileOf(() => (x, y, r) => { const d = Math.hypot(x - 7.5, y - 7.5); return d < 3.2 ? J([255, 250, 218], r, 4) : d < 4.3 ? J([255, 238, 166], r, 6) : x === 0 || y === 0 || x === 15 || y === 15 ? J([236, 198, 96], r, 6) : J([252, 222, 118], r, 8); });
+  const bSide = tileOf(() => (x, y, r) => face(x, y) ? [92, 62, 34] : (y === 9 && (x === 3 || x === 12)) ? [255, 168, 160] : y < 2 ? J([255, 246, 196], r, 6) : J([252, 220, 112], r, 8));
+  nb('butter_squishy', 'Butter squishy', bTop, bTop, bSide);
+  const kTop = tileOf(r => { const cols = [[252, 252, 254], [255, 204, 224], [206, 196, 255], [194, 240, 226], [255, 236, 180]], pick = Array.from({length: 16}, () => cols[Math.floor(r() * cols.length)]);
+    return (x, y, r) => { const kx = x % 4, ky = y % 4; if (kx === 3 || ky === 3) return [74, 64, 96]; const c = pick[(x >> 2) + (y >> 2) * 4]; return kx === 0 || ky === 0 ? c : J(c.map(v => v * .93), r, 4); }; });
+  const RGB = [[255, 90, 90], [255, 170, 60], [255, 230, 70], [90, 220, 110], [70, 170, 255], [160, 100, 255]];
+  const kSide = tileOf(() => (x, y, r) => y < 3 ? (x % 4 === 3 ? [74, 64, 96] : [228, 222, 244]) : y === 3 ? [74, 64, 96] : y === 12 ? RGB[Math.floor(x / 16 * 6)] : J([186, 168, 232], r, 8));
+  nb('asmr_keyboard', 'ASMR keyboard', kTop, kSide, kSide);
+  const ball = c => () => (x, y, r) => { const d = Math.hypot(x - 7.5, y - 7.5); if (d > 7.4) return J(c.map(v => v * .78), r, 6); if (Math.hypot(x - 5, y - 5) < 1.6) return [255, 255, 255]; return J(d > 6.2 ? c.map(v => v * .9) : c, r, 6); };
+  for (const [k, n, c] of [['pink', 'Pink', [255, 164, 204]], ['mint', 'Mint', [150, 236, 204]], ['purple', 'Purple', [204, 168, 255]]])
+    one('wakppu_' + k, `${n} 왁뿌볼 (squishy ball)`, ball(c));
+}
+const WAKPPU = [B2.wakppu_pink, B2.wakppu_mint, B2.wakppu_purple], ASMR_BLOCKS = [B2.butter_squishy, B2.asmr_keyboard, ...WAKPPU];
+const asmrKind = b => b === B2.butter_squishy ? 'butter' : b === B2.asmr_keyboard ? 'keys' : WAKPPU.includes(b) ? 'ball' : null;
+// keyboards go clack-thock, butter squishies squish slowly, 왁뿌볼s squelch and bloop
+function asmrSfx(kind, what, at) {
+  const v = what === 'step' ? 1 : 1.6;
+  if (kind === 'keys') {
+    for (let i = 0, n = what === 'step' ? 2 : 4; i < n; i++) setTimeout(() => {
+      noise(.025, 'highpass', 3500 + Math.random() * 1500, 1, .22 * v, at);
+      noise(.05, 'bandpass', 480 + Math.random() * 260, 5, .36 * v, at);
+    }, i * (45 + Math.random() * 40));
+  } else if (kind === 'butter') { noise(.4, 'lowpass', 1100, 3, .34 * v, at, 220); tone(170, 95, .32, .1 * v, 'sine', at); }
+  else { noise(.16, 'bandpass', 1500, 7, .3 * v, at, 500); tone(420 + Math.random() * 120, 1000, .13, .12 * v, 'sine', at); }
+}
 // lava: hot, glowing and runny. You can walk (slowly) into it, and it burns.
 one('lava', 'Lava', () => (x, y, r) => {
   const v = Math.sin(x * .8 + Math.sin(y * .6) * 2.2) + Math.sin(y * .9 - x * .35 + 1.3);
@@ -818,7 +850,7 @@ function treeAt(x, z) {
 const chunks = new Map();
 const edits = new Map(); // chunkKey -> Map(index -> block)
 let dim = 'o'; // 'o' overworld, 'n' the Nether, 'e' the End, 'b' the OneBlock world (its chunks and edits are kept apart by key)
-const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : d === 'w' ? 4e8 + dreamMat * 1e8 : d[0] === 'w' ? 4e8 + d.slice(1) * 1e8 : 0);
+const ck = (cx, cz, d = dim) => (cx + 4096) * 8192 + (cz + 4096) + (d === 'a' ? -1e8 : d === 'n' ? 1e8 : d === 'e' ? 2e8 : d === 'b' ? 3e8 : d === 'w' ? 4e8 + dreamMat * 1e8 : d[0] === 'w' ? 4e8 + d.slice(1) * 1e8 : 0);
 // the world you're in as a short name: o, n, e, b, or w + the block a dream world is made of (w216)
 function here() { return dim === 'w' ? 'w' + dreamMat : dim; }
 const idxOf = (x, y, z) => y + H * (x + CS * z);
@@ -827,6 +859,7 @@ function genData(cx, cz) {
   if (dim === 'n') return genNether(cx, cz);
   if (dim === 'e') return genEnd(cx, cz);
   if (dim === 'b') return genOneBlock(cx, cz);
+  if (dim === 'a') return genAsmr(cx, cz);
   if (dim === 'w') return genDream(cx, cz);
   const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS, W = CS + 4;
   const hg = new Int16Array(W * W);
@@ -1167,11 +1200,15 @@ function physics(dt) {
     P.vy = Math.max(P.vy, st.noFall ? -16 : -55);
   }
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(P.vx), Math.abs(P.vy), Math.abs(P.vz)) * dt / .3));
-  const h = dt / steps;
+  const h = dt / steps, vyBefore = P.vy;
   const wasGround = P.onGround;
   P.onGround = false; hitWall = false;
   for (let i = 0; i < steps; i++) { moveAxis('x', P.vx * h); moveAxis('z', P.vz * h); moveAxis('y', P.vy * h); }
-  if (P.y < -4) { if (dim === 'e' || dim === 'b') voidFall(); else otherSide(); }
+  if (P.onGround && !wasGround && vyBefore < -8 && !P.fly) { // land on a 왁뿌볼 and you bounce
+    const under = getBlock(fl(P.x), fl(P.y - .5), fl(P.z));
+    if (WAKPPU.includes(under)) { P.vy = Math.min(14, -vyBefore * .7); P.onGround = false; st.fallY = null; asmrSfx('ball', 'break', null); }
+  }
+  if (P.y < -4) { if (dim === 'a') { asmrHome(); toast('Boing! Back to the bottom of the tower'); } else if (dim === 'e' || dim === 'b') voidFall(); else otherSide(); }
   portalCheck(dt);
   if (mode === 's') survivalMove(dt, inWater, sprint);
   lavaTouch(dt, inLava, IS_WATER[inB] === 1);
@@ -1180,10 +1217,10 @@ function physics(dt) {
   wasWater = inWater;
   if (P.onGround && !P.fly && !inWater) {
     stepAcc += Math.hypot(P.vx, P.vz) * dt;
-    if (stepAcc > 2.2) { stepAcc = 0; const b = getBlock(fl(P.x), fl(P.y - .5), fl(P.z)); if (b) blockSfx('step', b); }
+    if (stepAcc > (dim === 'a' ? 1.1 : 2.2)) { stepAcc = 0; const b = getBlock(fl(P.x), fl(P.y - .5), fl(P.z)); if (b) blockSfx('step', b); }
   }
   // climb out of water / auto-jump on touch
-  if (hitWall && !P.fly && len > .2 && ((inWater && jump) || (TOUCH && (wasGround || P.onGround)))) P.vy = inWater ? 6.5 : 8.6;
+  if (hitWall && !P.fly && len > .2 && ((inWater && jump) || ((TOUCH || dim === 'a') && (wasGround || P.onGround)))) P.vy = inWater ? 6.5 : 8.6;
 }
 
 /* ---------- targeting ---------- */
@@ -1306,12 +1343,18 @@ function resetWorld() {
 }
 
 /* ---------- sky ---------- */
-const SKY_DAY = new THREE.Color(0x8cc0f2), SKY_NIGHT = new THREE.Color(0x0b1028), SKY_DUSK = new THREE.Color(0xf0935c), WATER_FOG = new THREE.Color(0x1d3f8a);
+const ASMR_SKY = new THREE.Color(0xf4cde6), SKY_DAY = new THREE.Color(0x8cc0f2), SKY_NIGHT = new THREE.Color(0x0b1028), SKY_DUSK = new THREE.Color(0xf0935c), WATER_FOG = new THREE.Color(0x1d3f8a);
 const sky = new THREE.Color(), sunDir = new THREE.Vector3(), SKY_GREY = new THREE.Color(0x7d8794), GLOOM = new THREE.Color(), BOLT_SKY = new THREE.Color(0xe8ecff);
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 let headInWater = false, skyLight = 1, dayAmt = 1;
 function updateSky() {
   sun.visible = moon.visible = (dim === 'o' || dim === 'b') && wAmt < .6;
+  if (dim === 'a') { // ASMR mode: a soft pastel sky, always calm and bright
+    sky.copy(ASMR_SKY); dayU.value = 1; minU.value = .72; skyLight = 1; dayAmt = 1; matWater.color.setScalar(1);
+    lightA.intensity = .7; lightD.intensity = .45;
+    scene.fog.color.copy(sky); scene.background = sky; scene.fog.near = RD * CS * .6; scene.fog.far = RD * CS * 1.1;
+    return;
+  }
   if (dim === 'e') { // the End: a dark violet void with a flat, pale light
     sky.copy(END_SKY); dayU.value = .85; minU.value = .5; skyLight = .85; dayAmt = 0; matWater.color.setScalar(.7);
     lightA.intensity = .65; lightD.intensity = .35;
@@ -1379,7 +1422,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1421,7 +1464,7 @@ function applySave(s) {
   petKinds = s && Array.isArray(s.pets) ? s.pets.filter(k => LAND.includes(k)).slice(0, PET_MAX) : [];
   edits.clear(); dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0;
   if (s && typeof s.seed === 'number') {
-    if (['n', 'e', 'b'].includes(s.dim)) dim = s.dim;
+    if (['n', 'e', 'b', 'a'].includes(s.dim)) dim = s.dim;
     obN = Math.max(0, s.ob | 0);
     const okP = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && v.length === 4) : [];
     if (Array.isArray(s.planesX)) planeStash[dim === 'n' ? 'o' : 'n'] = okP(s.planesX);
@@ -1468,7 +1511,7 @@ function newWorld(seed = null) {
   tod = .08; P.fly = false; P.yaw = 0; P.pitch = -.15; sel = 0; spawnPt = null;
   invs = {c: creativeInv(), s: Array(INV).fill(null)}; inv = invs[mode]; ensurePlane();
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false});
-  spawn(); renderHotbar(); refreshMeta(); persist();
+  spawn(); if (dim === 'a') asmrHome(); renderHotbar(); refreshMeta(); persist();
 }
 function refreshMeta() {
   $('#seed').textContent = 'World seed ' + SEED;
@@ -1476,6 +1519,7 @@ function refreshMeta() {
   $('#bFly').classList.toggle('on', P.fly); $('#bDown').hidden = !P.fly;
   $('#snd').textContent = S.on ? 'Sound on' : 'Sound off';
   $('#obBtn').textContent = dim === 'b' ? 'Back to the big world' : 'Play OneBlock';
+  $('#asmrBtn').textContent = dim === 'a' ? 'Back to the big world' : 'ASMR mode';
   $('#gm').value = mode; $('#stats').hidden = mode !== 's'; statsKey = '';
 }
 function toggleSound() {
@@ -1734,6 +1778,7 @@ MAT[GLASS] = 'glass'; MAT[WOOL] = 'cloth';
 const MATS = {soft: ['lowpass', 900, .7], sand: ['highpass', 1700, .7], rock: ['bandpass', 1500, 1.4], wood: ['bandpass', 520, 3], glass: ['highpass', 3200, .7], cloth: ['lowpass', 420, .7]};
 function blockSfx(kind, b, x, y, z) {
   const mat = MAT[b] || 'soft', m = MATS[mat], at = x === undefined ? null : [x + .5, y + .5, z + .5];
+  if (asmrKind(b)) { asmrSfx(asmrKind(b), kind, at); return; }
   if (kind === 'break') {
     noise(.24, m[0], m[1], m[2], .9, at);
     if (mat === 'glass') for (let k = 0; k < 3; k++) tone(2200 + Math.random() * 1800, 1600, .14, .06, 'triangle', at, k * .04);
@@ -1823,7 +1868,7 @@ function updateMobs(dt) {
     let pass = 0, host = 0;
     for (const m of mobs) if (KINDS[m.kind].hostile) host++; else pass++;
     const lead = mpLeader();
-    if (lead && pass < 12 && dim !== 'e') { if (dim === 'n') netherSpawn('piglin'); else trySpawn(); }
+    if (lead && pass < 12 && dim !== 'e' && dim !== 'a') { if (dim === 'n') netherSpawn('piglin'); else trySpawn(); }
     if (lead) spawnVillagers();
     if (mode === 's' && !dead && host < 5 && mpLeader(true)) { if (dim === 'n') netherSpawn('magma'); else if (dim === 'o') trySpawnZombie(); }
   }
@@ -2268,9 +2313,9 @@ function respawn() {
   if (ghost) endGhost();
   if (ghostFly !== null) { P.fly = ghostFly; ghostFly = null; $('#bDown').hidden = !P.fly; }
   dead = false; deadEl.hidden = true;
-  if (dim !== 'o' && dim !== 'b') switchDim('o');
+  if (dim !== 'o' && dim !== 'b' && dim !== 'a') switchDim('o');
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false, inv: 1});
-  if (dim === 'b') obHome(); else if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+  if (dim === 'b') obHome(); else if (dim === 'a') asmrHome(); else if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
   P.vx = P.vy = P.vz = 0;
   if (!TOUCH && !dragMode) requestLock();
   saveDirty = true;
@@ -2281,7 +2326,7 @@ function survivalMove(dt, inWater, sprint) {
   if (P.onGround || inWater) {
     if (st.fallY !== null && !st.noFall && !inWater) {
       const f = st.fallY - P.y;
-      if (f > 3.5 && jumpMul <= 1) hurtPlayer(Math.round(f - 3));
+      if (f > 3.5 && jumpMul <= 1 && dim !== 'a') hurtPlayer(Math.round(f - 3));
     }
     st.fallY = null;
   } else st.fallY = st.fallY === null ? P.y : Math.max(st.fallY, P.y);
@@ -3784,7 +3829,7 @@ const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixe
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${here()}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
-  const m = /^([oneb]|w\d{1,3})_(-?\d+)_(\d+)_(-?\d+)$/.exec(key);
+  const m = /^([oneba]|w\d{1,3})_(-?\d+)_(\d+)_(-?\d+)$/.exec(key);
   if (!m || !Number.isInteger(v) || v < 0 || v >= NB || (v && !BLOCKS[v])) return;
   const d = m[1], x = +m[2], y = +m[3], z = +m[4];
   if (y >= H) return;
@@ -3874,9 +3919,11 @@ const CMDS = {
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
+  asmr: () => { toggleAsmr(); return dim === 'a' ? 'ASMR mode! Run up the tower and listen' : 'Back in the big world'; },
   spawn: () => {
     if (riding) exitPlane();
     if (dim === 'b') obHome();
+    else if (dim === 'a') asmrHome();
     else { if (dim !== 'o') switchDim('o'); if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn(); }
     P.vx = P.vy = P.vz = 0; st.fallY = null;
     return 'Back to your spawn point';
@@ -3990,7 +4037,7 @@ function golemThink(m, K, dt) {
 /* ---------- find your friends ---------- */
 // markers show where everyone in your room is (an arrow at the screen edge when they're off-screen),
 // /find says which way to go, and /tp or the pause-menu buttons jump you straight to them
-const DIM_NAME = {o: 'the Overworld', n: 'the Nether', e: 'the End', b: 'OneBlock'};
+const DIM_NAME = {o: 'the Overworld', n: 'the Nether', e: 'the End', b: 'OneBlock', a: 'ASMR mode'};
 const marksEl = $('#friendMarks'), mpFriends = $('#mpFriends'), fv = new THREE.Vector3();
 function compass(dx, dz) {
   const a = (Math.atan2(dx, -dz) * 180 / Math.PI + 360 + 22.5) % 360; // north is -z, like where you face at the start
@@ -5107,7 +5154,7 @@ function chestBroken(x, y, z) {
   toast(lost ? 'Your backpack is full: some things from the chest were lost' : 'You picked up everything in the chest', 2200);
 }
 function mpChests(all) {
-  chests = new Map(Object.entries(all || {}).filter(([k]) => /^([oneb]|w\d{1,3})_-?\d+_\d+_-?\d+$/.test(k)).map(([k, v]) => [k, unpackChest(v)]));
+  chests = new Map(Object.entries(all || {}).filter(([k]) => /^([oneba]|w\d{1,3})_-?\d+_\d+_-?\d+$/.test(k)).map(([k, v]) => [k, unpackChest(v)]));
   if (chestF) { chestF.items = (chests.get(chestF.key) || Array(CHEST_N).fill(null)).slice(); if (invOpen) renderInv(); }
 }
 
@@ -5888,12 +5935,12 @@ DIM_NAME.w = 'a dream world';
 // in one go. It's a copy: what happens in the room doesn't change the world saved in your browser.
 function editName(k, i) { // chunk key + index -> the room's name for that block, like o_12_40_-3 or w216_8_30_8
   const tier = Math.floor(k / 1e8), base = k - tier * 1e8;
-  const d = tier === 0 ? 'o' : tier === 1 ? 'n' : tier === 2 ? 'e' : tier === 3 ? 'b' : 'w' + (tier - 4);
+  const d = tier === -1 ? 'a' : tier === 0 ? 'o' : tier === 1 ? 'n' : tier === 2 ? 'e' : tier === 3 ? 'b' : 'w' + (tier - 4);
   const cx = Math.floor(base / 8192) - 4096, cz = base % 8192 - 4096;
   return `${d}_${cx * CS + Math.floor(i / H) % CS}_${i % H}_${cz * CS + Math.floor(i / (H * CS))}`;
 }
 function snapshotWorld() {
-  const e = {}, c = {}, dr = {}, ok = k => /^([oneb]|w\d{1,3})_-?\d+_\d+_-?\d+$/.test(k);
+  const e = {}, c = {}, dr = {}, ok = k => /^([oneba]|w\d{1,3})_-?\d+_\d+_-?\d+$/.test(k);
   for (const [k, m] of edits) for (const [i, b] of m) e[editName(k, i)] = b;
   for (const [k, a] of chests) { const p = packChest(a); if (p && ok(k)) c[k] = p; }
   for (const [k, v] of dreamPortals) if (ok(k)) dr[k] = v;
@@ -5992,6 +6039,8 @@ function updateSurvFly(dt) {
 let godMode = false, speedMul = 1, jumpMul = 1;
 function idByName(text) {
   const q = (text || '').toLowerCase().replace(/[^a-z]/g, ''), all = PALETTE.filter(id => validId(id));
+  const raw = (text || '').trim().toLowerCase();
+  if (/[^\x00-\x7f]/.test(raw)) { const k = all.find(id => nameOf(id).toLowerCase().includes(raw)); if (k) return k; } // names like 왁뿌볼
   const n = id => nameOf(id).toLowerCase().replace(/[^a-z]/g, '');
   const words = ((text || '').toLowerCase().match(/[a-z]+/g) || []).map(w => w.replace(/s$/, '')).filter(w => w !== 'of');
   const hasAll = id => { const nw = nameOf(id).toLowerCase().match(/[a-z]+/g) || []; return words.length && words.every(w => nw.some(x => x === w || x.replace(/s$/, '') === w)); };
@@ -6206,6 +6255,84 @@ function useBucket(s) {
   liquidsMeet(px, py, pz);
 }
 
+/* ---------- ASMR mode ---------- */
+// A calm pastel world with a giant spiral tower made of butter squishies, ASMR keyboards and 왁뿌볼s. Every step
+// squishes, clacks or bloops. Stairs go round and round a 4x4 core; you step up them by yourself (no jumping
+// needed), falls don't hurt, and the top of the core is the summit.
+const ASMR_TOP = 54, ASMR_RISE = 20; // one lap of the stairs climbs 20 blocks
+let asmrTopDone = false;
+function asmrStair(x, z) { // where a stair cell sits on its lap (0..1), or -1 if (x, z) isn't on the stairs
+  const u = x + .5, v = z + .5, c = Math.max(Math.abs(u), Math.abs(v));
+  if (c < 2.5 || c > 4.5) return -1;
+  let sPos;
+  if (v === -c && u < c) sPos = u + c;
+  else if (u === c && v < c) sPos = 2 * c + v + c;
+  else if (v === c && u > -c) sPos = 4 * c + c - u;
+  else sPos = 6 * c + c - v;
+  return sPos / (8 * c);
+}
+function genAsmr(cx, cz) {
+  const d = new Uint8Array(CS * CS * H), ox = cx * CS, oz = cz * CS;
+  const floor = [B2.pink_wool, B2.lightblue_wool, B2.yellow_wool, B2.lime_wool];
+  for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+    const wx = ox + x, wz = oz + z, base = H * (x + CS * z);
+    d[base] = BEDROCK;
+    d[base + 1] = floor[(((wx >> 2) + (wz >> 2)) & 1) + 2 * (((wx >> 3) + (wz >> 3)) & 1)];
+    if (Math.max(Math.abs(wx + .5), Math.abs(wz + .5)) > 8) { // little piles of squishies and keyboards around the tower
+      const hsh = hash2(wx, wz, 1700);
+      if (hsh < .012) d[base + 2] = ASMR_BLOCKS[Math.floor(hsh / .012 * ASMR_BLOCKS.length)];
+      if (hsh < .003) d[base + 3] = WAKPPU[Math.floor(hsh / .001)];
+      continue;
+    }
+    const c = Math.max(Math.abs(wx + .5), Math.abs(wz + .5));
+    if (c < 2) { // the core: bands of butter, keyboards and 왁뿌볼s
+      for (let y = 2; y <= ASMR_TOP; y++) { const band = Math.floor((y - 2) / 3) % 3; d[base + y] = band === 0 ? B2.butter_squishy : band === 1 ? B2.asmr_keyboard : WAKPPU[Math.floor((y - 2) / 9) % 3]; }
+      continue;
+    }
+    const f = asmrStair(wx, wz);
+    if (f < 0) continue;
+    const side = Math.floor(f * 4);
+    for (let lap = 0; ; lap++) {
+      const y = 2 + Math.floor(f * ASMR_RISE) + lap * ASMR_RISE;
+      if (y > ASMR_TOP) break;
+      const pick = (side + lap) % 3;
+      d[base + y] = pick === 0 ? B2.butter_squishy : pick === 1 ? B2.asmr_keyboard : WAKPPU[(side + lap) % 3];
+    }
+  }
+  const e = edits.get(ck(cx, cz));
+  if (e) for (const [i, b] of e) d[i] = IS_LAVA[b] ? AIR : b;
+  return d;
+}
+function asmrHome() {
+  P.x = .5; P.y = 2; P.z = -7.5; P.vx = P.vy = P.vz = 0; P.yaw = Math.PI; P.pitch = .35; // facing the tower st.fallY = null; st.noFall = false;
+}
+function toggleAsmr() {
+  if (dim === 'a') {
+    switchDim('o');
+    if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+    P.vx = P.vy = P.vz = 0; st.fallY = null;
+    toast('Back in the big world', 2500);
+  } else {
+    if (riding) exitPlane();
+    if (mount) dismount();
+    switchDim('a');
+    asmrHome(); P.fly = false; asmrTopDone = false;
+    toast('ASMR mode 🧈⌨️🫧 Run up the tower! Every block makes its own sound.', 4500);
+  }
+  refreshMeta(); persist();
+}
+$('#asmrBtn').addEventListener('click', toggleAsmr);
+function updateAsmr() {
+  if (dim !== 'a') return;
+  if (!asmrTopDone && P.y >= ASMR_TOP + 1 && P.onGround && Math.max(Math.abs(P.x), Math.abs(P.z)) < 2) {
+    asmrTopDone = true;
+    toast('You made it to the top of the ASMR tower! 🎉', 4000);
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, f, .35, .12, 'triangle', null, i * .13));
+    for (let k = 0; k < 6; k++) burst(Math.floor(P.x), Math.floor(P.y + 1), Math.floor(P.z), 0, new THREE.Color([0xffa4cc, 0x96ecc8, 0xcca8ff, 0xfcdc70][k % 4]));
+  }
+  if (P.y < 4) asmrTopDone = false;
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6216,7 +6343,7 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr();
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();

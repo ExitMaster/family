@@ -206,6 +206,12 @@ build on it, fly over it. The world saves in the browser.
   between them fill it with a new water block, so you can make endless water. Craft a **Bucket** from 3 iron
   ingots (or buy one from a smith) and right-click water to scoop it up, then right-click again to pour it.
 
+- **ASMR mode**: press **ASMR mode** in the pause menu (or type `/asmr`) to go to a calm pastel world with a giant
+  spiral tower made of **butter squishies**, **ASMR keyboards** and **왁뿌볼s** (squishy balls). Run up the stairs
+  (you step up them by yourself) to the top. Every block has its own sound: keyboards clack, butter squishies
+  squish and 왁뿌볼s bloop. Falls don't hurt there, and landing on a 왁뿌볼 bounces you. The new blocks are in
+  the Creative inventory too (`/give 왁뿌볼` works). Press the button again to go back to the big world.
+
 ## Multiplayer
 
 Play in the same world with your family, like Jetpack Jump. In the pause menu, type **your name**
