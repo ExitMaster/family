@@ -212,6 +212,15 @@ build on it, fly over it. The world saves in the browser.
   squish and 왁뿌볼s bloop. Falls don't hurt there, and landing on a 왁뿌볼 bounces you. The new blocks are in
   the Creative inventory too (`/give 왁뿌볼` works). Press the button again to go back to the big world.
 
+- **Tesla Model Y L**: a car you can drive, built to the real car's size (about 5 m long) with a smooth body, an
+  all-glass roof, spinning wheels with front wheels that steer, light bars front and back (the brake lights glow
+  when you brake), and six seats, a dashboard, a big screen and a steering wheel inside. It's in the Creative
+  inventory; in Survival craft it from 8 iron ingots, 4 glass and 4 coal. Right-click the ground to park it (it
+  comes in Pearl White, Stealth Grey, Quicksilver, Ultra Red, Diamond Black or Glacier Blue), right-click it to
+  get in, left-click to pick it up. **W** drives, **S** brakes and reverses, **A/D** steer, **C** switches
+  between the chase camera and the driver's seat, **H** honks, **Shift** gets out. It hums like an electric car,
+  climbs one-block bumps, stops at walls and knocks mobs aside. On a phone the stick drives it.
+
 ## Multiplayer
 
 Play in the same world with your family, like Jetpack Jump. In the pause menu, type **your name**
