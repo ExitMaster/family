@@ -3109,6 +3109,7 @@ function switchDim(to) {
   clearMobs(); resetWorld();
   dim = to;
   (carStash[here()] || []).forEach(a => addCar(+a[0], +a[1], +a[2], +a[3], +a[4])); carStash[here()] = [];
+  showFriendCars();
   (planeStash[to] || []).forEach(a => addPlane(+a[0], +a[1], +a[2], +a[3])); planeStash[to] = [];
   saveDirty = true;
 }
@@ -3805,7 +3806,7 @@ async function mpJoinRoom() {
   const me = R('/players/' + mp.uid);
   quiet(fb.set(me, mpMe()));
   quiet(fb.onDisconnect(me).remove());
-  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.remove(R('/hits/' + mp.uid))); quiet(fb.remove(R('/fx/' + mp.uid)));
+  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.onDisconnect(R('/cars/' + mp.uid)).remove()); mp.carSig = ''; quiet(fb.remove(R('/hits/' + mp.uid))); quiet(fb.remove(R('/fx/' + mp.uid)));
   mp.mobSig = null; mp.mobT = 0; mp.sky = null;
   try { // one clock and one sky for the whole room
     const now = serverNow();
@@ -3820,7 +3821,7 @@ async function mpJoinRoom() {
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
-    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
+    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
     fb.onValue(R('/dreams'), s => { for (const [k, v] of Object.entries(s.val() || {})) if (Number.isInteger(v) && (v === -1 || isBlock(v))) dreamPortals.set(k, v); }),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
@@ -3834,9 +3835,10 @@ function mpLeave() {
   if (tradeF) { closeInv(false); cancelTrade(); }
   hideAsk();
   mp.subs.forEach(u => u()); mp.subs = [];
-  quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid)));
+  quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid))); quiet(fb.remove(R('/cars/' + mp.uid)));
+  clearFriendCars(); mp.carSig = '';
   mp.on = false; mp.sky = null; mp.owner = null; clearGhosts();
-  for (const a of avatars.values()) scene.remove(a.g);
+  for (const a of avatars.values()) { scene.remove(a.g); if (a.car) scene.remove(a.car.g); }
   avatars.clear(); marksEl.textContent = ''; mpFriends.textContent = '';
   resetWorld(); clearMobs(); applySave(loadSaved()); // back to your own world, exactly as you left it
   mpJoin.textContent = 'Join'; mpRoom.disabled = mpName.disabled = false;
@@ -3848,7 +3850,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2)] : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${here()}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -3871,7 +3873,7 @@ function mpPlayers(all) {
     if (!a) { a = buildAvatar(String(p.n || '?').slice(0, 12), SHIRTS.includes(p.c) ? p.c : SHIRTS[0]); a.x = p.x; a.y = p.y; a.z = p.z; a.yaw = p.yaw || 0; avatars.set(id, a); if (Date.now() - mp.joinedAt > 3000) toast(`${p.n} joined`); }
     a.p = p; a.seen = Date.now();
   }
-  for (const [id, a] of avatars) if (!all[id]) { scene.remove(a.g); avatars.delete(id); toast(`${a.name} left`); }
+  for (const [id, a] of avatars) if (!all[id]) { scene.remove(a.g); if (a.car) scene.remove(a.car.g); avatars.delete(id); toast(`${a.name} left`); }
   mpStatus.textContent = `Room ${mp.room} · ${names.length} playing: ${names.join(', ')}`;
   renderFriendButtons();
 }
@@ -3900,6 +3902,7 @@ function mpTick(dt) {
   for (const a of avatars.values()) {
     const p = a.p, vis = !!p && p.d === here() && Date.now() - a.seen < 60000;
     a.g.visible = vis;
+    if (a.car) a.car.g.visible = vis;
     if (!vis) continue;
     if (Math.hypot(p.x - a.x, p.z - a.z) > 10) { a.x = p.x; a.y = p.y; a.z = p.z; }
     const k = Math.min(1, 10 * dt), ox = a.x, oz = a.z;
@@ -3910,12 +3913,15 @@ function mpTick(dt) {
     a.head.rotation.x = Math.max(-1, Math.min(1, p.pitch || 0));
     a.g.position.set(a.x, a.y, a.z); a.g.rotation.y = a.yaw;
     avatarState(a, p.k || 0);
+    friendCar(a, p, dt);
+    if (a.car) continue;
     if (p.r > 0) { a.g.position.y += p.r - .55; a.legs[0].rotation.set(-1.2, 0, .3); a.legs[1].rotation.set(-1.2, 0, -.3); }
     else { a.legs[0].rotation.z = a.legs[1].rotation.z = 0; }
   }
   if ((mp.sendT -= dt) > 0) return;
   mp.sendT = .15;
-  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v, me.k, me.r].join();
+  const me = mpMe(), sig = [me.x, me.y, me.z, me.yaw, me.pitch, me.d, me.s, me.v, me.k, me.r, me.cv].join();
+  mpPublishCars();
   if (sig !== mp.last) { mp.last = sig; quiet(mp.fb.update(R('/players/' + mp.uid), me)); }
 }
 /* ---------- chat ---------- */
@@ -6408,7 +6414,7 @@ function carGeometry() {
 }
 const carMats = {};
 const cMat = (k, make) => carMats[k] || (carMats[k] = make());
-function addCar(x, y, z, yaw, color = 0) {
+function addCar(x, y, z, yaw, color = 0, remote = false) {
   const G = carGeometry(), g = new THREE.Group(), body = new THREE.Group();
   color = Math.max(0, Math.min(CAR_COLORS.length - 1, color | 0));
   const paint = cMat('p' + color, () => new THREE.MeshPhongMaterial({color: CAR_COLORS[color][1], shininess: 90, specular: 0x777777}));
@@ -6454,7 +6460,8 @@ function addCar(x, y, z, yaw, color = 0) {
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 5.3), shadowM); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .02; g.add(shadow);
   g.add(body); g.rotation.order = 'YXZ'; scene.add(g);
   const car = {g, body, wheels, tailM, x, y, z, yaw, color, speed: 0, steer: 0, vy: 0, vis: y, tilt: 0, brake: false};
-  cars.push(car); syncCar(car, 0);
+  if (!remote) cars.push(car);
+  syncCar(car, 0);
   return car;
 }
 function syncCar(c, dt) {
@@ -6466,7 +6473,7 @@ function syncCar(c, dt) {
   c.tailM.color.setHex(c.brake ? 0xff2a2a : 0x9a0f16);
 }
 function removeCar(c) { if (driving === c) exitCar(); scene.remove(c.g); cars.splice(cars.indexOf(c), 1); }
-function carList() { return cars.map(c => [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color)); }
+function carList(parkedOnly) { return cars.filter(c => !parkedOnly || c !== driving).map(c => [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color)); }
 function clearCars() { while (cars.length) removeCar(cars[0]); }
 // the corners and sides of the car, in the world
 function carPts(x, z, yaw) {
@@ -6618,6 +6625,48 @@ function carCam() {
   cam.position.set(c.x - f[0] * 7.5, c.vis + 2.4 - f[1] * 7.5, c.z - f[2] * 7.5);
 }
 $('#bExit').addEventListener('click', () => { if (driving) exitCar(); });
+
+
+/* ---------- friends' cars in multiplayer ---------- */
+// The car you're driving rides along with your player data (colour, heading, steering, speed, brake lights), so
+// friends see it drive, steer, spin its wheels and light up when you brake, with you in the driver's seat. Your
+// parked cars are shared under /cars/{you} and show up, in the same world, for everyone else.
+const friendParked = new Map(); // uid -> {sig, list of car models}
+function mpPublishCars() {
+  const sig = here() + JSON.stringify(carList(true));
+  if (sig === mp.carSig) return;
+  mp.carSig = sig;
+  quiet(mp.fb.set(R('/cars/' + mp.uid), {d: here(), l: carList(true)}));
+}
+function mpCars(all) {
+  for (const [id, f] of friendParked) if (!all[id] || id === mp.uid) { f.list.forEach(c => scene.remove(c.g)); friendParked.delete(id); }
+  for (const [id, v] of Object.entries(all)) {
+    if (id === mp.uid || !v || typeof v !== 'object') continue;
+    const list = Array.isArray(v.l) ? v.l.filter(a => Array.isArray(a) && a.length === 5 && a.every(Number.isFinite)).slice(0, 20) : [];
+    const sig = String(v.d) + JSON.stringify(list), old = friendParked.get(id);
+    if (old && old.sig === sig) continue;
+    if (old) old.list.forEach(c => scene.remove(c.g));
+    const made = list.map(a => addCar(a[0], a[1], a[2], a[3], a[4], true));
+    made.forEach(c => { c.g.visible = v.d === here(); });
+    friendParked.set(id, {sig, d: v.d, list: made});
+  }
+}
+function showFriendCars() { for (const f of friendParked.values()) for (const c of f.list) c.g.visible = f.d === here(); }
+function clearFriendCars() { for (const f of friendParked.values()) f.list.forEach(c => scene.remove(c.g)); friendParked.clear(); }
+function friendCar(a, p, dt) {
+  const cv = Array.isArray(p.cv) && p.cv.length === 6 && p.cv.every(Number.isFinite) ? p.cv : null;
+  if (!cv) { if (a.car) { scene.remove(a.car.g); a.car = null; a.legs.forEach(l => l.rotation.set(0, 0, 0)); a.g.scale.setScalar(1); } return; }
+  const [color, yaw, steer, speed, brake, cy] = cv;
+  if (!a.car || a.car.color !== color) { if (a.car) scene.remove(a.car.g); a.car = addCar(a.x, cy, a.z, yaw, color, true); a.car.vis = cy; }
+  const c = a.car;
+  let dy = yaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * Math.min(1, 10 * dt);
+  c.x = a.x; c.z = a.z; c.y = cy; c.steer = steer; c.speed = speed; c.brake = !!brake;
+  syncCar(c, dt);
+  // your friend sits in the driver's seat
+  const co = Math.cos(c.yaw), si = Math.sin(c.yaw);
+  a.g.position.set(c.x - .4 * co + .05 * si, c.vis + .25, c.z + .4 * si + .05 * co); a.g.rotation.y = c.yaw; a.g.scale.setScalar(.7); // seated, under the glass roof
+  a.legs[0].rotation.set(-1.45, 0, 0); a.legs[1].rotation.set(-1.45, 0, 0); a.arms[0].rotation.x = a.arms[1].rotation.x = -1.1;
+}
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;

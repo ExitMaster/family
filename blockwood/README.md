@@ -220,6 +220,8 @@ build on it, fly over it. The world saves in the browser.
   get in, left-click to pick it up. **W** drives, **S** brakes and reverses, **A/D** steer, **C** switches
   between the chase camera and the driver's seat, **H** honks, **Shift** gets out. It hums like an electric car,
   climbs one-block bumps, stops at walls and knocks mobs aside. On a phone the stick drives it.
+  In multiplayer, friends see your car: the one you're driving moves, steers, spins its wheels and lights its
+  brake lights with you in the driver's seat, and your parked cars show up for them too (they can't drive yours).
 
 ## Multiplayer
 
