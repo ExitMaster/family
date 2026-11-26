@@ -221,7 +221,10 @@ build on it, fly over it. The world saves in the browser.
   between the chase camera and the driver's seat, **H** honks, **Shift** gets out. It hums like an electric car,
   climbs one-block bumps, stops at walls and knocks mobs aside. On a phone the stick drives it.
   In multiplayer, friends see your car: the one you're driving moves, steers, spins its wheels and lights its
-  brake lights with you in the driver's seat, and your parked cars show up for them too (they can't drive yours).
+  brake lights with you in the driver's seat, and your parked cars show up for them too. Friends can **ride with
+  you**: they right-click your car (parked or while you drive) to sit in the front passenger seat, or a back
+  seat if that's taken (3 passengers at most), and Shift gets them out. In the driver's seat, **1**, **2** and
+  **3** paint the car Stealth Grey, Blue or White (**P** swaps between them).
 
 ## Multiplayer
 
