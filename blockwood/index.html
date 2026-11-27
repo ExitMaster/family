@@ -2373,7 +2373,8 @@ function respawn() {
   dead = false; deadEl.hidden = true;
   if (dim !== 'o' && dim !== 'b' && dim !== 'a') switchDim('o');
   Object.assign(st, {hp: 20, food: 20, air: 10, ex: 0, fallY: null, noFall: false, inv: 1});
-  if (dim === 'b') obHome(); else if (dim === 'a') asmrHome(); else if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
+  if (mp.on && mp.spawn) goRoomSpawn();
+  else if (dim === 'b') obHome(); else if (dim === 'a') asmrHome(); else if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn();
   P.vx = P.vy = P.vz = 0;
   if (!TOUCH && !dragMode) requestLock();
   saveDirty = true;
@@ -3847,7 +3848,7 @@ async function mpJoinRoom() {
   const me = R('/players/' + mp.uid);
   quiet(fb.set(me, mpMe()));
   quiet(fb.onDisconnect(me).remove());
-  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.onDisconnect(R('/cars/' + mp.uid)).remove()); mp.carSig = ''; quiet(fb.remove(R('/hits/' + mp.uid))); quiet(fb.remove(R('/fx/' + mp.uid)));
+  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.onDisconnect(R('/traffic/' + mp.uid)).remove()); mp.spawn = null; mp.spawnSeen = false; quiet(fb.onDisconnect(R('/cars/' + mp.uid)).remove()); mp.carSig = ''; quiet(fb.remove(R('/hits/' + mp.uid))); quiet(fb.remove(R('/fx/' + mp.uid)));
   mp.mobSig = null; mp.mobT = 0; mp.sky = null;
   try { // one clock and one sky for the whole room
     const now = serverNow();
@@ -3860,6 +3861,7 @@ async function mpJoinRoom() {
   const onEdit = s => mpApplyEdit(s.key, s.val());
   mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
+    fb.onValue(R('/traffic'), s => mpTraffic(s.val() || {})), fb.onValue(R('/meta/spawn'), s => mpRoomSpawn(s.val())),
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
     fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onValue(R('/borrow'), s => mpBorrows(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
@@ -3879,7 +3881,7 @@ function mpLeave() {
   hideAsk();
   mp.subs.forEach(u => u()); mp.subs = [];
   quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid))); quiet(fb.remove(R('/cars/' + mp.uid)));
-  clearFriendCars(); mp.carSig = '';
+  clearFriendCars(); mp.carSig = ''; quiet(fb.remove(R('/traffic/' + mp.uid))); clearRemoteTraffic(); mp.spawn = null;
   mp.on = false; mp.sky = null; mp.owner = null; clearGhosts();
   for (const a of avatars.values()) { scene.remove(a.g); if (a.car) scene.remove(a.car.g); }
   avatars.clear(); marksEl.textContent = ''; mpFriends.textContent = '';
@@ -3988,13 +3990,14 @@ function openChat(prefix = '') {
 function closeChat() { chatIn.hidden = true; chatLog.classList.remove('open'); chatIn.blur(); }
 const myName = () => mp.on ? mp.name : (mpName.value.trim() || 'You').slice(0, 12);
 const CMDS = {
-  help: () => 'Admin commands: type /admin. Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /no more NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
+  help: () => 'Admin commands: type /admin. Hold the knife and right-click a block to cut it open. Commands: /find  /tp NAME  /tp X Y Z  /spawn  /set room spawn point  /trade NAME  /pvp on|off  /kick NAME  /kill  /life NAME  /clone  /unclone  /summon 10 NAME  /unsummon  /no more NAME  /mobs  /day  /night  /weather rain|storm|clear  /seed  /fly  /clear',
   day: () => { setTod(.1); return 'The sun comes up'; },
   night: () => { setTod(.6); return 'Night falls… watch out for monsters'; },
   seed: () => 'World seed: ' + SEED,
   asmr: () => { toggleAsmr(); return dim === 'a' ? 'ASMR mode! Run up the tower and listen' : 'Back in the big world'; },
   spawn: () => {
     if (riding) exitPlane(); if (driving) exitCar(); if (passenger) leaveSeat();
+    if (mp.on && mp.spawn) { goRoomSpawn(); return "Back to the room's spawn point"; }
     if (dim === 'b') obHome();
     else if (dim === 'a') asmrHome();
     else { if (dim !== 'o') switchDim('o'); if (spawnPt) [P.x, P.y, P.z] = spawnPt; else spawn(); }
@@ -7130,7 +7133,7 @@ function spawnTraffic() {
   if (d < 35 || d > 110) return;
   if (traffic.some(o => o.axis === axis && o.line === line && o.dir === dir && Math.abs(o.a - a) < 14)) return;
   const c = addCar(0, 0, 0, laneYaw(axis, dir), Math.floor(Math.random() * CAR_COLORS.length), true);
-  const t = {c, axis, line, dir, a, v: 8 + Math.random() * 6, cruise: 9 + Math.random() * 6, honkT: 0};
+  const t = {c, axis, line, dir, a, v: 8 + Math.random() * 6, cruise: 9 + Math.random() * 6, honkT: 0, id: ++trafficSeq};
   placeTraffic(t); c.vis = c.y;
   traffic.push(t);
 }
@@ -7142,38 +7145,77 @@ function trafficRoom(t) {
   const L = t.dir > 0 ? ROAD_O + ROAD_G * Math.ceil((t.a + 5.3 - ROAD_O) / ROAD_G) : ROAD_O + ROAD_G * Math.floor((t.a - 6.3 - ROAD_O) / ROAD_G);
   const stopAt = t.dir > 0 ? L - 5.8 : L + 6.8, toStop = (stopAt - t.a) * t.dir, light = tlState(t.axis);
   if (toStop > -.5 && toStop < 30 && (light === 'r' || (light === 'y' && toStop > 3))) room = Math.max(0, toStop);
-  // cars in front in the same lane
+  // cars in front in the same lane (yours and friends')
   for (const o of traffic) if (o !== t && o.axis === t.axis && o.line === t.line && o.dir === t.dir) {
     const gap = (o.a - t.a) * t.dir;
     if (gap > 0 && gap < 30) room = Math.min(room, Math.max(0, gap - 6.5));
   }
-  // you (or your car) in the lane ahead
-  const across = t.line + LANE[t.axis][t.dir > 0 ? 0 : 1], you = driving || {x: P.x, z: P.z};
-  const yAcross = t.axis === 'x' ? you.z : you.x, yAlong = t.axis === 'x' ? you.x : you.z, gap = (yAlong - t.a) * t.dir;
-  if (Math.abs(yAcross - across) < (driving ? 2.4 : 1.6) && gap > 0 && gap < 16 && Math.abs((driving ? driving.y : P.y) - t.c.y) < 3) {
-    room = Math.min(room, Math.max(0, gap - (driving ? 6 : 4)));
+  // people in the lane ahead, on foot or in a car: you and your friends
+  const across = t.line + LANE[t.axis][t.dir > 0 ? 0 : 1], people = [driving ? {x: driving.x, y: driving.y, z: driving.z, car: true} : {x: P.x, y: P.y, z: P.z}];
+  for (const a of avatars.values()) if (a.g.visible && a.p) people.push(a.car ? {x: a.car.x, y: a.car.y, z: a.car.z, car: true} : {x: a.x, y: a.y, z: a.z});
+  for (const who of people) {
+    const yAcross = t.axis === 'x' ? who.z : who.x, yAlong = t.axis === 'x' ? who.x : who.z, gap = (yAlong - t.a) * t.dir;
+    if (Math.abs(yAcross - across) > (who.car ? 2.4 : 1.6) || gap <= 0 || gap > 16 || Math.abs(who.y - t.c.y) > 3) continue;
+    room = Math.min(room, Math.max(0, gap - (who.car ? 6 : 4)));
     if (gap < 10 && (t.honkT -= .1) <= 0) { t.honkT = 3; tone(400, 400, .25, .09, 'square', [t.c.x, t.c.y + 1, t.c.z]); tone(505, 505, .25, .07, 'square', [t.c.x, t.c.y + 1, t.c.z]); }
   }
   return room;
 }
+// In a room, one player near each group drives the traffic (the same one who runs the mobs) and shares it under
+// /traffic/{them}; everyone else draws those cars, gliding between updates.
+let trafficSeq = 0, trafficPubT = 0, trafficSig = '';
 function updateTraffic(dt) {
-  if (dim !== 'o') { while (traffic.length) removeTraffic(traffic[0]); return; }
+  const lead = dim === 'o' && (!mp.on || mpLeader());
+  if (!lead) for (const t of traffic.slice()) if (!t.remote) removeTraffic(t);
   if ((trafficT -= dt) <= 0) {
     trafficT = 1;
-    for (const t of traffic.slice()) if (Math.hypot(t.c.x - P.x, t.c.z - P.z) > 140) removeTraffic(t);
-    if (traffic.length < TRAFFIC_MAX) spawnTraffic();
+    for (const t of traffic.slice()) if (!t.remote && Math.hypot(t.c.x - P.x, t.c.z - P.z) > 140) removeTraffic(t);
+    if (lead && traffic.filter(t => !t.remote).length < TRAFFIC_MAX) spawnTraffic();
   }
   for (const t of traffic) {
-    const room = trafficRoom(t), want = Math.min(t.cruise, room * 1.1);
-    t.v += Math.max(-14 * dt, Math.min(4 * dt, want - t.v));
-    if (room < .05) t.v = Math.min(t.v, 0);
-    t.v = Math.max(0, t.v);
-    t.a += t.v * t.dir * dt;
+    if (t.remote) { // a friend's traffic: keep moving at its speed, and ease towards where they say it is
+      t.a += t.v * t.dir * dt;
+      t.a += (t.ta + t.v * t.dir * (Date.now() - t.at) / 1000 - t.a) * Math.min(1, 3 * dt);
+      t.c.g.visible = t.d === here();
+    } else {
+      const room = trafficRoom(t), want = Math.min(t.cruise, room * 1.1);
+      t.v += Math.max(-14 * dt, Math.min(4 * dt, want - t.v));
+      if (room < .05) t.v = Math.min(t.v, 0);
+      t.v = Math.max(0, t.v);
+      t.a += t.v * t.dir * dt;
+      t.c.brake = want < t.v - .5 || (t.v < .3 && room < 1);
+    }
     placeTraffic(t);
-    t.c.speed = t.v; t.c.brake = want < t.v - .5 || (t.v < .3 && room < 1);
+    t.c.speed = t.v;
     syncCar(t.c, dt);
   }
+  if (mp.on && (trafficPubT -= dt) <= 0) { // share yours
+    trafficPubT = .25;
+    const l = traffic.filter(t => !t.remote).map(t => [t.axis === 'x' ? 0 : 1, t.line, t.dir, Math.round(t.a * 10) / 10, Math.round(t.v * 10) / 10, t.c.color, t.id, t.c.brake ? 1 : 0]);
+    const sig = JSON.stringify(l);
+    if (sig !== trafficSig) { trafficSig = sig; quiet(l.length ? mp.fb.set(R('/traffic/' + mp.uid), {d: here(), l}) : mp.fb.remove(R('/traffic/' + mp.uid))); }
+  }
 }
+function mpTraffic(all) {
+  const seen = new Set();
+  for (const [uid, v] of Object.entries(all)) {
+    if (uid === mp.uid || !v || !Array.isArray(v.l)) continue;
+    for (const e of v.l.slice(0, 12)) {
+      if (!Array.isArray(e) || e.length !== 8 || !e.every(Number.isFinite)) continue;
+      const [ax, line, dir, a, sp, color, id, brake] = e, key = uid + '_' + id, axis = ax ? 'z' : 'x';
+      seen.add(key);
+      let t = traffic.find(o => o.key === key);
+      if (!t) {
+        t = {key, remote: true, axis, line, dir: dir > 0 ? 1 : -1, a, v: sp, c: addCar(0, 0, 0, laneYaw(axis, dir > 0 ? 1 : -1), color, true)};
+        placeTraffic(t); t.c.vis = t.c.y; traffic.push(t);
+      }
+      if (Math.abs(a - t.a) > 10) t.a = a;
+      t.ta = a; t.at = Date.now(); t.v = sp; t.d = v.d; t.c.brake = !!brake;
+    }
+  }
+  for (const t of traffic.slice()) if (t.remote && !seen.has(t.key)) removeTraffic(t);
+}
+function clearRemoteTraffic() { for (const t of traffic.slice()) if (t.remote) removeTraffic(t); trafficSig = ''; }
 // bumping into traffic while you drive
 function trafficHit(c) {
   for (const t of traffic) {
@@ -7306,6 +7348,36 @@ function autoParkStep(c, dt) {
     [660, 880].forEach((fq, k) => tone(fq, fq, .12, .07, 'sine', null, k * .12));
   }
 }
+
+
+/* ---------- the room's spawn point ---------- */
+// "/set room spawn point" (the host only) makes where you're standing the room's spawn point, saved in /meta/spawn:
+// friends start there when they join, come back there when they respawn, and /spawn takes them there.
+function goRoomSpawn() {
+  const sp = mp.spawn;
+  if (!sp) return;
+  if (riding) exitPlane(); if (driving) exitCar(); if (passenger) leaveSeat();
+  if (sp.d !== here() && DIM_NAME[sp.d]) switchDim(sp.d);
+  P.x = sp.x; P.y = sp.y; P.z = sp.z; P.vx = P.vy = P.vz = 0; st.fallY = null; st.noFall = false;
+}
+function mpRoomSpawn(v) {
+  const ok = v && [v.x, v.y, v.z].every(Number.isFinite) && DIM_NAME[v.d] && v.y > -2 && v.y < H + 4;
+  const first = !mp.spawnSeen; mp.spawnSeen = true;
+  const was = mp.spawn;
+  mp.spawn = ok ? {x: v.x, y: v.y, z: v.z, d: v.d} : null;
+  if (!mp.spawn) return;
+  if (first) { goRoomSpawn(); toast("You're at the room's spawn point", 2500); }
+  else if (!was || was.x !== v.x || was.z !== v.z) showChat(null, `${String(v.by || 'The host').slice(0, 12)} set the room's spawn point to ${Math.floor(v.x)} ${Math.floor(v.y)} ${Math.floor(v.z)}`);
+}
+CMDS.set = a => {
+  if (!/room\s*spawn/i.test(a || '')) return 'Did you mean /set room spawn point?';
+  if (!mp.on) return 'Join a multiplayer room first, then /set room spawn point sets where friends start';
+  if (!isHost()) return "Only the host (who made the room) can set the room's spawn point";
+  if (dim === 'w') return "The room's spawn point can't be in a dream world";
+  const sp = {x: +P.x.toFixed(2), y: +(P.y + .05).toFixed(2), z: +P.z.toFixed(2), d: here(), by: mp.name};
+  quiet(mp.fb.set(R('/meta/spawn'), sp));
+  return `Room spawn point set to ${Math.floor(sp.x)} ${Math.floor(sp.y)} ${Math.floor(sp.z)}. Friends start here and come back here when they respawn`;
+};
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
