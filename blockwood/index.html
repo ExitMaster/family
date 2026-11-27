@@ -1332,7 +1332,7 @@ function act(button) {
   } else if (button === 2) {
     if (s && s.id === PLANE) { placePlane(target.px + .5, target.py, target.pz + .5); return; }
     if (s && s.id === SIGN) { placeSign(target); return; }
-    if (s && s.id === CAR) { placeCar(target.px + .5, target.py, target.pz + .5); if (mode === 's') use1(sel); return; }
+    if (s && MODEL_BY_ITEM[s.id]) { placeCar(target.px + .5, target.py, target.pz + .5, MODEL_BY_ITEM[s.id].i); if (mode === 's') use1(sel); return; }
     if (s && s.id === FLINT) { useFlint(); return; }
     if (s && s.id === ENDEYE) { useEye(); return; }
     if (!s || !isBlock(s.id)) return;
@@ -1530,8 +1530,8 @@ function applySave(s) {
     clearPlanes();
     if (Array.isArray(s.planes)) s.planes.forEach(a => { if (Array.isArray(a) && a.length === 4) addPlane(+a[0], +a[1], +a[2], +a[3]); });
     clearCars(); carStash = {};
-    const okC = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && (v.length === 5 || v.length === 6) && v.every(Number.isFinite)) : [];
-    okC(s.cars).forEach(a => addCar(a[0], a[1], a[2], a[3], a[4], false, a[5]));
+    const okC = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && v.length >= 5 && v.length <= 7 && v.every(Number.isFinite)) : [];
+    okC(s.cars).forEach(a => addCar(a[0], a[1], a[2], a[3], a[4], false, a[5], a[6]));
     if (s.carsX && typeof s.carsX === 'object') for (const [k, v] of Object.entries(s.carsX)) if (/^([oneba]|w\d{1,3})$/.test(k)) carStash[k] = okC(v);
     if (dim === 'o') dropGarageCars(); else if (Array.isArray(carStash.o)) carStash.o = carStash.o.filter(a => !strayGarageCar(a[0], a[2]));
     if (Array.isArray(s.p)) { [P.x, P.y, P.z, P.yaw, P.pitch] = s.p; return; }
@@ -1655,6 +1655,7 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyH') honk();
     if (!e.repeat && PAINT_KEYS[e.code] !== undefined) paintCar(driving, PAINT_KEYS[e.code]);
     if (e.code === 'KeyG' && !e.repeat) startAutoPark();
+    if (e.code === 'KeyO' && !e.repeat) toggleDoors(driving);
     if (e.code === 'KeyP' && !e.repeat) paintCar(driving, SWAP_COLORS[(SWAP_COLORS.indexOf(driving.color) + 1) % SWAP_COLORS.length]);
     if (e.code === 'KeyT' || e.code === 'Enter') { e.preventDefault(); openChat(''); return; }
     keys[e.code] = true;
@@ -3160,7 +3161,7 @@ function switchDim(to) {
   carStash[here()] = carList(); clearCars();
   clearMobs(); resetWorld();
   dim = to;
-  (carStash[here()] || []).forEach(a => addCar(+a[0], +a[1], +a[2], +a[3], +a[4], false, +a[5] || 0)); carStash[here()] = [];
+  (carStash[here()] || []).forEach(a => addCar(+a[0], +a[1], +a[2], +a[3], +a[4], false, +a[5] || 0, +a[6] || 0)); carStash[here()] = [];
   showFriendCars();
   (planeStash[to] || []).forEach(a => addPlane(+a[0], +a[1], +a[2], +a[3])); planeStash[to] = [];
   saveDirty = true;
@@ -3906,7 +3907,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cb: driving && driving.borrow ? driving.borrow.owner : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2), driving.id] : 0, rc: passenger ? [passenger.owner, passenger.id, passenger.seat] : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cb: driving && driving.borrow ? driving.borrow.owner : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2), driving.id, driving.mi, doorMask(driving)] : 0, rc: passenger ? [passenger.owner, passenger.id, passenger.seat] : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${here()}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -6425,59 +6426,161 @@ function updateAsmr() {
 // the car's side outline, extruded and rounded; the whole roof is dark glass; inside are six seats, a dashboard with a
 // big screen and a steering wheel. W/S drive and brake, A/D steer, C swaps between the chase view and the driver's
 // seat, H honks, Shift gets out. It climbs one-block bumps, stops at walls, and pushes mobs out of the way.
-const CAR = 96, WHEEL_R = .37, WHEELBASE = 3.04;
+const CAR = 96;
 const CAR_COLORS = [['Pearl White', 0xf3f3f1], ['Stealth Grey', 0x4a4e55], ['Quicksilver', 0xb9bdc2], ['Ultra Red', 0xa3121b], ['Diamond Black', 0x121316], ['Glacier Blue', 0x7fa3c4],
   ['Marine Blue', 0x1f3f7a], ['Midnight Cherry Red', 0x5c0f1f], ['Ultra Violet', 0x5b2a8a], ['Sunset Orange', 0xe8661c], ['Bubblegum Pink', 0xf08cbc],
-  ['Lime Green', 0x8ccf2a], ['Gold', 0xd4af37], ['Mint', 0x9fe3c8]];
-item(CAR, 'Tesla Model Y L', g => {
-  rects(g, '#e8e8e8', [[1, 7, 14, 3], [3, 5, 9, 2], [2, 6, 2, 1]]);
-  rects(g, '#1b222c', [[4, 5, 7, 2], [5, 4, 5, 1]]); rects(g, '#e8e8e8', [[7, 5, 1, 2]]);
-  rects(g, '#9a9a9a', [[1, 9, 14, 1]]); rects(g, '#ff3b3b', [[14, 7, 1, 1]]); rects(g, '#ffffff', [[1, 7, 1, 1]]);
-  rects(g, '#1a1a1a', [[2, 9, 4, 4], [10, 9, 4, 4]]); rects(g, '#8a8f96', [[3, 10, 2, 2], [11, 10, 2, 2]]);
-}, {max: 1});
-PALETTE.push(CAR);
-RECIPES.push([CAR, 1, [[IRONI, 8], [GLASS, 4], [COALI, 4]]]);
-let carGeo = null, carHum = null, carView = 0, hornT = 0;
-function carGeometry() {
-  if (carGeo) return carGeo;
-  const W = 1.72, SIDE = .13;
-  // side outline, front of the car at -x: bumper, hood, along the beltline, the tailgate, then the underside with two
-  // wheel arches. The two sides of the car are this whole outline; between them the cabin is cut open down to the
-  // floor so you can see the seats through the glass and sit inside.
-  const outline = cabin => {
-    const sh = new THREE.Shape();
-    sh.moveTo(-2.44, .3);
-    sh.lineTo(-2.5, .52); sh.quadraticCurveTo(-2.52, .74, -2.36, .8);
-    sh.quadraticCurveTo(-1.7, .9, -.95, 1.03);
-    if (cabin) { sh.lineTo(-.9, .72); sh.lineTo(2.12, .72); sh.lineTo(2.16, 1.09); }
-    else sh.lineTo(1.9, 1.1);
-    sh.quadraticCurveTo(2.36, 1.08, 2.44, .98);
-    sh.quadraticCurveTo(2.52, .8, 2.5, .55); sh.lineTo(2.44, .3);
-    sh.lineTo(1.52 + .47, .3); sh.absarc(1.52, .37, .47, 0, Math.PI, false);
-    sh.lineTo(-1.52 + .47, .26); sh.absarc(-1.52, .37, .47, 0, Math.PI, false);
-    sh.lineTo(-2.44, .3);
-    return sh;
+  ['Lime Green', 0x8ccf2a], ['Gold', 0xd4af37], ['Mint', 0x9fe3c8], ['Stainless Steel', 0xb4b8bd]];
+/* ---------- car models: every Tesla and lots of Hyundais ---------- */
+// Each model is its side outline (front of the car at -x), its glass, where the wheels are, how wide it is, where
+// the seats and doors go and where the lights sit. One builder turns that into a car, so they all drive, open their
+// doors, park, borrow and share the same way. Sizes are the real cars' (in blocks = metres).
+// top: the painted outline from the bottom of the front bumper round to the bottom of the back (,1 = a sharp corner)
+const H_ = (pts, k = 1, ky = 1) => pts.map(p => [p[0] * k, p[1] * ky, p[2]]);
+const sedanTop = L => [[-L / 2 + .06, .3, 1], [-L / 2 + .02, .5], [-L / 2 + .07, .68], [-L / 2 + .55, .79], [-.95, .9, 1], [1.45, .97], [L / 2 - .24, .97], [L / 2 - .05, .86], [L / 2, .5], [L / 2 - .05, .3, 1]];
+const MODELS = [
+  {key: 'yl', name: 'Tesla Model Y L', item: CAR, L: 4.98, W: 1.88, r: .37, axles: [-1.52, 1.52], badge: 'T', fy: .74, ry: .99,
+    top: [[-2.44, .3, 1], [-2.5, .52], [-2.52, .74], [-2.36, .8], [-1.7, .9], [-.95, 1.03, 1], [1.9, 1.1], [2.36, 1.08], [2.52, .8], [2.5, .55], [2.44, .3, 1]],
+    glass: [[-.98, 1.02, 1], [-.4, 1.5], [.15, 1.63], [.9, 1.68], [1.45, 1.6], [2.05, 1.38], [2.3, 1.1, 1]],
+    cabin: [-.95, 2.14], floor: .72, seats: [[-.42, -.2], [.42, -.2], [-.42, .78], [.42, .78], [-.42, 1.66], [.42, 1.66]], doors: [[-.9, .3], [.32, 1.5]]},
+  {key: 's', name: 'Tesla Model S', item: 98, L: 5.02, W: 1.96, r: .35, axles: [-1.5, 1.46], badge: 'T', fy: .66, ry: .9, vmax: 38,
+    top: [[-2.46, .3, 1], [-2.51, .5], [-2.49, .66], [-2.3, .74], [-1.5, .84], [-.82, .93, 1], [1.7, .99], [2.35, .95], [2.5, .78], [2.5, .5], [2.45, .3, 1]],
+    glass: [[-.86, .92, 1], [-.2, 1.32], [.5, 1.43], [1.2, 1.38], [2.0, 1.12], [2.4, .97, 1]],
+    cabin: [-.82, 1.9], floor: .62, seats: [[-.42, -.15], [.42, -.15], [-.42, .9], [.42, .9]], doors: [[-.8, .35], [.37, 1.45]]},
+  {key: '3', name: 'Tesla Model 3', item: 99, L: 4.72, W: 1.88, r: .34, axles: [-1.43, 1.44], badge: 'T', fy: .66, ry: .9,
+    top: [[-2.31, .3, 1], [-2.36, .5], [-2.34, .65], [-2.1, .73], [-1.3, .84], [-.76, .92, 1], [1.35, .98], [2.15, .98], [2.34, .84], [2.36, .5], [2.3, .3, 1]],
+    glass: [[-.8, .91, 1], [-.15, 1.33], [.55, 1.44], [1.15, 1.36], [1.75, 1.0, 1]],
+    cabin: [-.76, 1.4], floor: .62, seats: [[-.42, -.15], [.42, -.15], [-.42, .85], [.42, .85]], doors: [[-.75, .35], [.37, 1.35]]},
+  {key: 'x', name: 'Tesla Model X', item: 100, L: 5.06, W: 2.0, r: .37, axles: [-1.48, 1.48], badge: 'T', fy: .76, ry: 1.0,
+    top: [[-2.48, .33, 1], [-2.54, .55], [-2.47, .78], [-2.1, .88], [-1.35, 1.0, 1], [1.8, 1.13], [2.38, 1.07], [2.53, .82], [2.52, .52], [2.47, .33, 1]],
+    glass: [[-1.4, .99, 1], [-.7, 1.5], [.3, 1.68], [1.3, 1.64], [2.0, 1.45], [2.38, 1.1, 1]],
+    cabin: [-1.35, 2.1], floor: .74, seats: [[-.42, -.6], [.42, -.6], [-.42, .45], [.42, .45], [-.42, 1.5], [.42, 1.5]], doors: [[-1.25, -.1], [0, 1.25, 'falcon']]},
+  {key: 'y', name: 'Tesla Model Y', item: 101, L: 4.75, W: 1.92, r: .36, axles: [-1.45, 1.44], badge: 'T', fy: .74, ry: .99,
+    top: [[-2.33, .3, 1], [-2.38, .52], [-2.4, .72], [-2.25, .8], [-1.65, .9], [-.92, 1.02, 1], [1.7, 1.09], [2.25, 1.07], [2.4, .97], [2.42, .55], [2.36, .3, 1]],
+    glass: [[-.95, 1.01, 1], [-.38, 1.48], [.15, 1.6], [.85, 1.63], [1.4, 1.55], [2.0, 1.33], [2.22, 1.09, 1]],
+    cabin: [-.92, 2.0], floor: .72, seats: [[-.42, -.2], [.42, -.2], [-.42, .8], [.42, .8]], doors: [[-.9, .3], [.32, 1.4]]},
+  {key: 'ct', name: 'Tesla Cybertruck', item: 102, L: 5.68, W: 2.03, r: .43, axles: [-1.82, 1.78], yb: .4, badge: '', fy: .94, ry: 1.18, color: 14, vmax: 36,
+    top: [[-2.8, .48, 1], [-2.84, .96, 1], [-1.6, 1.3, 1], [1.45, 1.43, 1], [2.84, 1.22, 1], [2.84, .56, 1], [2.8, .48, 1]],
+    glass: [[-1.6, 1.29, 1], [.05, 1.79, 1], [1.45, 1.42, 1]],
+    cabin: [-1.6, 1.4], floor: .86, seats: [[-.45, -.55], [.45, -.55], [-.45, .45], [.45, .45]], doors: [[-1.5, -.1], [0, 1.2]], doorY: [.5, 1.3]},
+  {key: 'rd', name: 'Tesla Roadster', item: 103, L: 4.2, W: 2.0, r: .34, axles: [-1.3, 1.25], yb: .22, badge: 'T', fy: .56, ry: .78, color: 3, vmax: 46,
+    top: [[-2.06, .25, 1], [-2.1, .4], [-2.03, .55], [-1.6, .62], [-.6, .78, 1], [.55, .82, 1], [1.4, .86], [2.0, .82], [2.1, .6], [2.08, .25, 1]],
+    glass: [[-.62, .78, 1], [-.25, 1.08], [-.12, 1.12, 1], [-.4, .79, 1]],
+    cabin: [-.6, .55], floor: .45, seats: [[-.4, .05], [.4, .05]], doors: [[-.55, .5]], doorY: [.3, .78]},
+  {key: 'semi', name: 'Tesla Semi', item: 104, L: 6.6, W: 2.5, r: .52, axles: [-2.6, 1.3, 2.5], yb: .55, badge: 'T', fy: 1.2, ry: 1.1, vmax: 26, big: true,
+    top: [[-3.28, .6, 1], [-3.33, 1.3], [-3.22, 1.95, 1], [-2.4, 3.0], [-1.1, 3.05, 1], [-1.0, 2.4, 1], [-1.0, 1.25, 1], [3.25, 1.2, 1], [3.28, .6, 1]],
+    glass: null, cabin: null, floor: 1.9, seats: [[0, -2.4], [.8, -2.2]], doors: [[-2.9, -1.9]], doorY: [.9, 2.4], eye: 2.75},
+  {key: 'cab', name: 'Tesla Cybercab', item: 105, L: 4.3, W: 1.95, r: .36, axles: [-1.4, 1.35], badge: 'T', fy: .7, ry: .93, color: 2, noWheel: true,
+    top: [[-2.12, .3, 1], [-2.17, .5], [-2.1, .66], [-1.6, .76], [-.95, .88, 1], [1.2, .96], [2.0, .92], [2.15, .72], [2.16, .45], [2.12, .3, 1]],
+    glass: [[-1.0, .87, 1], [-.3, 1.32], [.4, 1.42], [1.3, 1.22], [2.05, .94, 1]],
+    cabin: [-.95, 1.3], floor: .62, seats: [[-.4, .1], [.4, .1]], doors: [[-.9, .9, 'butterfly']]},
+  {key: 'i5', name: 'Hyundai Ioniq 5', item: 106, L: 4.64, W: 1.89, r: .37, axles: [-1.5, 1.5], badge: 'H', fy: .74, ry: .95, pixel: true,
+    top: [[-2.29, .32, 1], [-2.32, .6], [-2.28, .8, 1], [-1.5, .9], [-.88, 1.0, 1], [1.95, 1.06, 1], [2.3, 1.02, 1], [2.32, .6], [2.29, .32, 1]],
+    glass: [[-.92, .99, 1], [-.35, 1.5, 1], [1.55, 1.58, 1], [2.25, 1.07, 1]],
+    cabin: [-.88, 2.0], floor: .74, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.85, .4], [.45, 1.5]]},
+  {key: 'i6', name: 'Hyundai Ioniq 6', item: 107, L: 4.86, W: 1.88, r: .35, axles: [-1.48, 1.47], badge: 'H', fy: .66, ry: .92, pixel: true,
+    top: [[-2.4, .3, 1], [-2.43, .5], [-2.37, .66], [-1.8, .77], [-1.0, .88, 1], [1.45, .96], [2.1, .99], [2.36, .93], [2.43, .6], [2.4, .3, 1]],
+    glass: [[-1.05, .87, 1], [-.3, 1.35], [.4, 1.48], [1.1, 1.42], [1.8, 1.15], [2.15, .99, 1]],
+    cabin: [-1.0, 1.6], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.0, .25], [.3, 1.4]]},
+  {key: 'son', name: 'Hyundai Sonata', item: 108, L: 4.91, W: 1.86, r: .34, axles: [-1.43, 1.41], badge: 'H', fy: .7, ry: .88,
+    top: sedanTop(4.91), glass: [[-1.0, .9, 1], [-.25, 1.36], [.5, 1.44], [1.2, 1.36], [1.75, .99, 1]],
+    cabin: [-.95, 1.5], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.4]]},
+  {key: 'ava', name: 'Hyundai Avante', item: 109, L: 4.71, W: 1.83, r: .33, axles: [-1.36, 1.36], badge: 'H', fy: .68, ry: .86,
+    top: sedanTop(4.71), glass: [[-1.0, .9, 1], [-.25, 1.33], [.45, 1.41], [1.15, 1.32], [1.65, .99, 1]],
+    cabin: [-.95, 1.4], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .8], [.42, .8]], doors: [[-.95, .28], [.33, 1.3]]},
+  {key: 'tuc', name: 'Hyundai Tucson', item: 110, L: 4.63, W: 1.87, r: .36, axles: [-1.37, 1.38], badge: 'H', fy: .8, ry: .98,
+    top: [[-2.29, .33, 1], [-2.33, .6], [-2.27, .84], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]],
+    glass: [[-1.0, 1.03, 1], [-.35, 1.56], [1.35, 1.64], [2.05, 1.4], [2.25, 1.12, 1]],
+    cabin: [-.95, 1.9], floor: .74, seats: [[-.42, -.2], [.42, -.2], [-.42, .8], [.42, .8]], doors: [[-.95, .3], [.35, 1.35]]},
+  {key: 'kona', name: 'Hyundai Kona', item: 111, L: 4.35, W: 1.83, r: .35, axles: [-1.33, 1.33], badge: 'H', fy: .82, ry: .95, pixel: true,
+    top: H_([[-2.29, .33, 1], [-2.33, .6], [-2.27, .84], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], .94),
+    glass: H_([[-1.0, 1.03, 1], [-.35, 1.56], [1.35, 1.6], [2.05, 1.38], [2.25, 1.12, 1]], .94),
+    cabin: [-.9, 1.75], floor: .74, seats: [[-.42, -.2], [.42, -.2], [-.42, .72], [.42, .72]], doors: [[-.9, .25], [.3, 1.25]]},
+  {key: 'sf', name: 'Hyundai Santa Fe', item: 112, L: 4.83, W: 1.9, r: .37, axles: [-1.45, 1.37], badge: 'H', fy: .88, ry: 1.0,
+    top: [[-2.39, .35, 1], [-2.42, .65], [-2.39, .95, 1], [-1.7, 1.04], [-1.02, 1.1, 1], [2.0, 1.15, 1], [2.39, 1.12, 1], [2.42, .62], [2.39, .35, 1]],
+    glass: [[-1.05, 1.09, 1], [-.5, 1.64, 1], [2.2, 1.72, 1], [2.37, 1.16, 1]],
+    cabin: [-1.02, 2.05], floor: .76, seats: [[-.42, -.3], [.42, -.3], [-.42, .65], [.42, .65], [-.42, 1.55], [.42, 1.55]], doors: [[-1.0, .3], [.35, 1.4]]},
+  {key: 'pal', name: 'Hyundai Palisade', item: 113, L: 4.98, W: 1.98, r: .38, axles: [-1.5, 1.4], badge: 'H', fy: .86, ry: 1.02,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .9], [-1.7, 1.0], [-.95, 1.06, 1], [1.75, 1.12], [2.22, 1.1], [2.32, .7], [2.29, .33, 1]], 1.075, 1.02),
+    glass: H_([[-1.0, 1.05, 1], [-.4, 1.6], [1.4, 1.68], [2.08, 1.5], [2.25, 1.12, 1]], 1.075, 1.02),
+    cabin: [-1.02, 2.15], floor: .76, seats: [[-.42, -.3], [.42, -.3], [-.42, .65], [.42, .65], [-.42, 1.6], [.42, 1.6]], doors: [[-1.0, .3], [.35, 1.45]]},
+  {key: 'cas', name: 'Hyundai Casper', item: 114, L: 3.6, W: 1.6, r: .3, axles: [-1.2, 1.2], badge: 'H', fy: .8, ry: .9, vmax: 28, small: true,
+    top: [[-1.78, .3, 1], [-1.82, .55], [-1.76, .82], [-1.3, .9], [-.78, .98, 1], [1.35, 1.05], [1.76, 1.0, 1], [1.8, .55], [1.78, .3, 1]],
+    glass: [[-.82, .97, 1], [-.32, 1.5], [1.3, 1.56], [1.72, 1.07, 1]],
+    cabin: [-.78, 1.4], floor: .66, seats: [[-.36, -.2], [.36, -.2], [-.36, .7], [.36, .7]], doors: [[-.78, .25], [.3, 1.1]]},
+  {key: 'sta', name: 'Hyundai Staria', item: 115, L: 5.25, W: 1.99, r: .37, axles: [-1.6, 1.6], badge: 'H', fy: .95, ry: 1.05,
+    top: [[-2.6, .35, 1], [-2.65, .6], [-2.62, .88], [-2.45, 1.02, 1], [2.3, 1.12, 1], [2.62, 1.08, 1], [2.65, .6], [2.6, .35, 1]],
+    glass: [[-2.45, 1.01, 1], [-2.0, 1.6], [-1.3, 1.95], [2.3, 1.98, 1], [2.6, 1.12, 1]],
+    cabin: [-2.42, 2.4], floor: .7, seats: [[-.45, -1.4], [.45, -1.4], [-.45, -.3], [.45, -.3], [-.45, .8], [.45, .8], [-.45, 1.8], [.45, 1.8]], doors: [[-2.3, -1.15], [-.3, .9, 'slide']]},
+  {key: 'por', name: 'Hyundai Porter', item: 116, L: 5.1, W: 1.74, r: .33, axles: [-1.75, 1.25], yb: .45, badge: 'H', fy: .8, ry: .9, color: 6, vmax: 25, big: true,
+    top: [[-2.55, .45, 1], [-2.57, 1.12, 1], [-.95, 1.18, 1], [-.95, .98, 1], [2.55, .98, 1], [2.56, .45, 1]],
+    glass: [[-2.55, 1.12, 1], [-2.42, 1.95, 1], [-1.0, 1.97, 1], [-.97, 1.18, 1]],
+    cabin: [-2.45, -1.05], floor: .95, seats: [[-.5, -1.8], [.1, -1.8], [.6, -1.8]], doors: [[-2.45, -1.35]], doorY: [.55, 1.15]},
+];
+MODELS.forEach((m, i) => { m.i = i; m.wb = m.axles[m.axles.length - 1] - m.axles[0]; m.yb = m.yb || .28; m.vmax = m.vmax || 33; m.Ht = Math.max(...m.top.map(p => p[1]), ...(m.glass || []).map(p => p[1])); });
+const MODEL_BY_ITEM = {}; MODELS.forEach(m => { MODEL_BY_ITEM[m.item] = m; });
+const modelOf = i => MODELS[Math.max(0, Math.min(MODELS.length - 1, i | 0))] || MODELS[0];
+// a little side-view picture of each model for the hotbar, drawn from its outline
+function modelIcon(m) {
+  return g => {
+    const sx = 15 / (m.L + .4), sy = 13 / Math.max(2.1, m.Ht + .2), X = x => 8 + x * sx, Y = y => 14 - y * sy;
+    const poly = (pts, c) => { g.fillStyle = c; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.closePath(); g.fill(); };
+    poly(m.top.concat([[m.top[m.top.length - 1][0], m.yb], [m.top[0][0], m.yb]]), '#' + CAR_COLORS[m.color === undefined ? 0 : m.color][1].toString(16).padStart(6, '0'));
+    if (m.glass) poly(m.glass, '#1b222c');
+    g.fillStyle = '#1a1a1a'; for (const a of m.axles) { g.beginPath(); g.arc(X(a), Y(m.r), Math.max(1.4, m.r * sx), 0, 7); g.fill(); }
+    g.fillStyle = '#9a9ea6'; for (const a of m.axles) g.fillRect(X(a) - .5, Y(m.r) - .5, 1, 1);
   };
-  const ext = (sh, depth, bevel) => new THREE.ExtrudeGeometry(sh, {depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: .05, bevelSegments: 3, curveSegments: 14});
-  const sideL = ext(outline(false), SIDE, .08), sideR = ext(outline(false), SIDE, .08), core = ext(outline(true), W - 2 * SIDE, .02);
+}
+for (const m of MODELS) { item(m.item, m.name, modelIcon(m), {max: 1}); PALETTE.push(m.item); RECIPES.push([m.item, 1, [[IRONI, m.big ? 12 : 8], [GLASS, 4], [COALI, 4]]]); }
+let carHum = null, carView = 0, hornT = 0;
+const carGeos = {};
+// an outline: rounded through the points, except the sharp ones
+function outlinePath(sh, pts, first = true) {
+  pts.forEach((p, i) => {
+    if (i === 0) { if (first) sh.moveTo(p[0], p[1]); else sh.lineTo(p[0], p[1]); return; }
+    const nx = pts[i + 1];
+    if (p[2] || !nx) sh.lineTo(p[0], p[1]);
+    else sh.quadraticCurveTo(p[0], p[1], (p[0] + nx[0]) / 2, (p[1] + nx[1]) / 2);
+  });
+}
+function bodyShape(m, cabinCut) {
+  const sh = new THREE.Shape();
+  let top = m.top;
+  if (cabinCut && m.cabin) { // between the dashboard and the back, the middle of the car is open down to the floor
+    const [c0, c1] = m.cabin, yAt = x => { for (let i = 0; i < top.length - 1; i++) { const a = top[i], b = top[i + 1]; if ((a[0] - x) * (b[0] - x) <= 0 && a[0] !== b[0] && a[1] > m.floor && b[1] > m.floor) return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); } return m.floor + .3; };
+    top = top.filter(p => p[0] <= c0).concat([[c0, yAt(c0), 1], [c0 + .04, m.floor, 1], [c1, m.floor, 1], [c1 + .04, yAt(c1 + .04), 1]], top.filter(p => p[0] > c1 + .04));
+  }
+  outlinePath(sh, top);
+  // the underside, with an arch over every axle
+  for (const a of m.axles.slice().sort((p, q) => q - p)) { sh.lineTo(a + m.r + .1, m.yb); sh.absarc(a, m.r, m.r + .1, 0, Math.PI, false); }
+  sh.lineTo(top[0][0], top[0][1]);
+  return sh;
+}
+function carGeometry(m) {
+  if (carGeos[m.key]) return carGeos[m.key];
+  const W = m.W - .16, SIDE = .13;
+  const ext = (sh, depth, bevel) => new THREE.ExtrudeGeometry(sh, {depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: .05, bevelSegments: 3, curveSegments: 12});
+  const sideL = ext(bodyShape(m, false), SIDE, .08), sideR = ext(bodyShape(m, false), SIDE, .08), core = ext(bodyShape(m, true), W - 2 * SIDE, .02);
   sideL.translate(0, 0, -W / 2); sideR.translate(0, 0, W / 2 - SIDE); core.translate(0, 0, -W / 2 + SIDE);
-  // the glass greenhouse: steep windshield, long glass roof, sloping fastback rear window
-  const glassS = new THREE.Shape();
-  glassS.moveTo(-.98, 1.02); glassS.quadraticCurveTo(-.4, 1.5, .15, 1.63); glassS.quadraticCurveTo(.9, 1.68, 1.45, 1.6);
-  glassS.quadraticCurveTo(2.05, 1.38, 2.3, 1.1); glassS.lineTo(-.98, 1.02);
-  const glass = new THREE.ExtrudeGeometry(glassS, {depth: W - .3, bevelEnabled: true, bevelThickness: .1, bevelSize: .04, bevelSegments: 3, curveSegments: 14});
-  glass.translate(0, 0, -(W - .3) / 2);
-  for (const geo of [sideL, sideR, core, glass]) { geo.rotateY(-Math.PI / 2); geo.computeVertexNormals(); }
-  carGeo = {body: [sideL, sideR, core], glass, tire: new THREE.CylinderGeometry(WHEEL_R, WHEEL_R, .27, 28).rotateZ(Math.PI / 2), rim: new THREE.CylinderGeometry(.25, .25, .29, 24).rotateZ(Math.PI / 2),
-    hub: new THREE.CylinderGeometry(.06, .06, .31, 10).rotateZ(Math.PI / 2), wheelRing: new THREE.TorusGeometry(.17, .028, 8, 20)};
-  return carGeo;
+  const parts = [sideL, sideR, core];
+  let glass = null;
+  if (m.glass) { const gs = new THREE.Shape(); outlinePath(gs, m.glass); gs.lineTo(m.glass[0][0], m.glass[0][1]); glass = ext(gs, W - .3, .1); glass.translate(0, 0, -(W - .3) / 2); }
+  for (const geo of [...parts, glass]) if (geo) { geo.rotateY(-Math.PI / 2); geo.computeVertexNormals(); }
+  return carGeos[m.key] = {body: parts, glass, tire: new THREE.CylinderGeometry(m.r, m.r, m.big ? .36 : .27, 28).rotateZ(Math.PI / 2), rim: new THREE.CylinderGeometry(m.r * .68, m.r * .68, m.big ? .38 : .29, 24).rotateZ(Math.PI / 2),
+    hub: new THREE.CylinderGeometry(.06, .06, m.big ? .4 : .31, 10).rotateZ(Math.PI / 2), wheelRing: new THREE.TorusGeometry(.17, .028, 8, 20)};
+}
+// where the outline's front (or back) is at height y
+function noseAt(m, y, back) {
+  const t = back ? m.top.slice().reverse() : m.top;
+  for (let i = 0; i < t.length - 1; i++) { const a = t[i], b = t[i + 1]; if ((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]) return a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]); }
+  return back ? m.L / 2 : -m.L / 2;
 }
 const carMats = {};
 const cMat = (k, make) => carMats[k] || (carMats[k] = make());
-function addCar(x, y, z, yaw, color = 0, remote = false, id = 0) {
-  const G = carGeometry(), g = new THREE.Group(), body = new THREE.Group();
+const paintMat = color => cMat('p' + color, () => new THREE.MeshPhongMaterial({color: CAR_COLORS[color][1], shininess: color === 14 ? 50 : 90, specular: color === 14 ? 0xbbbbbb : 0x777777}));
+function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
+  const m = modelOf(mi), G = carGeometry(m), g = new THREE.Group(), body = new THREE.Group();
   color = Math.max(0, Math.min(CAR_COLORS.length - 1, color | 0));
-  const paint = cMat('p' + color, () => new THREE.MeshPhongMaterial({color: CAR_COLORS[color][1], shininess: 90, specular: 0x777777}));
+  const paint = paintMat(color);
   const glassM = cMat('glass', () => new THREE.MeshPhongMaterial({color: 0x0c1016, shininess: 140, specular: 0xaab4c0, transparent: true, opacity: .9}));
   const black = cMat('black', () => new THREE.MeshPhongMaterial({color: 0x15161a, shininess: 30, specular: 0x222222}));
   const tireM = cMat('tire', () => new THREE.MeshLambertMaterial({color: 0x19191b}));
@@ -6488,67 +6591,116 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0) {
   const seatM = cMat('seat', () => new THREE.MeshLambertMaterial({color: 0x1d1d20}));
   const screenM = cMat('screen', () => new THREE.MeshBasicMaterial({color: 0x23395a}));
   const shadowM = cMat('shadow', () => new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: .3, depthWrite: false}));
-  const mesh = (geo, m, px = 0, py = 0, pz = 0, parent = body) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); parent.add(o); return o; };
-  const box = (m, w, h, d, px, py, pz, parent = body) => { const o = new THREE.Mesh(boxG, m); o.scale.set(w, h, d); o.position.set(px, py, pz); parent.add(o); return o; };
+  const mesh = (geo, mt, px = 0, py = 0, pz = 0, parent = body) => { const o = new THREE.Mesh(geo, mt); o.position.set(px, py, pz); parent.add(o); return o; };
+  const box = (mt, w, h, d, px, py, pz, parent = body) => { const o = new THREE.Mesh(boxG, mt); o.scale.set(w, h, d); o.position.set(px, py, pz); parent.add(o); return o; };
+  const hw = m.W / 2;
   for (const part of G.body) mesh(part, paint);
-  mesh(G.glass, glassM);
-  box(seatM, 1.6, .02, 2.9, 0, .73, .6); // cabin floor
-  // lights: the full-width light bar and slim headlights at the front, a light bar and tail lights at the back
-  box(lampM, 1.5, .025, .03, 0, .74, -2.56); box(lampM, .34, .05, .04, -.62, .69, -2.55); box(lampM, .34, .05, .04, .62, .69, -2.55);
-  box(tailM, 1.55, .035, .03, 0, .99, 2.53); box(tailM, .34, .07, .04, -.66, .93, 2.53); box(tailM, .34, .07, .04, .66, .93, 2.53);
-  box(black, 1.25, .13, .05, 0, .42, -2.55); box(black, 1.55, .18, .08, 0, .38, 2.52); // front intake, rear diffuser
-  box(silver, .13, .025, .012, 0, .62, -2.565); box(silver, .025, .08, .012, 0, .575, -2.565); // the little T badge
-  box(silver, .13, .025, .012, 0, .86, 2.545); box(silver, .025, .08, .012, 0, .815, 2.545);
-  for (const s of [-1, 1]) { box(paint, .2, .11, .09, s * .99, 1.1, -.78); box(black, .08, .05, .06, s * .9, 1.07, -.78); } // mirrors
-  for (const s of [-1, 1]) for (const zz of [-.05, 1.15]) box(black, .01, .5, .008, s * .915, .76, zz); // door seams
-  // inside: dashboard, the big centre screen, steering wheel and three rows of seats
-  box(black, 1.55, .16, .4, 0, .96, -.82); box(screenM, .42, .25, .02, 0, 1.15, -.67).rotation.x = -.25;
-  const wheel = mesh(G.wheelRing, black, -.4, .99, -.6); wheel.rotation.x = -.35;
-  for (const zz of [-.2, .78, 1.66]) for (const s of [-1, 1]) { box(seatM, .5, .12, .5, s * .42, .82, zz); box(seatM, .5, .5, .1, s * .42, 1.1, zz + .26); box(seatM, .26, .14, .08, s * .42, 1.42, zz + .27); }
-  // wheels: tyre, two-tone rim with five spokes, centre cap; the front ones steer
-  const wheels = [];
-  for (const [wx, wz] of [[-.86, -1.52], [.86, -1.52], [-.86, 1.52], [.86, 1.52]]) {
-    const steerG = new THREE.Group(), spin = new THREE.Group();
-    steerG.position.set(wx, WHEEL_R, wz); steerG.add(spin); body.add(steerG);
-    mesh(G.tire, tireM, 0, 0, 0, spin); mesh(G.rim, rimM, 0, 0, 0, spin); mesh(G.hub, silver, 0, 0, 0, spin);
-    for (let k = 0; k < 5; k++) { // five spokes from the hub to the rim
-      const a = k * Math.PI * 2 / 5, sp = box(silver, .02, .2, .06, Math.sign(wx) * .14, Math.cos(a) * .12, Math.sin(a) * .12, spin);
-      sp.rotation.x = a;
-    }
-    wheels.push({steerG, spin, front: wz < 0});
+  if (G.glass) mesh(G.glass, glassM);
+  if (m.cabin) box(seatM, m.W - .3, .02, m.cabin[1] - m.cabin[0] - .1, 0, m.floor + .01, (m.cabin[0] + m.cabin[1]) / 2);
+  // lights: front and back, as light bars (or Hyundai's little square "pixel" lights)
+  const fz = noseAt(m, m.fy) - .03, rz = noseAt(m, m.ry, true) + .03;
+  if (m.pixel) for (const s of [-1, 1]) for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) { box(lampM, .07, .07, .03, s * (hw - .3 - k * .1), m.fy - j * .09, fz - .01); box(tailM, .07, .07, .03, s * (hw - .3 - k * .1), m.ry - j * .09, rz + .01); }
+  else {
+    box(lampM, m.W - .4, .025, .03, 0, m.fy, fz); for (const s of [-1, 1]) box(lampM, .34, .05, .04, s * (hw - .34), m.fy - .05, fz + .01);
+    box(tailM, m.W - .35, .035, .03, 0, m.ry, rz); for (const s of [-1, 1]) box(tailM, .34, .07, .04, s * (hw - .32), m.ry - .06, rz - .01);
   }
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 5.3), shadowM); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .02; g.add(shadow);
+  box(black, m.W - .65, .13, .05, 0, m.yb + .14, noseAt(m, m.yb + .14) - .02); box(black, m.W - .35, .18, .08, 0, m.yb + .1, noseAt(m, m.yb + .1, true) + .02); // intake, diffuser
+  if (m.badge === 'T') { const bz = noseAt(m, m.fy - .12) - .035; box(silver, .13, .025, .012, 0, m.fy - .12, bz); box(silver, .025, .08, .012, 0, m.fy - .165, bz); }
+  if (m.badge === 'H') { const bz = noseAt(m, m.fy - .12) - .035; box(silver, .025, .09, .012, -.045, m.fy - .12, bz); box(silver, .025, .09, .012, .045, m.fy - .12, bz); const hb = box(silver, .09, .022, .012, 0, m.fy - .12, bz); hb.rotation.z = .3; }
+  const cz = m.cabin ? m.cabin[0] : m.axles[0] + .9, beltY = m.cabin ? noseAtTop(m, cz) : m.floor + .5;
+  for (const s of [-1, 1]) { box(paint, .2, .11, .09, s * (hw + .03), beltY + .08, cz + .15); box(black, .08, .05, .06, s * (hw - .05), beltY + .05, cz + .15); } // mirrors
+  // doors: a panel on each side that swings open (Model X back doors lift up like wings, Cybercab's open upwards)
+  const doors = [];
+  const [dy0, dy1] = m.doorY || [m.yb + .1, Math.min(beltY - .04, m.floor + .38)];
+  for (const [z0, z1, kind = 'hinge'] of m.doors) for (const s of [-1, 1]) {
+    const pivot = new THREE.Group(), len = z1 - z0, hgt = dy1 - dy0, up = kind === 'falcon' || kind === 'butterfly';
+    pivot.position.set(s * (hw + .02), up ? dy1 : 0, up ? (z0 + z1) / 2 : z0); body.add(pivot);
+    const panel = box(paint, .05, hgt, len, 0, up ? -hgt / 2 : (dy0 + dy1) / 2, up ? 0 : len / 2, pivot);
+    box(silver, .03, .03, .16, s * .03, up ? -hgt * .35 : dy0 + hgt * .7, up ? len * .3 : len * .75, pivot); // the handle
+    doors.push({pivot, panel, side: s, kind, z0, z1, t: 0, want: 0, pulse: 0});
+  }
+  // inside: dashboard, centre screen, steering wheel (not in a Cybercab) and the seats
+  if (m.cabin || m.key === 'semi') {
+    const dz = (m.cabin ? m.cabin[0] : -2.9) + .14, d0 = m.seats[0];
+    box(black, m.W - .35, .16, .38, 0, m.floor + .24, dz); box(screenM, .42, .25, .02, 0, m.floor + .43, dz + .15).rotation.x = -.25;
+    if (!m.noWheel) { const w = mesh(G.wheelRing, black, d0[0], m.floor + .27, d0[1] - .4); w.rotation.x = -.35; }
+    for (const [sx, sz] of m.seats) { box(seatM, .5, .12, .5, sx, m.floor + .1, sz); box(seatM, .5, .5, .1, sx, m.floor + .38, sz + .26); box(seatM, .26, .14, .08, sx, m.floor + .7, sz + .27); }
+  }
+  // wheels: tyre, rim with five spokes, centre cap; the front ones steer
+  const wheels = [], track = hw - .09;
+  m.axles.forEach((az, ai) => { for (const s of [-1, 1]) {
+    const steerG = new THREE.Group(), spin = new THREE.Group();
+    steerG.position.set(s * track, m.r, az); steerG.add(spin); body.add(steerG);
+    mesh(G.tire, tireM, 0, 0, 0, spin); mesh(G.rim, rimM, 0, 0, 0, spin); mesh(G.hub, silver, 0, 0, 0, spin);
+    for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5, sp = box(silver, .02, m.r * .55, .06, s * .14, Math.cos(a) * m.r * .32, Math.sin(a) * m.r * .32, spin); sp.rotation.x = a; }
+    wheels.push({steerG, spin, front: ai === 0});
+  } });
+  // extras some models need
+  if (m.key === 'semi') { const ws = box(glassM, m.W - .5, 1.15, .05, 0, 2.45, -2.86); ws.rotation.x = -.62; box(black, 1.3, .1, 1.3, 0, 1.26, 1.9); box(paint, .05, 1.2, 2.2, -hw + .02, 1.6, -2.1); box(paint, .05, 1.2, 2.2, hw - .02, 1.6, -2.1); }
+  if (m.key === 'por') { box(paint, m.W - .16, .08, 1.45, 0, 1.99, -1.73); for (const s of [-1, 1]) box(paint, .06, .4, 3.45, s * (hw - .03), 1.18, .8); box(paint, m.W - .16, .4, .06, 0, 1.18, 2.52); box(paint, m.W - .16, .4, .06, 0, 1.18, -.92); }
+  if (m.key === 'ct') { box(lampM, m.W - .1, .03, .03, 0, .95, noseAt(m, .95) - .03); box(tailM, m.W - .1, .04, .03, 0, 1.18, rz); }
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(m.W + .2, m.L + .3), shadowM); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .02; g.add(shadow);
   g.add(body); g.rotation.order = 'YXZ'; scene.add(g);
-  const car = {g, body, wheels, tailM, x, y, z, yaw, color, id: id || 1 + Math.floor(Math.random() * 1e9), speed: 0, steer: 0, vy: 0, vis: y, tilt: 0, brake: false,
-    painted: body.children.filter(o => o.material === paint)};
+  const car = {g, body, wheels, doors, tailM, m, mi: m.i, x, y, z, yaw, color, id: id || 1 + Math.floor(Math.random() * 1e9), speed: 0, steer: 0, vy: 0, vis: y, tilt: 0, brake: false,
+    painted: [...body.children.filter(o => o.material === paint), ...doors.map(d => d.panel)]};
   if (!remote) cars.push(car);
   syncCar(car, 0);
   return car;
 }
+// the top of the outline at some point along the car
+function noseAtTop(m, x) {
+  for (let i = 0; i < m.top.length - 1; i++) { const a = m.top[i], b = m.top[i + 1]; if ((a[0] - x) * (b[0] - x) <= 0 && a[0] !== b[0] && Math.min(a[1], b[1]) > m.floor - .2) return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); }
+  return m.floor + .35;
+}
+// open a door for a moment (or until told otherwise): which = 'all', or the door by a seat
+function openDoor(c, seatIdx, secs = 1.6) {
+  if (!c || !c.doors.length) return;
+  const st = c.m.seats[seatIdx] || c.m.seats[0], s = Math.sign(st[0]) || -1;
+  let best = null, bd = 1e9;
+  for (const d of c.doors) if (d.side === s) { const dd = Math.abs((d.z0 + d.z1) / 2 - st[1]); if (dd < bd) { bd = dd; best = d; } }
+  if (!best) best = c.doors[0];
+  best.pulse = Math.max(best.pulse, secs);
+  noise(.25, 'bandpass', 1400, 3, .3, [c.x, c.y + 1, c.z]);
+}
+function toggleDoors(c) {
+  c.allOpen = !c.allOpen;
+  noise(.25, 'bandpass', 1400, 3, .3, [c.x, c.y + 1, c.z]);
+  toast(c.allOpen ? 'Doors open' : 'Doors closed', 1000);
+}
+const doorMask = c => c.doors.reduce((a, d, i) => a | (d.want ? 1 << i : 0), 0);
 function syncCar(c, dt) {
   c.vis += (c.y - c.vis) * Math.min(1, dt * 12 || 1);
   c.tilt *= Math.exp(-dt * 5);
   c.g.position.set(c.x, c.vis, c.z); c.g.rotation.set(0, c.yaw, 0);
   c.body.rotation.set(c.tilt, 0, -c.steer * Math.min(1, Math.abs(c.speed) / 20) * .06);
-  for (const w of c.wheels) { w.spin.rotation.x -= c.speed / WHEEL_R * dt; if (w.front) w.steerG.rotation.y = -c.steer; }
+  for (const w of c.wheels) { w.spin.rotation.x -= c.speed / c.m.r * dt; if (w.front) w.steerG.rotation.y = -c.steer; }
   c.tailM.color.setHex(c.brake ? 0xff2a2a : 0x9a0f16);
+  c.doors.forEach((d, i) => {
+    if (d.pulse > 0) d.pulse -= dt;
+    d.want = c.allOpen || d.pulse > 0 || (c.remoteMask & (1 << i)) ? 1 : 0;
+    d.t = d.want ? Math.min(1, d.t + dt * 2.2) : Math.max(0, d.t - dt * 2.2);
+    const e = d.t * d.t * (3 - 2 * d.t);
+    if (d.kind === 'falcon' || d.kind === 'butterfly') { d.pivot.rotation.set(0, 0, 0); d.pivot.rotation.z = d.side * e * 2.1; }
+    else if (d.kind === 'slide') d.pivot.position.z = d.z0 + e * (d.z1 - d.z0) * .9, d.pivot.position.x = d.side * (c.m.W / 2 + .02 + e * .12);
+    else d.pivot.rotation.y = d.side * e * 1.15;
+  });
 }
 function removeCar(c) { if (driving === c) exitCar(); scene.remove(c.g); cars.splice(cars.indexOf(c), 1); }
-function carList(parkedOnly) { return cars.filter(c => !parkedOnly || (c !== driving && !c.borrowedBy)).map(c => [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color, c.id)); }
+function carList(parkedOnly) { return cars.filter(c => !parkedOnly || (c !== driving && !c.borrowedBy)).map(c => [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color, c.id, c.mi)); }
 function clearCars() { while (cars.length) removeCar(cars[0]); }
 // the corners and sides of the car, in the world
-function carPts(x, z, yaw) {
-  const c = Math.cos(yaw), s = Math.sin(yaw), out = [];
-  for (const lx of [-.85, .85]) for (const lz of [-2.4, -1.2, 0, 1.2, 2.4]) out.push([x + lx * c + lz * s, z - lx * s + lz * c]);
+function carPts(x, z, yaw, m = MODELS[0]) {
+  const c = Math.cos(yaw), s = Math.sin(yaw), out = [], hl = m.L / 2 - .1, n = Math.max(4, Math.ceil(m.L / 1.2));
+  for (const lx of [-(m.W / 2 - .07), m.W / 2 - .07]) for (let k = 0; k <= n; k++) { const lz = -hl + 2 * hl * k / n; out.push([x + lx * c + lz * s, z - lx * s + lz * c]); }
   return out;
 }
-const carHits = (x, y, z, yaw) => carPts(x, z, yaw).some(([px, pz]) => SOLID[getBlock(Math.floor(px), Math.floor(y), Math.floor(pz))] === 1);
-function placeCar(x, y, z) {
-  const yaw = P.yaw;
-  for (let i = 0; i < 6 && (carHits(x, y + .3, z, yaw) || carHits(x, y + 1.3, z, yaw)); i++) y += 1;
-  const c = addCar(x, y, z, yaw, Math.floor(Math.random() * CAR_COLORS.length));
+const carHits = (x, y, z, yaw, m) => carPts(x, z, yaw, m).some(([px, pz]) => SOLID[getBlock(Math.floor(px), Math.floor(y), Math.floor(pz))] === 1);
+function placeCar(x, y, z, mi = 0) {
+  const yaw = P.yaw, m = modelOf(mi);
+  for (let i = 0; i < 6 && (carHits(x, y + .3, z, yaw, m) || carHits(x, y + 1.3, z, yaw, m)); i++) y += 1;
+  const c = addCar(x, y, z, yaw, m.color !== undefined ? m.color : Math.floor(Math.random() * 14), false, 0, mi);
   saveDirty = true;
-  toast(`A ${CAR_COLORS[c.color][0].toLowerCase()} Tesla Model Y L! Right-click it to get in`, 3000);
+  toast(`A ${CAR_COLORS[c.color][0].toLowerCase()} ${m.name}! Right-click it to get in`, 3000);
   return c;
 }
 function carHit(maxD, list = cars) { // the car you're pointing at: test the ray against each car's own (turned) box
@@ -6558,7 +6710,7 @@ function carHit(maxD, list = cars) { // the car you're pointing at: test the ray
     if (!c.g.visible) continue;
     const co = Math.cos(-c.yaw), si = Math.sin(-c.yaw), ox = cam.position.x - c.x, oz = cam.position.z - c.z;
     const o = [ox * co + oz * si, cam.position.y - c.y, -ox * si + oz * co], d = [dirV.x * co + dirV.z * si, dirV.y, -dirV.x * si + dirV.z * co];
-    const mn = [-.98, 0, -2.56], mx = [.98, 1.7, 2.56];
+    const m = c.m, mn = [-m.W / 2 - .05, 0, -m.L / 2 - .05], mx = [m.W / 2 + .05, m.Ht, m.L / 2 + .05];
     let t0 = 0, t1 = bt, ok = true;
     for (let a = 0; a < 3 && ok; a++) {
       if (Math.abs(d[a]) < 1e-9) { if (o[a] < mn[a] || o[a] > mx[a]) ok = false; continue; }
@@ -6572,7 +6724,7 @@ function carHit(maxD, list = cars) { // the car you're pointing at: test the ray
 }
 function pickCar(c) {
   removeCar(c); blockSfx('break', IRON, Math.floor(c.x), Math.floor(c.y), Math.floor(c.z));
-  if (mode === 's') give(CAR, 1);
+  if (mode === 's') give(c.m.item, 1);
   saveDirty = true;
 }
 function enterCar(c) {
@@ -6580,15 +6732,17 @@ function enterCar(c) {
   if (mount) dismount();
   if (riding) exitPlane();
   driving = c; P.fly = false; P.yaw = c.yaw; P.pitch = -.2; mine.on = false; held = null;
+  openDoor(c, 0);
   $('#bExit').hidden = false;
-  toast(TOUCH ? 'Push the stick up to drive, left and right to steer' : 'W drive · S brake/reverse · A/D steer · G autopark · C view · H horn · 1–9 or P paint · Shift get out', 6000);
+  toast(TOUCH ? 'Push the stick up to drive, left and right to steer' : 'W drive · S brake/reverse · A/D steer · G autopark · O doors · C view · H horn · 1–9 or P paint · Shift get out', 6000);
   tone(660, 660, .08, .08, 'sine'); tone(990, 990, .1, .08, 'sine', null, .1); // the welcome chime
 }
 function exitCar() {
   const c = driving;
   if (!c) return;
   driving = null; autoPark = null; c.brake = false; $('#bExit').hidden = true; humOff();
-  const side = [[-1.6, 0], [1.6, 0], [0, -3.4], [0, 3.4]], co = Math.cos(c.yaw), si = Math.sin(c.yaw);
+  openDoor(c, 0);
+  const sw = c.m.W / 2 + .75, sl = c.m.L / 2 + .8, side = [[-sw, c.m.seats[0][1]], [sw, c.m.seats[0][1]], [0, -sl], [0, sl]], co = Math.cos(c.yaw), si = Math.sin(c.yaw);
   for (const [lx, lz] of side) {
     P.x = c.x + lx * co + lz * si; P.z = c.z - lx * si + lz * co; P.y = c.y + .05;
     let k = 0; while (k < 6 && collides()) { P.y += 1; k++; }
@@ -6637,21 +6791,21 @@ function driveCar(dt) {
   if (thr > .2) c.speed += (c.speed < 0 ? 16 : 8.5 - Math.max(0, c.speed - 20) * .3) * dt;
   else if (thr < -.2) c.speed -= (c.speed > .5 ? 16 : 4) * dt;
   else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 1.6 * dt);
-  c.speed = Math.max(-7, Math.min(33, c.speed));
+  c.speed = Math.max(-7, Math.min(c.m.vmax, c.speed));
   carBattery(c, dt);
   const want = Math.max(-1, Math.min(1, turn)) * (.55 - Math.min(.35, Math.abs(c.speed) / 60)); // less steering at speed
   c.steer += (want - c.steer) * Math.min(1, 6 * dt);
   const inW = IS_WATER[getBlock(fl(c.x), fl(c.y + .4), fl(c.z))];
   if (inW) c.speed *= Math.exp(-2 * dt);
   // turn, then move; one-block bumps are climbed, anything taller stops the car
-  const nyaw = c.yaw - c.speed / WHEELBASE * Math.tan(c.steer) * dt;
-  if (!carHits(c.x, c.y + 1.3, c.z, nyaw) && !carHits(c.x, c.y + .3, c.z, nyaw)) c.yaw = nyaw;
+  const nyaw = c.yaw - c.speed / c.m.wb * Math.tan(c.steer) * dt, M = c.m;
+  if (!carHits(c.x, c.y + 1.3, c.z, nyaw, M) && !carHits(c.x, c.y + .3, c.z, nyaw, M)) c.yaw = nyaw;
   const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
-  if (carHits(nx, c.y + 1.3, nz, c.yaw) || (carHits(nx, c.y + .3, nz, c.yaw) && (carHits(nx, c.y + 2.3, nz, c.yaw) || carHits(nx, c.y + 1.3 + 1, nz, c.yaw)))) {
+  if (carHits(nx, c.y + 1.3, nz, c.yaw, c.m) || (carHits(nx, c.y + .3, nz, c.yaw, c.m) && (carHits(nx, c.y + 2.3, nz, c.yaw, c.m) || carHits(nx, c.y + 1.3 + 1, nz, c.yaw, c.m)))) {
     if (Math.abs(c.speed) > 7) { noise(.25, 'lowpass', 300, 1, .9); shake = Math.min(1, Math.abs(c.speed) / 25); if (Math.abs(c.speed) > 14) hurtPlayer(Math.floor(Math.abs(c.speed) / 7)); }
     c.speed *= -.2;
   } else {
-    if (carHits(nx, c.y + .3, nz, c.yaw)) { c.y = fl(c.y + .3) + 1; c.tilt = Math.sign(c.speed) * .12; noise(.12, 'lowpass', 500, 1, .4); }
+    if (carHits(nx, c.y + .3, nz, c.yaw, c.m)) { c.y = fl(c.y + .3) + 1; c.tilt = Math.sign(c.speed) * .12; noise(.12, 'lowpass', 500, 1, .4); }
     c.x = nx; c.z = nz;
   }
   if (trafficHit(c)) { // crashed into another car
@@ -6681,10 +6835,10 @@ function driveCar(dt) {
   syncCar(c, dt);
 }
 function carFall(c, dt) {
-  if (carHits(c.x, c.y - .05, c.z, c.yaw)) { if (c.vy < -12) noise(.2, 'lowpass', 260, 1, .7); c.vy = 0; c.y = Math.max(c.y, Math.floor(c.y - .05) + 1); return; }
+  if (carHits(c.x, c.y - .05, c.z, c.yaw, c.m)) { if (c.vy < -12) noise(.2, 'lowpass', 260, 1, .7); c.vy = 0; c.y = Math.max(c.y, Math.floor(c.y - .05) + 1); return; }
   c.vy = Math.max(-30, c.vy - 25 * dt);
   const ny = c.y + c.vy * dt;
-  if (carHits(c.x, ny, c.z, c.yaw)) { c.y = Math.floor(ny) + 1; c.vy = 0; c.tilt = -.05; } else c.y = ny;
+  if (carHits(c.x, ny, c.z, c.yaw, c.m)) { c.y = Math.floor(ny) + 1; c.vy = 0; c.tilt = -.05; } else c.y = ny;
   if (c.y < -20) { const g = groundAt(Math.floor(c.x), Math.floor(c.z)); c.y = g > 0 ? g : H - 2; c.vy = 0; }
 }
 function updateCars(dt) {
@@ -6699,14 +6853,16 @@ function updateCars(dt) {
 function chaseBehind(c) {
   const cp = Math.cos(P.pitch), f = [-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp];
   const fl = Math.floor;
-  let d = 7.5;
-  for (let t = 1; t <= 7.5; t += .25) if (SOLID[getBlock(fl(c.x - f[0] * t), fl(c.vis + 2.4 - f[1] * t), fl(c.z - f[2] * t))]) { d = Math.max(.5, t - .6); break; }
-  cam.position.set(c.x - f[0] * d, c.vis + 2.4 - f[1] * d, c.z - f[2] * d);
+  const D = 7.5 * Math.max(1, c.m.L / 5), up = Math.max(2.4, c.m.Ht + .9);
+  let d = D;
+  for (let t = 1; t <= D; t += .25) if (SOLID[getBlock(fl(c.x - f[0] * t), fl(c.vis + up - f[1] * t), fl(c.z - f[2] * t))]) { d = Math.max(.5, t - .6); break; }
+  cam.position.set(c.x - f[0] * d, c.vis + up - f[1] * d, c.z - f[2] * d);
 }
 function carCam() {
   const c = driving, co = Math.cos(c.yaw), si = Math.sin(c.yaw);
-  if (carView === 1) { // the driver's seat: left side of the front row
-    cam.position.set(c.x - .4 * co - .1 * si, c.vis + 1.33, c.z + .4 * si - .1 * co);
+  if (carView === 1) { // the driver's seat
+    const [lx, lz] = c.m.seats[0];
+    cam.position.set(c.x + lx * co + (lz + .1) * si, c.vis + (c.m.eye || c.m.floor + .61), c.z - lx * si + (lz + .1) * co);
     return;
   }
   chaseBehind(c);
@@ -6729,11 +6885,11 @@ function mpCars(all) {
   for (const [id, f] of friendParked) if (!all[id] || id === mp.uid) { f.list.forEach(c => scene.remove(c.g)); friendParked.delete(id); }
   for (const [id, v] of Object.entries(all)) {
     if (id === mp.uid || !v || typeof v !== 'object') continue;
-    const list = Array.isArray(v.l) ? v.l.filter(a => Array.isArray(a) && (a.length === 5 || a.length === 6) && a.every(Number.isFinite)).slice(0, 20) : [];
+    const list = Array.isArray(v.l) ? v.l.filter(a => Array.isArray(a) && a.length >= 5 && a.length <= 7 && a.every(Number.isFinite)).slice(0, 20) : [];
     const sig = String(v.d) + JSON.stringify(list), old = friendParked.get(id);
     if (old && old.sig === sig) continue;
     if (old) old.list.forEach(c => scene.remove(c.g));
-    const made = list.map(a => addCar(a[0], a[1], a[2], a[3], a[4], true, a[5]));
+    const made = list.map(a => addCar(a[0], a[1], a[2], a[3], a[4], true, a[5], a[6]));
     made.forEach(c => { c.g.visible = v.d === here(); c.owner = id; c.parked = true; });
     friendParked.set(id, {sig, d: v.d, list: made});
   }
@@ -6743,16 +6899,17 @@ function clearFriendCars() { for (const f of friendParked.values()) f.list.forEa
 function friendCar(a, p, dt) {
   const cv = Array.isArray(p.cv) && p.cv.length >= 6 && p.cv.every(Number.isFinite) ? p.cv : null;
   if (!cv) { if (a.car) { scene.remove(a.car.g); a.car = null; a.legs.forEach(l => l.rotation.set(0, 0, 0)); a.g.scale.setScalar(1); } return; }
-  const [color, yaw, steer, speed, brake, cy] = cv;
-  if (!a.car || a.car.color !== color) { if (a.car) scene.remove(a.car.g); a.car = addCar(a.x, cy, a.z, yaw, color, true, cv[6]); a.car.vis = cy; }
+  const [color, yaw, steer, speed, brake, cy] = cv, mi = cv[7] | 0;
+  if (!a.car || a.car.color !== color || a.car.mi !== mi) { if (a.car) scene.remove(a.car.g); a.car = addCar(a.x, cy, a.z, yaw, color, true, cv[6], mi); a.car.vis = cy; }
+  a.car.remoteMask = cv[8] | 0;
   a.car.id = cv[6] || a.car.id; a.car.owner = typeof p.cb === 'string' && p.cb ? p.cb : a.uid; // p.cb: whose car they borrowed
   const c = a.car;
   let dy = yaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * Math.min(1, 10 * dt);
   c.x = a.x; c.z = a.z; c.y = cy; c.steer = steer; c.speed = speed; c.brake = !!brake;
   syncCar(c, dt);
   // your friend sits in the driver's seat
-  const co = Math.cos(c.yaw), si = Math.sin(c.yaw);
-  a.g.position.set(c.x - .4 * co + .05 * si, c.vis + .25, c.z + .4 * si + .05 * co); a.g.rotation.y = c.yaw; a.g.scale.setScalar(.7); // seated, under the glass roof
+  const co = Math.cos(c.yaw), si = Math.sin(c.yaw), [dx0, dz0] = c.m.seats[0];
+  a.g.position.set(c.x + dx0 * co + (dz0 + .25) * si, c.vis + c.m.floor - .47, c.z - dx0 * si + (dz0 + .25) * co); a.g.rotation.y = c.yaw; a.g.scale.setScalar(.7); // seated, under the glass roof
   a.legs[0].rotation.set(-1.45, 0, 0); a.legs[1].rotation.set(-1.45, 0, 0); a.arms[0].rotation.x = a.arms[1].rotation.x = -1.1;
 }
 
@@ -6761,12 +6918,12 @@ function friendCar(a, p, dt) {
 // In your car, 1 / 2 / 3 paint it Stealth Grey, Blue or White (P swaps between them). Friends see the new colour.
 // 1 Stealth Grey, 2 Glacier Blue, 3 Pearl White, 4 Ultra Red, 5 Diamond Black, 6 Quicksilver, 7 Marine Blue,
 // 8 Midnight Cherry Red, 9 Ultra Violet; P goes through all of them and Sunset Orange, Bubblegum Pink, Lime Green, Gold and Mint
-const SWAP_COLORS = [1, 5, 0, 3, 4, 2, 6, 7, 8, 9, 10, 11, 12, 13], PAINT_KEYS = {};
+const SWAP_COLORS = [1, 5, 0, 3, 4, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14], PAINT_KEYS = {};
 for (let k = 1; k <= 9; k++) PAINT_KEYS['Digit' + k] = SWAP_COLORS[k - 1];
 function paintCar(c, color, quietly) {
   if (!c || c.color === color) return;
   c.color = color;
-  const paint = cMat('p' + color, () => new THREE.MeshPhongMaterial({color: CAR_COLORS[color][1], shininess: 90, specular: 0x777777}));
+  const paint = paintMat(color);
   for (const m of c.painted) m.material = paint;
   if (quietly) return;
   noise(.5, 'highpass', 4000, 1, .25); // pssshh
@@ -6775,8 +6932,9 @@ function paintCar(c, color, quietly) {
 }
 // Friends ride along: right-click someone's Tesla to sit in the front passenger seat (or a back seat if it's taken).
 // Your seat follows their car while they drive; Shift gets you out.
-const SEATS = [[.4, -.2], [-.42, .78], [.42, .78]]; // front passenger, then the second row
-const seatPos = (c, seat) => { const [lx, lz] = SEATS[seat], co = Math.cos(c.yaw), si = Math.sin(c.yaw); return [c.x + lx * co + lz * si, c.z - lx * si + lz * co]; };
+const rc0 = rc => rc[2];
+const seatOf = (c, seat) => c.m.seats[seat + 1] || c.m.seats[0]; // passengers: every seat but the driver's
+const seatPos = (c, seat) => { const [lx, lz] = seatOf(c, seat), co = Math.cos(c.yaw), si = Math.sin(c.yaw); return [c.x + lx * co + lz * si, c.z - lx * si + lz * co]; };
 const ownerName = uid => uid === mp.uid ? 'your' : (avatars.get(uid) || {}).name || 'a friend';
 function friendCarList() {
   const out = [];
@@ -6795,8 +6953,9 @@ function findCar(owner, id) {
 function takeSeat(c) {
   const taken = new Set();
   for (const a of avatars.values()) if (a.p && Array.isArray(a.p.rc) && a.p.rc[0] === c.owner && a.p.rc[1] === c.id) taken.add(a.p.rc[2]);
-  const seat = [0, 1, 2].find(k => !taken.has(k));
-  if (seat === undefined) { toast('The car is full!'); return; }
+  const seat = c.m.seats.slice(1).map((_, k) => k).find(k => !taken.has(k));
+  if (seat === undefined) { toast(c.m.seats.length > 1 ? 'The car is full!' : `A ${c.m.name} only has the driver's seat`); return; }
+  openDoor(c, seat + 1);
   if (mount) dismount();
   passenger = {owner: c.owner, id: c.id, seat, lost: 0}; P.fly = false; P.yaw = c.yaw; P.pitch = -.15; mine.on = false; held = null;
   $('#bExit').hidden = false;
@@ -6809,8 +6968,9 @@ function leaveSeat(why) {
   passenger = null; $('#bExit').hidden = true;
   const c = findCar(ps.owner, ps.id);
   if (c) {
-    const co = Math.cos(c.yaw), si = Math.sin(c.yaw), lx = SEATS[ps.seat][0] > 0 ? 1.6 : -1.6;
-    P.x = c.x + lx * co + SEATS[ps.seat][1] * si; P.z = c.z - lx * si + SEATS[ps.seat][1] * co; P.y = c.y + .05;
+    const st = seatOf(c, ps.seat), co = Math.cos(c.yaw), si = Math.sin(c.yaw), lx = (st[0] > 0 ? 1 : -1) * (c.m.W / 2 + .75);
+    openDoor(c, ps.seat + 1);
+    P.x = c.x + lx * co + st[1] * si; P.z = c.z - lx * si + st[1] * co; P.y = c.y + .05;
     for (let k = 0; k < 6 && collides(); k++) P.y += 1;
   }
   P.vx = P.vy = P.vz = 0; st.fallY = null;
@@ -6827,16 +6987,16 @@ function rideSeat(dt) {
 function seatCam() {
   const c = findCar(passenger.owner, passenger.id);
   if (!c) return;
-  if (carView === 1) { const [x, z] = seatPos(c, passenger.seat); cam.position.set(x, c.vis + 1.3, z); return; }
+  if (carView === 1) { const [x, z] = seatPos(c, passenger.seat); cam.position.set(x, c.vis + (c.m.eye || c.m.floor + .58), z); return; }
   chaseBehind(c);
 }
 // a friend riding in a car you can see: sit them in their seat
 function seatFriend(a, p) {
-  const rc = Array.isArray(p.rc) && p.rc.length === 3 ? p.rc : null, c = rc && SEATS[rc[2]] ? findCar(rc[0], rc[1]) : null;
+  const rc = Array.isArray(p.rc) && p.rc.length === 3 && Number.isInteger(rc0(p.rc)) ? p.rc : null, c = rc ? findCar(rc[0], rc[1]) : null;
   if (!c) { if (a.seated) { a.seated = false; a.g.scale.setScalar(1); a.legs.forEach(l => l.rotation.set(0, 0, 0)); } return false; }
   a.seated = true;
-  const [lx, lz] = SEATS[rc[2]], co = Math.cos(c.yaw), si = Math.sin(c.yaw);
-  a.g.position.set(c.x + lx * co + (lz + .25) * si, c.vis + .25, c.z - lx * si + (lz + .25) * co); a.g.rotation.y = c.yaw; a.g.scale.setScalar(.7);
+  const [lx, lz] = seatOf(c, rc[2]), co = Math.cos(c.yaw), si = Math.sin(c.yaw);
+  a.g.position.set(c.x + lx * co + (lz + .25) * si, c.vis + c.m.floor - .47, c.z - lx * si + (lz + .25) * co); a.g.rotation.y = c.yaw; a.g.scale.setScalar(.7);
   a.legs[0].rotation.set(-1.45, 0, 0); a.legs[1].rotation.set(-1.45, 0, 0); a.arms[0].rotation.x = a.arms[1].rotation.x = -.3;
   return true;
 }
@@ -6851,7 +7011,7 @@ const borrowKey = (owner, id) => owner + '_' + id;
 function borrowCar(gc) {
   const v = borrows.get(borrowKey(gc.owner, gc.id));
   if (v && !v.done && v.by !== mp.uid) { takeSeat(gc); return; }
-  const c = addCar(gc.x, gc.y, gc.z, gc.yaw, gc.color, true, gc.id);
+  const c = addCar(gc.x, gc.y, gc.z, gc.yaw, gc.color, true, gc.id, gc.mi);
   c.borrow = {owner: gc.owner}; c.owner = gc.owner;
   quiet(mp.fb.set(R('/borrow/' + borrowKey(gc.owner, gc.id)), {by: mp.uid, t: mp.fb.serverTimestamp()}));
   enterCar(c);
@@ -7035,7 +7195,8 @@ function updateGarages(dt) {
         garagesDone.add(key);
         // facing out of the door, towards the road
         const yaw = axis === 'x' ? (g.s > 0 ? 0 : Math.PI) : (g.s > 0 ? Math.PI / 2 : -Math.PI / 2);
-        addCar(x + .5, g.F + 1, z + .5, yaw, [0, 1, 5][Math.floor(hash2(j, line, 779) * 3)]);
+        const gm = MODELS.filter(m => !m.big), m = gm[Math.floor(hash2(j * 3, line, 782) * gm.length)];
+        addCar(x + .5, g.F + 1, z + .5, yaw, m.color !== undefined ? m.color : [0, 1, 5][Math.floor(hash2(j, line, 779) * 3)], false, 0, m.i);
         saveDirty = true;
       }
     }
@@ -7146,7 +7307,8 @@ function spawnTraffic() {
   const d = Math.hypot((axis === 'x' ? a : line) - P.x, (axis === 'x' ? line : a) - P.z);
   if (d < 35 || d > 110) return;
   if (traffic.some(o => o.axis === axis && o.line === line && o.dir === dir && Math.abs(o.a - a) < 14)) return;
-  const c = addCar(0, 0, 0, laneYaw(axis, dir), Math.floor(Math.random() * CAR_COLORS.length), true);
+  const mi = Math.random() < .08 ? MODELS.findIndex(m => m.key === 'semi') : Math.floor(Math.random() * MODELS.length), mm = MODELS[mi];
+  const c = addCar(0, 0, 0, laneYaw(axis, dir), mm.color !== undefined && Math.random() < .6 ? mm.color : Math.floor(Math.random() * 14), true, 0, mi);
   const t = {c, axis, line, dir, a, v: 8 + Math.random() * 6, cruise: 9 + Math.random() * 6, honkT: 0, id: ++trafficSeq};
   placeTraffic(t); c.vis = c.y;
   traffic.push(t);
@@ -7162,7 +7324,7 @@ function trafficRoom(t) {
   // cars in front in the same lane (yours and friends')
   for (const o of traffic) if (o !== t && o.axis === t.axis && o.line === t.line && o.dir === t.dir) {
     const gap = (o.a - t.a) * t.dir;
-    if (gap > 0 && gap < 30) room = Math.min(room, Math.max(0, gap - 6.5));
+    if (gap > 0 && gap < 30) room = Math.min(room, Math.max(0, gap - (t.c.m.L + o.c.m.L) / 2 - 1.5));
   }
   // people in the lane ahead, on foot or in a car: you and your friends
   const across = t.line + LANE[t.axis][t.dir > 0 ? 0 : 1], people = [driving ? {x: driving.x, y: driving.y, z: driving.z, car: true} : {x: P.x, y: P.y, z: P.z}];
@@ -7170,7 +7332,7 @@ function trafficRoom(t) {
   for (const who of people) {
     const yAcross = t.axis === 'x' ? who.z : who.x, yAlong = t.axis === 'x' ? who.x : who.z, gap = (yAlong - t.a) * t.dir;
     if (Math.abs(yAcross - across) > (who.car ? 2.4 : 1.6) || gap <= 0 || gap > 16 || Math.abs(who.y - t.c.y) > 3) continue;
-    room = Math.min(room, Math.max(0, gap - (who.car ? 6 : 4)));
+    room = Math.min(room, Math.max(0, gap - t.c.m.L / 2 - (who.car ? 3.5 : 1.5)));
     if (gap < 10 && (t.honkT -= .1) <= 0) { t.honkT = 3; tone(400, 400, .25, .09, 'square', [t.c.x, t.c.y + 1, t.c.z]); tone(505, 505, .25, .07, 'square', [t.c.x, t.c.y + 1, t.c.z]); }
   }
   return room;
@@ -7205,7 +7367,7 @@ function updateTraffic(dt) {
   }
   if (mp.on && (trafficPubT -= dt) <= 0) { // share yours
     trafficPubT = .25;
-    const l = traffic.filter(t => !t.remote).map(t => [t.axis === 'x' ? 0 : 1, t.line, t.dir, Math.round(t.a * 10) / 10, Math.round(t.v * 10) / 10, t.c.color, t.id, t.c.brake ? 1 : 0]);
+    const l = traffic.filter(t => !t.remote).map(t => [t.axis === 'x' ? 0 : 1, t.line, t.dir, Math.round(t.a * 10) / 10, Math.round(t.v * 10) / 10, t.c.color, t.id, t.c.brake ? 1 : 0, t.c.mi]);
     const sig = JSON.stringify(l);
     if (sig !== trafficSig) { trafficSig = sig; quiet(l.length ? mp.fb.set(R('/traffic/' + mp.uid), {d: here(), l}) : mp.fb.remove(R('/traffic/' + mp.uid))); }
   }
@@ -7215,12 +7377,12 @@ function mpTraffic(all) {
   for (const [uid, v] of Object.entries(all)) {
     if (uid === mp.uid || !v || !Array.isArray(v.l)) continue;
     for (const e of v.l.slice(0, 12)) {
-      if (!Array.isArray(e) || e.length !== 8 || !e.every(Number.isFinite)) continue;
+      if (!Array.isArray(e) || e.length < 8 || e.length > 9 || !e.every(Number.isFinite)) continue;
       const [ax, line, dir, a, sp, color, id, brake] = e, key = uid + '_' + id, axis = ax ? 'z' : 'x';
       seen.add(key);
       let t = traffic.find(o => o.key === key);
       if (!t) {
-        t = {key, remote: true, axis, line, dir: dir > 0 ? 1 : -1, a, v: sp, c: addCar(0, 0, 0, laneYaw(axis, dir > 0 ? 1 : -1), color, true)};
+        t = {key, remote: true, axis, line, dir: dir > 0 ? 1 : -1, a, v: sp, c: addCar(0, 0, 0, laneYaw(axis, dir > 0 ? 1 : -1), color, true, 0, e[8] | 0)};
         placeTraffic(t); t.c.vis = t.c.y; traffic.push(t);
       }
       if (Math.abs(a - t.a) > 10) t.a = a;
@@ -7236,8 +7398,8 @@ function trafficHit(c) {
     const dx = t.c.x - c.x, dz = t.c.z - c.z;
     if (Math.abs(t.c.y - c.y) > 2 || dx * dx + dz * dz > 36) continue;
     const lx = dx * Math.cos(c.yaw) - dz * Math.sin(c.yaw), lz = dx * Math.sin(c.yaw) + dz * Math.cos(c.yaw);
-    const along = Math.abs(Math.sin(t.c.yaw - c.yaw)) > .7; // crossing at right angles
-    if (Math.abs(lx) < (along ? 3.4 : 1.9) && Math.abs(lz) < (along ? 3.4 : 4.9)) return t;
+    const across = Math.abs(Math.sin(t.c.yaw - c.yaw)) > .7, a = c.m, b = t.c.m; // crossing at right angles?
+    if (Math.abs(lx) < (across ? (a.W + b.L) / 2 : (a.W + b.W) / 2) - .1 && Math.abs(lz) < (across ? (a.L + b.W) / 2 : (a.L + b.L) / 2) - .1) return t;
   }
   return null;
 }
@@ -7351,10 +7513,10 @@ function autoParkStep(c, dt) {
   const dx = b[0] - a[0], dz = b[1] - a[1];
   if (dx || dz) {
     const nyaw = Math.atan2(-dx, -dz); let dy = nyaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    c.steer += (Math.max(-.55, Math.min(.55, Math.atan(-dy / dt * WHEELBASE / Math.max(v, .5)))) - c.steer) * Math.min(1, 8 * dt);
+    c.steer += (Math.max(-.55, Math.min(.55, Math.atan(-dy / dt * c.m.wb / Math.max(v, .5)))) - c.steer) * Math.min(1, 8 * dt);
     c.yaw += dy;
   }
-  if (carHits(nx, c.y + .3, nz, c.yaw) && !carHits(nx, c.y + 1.3, nz, c.yaw)) c.y = Math.floor(c.y + .3) + 1; // up a kerb
+  if (carHits(nx, c.y + .3, nz, c.yaw, c.m) && !carHits(nx, c.y + 1.3, nz, c.yaw, c.m)) c.y = Math.floor(c.y + .3) + 1; // up a kerb
   c.x = nx; c.z = nz; c.speed = v; c.brake = left < 3;
   if (left < .05 || ap.s >= path.length - 1.001) {
     autoPark = null; c.speed = 0; c.steer = 0; c.brake = false;
