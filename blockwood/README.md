@@ -252,8 +252,8 @@ Play in the same world with your family, like Jetpack Jump. In the pause menu, t
 and a **room code** (3 to 6 letters or numbers, like `FAM1`) and press **Join**. Everyone who
 joins with the same code is in the same world:
 
-- **Room spawn point**: the host (who made the room) can type `/set room spawn point` to make where
-  they're standing the room's spawn point. Friends start there when they join, come back there when
+- **Room spawn point**: anyone in the room can type `/set room spawn point` to make where they're
+  standing the room's spawn point. Friends start there when they join, come back there when
   they respawn, and `/spawn` takes them there.
 - **Share my world** (pause menu) shows friends what you built: it makes a new room with a copy of
   your own world (every block you changed, your chests and dream portals) and tells you its code.

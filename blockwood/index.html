@@ -7351,7 +7351,7 @@ function autoParkStep(c, dt) {
 
 
 /* ---------- the room's spawn point ---------- */
-// "/set room spawn point" (the host only) makes where you're standing the room's spawn point, saved in /meta/spawn:
+// "/set room spawn point" (anyone in the room) makes where you're standing the room's spawn point, saved in /meta/spawn:
 // friends start there when they join, come back there when they respawn, and /spawn takes them there.
 function goRoomSpawn() {
   const sp = mp.spawn;
@@ -7372,7 +7372,6 @@ function mpRoomSpawn(v) {
 CMDS.set = a => {
   if (!/room\s*spawn/i.test(a || '')) return 'Did you mean /set room spawn point?';
   if (!mp.on) return 'Join a multiplayer room first, then /set room spawn point sets where friends start';
-  if (!isHost()) return "Only the host (who made the room) can set the room's spawn point";
   if (dim === 'w') return "The room's spawn point can't be in a dream world";
   const sp = {x: +P.x.toFixed(2), y: +(P.y + .05).toFixed(2), z: +P.z.toFixed(2), d: here(), by: mp.name};
   quiet(mp.fb.set(R('/meta/spawn'), sp));
