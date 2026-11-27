@@ -235,7 +235,7 @@ build on it, fly over it. The world saves in the browser.
   30 blocks from where the world starts). They're asphalt with a dashed yellow middle line and white edges,
   smoothed over hills, cut through mountains as tunnels and carried over water on bridges. Every crossing
   has **traffic lights** that go green, yellow and red (one road at a time). White **garages** with a driveway,
-  windows and a light stand along the roads; about one in 30 has a Tesla parked inside for you to drive. Each
+  windows, a light and an **EV charger** (park inside and your battery fills up) stand along the roads; about one in 30 has a Tesla parked inside for you to drive. Each
   garage has a **roll-up door** that opens when you come within 26 blocks, closes behind you once you're inside,
   and opens again when you head out. **Traffic** drives on the roads near you: cars keep to the right, stop at
   red lights, keep a gap behind each other and stop and honk if you (or a friend) are in their way (you can
@@ -272,6 +272,15 @@ build on it, fly over it. The world saves in the browser.
   Traffic and garages have all kinds now. **Doors open**: the driver's door opens when you get in or out (and a
   friend's door when they hop in), and **O** in the driver's seat opens or closes them all; the Model X's back
   doors lift up like wings, the Cybercab's open upwards and the Staria's slide.
+
+- **A whole town**: the roads are lined with mansions, cave houses, garages and gas stations, and now also
+  **schools** (two storeys of red brick with a SCHOOL sign, a flagpole, classrooms with desks and chalkboards,
+  stairs, an elevator, a playground with a slide and a swing, and a yellow **School Bus** you can drive),
+  **convenience stores** (a MART sign, a green awning, shelves of snacks, a counter and a car park) and **parks**
+  (a fountain, paths, trees, benches and lamp posts). **Pedestrians** walk along the edges of the roads, some kids,
+  some with a dog: they wait at crossings for a green light, jump out of the way of cars, and say hello when you
+  right-click them. `/summon garage` builds a garage (with a roll-up door) next to the nearest mansion, and
+  `/tp tesla model s` (any car name) takes you to the nearest car of that model.
 
 ## Multiplayer
 
