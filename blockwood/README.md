@@ -256,11 +256,12 @@ build on it, fly over it. The world saves in the browser.
   to 4 lines (Enter is done, Shift+Enter starts a new line). Right-click a sign to change what it says,
   left-click to take it down. Signs are saved with your world, and in a room everyone sees them.
 
-- **Every Tesla, and Hyundais (현대)**: besides the Model Y L there's the **Model S**, **Model 3**, **Model X**,
+- **Every Tesla, Hyundais (현대) and Kias (기아)**: besides the Model Y L there's the **Model S**, **Model 3**, **Model X**,
   **Model Y**, **Cybertruck** (stainless steel), **Roadster** (a low convertible), **Semi** (a big truck cab on
   three axles) and **Cybercab** (two seats, no steering wheel), plus the **Hyundai Ioniq 5**, **Ioniq 6**,
   **Sonata**, **Avante**, **Tucson**, **Kona**, **Santa Fe**, **Palisade**, **Casper**, **Staria** and **Porter**
-  truck. Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
+  truck, and the **Kia Morning**, **Ray**, **K5**, **K8**, **EV3**, **EV6**, **EV9**, **Sportage**, **Sorento**,
+  **Carnival** and **Bongo** truck. Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
   (or `/give cybertruck`, `/give hyundai porter`…) and drive, autopark, get borrowed and share like the Model Y L.
   Traffic and garages have all kinds now. **Doors open**: the driver's door opens when you get in or out (and a
   friend's door when they hop in), and **O** in the driver's seat opens or closes them all; the Model X's back

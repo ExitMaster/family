@@ -6126,17 +6126,22 @@ function updateSurvFly(dt) {
 // /speed 1-5 · /jump 1-5 · /top · /clearbag · /admin lists them
 let godMode = false, speedMul = 1, jumpMul = 1;
 function idByName(text) {
-  const q = (text || '').toLowerCase().replace(/[^a-z]/g, ''), all = PALETTE.filter(id => validId(id));
+  const q = (text || '').toLowerCase().replace(/[^a-z0-9]/g, ''), all = PALETTE.filter(id => validId(id));
   const raw = (text || '').trim().toLowerCase();
   if (/[^\x00-\x7f]/.test(raw)) { const k = all.find(id => nameOf(id).toLowerCase().includes(raw)); if (k) return k; } // names like 왁뿌볼
-  const n = id => nameOf(id).toLowerCase().replace(/[^a-z]/g, '');
-  const words = ((text || '').toLowerCase().match(/[a-z]+/g) || []).map(w => w.replace(/s$/, '')).filter(w => w !== 'of');
-  const hasAll = id => { const nw = nameOf(id).toLowerCase().match(/[a-z]+/g) || []; return words.length && words.every(w => nw.some(x => x === w || x.replace(/s$/, '') === w)); };
-  return all.find(id => n(id) === q) || all.find(id => n(id) === q.replace(/s$/, '')) || all.find(hasAll) || all.find(id => n(id).startsWith(q)) || all.find(id => n(id).includes(q)) || null;
+  const n = id => nameOf(id).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const words = ((text || '').toLowerCase().match(/[a-z0-9]+/g) || []).map(w => w.replace(/s$/, '')).filter(w => w !== 'of');
+  const nWords = id => (nameOf(id).toLowerCase().match(/[a-z0-9]+/g) || []).length;
+  const hasAll = id => { const nw = nameOf(id).toLowerCase().match(/[a-z0-9]+/g) || []; return words.length && words.every(w => nw.some(x => x === w || x.replace(/s$/, '') === w)); };
+  const best = all.filter(hasAll).sort((a, b) => nWords(a) - nWords(b))[0]; // "model y" is the Model Y, not the Model Y L
+  return all.find(id => n(id) === q) || all.find(id => n(id) === q.replace(/s$/, '')) || best || all.find(id => n(id).startsWith(q)) || all.find(id => n(id).includes(q)) || null;
 }
 const ADMIN = {
   give: a => {
-    const num = ((a || '').match(/\d+/) || [])[0], name = (a || '').replace(/\d+/g, '').trim();
+    // a number on its own is how many, unless it's part of the name (Model 3, EV6)
+    const toks = (a || '').trim().split(/\s+/).filter(Boolean), ni = toks.findIndex(t => /^\d+$/.test(t)), full = idByName(toks.join(' '));
+    let num = ni >= 0 ? toks[ni] : undefined, name = toks.filter((_, i) => i !== ni).join(' ');
+    if (num && full && (nameOf(full).toLowerCase().match(/[a-z0-9]+/g) || []).includes(num)) { name = toks.join(' '); num = undefined; }
     if (!name) return 'Type /give NAME COUNT, like /give diamond block 64 or /give iron sword';
     const id = idByName(name);
     if (!id) return `There's nothing called ${name}`;
@@ -6514,6 +6519,49 @@ const MODELS = [
   {key: 'por', name: 'Hyundai Porter', item: 116, L: 5.1, W: 1.74, r: .33, axles: [-1.75, 1.25], yb: .45, badge: 'H', fy: .8, ry: .9, color: 6, vmax: 25, big: true,
     top: [[-2.55, .45, 1], [-2.57, 1.12, 1], [-.95, 1.18, 1], [-.95, .98, 1], [2.55, .98, 1], [2.56, .45, 1]],
     glass: [[-2.55, 1.12, 1], [-2.42, 1.95, 1], [-1.0, 1.97, 1], [-.97, 1.18, 1]],
+    cabin: [-2.45, -1.05], floor: .95, seats: [[-.5, -1.8], [.1, -1.8], [.6, -1.8]], doors: [[-2.45, -1.35]], doorY: [.55, 1.15], truck: true},
+  // Kia
+  {key: 'mor', name: 'Kia Morning', item: 117, L: 3.6, W: 1.6, r: .3, axles: [-1.2, 1.2], badge: 'K', fy: .72, ry: .88, vmax: 28, small: true, color: 3,
+    top: [[-1.78, .3, 1], [-1.82, .5], [-1.76, .7], [-1.35, .8], [-.75, .9, 1], [1.25, .98], [1.72, .95, 1], [1.8, .55], [1.78, .3, 1]],
+    glass: [[-.8, .89, 1], [-.25, 1.38], [1.05, 1.45], [1.7, 1.0, 1]],
+    cabin: [-.75, 1.3], floor: .62, seats: [[-.36, -.2], [.36, -.2], [-.36, .7], [.36, .7]], doors: [[-.75, .2], [.25, 1.05]]},
+  {key: 'ray', name: 'Kia Ray', item: 118, L: 3.6, W: 1.6, r: .3, axles: [-1.25, 1.25], badge: 'K', fy: .82, ry: .95, vmax: 26, small: true,
+    top: [[-1.78, .32, 1], [-1.82, .6], [-1.78, .86], [-1.45, .95], [-1.05, 1.02, 1], [1.6, 1.08, 1], [1.78, 1.05, 1], [1.8, .55], [1.78, .32, 1]],
+    glass: [[-1.08, 1.0, 1], [-.7, 1.62, 1], [1.55, 1.7, 1], [1.74, 1.1, 1]],
+    cabin: [-1.0, 1.5], floor: .66, seats: [[-.36, -.35], [.36, -.35], [-.36, .7], [.36, .7]], doors: [[-1.0, .2], [.25, 1.1, 'slide']]},
+  {key: 'k5', name: 'Kia K5', item: 119, L: 4.9, W: 1.86, r: .34, axles: [-1.43, 1.42], badge: 'K', fy: .7, ry: .9,
+    top: sedanTop(4.9), glass: [[-1.0, .9, 1], [-.25, 1.36], [.5, 1.44], [1.3, 1.34], [1.95, .99, 1]],
+    cabin: [-.95, 1.5], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.4]]},
+  {key: 'k8', name: 'Kia K8', item: 120, L: 5.02, W: 1.88, r: .35, axles: [-1.47, 1.48], badge: 'K', fy: .7, ry: .9, color: 4,
+    top: sedanTop(5.02), glass: [[-1.0, .9, 1], [-.2, 1.38], [.6, 1.46], [1.35, 1.36], [1.85, .99, 1]],
+    cabin: [-.95, 1.55], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .9], [.42, .9]], doors: [[-.95, .35], [.4, 1.45]]},
+  {key: 'ev3', name: 'Kia EV3', item: 121, L: 4.3, W: 1.85, r: .35, axles: [-1.34, 1.34], badge: 'K', fy: .8, ry: .95, pixel: true,
+    top: [[-2.13, .33, 1], [-2.16, .6], [-2.12, .84, 1], [-1.6, .95], [-.95, 1.02, 1], [1.7, 1.1, 1], [2.12, 1.06, 1], [2.16, .62], [2.13, .33, 1]],
+    glass: [[-1.0, 1.01, 1], [-.4, 1.52, 1], [1.55, 1.56, 1], [2.08, 1.12, 1]],
+    cabin: [-.95, 1.75], floor: .72, seats: [[-.42, -.2], [.42, -.2], [-.42, .75], [.42, .75]], doors: [[-.95, .25], [.3, 1.25]]},
+  {key: 'ev6', name: 'Kia EV6', item: 122, L: 4.68, W: 1.88, r: .36, axles: [-1.45, 1.45], badge: 'K', fy: .74, ry: .98,
+    top: [[-2.31, .3, 1], [-2.35, .52], [-2.3, .7], [-1.8, .82], [-1.0, .94, 1], [1.5, 1.02], [2.2, 1.02], [2.32, .9], [2.35, .55], [2.3, .3, 1]],
+    glass: [[-1.05, .93, 1], [-.35, 1.42], [.45, 1.52], [1.3, 1.38], [2.05, 1.04, 1]],
+    cabin: [-1.0, 1.6], floor: .66, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.0, .25], [.3, 1.35]]},
+  {key: 'ev9', name: 'Kia EV9', item: 123, L: 5.01, W: 1.98, r: .38, axles: [-1.55, 1.55], badge: 'K', fy: .9, ry: 1.02, pixel: true,
+    top: [[-2.48, .35, 1], [-2.51, .65], [-2.48, .95, 1], [-1.75, 1.05], [-1.05, 1.12, 1], [2.1, 1.18, 1], [2.48, 1.14, 1], [2.51, .62], [2.48, .35, 1]],
+    glass: [[-1.08, 1.11, 1], [-.5, 1.68, 1], [2.25, 1.76, 1], [2.46, 1.2, 1]],
+    cabin: [-1.05, 2.2], floor: .78, seats: [[-.42, -.3], [.42, -.3], [-.42, .7], [.42, .7], [-.42, 1.7], [.42, 1.7]], doors: [[-1.0, .35], [.4, 1.5]]},
+  {key: 'spo', name: 'Kia Sportage', item: 124, L: 4.66, W: 1.87, r: .36, axles: [-1.38, 1.37], badge: 'K', fy: .82, ry: .98,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.007),
+    glass: H_([[-1.0, 1.03, 1], [-.35, 1.55], [1.35, 1.62], [2.05, 1.38], [2.25, 1.12, 1]], 1.007),
+    cabin: [-.95, 1.9], floor: .74, seats: [[-.42, -.2], [.42, -.2], [-.42, .8], [.42, .8]], doors: [[-.95, .3], [.35, 1.35]]},
+  {key: 'sor', name: 'Kia Sorento', item: 125, L: 4.81, W: 1.9, r: .37, axles: [-1.42, 1.4], badge: 'K', fy: .84, ry: 1.0,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.3, .9, 1], [-1.7, 1.0], [-.95, 1.06, 1], [1.75, 1.12], [2.22, 1.1], [2.32, .7], [2.29, .33, 1]], 1.04, 1.01),
+    glass: H_([[-1.0, 1.05, 1], [-.4, 1.6], [1.4, 1.66], [2.08, 1.45], [2.25, 1.12, 1]], 1.04, 1.01),
+    cabin: [-1.0, 2.05], floor: .76, seats: [[-.42, -.3], [.42, -.3], [-.42, .65], [.42, .65], [-.42, 1.55], [.42, 1.55]], doors: [[-1.0, .3], [.35, 1.4]]},
+  {key: 'car', name: 'Kia Carnival', item: 126, L: 5.16, W: 1.99, r: .37, axles: [-1.55, 1.55], badge: 'K', fy: .86, ry: 1.0,
+    top: [[-2.56, .33, 1], [-2.6, .6], [-2.55, .86], [-2.0, .98], [-1.35, 1.06, 1], [2.15, 1.14, 1], [2.55, 1.1, 1], [2.58, .6], [2.55, .33, 1]],
+    glass: [[-1.4, 1.05, 1], [-.75, 1.66], [2.3, 1.78, 1], [2.53, 1.15, 1]],
+    cabin: [-1.35, 2.3], floor: .72, seats: [[-.45, -.75], [.45, -.75], [-.45, .25], [.45, .25], [-.45, 1.25], [.45, 1.25], [0, 1.95]], doors: [[-1.3, -.1], [0, 1.2, 'slide']]},
+  {key: 'bon', name: 'Kia Bongo', item: 127, L: 5.1, W: 1.74, r: .33, axles: [-1.75, 1.25], yb: .45, badge: 'K', fy: .8, ry: .9, color: 0, vmax: 25, big: true, truck: true,
+    top: [[-2.55, .45, 1], [-2.57, 1.12, 1], [-.95, 1.18, 1], [-.95, .98, 1], [2.55, .98, 1], [2.56, .45, 1]],
+    glass: [[-2.55, 1.12, 1], [-2.42, 1.95, 1], [-1.0, 1.97, 1], [-.97, 1.18, 1]],
     cabin: [-2.45, -1.05], floor: .95, seats: [[-.5, -1.8], [.1, -1.8], [.6, -1.8]], doors: [[-2.45, -1.35]], doorY: [.55, 1.15]},
 ];
 MODELS.forEach((m, i) => { m.i = i; m.wb = m.axles[m.axles.length - 1] - m.axles[0]; m.yb = m.yb || .28; m.vmax = m.vmax || 33; m.Ht = Math.max(...m.top.map(p => p[1]), ...(m.glass || []).map(p => p[1])); });
@@ -6606,6 +6654,7 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
   }
   box(black, m.W - .65, .13, .05, 0, m.yb + .14, noseAt(m, m.yb + .14) - .02); box(black, m.W - .35, .18, .08, 0, m.yb + .1, noseAt(m, m.yb + .1, true) + .02); // intake, diffuser
   if (m.badge === 'T') { const bz = noseAt(m, m.fy - .12) - .035; box(silver, .13, .025, .012, 0, m.fy - .12, bz); box(silver, .025, .08, .012, 0, m.fy - .165, bz); }
+  if (m.badge === 'K') { const bz = noseAt(m, m.fy - .12) - .035, k1 = box(silver, .02, .1, .012, -.05, m.fy - .12, bz), k2 = box(silver, .02, .065, .012, -.015, m.fy - .1, bz), k3 = box(silver, .02, .065, .012, -.015, m.fy - .145, bz); k2.rotation.z = -.7; k3.rotation.z = .7; }
   if (m.badge === 'H') { const bz = noseAt(m, m.fy - .12) - .035; box(silver, .025, .09, .012, -.045, m.fy - .12, bz); box(silver, .025, .09, .012, .045, m.fy - .12, bz); const hb = box(silver, .09, .022, .012, 0, m.fy - .12, bz); hb.rotation.z = .3; }
   const cz = m.cabin ? m.cabin[0] : m.axles[0] + .9, beltY = m.cabin ? noseAtTop(m, cz) : m.floor + .5;
   for (const s of [-1, 1]) { box(paint, .2, .11, .09, s * (hw + .03), beltY + .08, cz + .15); box(black, .08, .05, .06, s * (hw - .05), beltY + .05, cz + .15); } // mirrors
@@ -6637,7 +6686,7 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
   } });
   // extras some models need
   if (m.key === 'semi') { const ws = box(glassM, m.W - .5, 1.15, .05, 0, 2.45, -2.86); ws.rotation.x = -.62; box(black, 1.3, .1, 1.3, 0, 1.26, 1.9); box(paint, .05, 1.2, 2.2, -hw + .02, 1.6, -2.1); box(paint, .05, 1.2, 2.2, hw - .02, 1.6, -2.1); }
-  if (m.key === 'por') { box(paint, m.W - .16, .08, 1.45, 0, 1.99, -1.73); for (const s of [-1, 1]) box(paint, .06, .4, 3.45, s * (hw - .03), 1.18, .8); box(paint, m.W - .16, .4, .06, 0, 1.18, 2.52); box(paint, m.W - .16, .4, .06, 0, 1.18, -.92); }
+  if (m.truck) { box(paint, m.W - .16, .08, 1.45, 0, 1.99, -1.73); for (const s of [-1, 1]) box(paint, .06, .4, 3.45, s * (hw - .03), 1.18, .8); box(paint, m.W - .16, .4, .06, 0, 1.18, 2.52); box(paint, m.W - .16, .4, .06, 0, 1.18, -.92); }
   if (m.key === 'ct') { box(lampM, m.W - .1, .03, .03, 0, .95, noseAt(m, .95) - .03); box(tailM, m.W - .1, .04, .03, 0, 1.18, rz); }
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(m.W + .2, m.L + .3), shadowM); shadow.rotation.x = -Math.PI / 2; shadow.position.y = .02; g.add(shadow);
   g.add(body); g.rotation.order = 'YXZ'; scene.add(g);
