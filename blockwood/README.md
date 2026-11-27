@@ -246,6 +246,16 @@ build on it, fly over it. The world saves in the browser.
   empty the car only crawls: stop next to a pump or charger to fill it back up. Asphalt, the road lines, pumps,
   chargers and the GAS sign are in the Creative inventory.
 
+- **Houses and cave houses**: the roads are lined with buildings now. **Houses** have wooden walls with log
+  corners, windows, a door facing the road, a sloping roof, and a bed, chest, crafting table, furnace,
+  bookshelf and lamp inside. **Cave houses** are a little stone hut by the road with a spiral staircase that
+  goes all the way down (lamps light the way) to a room near the bedrock with a bed, chest, crafting table,
+  furnace, bookshelves and a red rug.
+- **Signs you can write on**: take a Sign from the Creative inventory (or craft 3 from 6 planks and a stick).
+  Right-click the top of a block to stand it up, or the side of a block to hang it on the wall, then type up
+  to 4 lines (Enter is done, Shift+Enter starts a new line). Right-click a sign to change what it says,
+  left-click to take it down. Signs are saved with your world, and in a room everyone sees them.
+
 ## Multiplayer
 
 Play in the same world with your family, like Jetpack Jump. In the pause menu, type **your name**

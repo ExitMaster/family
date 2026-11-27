@@ -71,6 +71,10 @@ body{
   transition:opacity .4s;opacity:0;white-space:nowrap;
 }
 #toast.on{opacity:1;transition:none}
+#signEd{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:9;display:flex;flex-direction:column;gap:10px;align-items:center;
+  background:rgba(20,16,10,.86);color:#fff;padding:16px;border-radius:12px;max-width:calc(100vw - 32px)}
+#signEd[hidden]{display:none}
+#signTxt{width:min(260px,80vw);font:600 20px/1.3 "Pixelify Sans",monospace;text-align:center;background:#c69c60;color:#2a1c0e;border:3px solid #8a6234;border-radius:6px;padding:8px;resize:none;user-select:text;-webkit-user-select:text}
 #tradeAsk{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;gap:10px;align-items:center;
   background:rgba(14,18,28,.92);border:2px solid var(--gold);border-radius:8px;padding:8px 10px 8px 14px;font-family:var(--display);font-size:15px;max-width:calc(100vw - 32px)}
 #tradeAsk[hidden]{display:none}
@@ -234,6 +238,7 @@ body.ghost::after{content:"";position:fixed;inset:0;pointer-events:none;backgrou
 <div id="friendMarks" aria-hidden="true"></div>
 <input id="chatIn" type="text" maxlength="80" autocomplete="off" placeholder="Say something, or /help · Enter sends · Esc cancels" hidden>
 <div id="toast" role="status"></div>
+<div id="signEd" hidden><b>Write on your sign</b><textarea id="signTxt" rows="4" maxlength="67" spellcheck="false" placeholder="Up to 4 lines"></textarea><small>Enter = done · Shift+Enter = new line</small><button id="signDone" class="btn primary small" type="button">Done</button></div>
 <div id="tradeAsk" role="alert" hidden><span></span><button id="tradeYes" class="btn primary small" type="button">Trade (Y)</button><button id="tradeNo" class="btn small" type="button">No (N)</button></div>
 <div id="hotbar" role="toolbar" aria-label="Block hotbar"></div>
 <canvas id="stats" width="190" height="18" hidden aria-hidden="true"></canvas>
@@ -961,6 +966,7 @@ function setBlock(x, y, z, b) {
   const c = getChunk(cx, cz), i = idxOf(lx, y, lz), old = c.data[i];
   if (old === b) return false;
   if (old === CHEST && !mp.applying) chestBroken(x, y, z);
+  if (!mp.applying) signsLose(x, y, z, b);
   c.data[i] = b;
   if (LIGHT[old] || LIGHT[b]) {
     if (LIGHT[b]) c.torches.add(i); else c.torches.delete(i);
@@ -1277,10 +1283,12 @@ function updateTarget() {
 }
 function act(button) {
   noiseAt = performance.now();
-  if (dead || sleeping || riding || driving || passenger) return;
+  if (dead || sleeping || riding || driving || passenger || signEditing) return;
   if (button === 2 && inv[sel] && inv[sel].id === BOW) { drawBow(); return; }
   if (button === 0 || button === 2) {
     const far = target ? Math.hypot(target.x + .5 - cam.position.x, target.y + .5 - cam.position.y, target.z + .5 - cam.position.z) : 5;
+    const sg = signHit(Math.min(5, far));
+    if (sg) { if (button === 2) editSign(sg, signs.get(sg), false); else breakSign(sg); return; }
     const car = carHit(Math.min(5, far));
     if (car) { if (button === 2) enterCar(car); else pickCar(car); return; }
     const fcar = mp.on && carHit(Math.min(5, far), friendCarList());
@@ -1323,6 +1331,7 @@ function act(button) {
     if (mode === 'c') breakBlock(x, y, z);
   } else if (button === 2) {
     if (s && s.id === PLANE) { placePlane(target.px + .5, target.py, target.pz + .5); return; }
+    if (s && s.id === SIGN) { placeSign(target); return; }
     if (s && s.id === CAR) { placeCar(target.px + .5, target.py, target.pz + .5); if (mode === 's') use1(sel); return; }
     if (s && s.id === FLINT) { useFlint(); return; }
     if (s && s.id === ENDEYE) { useEye(); return; }
@@ -1463,7 +1472,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: dim === 'w' ? [...(dreamHome || spawnPt || [P.x, H - 2, P.z]), P.yaw, P.pitch] : [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), cars: carList(), carsX: carStash, dim: dim === 'w' ? 'o' : dim, planesX: planeStash, dreams: Object.fromEntries(dreamPortals), end: endState, ob: obN, garages: [...garagesDone].slice(-3000), w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), cars: carList(), carsX: carStash, dim: dim === 'w' ? 'o' : dim, planesX: planeStash, dreams: Object.fromEntries(dreamPortals), end: endState, ob: obN, garages: [...garagesDone].slice(-3000), w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, signs: Object.fromEntries(signs || []), chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1489,6 +1498,7 @@ function spawn() {
 function applySave(s) {
   dreamPortals.clear();
   if (s && s.dreams && typeof s.dreams === 'object') for (const [k, v] of Object.entries(s.dreams)) if (Number.isInteger(v) && (v === -1 || isBlock(v))) dreamPortals.set(k, v);
+  signs = new Map(s && s.signs && typeof s.signs === 'object' ? Object.entries(s.signs).map(([k, v]) => [k, okSign(v)]).filter(e => e[1]) : []); refreshSigns();
   chests = new Map(s && s.chests && typeof s.chests === 'object' ? Object.entries(s.chests).map(([k, v]) => [k, unpackChest(v)]) : []);
   clonesWanted = s && s.clones > 0 ? Math.min(CLONE_MAX, s.clones | 0) : 0;
   petKinds = s && Array.isArray(s.pets) ? s.pets.filter(k => LAND.includes(k)).slice(0, PET_MAX) : [];
@@ -3154,6 +3164,7 @@ function switchDim(to) {
   showFriendCars();
   (planeStash[to] || []).forEach(a => addPlane(+a[0], +a[1], +a[2], +a[3])); planeStash[to] = [];
   saveDirty = true;
+  refreshSigns();
 }
 function travel() {
   const to = dim === 'o' ? 'n' : 'o', k = to === 'n' ? 1 / 8 : dim === 'n' ? 8 : 1; // one step in the Nether is 8 in the Overworld
@@ -3842,7 +3853,7 @@ async function mpJoinRoom() {
   mp.on = true;
   const mine = created ? snapshotWorld() : null; // a new room starts as a copy of your own world
   // load the room's world
-  resetWorld(); clearMobs(); edits.clear(); chests = new Map(); chestF = null; dreamPortals.clear();
+  resetWorld(); clearMobs(); edits.clear(); chests = new Map(); chestF = null; dreamPortals.clear(); signs = new Map(); refreshSigns();
   SEED = meta.seed | 0; dim = 'o'; planeStash = {}; endState = freshEnd(); obN = 0; spawnPt = null; P.fly = false;
   spawn(); renderHotbar();
   const me = R('/players/' + mp.uid);
@@ -3864,7 +3875,7 @@ async function mpJoinRoom() {
     fb.onValue(R('/traffic'), s => mpTraffic(s.val() || {})), fb.onValue(R('/meta/spawn'), s => mpRoomSpawn(s.val())),
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
-    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onValue(R('/borrow'), s => mpBorrows(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
+    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onValue(R('/signs'), s => mpSigns(s.val())), fb.onValue(R('/borrow'), s => mpBorrows(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
     fb.onValue(R('/dreams'), s => { for (const [k, v] of Object.entries(s.val() || {})) if (Number.isInteger(v) && (v === -1 || isBlock(v))) dreamPortals.set(k, v); }),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
@@ -6894,10 +6905,11 @@ function roadH(axis, line, along) {
 function garageSpec(axis, line, j) {
   const along = GSLOT * j + GSLOT / 2;
   if (Math.abs(along - nearLine(along)) < 16) return null; // not right at a crossing
-  if (hash2(j * 7 + (axis === 'x' ? 1 : 2), line, 777) > .45) return null;
+  if (hash2(j * 7 + (axis === 'x' ? 1 : 2), line, 777) > .7) return null;
   const s = hash2(j, line * 3 + (axis === 'x' ? 5 : 9), 778) < .5 ? -1 : 1, F = roadH(axis, line, along);
   if (F <= WATER + 2) return null; // not on bridges or beaches
-  return {axis, line, along, s, F, kind: hash2(j, line * 11 + (axis === 'x' ? 3 : 7), 781) < .3 ? 'gas' : 'garage'};
+  const kr = hash2(j, line * 11 + (axis === 'x' ? 3 : 7), 781);
+  return {axis, line, along, s, F, kind: kr < .2 ? 'gas' : kr < .55 ? 'house' : kr < .72 ? 'cave' : 'garage'};
 }
 // no trees on or right beside a road, or where a garage or gas station stands
 function roadside(x, z) {
@@ -6951,6 +6963,8 @@ function buildRoads(cx, cz, d) {
         if (!g) continue;
         const F = g.F;
         if (g.kind === 'gas') { buildGas(g, inC, lay, set, at, fillUnder); continue; }
+        if (g.kind === 'house') { buildHouse(g, inC, lay, set, at, fillUnder); continue; }
+        if (g.kind === 'cave') { buildCave(g, inC, lay, set, at, fillUnder); continue; }
         for (let du = -3; du <= 3; du++) for (let off = 4; off <= 14; off++) {
           const [x, z] = gCell(g, du, off);
           if (!inC(x, z)) continue;
@@ -7287,7 +7301,7 @@ function parkSpots(c) {
     const across = axis === 'x' ? c.z : c.x, along = axis === 'x' ? c.x : c.z;
     for (let line = nearLine(across - 70); line <= across + 70; line += ROAD_G) for (let j = Math.floor((along - 70) / GSLOT); j <= Math.floor((along + 70) / GSLOT); j++) {
       const g = garageSpec(axis, line, j);
-      if (!g) continue;
+      if (!g || (g.kind !== 'gas' && g.kind !== 'garage')) continue;
       const off = g.kind === 'gas' ? 9 : 10, [sx, sz] = gCell(g, 0, off).map(v => v + .5);
       if (cars.some(o => o !== c && Math.hypot(o.x - sx, o.z - sz) < 3)) continue; // someone's parked there
       const d = Math.hypot(sx - c.x, sz - c.z);
@@ -7377,6 +7391,188 @@ CMDS.set = a => {
   quiet(mp.fb.set(R('/meta/spawn'), sp));
   return `Room spawn point set to ${Math.floor(sp.x)} ${Math.floor(sp.y)} ${Math.floor(sp.z)}. Friends start here and come back here when they respawn`;
 };
+
+/* ---------- houses and cave houses along the roads ---------- */
+// Houses: wooden walls with log corners, windows, a door facing the road, a brick roof and a bed, chest, crafting
+// table and furnace inside. Cave houses: a little stone hut with a spiral staircase going all the way down to a lit
+// room near the bedrock, with a bed, chest, crafting table, furnace, bookshelves and a rug.
+function buildHouse(g, inC, lay, set, at, fillUnder) {
+  const F = g.F, v = Math.floor(hash2(g.along, g.line, 783) * 3);
+  const log = [LOG, B2.birch_log, B2.spruce_log][v], plank = [PLANKS, B2.birch_planks, B2.spruce_planks][v], roof = [BRICK, B2.terracotta, SBRICK][v];
+  for (let du = -5; du <= 5; du++) for (let off = 4; off <= 15; off++) {
+    const [x, z] = gCell(g, du, off);
+    if (!inC(x, z)) continue;
+    for (let y = F + 1; y <= Math.min(H - 1, F + 12); y++) set(x, y, z, AIR);
+    const house = Math.abs(du) <= 4 && off >= 6 && off <= 14;
+    set(x, F, z, house ? plank : off <= 5 && du === 0 ? B2.gravel : GRASS); fillUnder(x, F, z, 4);
+    if (house) {
+      const corner = Math.abs(du) === 4 && (off === 6 || off === 14), wall = Math.abs(du) === 4 || off === 6 || off === 14;
+      for (let y = F + 1; y <= F + 4; y++) {
+        let b = AIR;
+        if (corner) b = log;
+        else if (wall) {
+          const win = (y === F + 2 || y === F + 3) && ((off === 6 || off === 14) ? Math.abs(du) === 2 : off === 9 || off === 11);
+          b = off === 6 && du === 0 && y <= F + 2 ? AIR : win ? GLASS : plank;
+        }
+        set(x, y, z, b);
+      }
+    }
+    // a roof sloping down to both sides, with gables at the front and back
+    if (off >= 5 && off <= 15) for (let k = 0; k <= 5; k++) {
+      const y = F + 5 + k, edge = 5 - k;
+      if (Math.abs(du) === edge) set(x, y, z, roof);
+      else if (Math.abs(du) < edge && (off === 6 || off === 14)) set(x, y, z, plank);
+    }
+  }
+  const put = (du, off, y, b) => { const [x, z] = gCell(g, du, off); if (inC(x, z)) set(x, y, z, b); };
+  put(-3, 13, F + 1, BED); put(3, 13, F + 1, CHEST); put(3, 12, F + 1, B2.crafting_table); put(3, 7, F + 1, B2.furnace); put(-3, 7, F + 1, B2.bookshelf);
+  put(0, 10, F + 4, B2.lamp);
+}
+const RING = [[0, 6], [1, 6], [1, 7], [1, 8], [0, 8], [-1, 8], [-1, 7], [-1, 6]]; // the spiral stairs, going down clockwise
+function buildCave(g, inC, lay, set, at, fillUnder) {
+  const F = g.F, Y = 3; // the room's floor
+  for (let du = -4; du <= 4; du++) for (let off = 4; off <= 18; off++) {
+    const [x, z] = gCell(g, du, off);
+    if (!inC(x, z)) continue;
+    const hut = Math.abs(du) <= 2 && off >= 5 && off <= 9, room = off >= 10;
+    if (off <= 9) for (let y = F + 1; y <= Math.min(H - 1, F + 8); y++) set(x, y, z, AIR);
+    if (off === 4) { if (du === 0) { set(x, F, z, B2.gravel); fillUnder(x, F, z, 3); } continue; }
+    if (hut) {
+      const edge = Math.abs(du) === 2 || off === 5 || off === 9, ring = RING.findIndex(([a, b]) => a === du && b === off);
+      if (edge) { // stone walls all the way down (so caves don't break in), a stone hut on top
+        for (let y = Y; y <= F; y++) set(x, y, z, (off === 9 && du === 0 && (y === Y + 1 || y === Y + 2)) ? AIR : SBRICK);
+        for (let y = F + 1; y <= F + 3; y++) set(x, y, z, off === 5 && du === 0 && y <= F + 2 ? AIR : (Math.abs(du) === 1 && off === 5 && y === F + 2) ? GLASS : COBBLE);
+        if (off === 5 && du === 0) { set(x, F, z, SBRICK); fillUnder(x, F, z, 3); }
+      } else if (ring < 0) { // the middle pillar, with lamps on the way down
+        for (let y = Y; y <= F + 3; y++) set(x, y, z, (F - y) % 5 === 2 ? B2.lamp : SBRICK);
+      } else {
+        for (let y = Y + 1; y <= F + 3; y++) set(x, y, z, AIR);
+        set(x, Y, z, SBRICK);
+        for (let k = ring; k <= F - Y - 1; k += 8) set(x, F - k, z, SBRICK);
+      }
+      set(x, F + 4, z, du === 0 && off === 7 ? B2.lamp : B2.smooth_stone);
+      continue;
+    }
+    if (!room) continue;
+    // the room near the bedrock: stone walls, plank floor, lamps in the ceiling
+    const wall = Math.abs(du) === 4 || off === 10 || off === 18;
+    set(x, Y, z, wall ? SBRICK : Math.abs(du) <= 1 && off >= 13 && off <= 15 ? B2.red_wool : PLANKS);
+    for (let y = Y + 1; y <= Y + 4; y++) set(x, y, z, wall && !(du === 0 && off === 10 && y <= Y + 2) ? SBRICK : AIR);
+    set(x, Y + 5, z, (Math.abs(du) === 2 && (off === 12 || off === 16)) ? B2.lamp : SBRICK);
+  }
+  const put = (du, off, y, b) => { const [x, z] = gCell(g, du, off); if (inC(x, z)) set(x, y, z, b); };
+  put(-3, 17, Y + 1, BED); put(3, 17, Y + 1, CHEST); put(3, 16, Y + 1, B2.crafting_table); put(3, 15, Y + 1, B2.furnace);
+  put(-3, 11, Y + 1, B2.bookshelf); put(-3, 12, Y + 1, B2.bookshelf); put(-3, 11, Y + 2, B2.bookshelf); put(-3, 12, Y + 2, B2.bookshelf);
+}
+
+/* ---------- signs you can write on ---------- */
+// Craft signs (6 planks + a stick makes 3) or take them from the Creative inventory. Right-click the top of a block
+// to stand one up, or the side of a block to hang it on the wall, then type up to 4 lines. Right-click a sign to
+// change what it says, left-click to take it down. Signs are saved with your world and shared in a room.
+const SIGN = 97;
+item(SIGN, 'Sign', g => { rects(g, '#c39a5c', [[2, 3, 12, 7]]); rects(g, '#8a6234', [[2, 3, 12, 1], [2, 9, 12, 1], [2, 3, 1, 7], [13, 3, 1, 7]]); rects(g, '#3a2a18', [[4, 5, 8, 1], [4, 7, 6, 1]]); rects(g, '#7a5a32', [[7, 10, 2, 5]]); }, {max: 16});
+PALETTE.push(SIGN);
+RECIPES.push([SIGN, 3, [[PLANKS, 6], [STICK, 1]]]);
+var signs = new Map(); // "o_10_40_-3" -> {t: text, r: which way it faces, w: 1 on a wall, 0 standing}
+const signMeshes = new Map(), signEd = $('#signEd'), signTxt = $('#signTxt');
+let signEditing = null;
+const signKey = (x, y, z, d = here()) => `${d}_${x}_${y}_${z}`;
+const okSign = v => v && typeof v === 'object' && typeof v.t === 'string' && Number.isFinite(v.r) ? {t: v.t.slice(0, 64), r: +v.r, w: v.w ? 1 : 0} : null;
+function signTexture(text) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#c69c60'; x.fillRect(0, 0, 256, 128);
+  x.fillStyle = 'rgba(90,60,30,.18)'; for (let y = 6; y < 128; y += 14) x.fillRect(0, y, 256, 3); // wood grain
+  x.fillStyle = '#2a1c0e'; x.font = '600 29px "Pixelify Sans", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  const lines = text.split('\n').slice(0, 4);
+  lines.forEach((l, i) => x.fillText(l.slice(0, 16), 128, 64 + (i - (lines.length - 1) / 2) * 30, 248));
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+  return t;
+}
+function signMesh(k, s) {
+  const [, xs, ys, zs] = /_(-?\d+)_(\d+)_(-?\d+)$/.exec(k), x = +xs, y = +ys, z = +zs;
+  const g = new THREE.Group(), wood = cMat('signwood', () => new THREE.MeshLambertMaterial({color: 0x8a6234})), face = new THREE.MeshLambertMaterial({map: signTexture(s.t)});
+  const board = new THREE.Mesh(boxG, [wood, wood, wood, wood, face, s.w ? wood : face]);
+  board.scale.set(.96, .5, .07); g.add(board);
+  if (s.w) board.position.set(0, .5, -.44); // flat against the wall behind it
+  else { board.position.set(0, 1.05, 0); const post = new THREE.Mesh(boxG, wood); post.scale.set(.08, .82, .08); post.position.y = .41; g.add(post); }
+  g.position.set(x + .5, y, z + .5); g.rotation.y = s.r; scene.add(g);
+  return {g, board, face};
+}
+function refreshSigns() {
+  const pre = here() + '_';
+  for (const [k, m] of signMeshes) { const s = signs.get(k); if (!s || !k.startsWith(pre) || m.t !== s.t || m.r !== s.r) { scene.remove(m.g); m.face.map.dispose(); signMeshes.delete(k); } }
+  for (const [k, s] of signs) if (k.startsWith(pre) && !signMeshes.has(k)) signMeshes.set(k, Object.assign(signMesh(k, s), {t: s.t, r: s.r}));
+}
+function setSign(k, s) {
+  if (s) signs.set(k, s); else signs.delete(k);
+  refreshSigns(); saveDirty = true;
+  if (mp.on && !mp.applying) quiet(s ? mp.fb.set(R('/signs/' + k), s) : mp.fb.remove(R('/signs/' + k)));
+}
+function mpSigns(all) {
+  signs = new Map();
+  for (const [k, v] of Object.entries(all || {})) { const s = okSign(v); if (s && /^([oneba]|w\d{1,3})_-?\d+_\d+_-?\d+$/.test(k)) signs.set(k, s); }
+  refreshSigns();
+}
+const signRay = new THREE.Raycaster();
+function signHit(maxD) {
+  if (!signMeshes.size) return null;
+  dirV.set(0, 0, -1).applyQuaternion(cam.quaternion);
+  signRay.set(cam.position, dirV); signRay.far = maxD;
+  const hits = signRay.intersectObjects([...signMeshes.values()].map(m => m.board), false);
+  if (!hits.length) return null;
+  for (const [k, m] of signMeshes) if (m.board === hits[0].object) return k;
+  return null;
+}
+function placeSign(t) {
+  const nx = t.px - t.x, ny = t.py - t.y, nz = t.pz - t.z;
+  if (ny < 0) { toast('Signs go on top of a block or on its side'); return; }
+  if (getBlock(t.px, t.py, t.pz) !== AIR) return;
+  const k = signKey(t.px, t.py, t.pz);
+  const s = ny > 0 ? {t: '', r: Math.round(P.yaw / (Math.PI / 8)) * Math.PI / 8, w: 0} : {t: '', r: Math.atan2(nx, nz), w: 1};
+  if (mode === 's') use1(sel);
+  editSign(k, s, true);
+}
+function editSign(k, s, isNew) {
+  signEditing = {k, s, isNew};
+  signTxt.value = s.t; signEd.hidden = false;
+  for (const key in keys) keys[key] = false;
+  held = null; mine.on = false;
+  setTimeout(() => signTxt.focus(), 30);
+}
+function doneSign() {
+  const e = signEditing;
+  if (!e) return;
+  signEditing = null; signEd.hidden = true;
+  const t = signTxt.value.split('\n').slice(0, 4).map(l => l.slice(0, 16)).join('\n').trim().slice(0, 64);
+  if (!t && e.isNew) { if (mode === 's') give(SIGN, 1); toast('Empty sign, so it went back in your bag'); }
+  else setSign(e.k, Object.assign({}, e.s, {t}));
+  signTxt.blur();
+  if (!TOUCH && !dragMode && playing && !locked) requestLock();
+}
+function breakSign(k) {
+  setSign(k, null);
+  if (mode === 's') give(SIGN, 1);
+  noise(.15, 'bandpass', 700, 2, .5);
+}
+// a sign falls off when the block it stands on or hangs from is broken, or when a block is put where it is
+function signsLose(x, y, z, b) {
+  if (!signs.size) return;
+  if (b !== AIR) { const k = signKey(x, y, z); if (signs.has(k)) setSign(k, null); return; }
+  const up = signKey(x, y + 1, z), su = signs.get(up);
+  if (su && !su.w) setSign(up, null);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const k = signKey(x + dx, y, z + dz), s = signs.get(k);
+    if (s && s.w && Math.abs(Math.sin(s.r) - dx) < .1 && Math.abs(Math.cos(s.r) - dz) < .1) setSign(k, null);
+  }
+}
+$('#signDone').addEventListener('click', doneSign);
+signTxt.addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter' && (!e.shiftKey || signTxt.value.split('\n').length >= 4)) { e.preventDefault(); doneSign(); }
+  else if (e.key === 'Escape') { e.preventDefault(); doneSign(); }
+});
+signTxt.addEventListener('keyup', e => e.stopPropagation());
 
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
