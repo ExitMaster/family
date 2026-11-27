@@ -703,6 +703,10 @@ one('dream_portal', 'Dream portal', r => { const st = spotsOf(r, 8, 1); return (
   for (const [k, n, c] of [['pink', 'Pink', [255, 164, 204]], ['mint', 'Mint', [150, 236, 204]], ['purple', 'Purple', [204, 168, 255]]])
     one('wakppu_' + k, `${n} 왁뿌볼 (squishy ball)`, ball(c));
 }
+// roads: asphalt and painted lines
+one('asphalt', 'Asphalt', plainT([52, 54, 58], 14, [72, 74, 78], .12), 'stone');
+one('road_white', 'Road line (white)', plainT([226, 228, 230], 10, [190, 192, 196], .1), 'stone');
+one('road_yellow', 'Road line (yellow)', plainT([236, 190, 40], 12, [200, 160, 30], .1), 'stone');
 const WAKPPU = [B2.wakppu_pink, B2.wakppu_mint, B2.wakppu_purple], ASMR_BLOCKS = [B2.butter_squishy, B2.asmr_keyboard, ...WAKPPU];
 const asmrKind = b => b === B2.butter_squishy ? 'butter' : b === B2.asmr_keyboard ? 'keys' : WAKPPU.includes(b) ? 'ball' : null;
 // keyboards go clack-thock, butter squishies squish slowly, 왁뿌볼s squelch and bloop
@@ -909,6 +913,7 @@ function genData(cx, cz) {
     }
     for (let dy = 1; dy <= th; dy++) put(tx, h + dy, tz, tLog, false);
   }
+  buildRoads(cx, cz, d);
   buildVillages(cx, cz, put);
   const e = edits.get(ck(cx, cz));
   if (e) for (const [i, b] of e) d[i] = IS_LAVA[b] ? AIR : b;
@@ -1438,7 +1443,7 @@ function serialize() {
   for (const [k, m] of edits) e[k] = [...m];
   return {seed: SEED, edits: e, p: dim === 'w' ? [...(dreamHome || spawnPt || [P.x, H - 2, P.z]), P.yaw, P.pitch] : [P.x, P.y, P.z, P.yaw, P.pitch], fly: P.fly, tod, sel, rd: RD, snd: S.on,
     mode, invs: {c: packInv(invs.c), s: packInv(invs.s)}, hp: st.hp, food: st.food, spawn: spawnPt,
-    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), cars: carList(), carsX: carStash, dim: dim === 'w' ? 'o' : dim, planesX: planeStash, dreams: Object.fromEntries(dreamPortals), end: endState, ob: obN, w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
+    planes: planes.map(pl => [pl.x, pl.y, pl.z, pl.yaw].map(v => Math.round(v * 100) / 100)), cars: carList(), carsX: carStash, dim: dim === 'w' ? 'o' : dim, planesX: planeStash, dreams: Object.fromEntries(dreamPortals), end: endState, ob: obN, garages: [...garagesDone].slice(-3000), w: [weather, Math.round(wLeft)], pets: petKinds, clones: clonesWanted, chests: Object.fromEntries([...chests].map(([k, a]) => [k, packChest(a)]).filter(e => e[1]))};
 }
 function persist() {
   saveDirty = false; lastSave = performance.now();
@@ -1471,6 +1476,7 @@ function applySave(s) {
   if (s && typeof s.seed === 'number') {
     if (['n', 'e', 'b', 'a'].includes(s.dim)) dim = s.dim;
     obN = Math.max(0, s.ob | 0);
+    garagesDone.clear(); if (Array.isArray(s.garages)) s.garages.forEach(k => { if (typeof k === 'string') garagesDone.add(k); });
     const okP = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && v.length === 4) : [];
     if (Array.isArray(s.planesX)) planeStash[dim === 'n' ? 'o' : 'n'] = okP(s.planesX);
     else if (s.planesX && typeof s.planesX === 'object') for (const k of ['o', 'n', 'e']) planeStash[k] = okP(s.planesX[k]);
@@ -6630,10 +6636,19 @@ function carFall(c, dt) {
 }
 function updateCars(dt) {
   for (const c of cars) if (c !== driving) {
+    c.g.visible = !c.borrowedBy && Math.abs(c.x - P.x) + Math.abs(c.z - P.z) < RD * CS * 1.6;
     c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 6 * dt);
     if (chunks.has(ck(Math.floor(c.x / CS), Math.floor(c.z / CS)))) carFall(c, dt);
     syncCar(c, dt);
   }
+}
+// the camera behind the car, pulled in closer when a wall or hill is in the way (like coming out of a garage)
+function chaseBehind(c) {
+  const cp = Math.cos(P.pitch), f = [-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp];
+  const fl = Math.floor;
+  let d = 7.5;
+  for (let t = 1; t <= 7.5; t += .25) if (SOLID[getBlock(fl(c.x - f[0] * t), fl(c.vis + 2.4 - f[1] * t), fl(c.z - f[2] * t))]) { d = Math.max(.5, t - .6); break; }
+  cam.position.set(c.x - f[0] * d, c.vis + 2.4 - f[1] * d, c.z - f[2] * d);
 }
 function carCam() {
   const c = driving, co = Math.cos(c.yaw), si = Math.sin(c.yaw);
@@ -6641,8 +6656,7 @@ function carCam() {
     cam.position.set(c.x - .4 * co - .1 * si, c.vis + 1.33, c.z + .4 * si - .1 * co);
     return;
   }
-  const cp = Math.cos(P.pitch), f = [-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp];
-  cam.position.set(c.x - f[0] * 7.5, c.vis + 2.4 - f[1] * 7.5, c.z - f[2] * 7.5);
+  chaseBehind(c);
 }
 $('#bExit').addEventListener('click', () => { if (driving) exitCar(); else if (passenger) leaveSeat(); });
 
@@ -6758,8 +6772,7 @@ function seatCam() {
   const c = findCar(passenger.owner, passenger.id);
   if (!c) return;
   if (carView === 1) { const [x, z] = seatPos(c, passenger.seat); cam.position.set(x, c.vis + 1.3, z); return; }
-  const cp = Math.cos(P.pitch), f = [-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp];
-  cam.position.set(c.x - f[0] * 7.5, c.vis + 2.4 - f[1] * 7.5, c.z - f[2] * 7.5);
+  chaseBehind(c);
 }
 // a friend riding in a car you can see: sit them in their seat
 function seatFriend(a, p) {
@@ -6818,6 +6831,117 @@ function carBack(uid, a) {
   }
 }
 
+/* ---------- roads and garages ---------- */
+// A grid of roads crosses the Overworld every 128 blocks (one passes 32 blocks from where the world starts). They're
+// 7 wide with a dashed yellow middle line and white edges, smoothed over hills, cut through mountains as tunnels,
+// and carried over water on bridges. Garages stand along them, each with a driveway, windows and a light, and a
+// Tesla parked inside the first time you come by (yours to drive).
+const ROAD_G = 128, ROAD_O = 40, ROAD_W = 3, GSLOT = 48;
+const nearLine = v => ROAD_G * Math.floor((v - ROAD_O + ROAD_G / 2) / ROAD_G) + ROAD_O; // the road line closest to v
+const onLine = v => Math.abs(v - nearLine(v)) <= ROAD_W;
+// the road's height at a point along it: the ground averaged over 17 blocks, so it climbs gently
+function roadH(axis, line, along) {
+  let sum = 0;
+  for (let k = -8; k <= 8; k++) sum += axis === 'x' ? heightAt(along + k, line) : heightAt(line, along + k);
+  return Math.max(WATER + 1, Math.min(H - 14, Math.round(sum / 17)));
+}
+// is there a garage in slot j along this road? where, which side, and how high
+function garageSpec(axis, line, j) {
+  const along = GSLOT * j + GSLOT / 2;
+  if (Math.abs(along - nearLine(along)) < 16) return null; // not right at a crossing
+  if (hash2(j * 7 + (axis === 'x' ? 1 : 2), line, 777) > .45) return null;
+  const s = hash2(j, line * 3 + (axis === 'x' ? 5 : 9), 778) < .5 ? -1 : 1, F = roadH(axis, line, along);
+  if (F <= WATER + 2) return null; // not on bridges or beaches
+  return {axis, line, along, s, F};
+}
+// a garage cell: du runs along the road, off goes away from it
+const gCell = (g, du, off) => g.axis === 'x' ? [g.along + du, g.line + g.s * off] : [g.line + g.s * off, g.along + du];
+function buildRoads(cx, cz, d) {
+  const ox = cx * CS, oz = cz * CS;
+  const inC = (x, z) => x >= ox && x < ox + CS && z >= oz && z < oz + CS;
+  const at = (x, y, z) => d[idxOf(x - ox, y, z - oz)];
+  const set = (x, y, z, b) => { if (y >= 1 && y < H && inC(x, z)) d[idxOf(x - ox, y, z - oz)] = b; };
+  const fillUnder = (x, y, z, n) => { for (let k = 1; k <= n && y - k >= 1; k++) { const b = at(x, y - k, z); if (b === AIR || IS_WATER[b] || LEAFY[b]) set(x, y - k, z, STONE); else break; } };
+  const lay = (x, z, h, b, pillar) => {
+    set(x, h, z, b);
+    for (let y = h + 1; y <= Math.min(H - 1, h + 6); y++) set(x, y, z, AIR);
+    fillUnder(x, h, z, pillar ? H : 3);
+  };
+  // roads along x (at z = line) and along z (at x = line); crossings belong to the x roads
+  for (const axis of ['x', 'z']) {
+    const lo = axis === 'x' ? oz : ox;
+    for (let line = nearLine(lo - ROAD_W) - ROAD_G; line <= lo + CS + ROAD_W + ROAD_G; line += ROAD_G) {
+      if (line + ROAD_W < lo || line - ROAD_W >= lo + CS) continue;
+      const hs = new Map();
+      for (let a = (axis === 'x' ? ox : oz); a < (axis === 'x' ? ox : oz) + CS; a++) {
+        const h = hs.get(a) ?? roadH(axis, line, a); hs.set(a, h);
+        for (let w = -ROAD_W; w <= ROAD_W; w++) {
+          const x = axis === 'x' ? a : line + w, z = axis === 'x' ? line + w : a;
+          const cross = axis === 'x' ? onLine(x) : onLine(z);
+          if (axis === 'z' && cross) continue;
+          const paint = cross ? B2.asphalt : Math.abs(w) === ROAD_W ? B2.road_white : w === 0 && ((a % 8) + 8) % 8 < 4 ? B2.road_yellow : B2.asphalt;
+          lay(x, z, h, paint, h <= WATER + 1 && Math.abs(w) === ROAD_W && ((a % 10) + 10) % 10 === 0);
+        }
+      }
+    }
+  }
+  // garages whose footprint reaches into this chunk
+  for (const axis of ['x', 'z']) {
+    const lo = axis === 'x' ? oz : ox, alo = axis === 'x' ? ox : oz;
+    for (let line = nearLine(lo) - ROAD_G; line <= lo + CS + ROAD_G; line += ROAD_G) {
+      if (line + 15 < lo || line - 15 >= lo + CS) continue;
+      for (let j = Math.floor((alo - 30) / GSLOT); j <= Math.floor((alo + CS + 30) / GSLOT); j++) {
+        const g = garageSpec(axis, line, j);
+        if (!g) continue;
+        const F = g.F;
+        for (let du = -3; du <= 3; du++) for (let off = 4; off <= 14; off++) {
+          const [x, z] = gCell(g, du, off);
+          if (!inC(x, z)) continue;
+          if (off <= 5) { if (Math.abs(du) <= 2) lay(x, z, F, B2.asphalt); continue; } // the driveway
+          set(x, F, z, B2.smooth_stone); fillUnder(x, F, z, 4);
+          const side = Math.abs(du) === 3, back = off === 14, front = off === 6;
+          for (let y = F + 1; y <= F + 4; y++) {
+            let b = AIR;
+            if (side || back) b = side && off >= 9 && off <= 11 && (y === F + 2 || y === F + 3) ? GLASS : B2.quartz;
+            else if (front && y === F + 4) b = B2.black_wool; // over the door
+            set(x, y, z, b);
+          }
+          set(x, F + 5, z, du === 0 && off === 10 ? B2.lamp : B2.slate);
+          for (let y = F + 6; y <= F + 7; y++) if (!SOLID[at(x, y, z)] || LEAFY[at(x, y, z)]) set(x, y, z, AIR);
+        }
+      }
+    }
+  }
+}
+// park a Tesla in each garage the first time you come near it (only one player in a room does it)
+const garagesDone = new Set();
+let garageT = 0;
+function updateGarages(dt) {
+  if (dim !== 'o' || (garageT -= dt) > 0) return;
+  garageT = 1;
+  if (mp.on && !mpLeader()) return;
+  const R2 = 40;
+  for (const axis of ['x', 'z']) {
+    const across = axis === 'x' ? P.z : P.x, along = axis === 'x' ? P.x : P.z;
+    for (let line = nearLine(across - R2); line <= across + R2; line += ROAD_G) {
+      if (Math.abs(line - across) > R2) continue;
+      for (let j = Math.floor((along - R2) / GSLOT); j <= Math.floor((along + R2) / GSLOT); j++) {
+        const key = `${axis}${line}_${j}`;
+        if (garagesDone.has(key)) continue;
+        const g = garageSpec(axis, line, j);
+        if (!g) { garagesDone.add(key); continue; }
+        const [x, z] = gCell(g, 0, 10);
+        if (!chunks.has(ck(Math.floor(x / CS), Math.floor(z / CS))) || getBlock(Math.floor(x), g.F, Math.floor(z)) !== B2.smooth_stone) continue;
+        garagesDone.add(key);
+        // facing out of the door, towards the road
+        const yaw = axis === 'x' ? (g.s > 0 ? 0 : Math.PI) : (g.s > 0 ? Math.PI / 2 : -Math.PI / 2);
+        addCar(x + .5, g.F + 1, z + .5, yaw, [0, 1, 5][Math.floor(hash2(j, line, 779) * 3)]);
+        saveDirty = true;
+      }
+    }
+  }
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -6830,7 +6954,7 @@ function loop(now) {
     else if (passenger && !dead) rideSeat(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr();
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateCars(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
