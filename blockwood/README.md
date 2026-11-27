@@ -279,8 +279,9 @@ build on it, fly over it. The world saves in the browser.
   **convenience stores** (a MART sign, a green awning, shelves of snacks, a counter and a car park) and **parks**
   (a fountain, paths, trees, benches and lamp posts). **Pedestrians** walk along the edges of the roads, some kids,
   some with a dog: they wait at crossings for a green light, jump out of the way of cars, and say hello when you
-  right-click them. `/summon garage` builds a garage (with a roll-up door) next to the nearest mansion, and
-  `/tp tesla model s` (any car name) takes you to the nearest car of that model.
+  right-click them. In multiplayer everyone sees the same people (one player near each group walks them). `/summon garage` builds a garage (with a roll-up door) next to the nearest mansion, and
+  `/tp car` takes you to your car (the one you drove last), and `/tp tesla model s` (any car name) takes you to your
+  car of that model, or the nearest one around if you don't have one.
 
 ## Multiplayer
 

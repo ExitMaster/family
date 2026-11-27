@@ -3885,7 +3885,7 @@ async function mpJoinRoom() {
   const me = R('/players/' + mp.uid);
   quiet(fb.set(me, mpMe()));
   quiet(fb.onDisconnect(me).remove());
-  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.onDisconnect(R('/traffic/' + mp.uid)).remove()); mp.spawn = null; mp.spawnSeen = false; quiet(fb.onDisconnect(R('/cars/' + mp.uid)).remove()); mp.carSig = ''; quiet(fb.remove(R('/hits/' + mp.uid))); quiet(fb.remove(R('/fx/' + mp.uid)));
+  quiet(fb.onDisconnect(R('/mobs/' + mp.uid)).remove()); quiet(fb.onDisconnect(R('/traffic/' + mp.uid)).remove()); quiet(fb.onDisconnect(R('/peds/' + mp.uid)).remove()); mp.spawn = null; mp.spawnSeen = false; quiet(fb.onDisconnect(R('/cars/' + mp.uid)).remove()); mp.carSig = ''; quiet(fb.remove(R('/hits/' + mp.uid))); quiet(fb.remove(R('/fx/' + mp.uid)));
   mp.mobSig = null; mp.mobT = 0; mp.sky = null;
   try { // one clock and one sky for the whole room
     const now = serverNow();
@@ -3898,7 +3898,7 @@ async function mpJoinRoom() {
   const onEdit = s => mpApplyEdit(s.key, s.val());
   mp.subs.push(fb.onChildAdded(R('/edits'), onEdit), fb.onChildChanged(R('/edits'), onEdit),
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
-    fb.onValue(R('/traffic'), s => mpTraffic(s.val() || {})), fb.onValue(R('/meta/spawn'), s => mpRoomSpawn(s.val())),
+    fb.onValue(R('/traffic'), s => mpTraffic(s.val() || {})), fb.onValue(R('/peds'), s => mpPeds(s.val() || {})), fb.onValue(R('/meta/spawn'), s => mpRoomSpawn(s.val())),
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
     fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onValue(R('/signs'), s => mpSigns(s.val())), fb.onValue(R('/borrow'), s => mpBorrows(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
@@ -3918,7 +3918,7 @@ function mpLeave() {
   hideAsk();
   mp.subs.forEach(u => u()); mp.subs = [];
   quiet(fb.remove(R('/players/' + mp.uid))); quiet(fb.remove(R('/mobs/' + mp.uid))); quiet(fb.remove(R('/cars/' + mp.uid)));
-  clearFriendCars(); mp.carSig = ''; quiet(fb.remove(R('/traffic/' + mp.uid))); clearRemoteTraffic(); mp.spawn = null;
+  clearFriendCars(); mp.carSig = ''; quiet(fb.remove(R('/traffic/' + mp.uid))); clearRemoteTraffic(); quiet(fb.remove(R('/peds/' + mp.uid))); clearRemotePeds(); mp.spawn = null;
   mp.on = false; mp.sky = null; mp.owner = null; clearGhosts();
   for (const a of avatars.values()) { scene.remove(a.g); if (a.car) scene.remove(a.car.g); }
   avatars.clear(); marksEl.textContent = ''; mpFriends.textContent = '';
@@ -7007,7 +7007,7 @@ function enterCar(c) {
   if (c.borrowedBy) { toast(`${ownerName(c.borrowedBy)} is driving it right now`); return; }
   if (mount) dismount();
   if (riding) exitPlane();
-  driving = c; P.fly = false; P.yaw = c.yaw; P.pitch = -.2; mine.on = false; held = null;
+  driving = c; P.fly = false; P.yaw = c.yaw; P.pitch = -.2; mine.on = false; held = null; if (cars.includes(c)) lastCarId = c.id;
   openDoor(c, 0);
   $('#bExit').hidden = false;
   toast(TOUCH ? 'Push the stick up to drive, left and right to steer' : 'W drive · S brake/reverse · A/D steer · G autopark · O doors · C view · H horn · 1–9 or P paint · Shift get out', 6000);
@@ -8215,19 +8215,25 @@ function buildPark(g, inC, lay, set, at, fillUnder) {
 // until their light is green, jump out of the way if you drive at them, and say hello when you right-click them.
 const peds = [], PED_MAX = 14, SKINS = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac], HAIR = [0x2b1b0e, 0x0e0e0e, 0x6a4423, 0xd6b25e, 0x9a3412, 0x888888];
 const SHIRT_C = [0xd8342c, 0x2a6fd6, 0x2a9d4a, 0xf2c230, 0x8e44ad, 0xf08cbc, 0xffffff, 0x222222, 0xe8661c, 0x16a3a3];
-let pedT = 0, pedHelloT = 0;
-function makePed(axis, line, side, a, dir) {
-  const g = new THREE.Group(), kid = Math.random() < .25, pk = a => a[Math.floor(Math.random() * a.length)];
-  const skin = pk(SKINS), shirt = pk(SHIRT_C), pants = pk([0x2e3a6a, 0x3a3a3a, 0x6b4f2a, 0x1d4f91, 0x555555]);
+let pedT = 0, pedHelloT = 0, pedSeq = 0, pedPubT = 0, pedSig = '';
+const PANTS = [0x2e3a6a, 0x3a3a3a, 0x6b4f2a, 0x1d4f91, 0x555555], DOGS = [0x8b5a2b, 0xd9b38c, 0x222222, 0xffffff];
+// a person's look as numbers, so friends see the same person: kid, skin, hair, shirt, trousers, dog (-1 = no dog)
+function randomLook() {
+  const r = n => Math.floor(Math.random() * n), kid = Math.random() < .25 ? 1 : 0;
+  return [kid, r(SKINS.length), r(HAIR.length), r(SHIRT_C.length), r(PANTS.length), !kid && Math.random() < .3 ? r(DOGS.length) : -1];
+}
+function makePed(axis, line, side, a, dir, look = randomLook()) {
+  const g = new THREE.Group(), [kid, si, hi, shi, pi, di] = look;
+  const skin = SKINS[si] || SKINS[0], shirt = SHIRT_C[shi] || SHIRT_C[0], pants = PANTS[pi] || PANTS[0];
   part(g, shirt, .5, .65, .28, 0, 1.1, 0);
-  const head = new THREE.Group(); head.position.set(0, 1.43, 0); part(head, skin, .44, .44, .44, 0, .22, 0); part(head, pk(HAIR), .46, .12, .46, 0, .42, 0); eyes(head, .26, -.225, .1); g.add(head);
+  const head = new THREE.Group(); head.position.set(0, 1.43, 0); part(head, skin, .44, .44, .44, 0, .22, 0); part(head, HAIR[hi] || HAIR[0], .46, .12, .46, 0, .42, 0); eyes(head, .26, -.225, .1); g.add(head);
   const arms = [-.34, .34].map(sx => { const ar = new THREE.Group(); ar.position.set(sx, 1.4, 0); part(ar, shirt, .18, .58, .18, 0, -.26, 0); part(ar, skin, .18, .1, .18, 0, -.58, 0); g.add(ar); return ar; });
   const legs = [leg(g, pants, .2, .75, -.12, 0), leg(g, pants, .2, .75, .12, 0)];
   let dog = null;
-  if (!kid && Math.random() < .3) { dog = new THREE.Group(); part(dog, pk([0x8b5a2b, 0xd9b38c, 0x222222, 0xffffff]), .25, .25, .55, 0, .3, 0); part(dog, 0x5a3a1a, .2, .2, .2, 0, .45, -.33); g.add(dog); dog.position.set(.6 * (side > 0 ? 1 : -1), 0, -.9); }
+  if (di >= 0 && DOGS[di] !== undefined) { dog = new THREE.Group(); part(dog, DOGS[di], .25, .25, .55, 0, .3, 0); part(dog, 0x5a3a1a, .2, .2, .2, 0, .45, -.33); g.add(dog); dog.position.set(.6 * (side > 0 ? 1 : -1), 0, -.9); }
   if (kid) g.scale.setScalar(.68);
   scene.add(g);
-  const p = {g, head, arms, legs, dog, axis, line, side, a, dir, v: 1.1 + Math.random() * .5, ph: Math.random() * 6, hop: 0, push: 0, hA: null, y: 0};
+  const p = {g, head, arms, legs, dog, axis, line, side, a, dir, look, id: ++pedSeq, v: 1.1 + Math.random() * .5, sp: 0, ph: Math.random() * 6, hop: 0, push: 0, hA: null, y: 0};
   placePed(p); return p;
 }
 function placePed(p) {
@@ -8237,12 +8243,15 @@ function placePed(p) {
   const x = p.axis === 'x' ? p.a : across, z = p.axis === 'x' ? across : p.a;
   p.g.position.set(x, p.y + Math.max(0, Math.sin(Math.min(1, p.hop) * Math.PI)) * .9, z); p.g.rotation.y = laneYaw(p.axis, p.dir);
 }
+// In a room, the same player who drives the traffic near a group walks the pedestrians too, and shares them under
+// /peds/{them}; everyone else sees those people (same looks, same dogs) gliding along between updates.
 function updatePeds(dt) {
-  if (dim !== 'o') { while (peds.length) scene.remove(peds.pop().g); return; }
-  if ((pedT -= dt) <= 0) {
+  const lead = dim === 'o' && (!mp.on || mpLeader());
+  for (let i = peds.length - 1; i >= 0; i--) if ((!lead || dim !== 'o') && !peds[i].remote) { scene.remove(peds[i].g); peds.splice(i, 1); }
+  if ((pedT -= dt) <= 0 && lead) {
     pedT = .6;
-    for (let i = peds.length - 1; i >= 0; i--) if (Math.hypot(peds[i].g.position.x - P.x, peds[i].g.position.z - P.z) > 110) { scene.remove(peds[i].g); peds.splice(i, 1); }
-    for (let tries = 0; tries < 4 && peds.length < PED_MAX; tries++) {
+    for (let i = peds.length - 1; i >= 0; i--) if (!peds[i].remote && Math.hypot(peds[i].g.position.x - P.x, peds[i].g.position.z - P.z) > 110) { scene.remove(peds[i].g); peds.splice(i, 1); }
+    for (let tries = 0; tries < 4 && peds.filter(q => !q.remote).length < PED_MAX; tries++) {
       const axis = Math.random() < .5 ? 'x' : 'z', across = axis === 'x' ? P.z : P.x, along = axis === 'x' ? P.x : P.z;
       const line = nearLine(across + (Math.random() - .5) * 140), a = along + (Math.random() - .5) * 140;
       const d = Math.hypot((axis === 'x' ? a : line) - P.x, (axis === 'x' ? line : a) - P.z);
@@ -8251,11 +8260,23 @@ function updatePeds(dt) {
   }
   const you = driving || {x: P.x, z: P.z, speed: Math.hypot(P.vx, P.vz)};
   for (const p of peds) {
+    if (p.remote) { // a friend's pedestrian: keep walking, and ease towards where they say it is
+      p.a += p.sp * p.dir * dt;
+      p.a += (p.ta + p.sp * p.dir * (Date.now() - p.at) / 1000 - p.a) * Math.min(1, 3 * dt);
+      p.g.visible = p.d === here();
+      p.ph += dt * p.sp * 6;
+      const sw = Math.sin(p.ph) * (p.sp ? .6 : 0);
+      p.legs[0].rotation.x = sw; p.legs[1].rotation.x = -sw; p.arms[0].rotation.x = -sw; p.arms[1].rotation.x = sw;
+      if (p.hop > 0) p.hop = Math.min(1.01, p.hop + dt * 2.2); if (p.hop >= 1) p.hop = 0;
+      placePed(p);
+      continue;
+    }
     // wait at the kerb for a green light to cross
     const L = p.dir > 0 ? ROAD_O + ROAD_G * Math.ceil((p.a + 3.6 - ROAD_O) / ROAD_G) : ROAD_O + ROAD_G * Math.floor((p.a - 4.6 - ROAD_O) / ROAD_G);
     const stopAt = p.dir > 0 ? L - 4.1 : L + 5.1, toStop = (stopAt - p.a) * p.dir;
     const wait = toStop > -.2 && toStop < 1.5 && tlState(p.axis) !== 'g';
     const sp = wait ? 0 : p.v;
+    p.sp = sp;
     p.a += sp * p.dir * dt;
     // a car coming at you? jump out of the way
     const dx = p.g.position.x - you.x, dz = p.g.position.z - you.z;
@@ -8272,7 +8293,31 @@ function updatePeds(dt) {
     placePed(p);
   }
   pedHelloT -= dt;
+  if (mp.on && (pedPubT -= dt) <= 0) { // share yours
+    pedPubT = .3;
+    const l = peds.filter(q => !q.remote).map(q => [q.axis === 'x' ? 0 : 1, q.line, q.side, q.dir, Math.round(q.a * 10) / 10, Math.round(q.sp * 10) / 10, q.id, q.hop > 0 ? 1 : 0, ...q.look]);
+    const sig = JSON.stringify(l);
+    if (sig !== pedSig) { pedSig = sig; quiet(l.length ? mp.fb.set(R('/peds/' + mp.uid), {d: here(), l}) : mp.fb.remove(R('/peds/' + mp.uid))); }
+  }
 }
+function mpPeds(all) {
+  const seen = new Set();
+  for (const [uid, v] of Object.entries(all)) {
+    if (uid === mp.uid || !v || !Array.isArray(v.l)) continue;
+    for (const e of v.l.slice(0, 20)) {
+      if (!Array.isArray(e) || e.length !== 14 || !e.every(Number.isFinite)) continue;
+      const [ax, line, side, dir, a, sp, id, hop, ...look] = e, key = uid + '_' + id;
+      seen.add(key);
+      let q = peds.find(o => o.key === key);
+      if (!q) { q = makePed(ax ? 'z' : 'x', line, side > 0 ? 1 : -1, a, dir > 0 ? 1 : -1, look); q.key = key; q.remote = true; peds.push(q); }
+      if (Math.abs(a - q.a) > 8) q.a = a;
+      q.ta = a; q.at = Date.now(); q.sp = sp; q.d = v.d;
+      if (hop && q.hop <= 0) q.hop = .01;
+    }
+  }
+  for (let i = peds.length - 1; i >= 0; i--) if (peds[i].remote && !seen.has(peds[i].key)) { scene.remove(peds[i].g); peds.splice(i, 1); }
+}
+function clearRemotePeds() { for (let i = peds.length - 1; i >= 0; i--) if (peds[i].remote) { scene.remove(peds[i].g); peds.splice(i, 1); } pedSig = ''; }
 const pedRay = new THREE.Raycaster();
 function pedHit(maxD) {
   if (!peds.length) return null;
@@ -8321,19 +8366,23 @@ function summonGarage() {
   return `A garage appeared next to the mansion${bd > 12 ? ` (${Math.round(bd)} blocks away)` : ''}!`;
 }
 // /tp tesla model s: to the nearest car of that model (yours, a friend's, or one in traffic)
+let lastCarId = 0; // the car you drove last: /tp car takes you back to it
 function tpToCar(q) {
-  const id = idByName(q), m = id && MODEL_BY_ITEM[id];
-  if (!m) return null;
-  const all = [...cars, ...traffic.map(t => t.c), ...(mp.on ? friendCarList() : [])].filter(c => c.mi === m.i && !c.borrowedBy); // your own cars count even when they're far away (and not drawn)
-  let best = null, bd = 1e9;
-  for (const c of all) { const d = Math.hypot(c.x - P.x, c.z - P.z); if (d < bd) { bd = d; best = c; } }
+  const mine = /^\s*(my\s*)?car\s*$/i.test(q || '');
+  const id = mine ? 0 : idByName(q), m = id && MODEL_BY_ITEM[id];
+  if (!mine && !m) return null;
+  const near = list => { let b = null, bd = 1e9; for (const c of list) { const d = Math.hypot(c.x - P.x, c.z - P.z); if (d < bd) { bd = d; b = c; } } return b; };
+  const own = cars.filter(c => !c.borrowedBy && (mine || c.mi === m.i)); // yours count even when far away (and not drawn)
+  let best = mine ? (own.find(c => c.id === lastCarId) || near(own)) : near(own);
+  if (mine && !best) return "You don't have a car yet. Get one from the Creative inventory or with /give tesla model y";
+  if (!best) best = near([...traffic.map(t => t.c), ...(mp.on ? friendCarList() : [])].filter(c => c.mi === m.i));
   if (!best) return `There's no ${m.name} around. Get one with /give ${m.name.toLowerCase()}`;
   if (riding) exitPlane(); if (driving) exitCar(); if (passenger) leaveSeat();
   const co = Math.cos(best.yaw), si = Math.sin(best.yaw), lx = best.m.W / 2 + 1;
   P.x = best.x - lx * co; P.z = best.z + lx * si; P.y = best.y + .2; P.vx = P.vy = P.vz = 0; st.fallY = null;
   for (let k = 0; k < 6 && collides(); k++) P.y += 1;
   P.yaw = Math.atan2(P.x - best.x, P.z - best.z);
-  return `Whoosh! You're next to ${cars.includes(best) ? 'your' : 'a'} ${m.name}`;
+  return `Whoosh! You're next to ${cars.includes(best) ? 'your' : 'a'} ${best.m.name}`;
 }
 
 /* ---------- main loop ---------- */
