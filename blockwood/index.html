@@ -708,6 +708,13 @@ one('dream_portal', 'Dream portal', r => { const st = spotsOf(r, 8, 1); return (
   for (const [k, n, c] of [['pink', 'Pink', [255, 164, 204]], ['mint', 'Mint', [150, 236, 204]], ['purple', 'Purple', [204, 168, 255]]])
     one('wakppu_' + k, `${n} 왁뿌볼 (squishy ball)`, ball(c));
 }
+// elevators: stand on one and it takes you to the next one straight above or below
+one('elevator', 'Elevator', () => (x, y, r) => {
+  if (x === 0 || y === 0 || x === 15 || y === 15) return [70, 74, 80];
+  const up = y < 8, ax = x - 7.5, ay = up ? 6 - y : y - 9;
+  if (ay >= 0 && ay <= 3 && Math.abs(ax) <= ay + .5) return [120, 230, 160]; // arrows
+  return J([180, 186, 194], r, 6);
+}, 'light');
 // roads: asphalt and painted lines
 one('asphalt', 'Asphalt', plainT([52, 54, 58], 14, [72, 74, 78], .12), 'stone');
 one('road_white', 'Road line (white)', plainT([226, 228, 230], 10, [190, 192, 196], .1), 'stone');
@@ -1291,6 +1298,8 @@ function act(button) {
     if (sg) { if (button === 2) editSign(sg, signs.get(sg), false); else breakSign(sg); return; }
     const car = carHit(Math.min(5, far));
     if (car) { if (button === 2) enterCar(car); else pickCar(car); return; }
+    const tcar = carHit(Math.min(5, far), traffic.map(t => t.c));
+    if (tcar) { if (button === 2) rideTraffic(traffic.find(t => t.c === tcar)); else toast('Right-click a car on the road to hop in and ride along'); return; }
     const fcar = mp.on && carHit(Math.min(5, far), friendCarList());
     if (fcar) { if (button === 2) { if (fcar.parked) borrowCar(fcar); else takeSeat(fcar); } else toast(`That's ${ownerName(fcar.owner)}'s car. Right-click to ${fcar.parked ? 'drive' : 'ride in'} it`); return; }
     const pl = planeHit(Math.min(5, far));
@@ -1461,7 +1470,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving && autoPark ? '  · AUTOPARK' : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${passenger.t ? 'a ' + passenger.t.c.m.name : ownerName(passenger.owner) + "'s " + (seatCar(passenger) || {m: {name: 'car'}}).m.name} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving && autoPark ? '  · AUTOPARK' : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -3907,7 +3916,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cb: driving && driving.borrow ? driving.borrow.owner : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2), driving.id, driving.mi, doorMask(driving)] : 0, rc: passenger ? [passenger.owner, passenger.id, passenger.seat] : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cb: driving && driving.borrow ? driving.borrow.owner : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2), driving.id, driving.mi, doorMask(driving)] : 0, rc: passenger && !passenger.t ? [passenger.owner, passenger.id, passenger.seat] : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${here()}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -6129,10 +6138,11 @@ function idByName(text) {
   const q = (text || '').toLowerCase().replace(/[^a-z0-9]/g, ''), all = PALETTE.filter(id => validId(id));
   const raw = (text || '').trim().toLowerCase();
   if (/[^\x00-\x7f]/.test(raw)) { const k = all.find(id => nameOf(id).toLowerCase().includes(raw)); if (k) return k; } // names like 왁뿌볼
-  const n = id => nameOf(id).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const plain = t => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // Huracán -> huracan
+  const n = id => plain(nameOf(id)).replace(/[^a-z0-9]/g, '');
   const words = ((text || '').toLowerCase().match(/[a-z0-9]+/g) || []).map(w => w.replace(/s$/, '')).filter(w => w !== 'of');
-  const nWords = id => (nameOf(id).toLowerCase().match(/[a-z0-9]+/g) || []).length;
-  const hasAll = id => { const nw = nameOf(id).toLowerCase().match(/[a-z0-9]+/g) || []; return words.length && words.every(w => nw.some(x => x === w || x.replace(/s$/, '') === w)); };
+  const nWords = id => (plain(nameOf(id)).match(/[a-z0-9]+/g) || []).length;
+  const hasAll = id => { const nw = plain(nameOf(id)).match(/[a-z0-9]+/g) || []; return words.length && words.every(w => nw.some(x => x === w || x.replace(/s$/, '') === w)); };
   const best = all.filter(hasAll).sort((a, b) => nWords(a) - nWords(b))[0]; // "model y" is the Model Y, not the Model Y L
   return all.find(id => n(id) === q) || all.find(id => n(id) === q.replace(/s$/, '')) || best || all.find(id => n(id).startsWith(q)) || all.find(id => n(id).includes(q)) || null;
 }
@@ -6434,7 +6444,8 @@ function updateAsmr() {
 const CAR = 96;
 const CAR_COLORS = [['Pearl White', 0xf3f3f1], ['Stealth Grey', 0x4a4e55], ['Quicksilver', 0xb9bdc2], ['Ultra Red', 0xa3121b], ['Diamond Black', 0x121316], ['Glacier Blue', 0x7fa3c4],
   ['Marine Blue', 0x1f3f7a], ['Midnight Cherry Red', 0x5c0f1f], ['Ultra Violet', 0x5b2a8a], ['Sunset Orange', 0xe8661c], ['Bubblegum Pink', 0xf08cbc],
-  ['Lime Green', 0x8ccf2a], ['Gold', 0xd4af37], ['Mint', 0x9fe3c8], ['Stainless Steel', 0xb4b8bd]];
+  ['Lime Green', 0x8ccf2a], ['Gold', 0xd4af37], ['Mint', 0x9fe3c8], ['Stainless Steel', 0xb4b8bd],
+  ['Rosso Corsa', 0xd10f0f], ['Giallo Modena', 0xf7c919]];
 /* ---------- car models: every Tesla and lots of Hyundais ---------- */
 // Each model is its side outline (front of the car at -x), its glass, where the wheels are, how wide it is, where
 // the seats and doors go and where the lights sit. One builder turns that into a car, so they all drive, open their
@@ -6685,6 +6696,53 @@ const MODELS = [
     top: [[-2.3, .24, 1], [-2.34, .4], [-2.26, .54], [-1.5, .64], [-.5, .76, 1], [.45, .8, 1], [1.5, .9], [2.18, .86], [2.32, .6], [2.3, .24, 1]],
     glass: [[-.52, .76, 1], [-.18, 1.06], [-.06, 1.09, 1], [-.36, .77, 1]],
     cabin: [-.5, .45], floor: .4, seats: [[-.4, 0], [.4, 0]], doors: [[-.5, .4]], doorY: [.28, .76]},
+  // Ferrari
+  {key: 'fsf90', name: 'Ferrari SF90 Stradale', item: 293, L: 4.71, W: 1.97, r: .35, axles: [-1.32, 1.33], yb: .2, badge: 'F', fy: .56, ry: .8, vmax: 50, color: 15, roundLamps: true,
+    top: H_([[-2.33, .24, 1], [-2.36, .4], [-2.28, .54], [-1.6, .64], [-.7, .78, 1], [.45, .95, 1], [1.6, .94], [2.2, .88], [2.35, .6], [2.33, .24, 1]], 1.0, 1.0), glass: H_([[-.75, .77, 1], [-.15, 1.13], [.3, 1.19], [.5, .95, 1]], 1.0, 1.0),
+    cabin: [-0.7, 0.45], floor: .38, seats: [[-.4, -.1], [.4, -.1]], doors: [[-0.7, 0.45]], doorY: [.28, .8]},
+  {key: 'f296', name: 'Ferrari 296 GTB', item: 294, L: 4.57, W: 1.97, r: .35, axles: [-1.28, 1.29], yb: .2, badge: 'F', fy: .56, ry: .8, vmax: 50, color: 15, roundLamps: true,
+    top: H_([[-2.33, .24, 1], [-2.36, .4], [-2.28, .54], [-1.6, .64], [-.7, .78, 1], [.45, .95, 1], [1.6, .94], [2.2, .88], [2.35, .6], [2.33, .24, 1]], 0.97, 1.0), glass: H_([[-.75, .77, 1], [-.15, 1.13], [.3, 1.19], [.5, .95, 1]], 0.97, 1.0),
+    cabin: [-0.68, 0.44], floor: .38, seats: [[-.4, -.1], [.4, -.1]], doors: [[-0.68, 0.44]], doorY: [.28, .8]},
+  {key: 'ff8', name: 'Ferrari F8 Tributo', item: 295, L: 4.61, W: 1.97, r: .35, axles: [-1.29, 1.3], yb: .2, badge: 'F', fy: .56, ry: .8, vmax: 50, color: 16, roundLamps: true,
+    top: H_([[-2.33, .24, 1], [-2.36, .4], [-2.28, .54], [-1.6, .64], [-.7, .78, 1], [.45, .95, 1], [1.6, .94], [2.2, .88], [2.35, .6], [2.33, .24, 1]], 0.98, 1.0), glass: H_([[-.75, .77, 1], [-.15, 1.13], [.3, 1.19], [.5, .95, 1]], 0.98, 1.0),
+    cabin: [-0.69, 0.44], floor: .38, seats: [[-.4, -.1], [.4, -.1]], doors: [[-0.69, 0.44]], doorY: [.28, .8]},
+  {key: 'flaf', name: 'Ferrari LaFerrari', item: 296, L: 4.7, W: 1.97, r: .35, axles: [-1.32, 1.33], yb: .2, badge: 'F', fy: .56, ry: .8, vmax: 50, color: 15, roundLamps: true, vmax: 54,
+    top: H_([[-2.33, .24, 1], [-2.36, .4], [-2.28, .54], [-1.6, .64], [-.7, .78, 1], [.45, .95, 1], [1.6, .94], [2.2, .88], [2.35, .6], [2.33, .24, 1]], 1.0, 0.95), glass: H_([[-.75, .77, 1], [-.15, 1.13], [.3, 1.19], [.5, .95, 1]], 1.0, 0.95),
+    cabin: [-0.7, 0.45], floor: .38, seats: [[-.4, -.1], [.4, -.1]], doors: [[-0.7, 0.45]], doorY: [.28, .8]},
+  {key: 'froma', name: 'Ferrari Roma', item: 297, L: 4.66, W: 1.97, r: .35, axles: [-1.35, 1.32], yb: .22, badge: 'F', fy: .6, ry: .8, vmax: 46, color: 2,
+    top: [[-2.31, .26, 1], [-2.35, .42], [-2.27, .58], [-1.5, .7], [-.4, .82, 1], [1.1, .9], [2.0, .88], [2.3, .72], [2.33, .45], [2.3, .26, 1]], glass: [[-.45, .81, 1], [.1, 1.2], [.6, 1.26], [1.3, 1.1], [2.0, .9, 1]],
+    cabin: [-.4, 1.15], floor: .42, seats: [[-.4, .05], [.4, .05], [-.4, .75], [.4, .75]], doors: [[-.4, .65]], doorY: [.3, .82]},
+  {key: 'f812', name: 'Ferrari 812 Superfast', item: 298, L: 4.66, W: 1.97, r: .36, axles: [-1.36, 1.36], yb: .22, badge: 'F', fy: .6, ry: .8, vmax: 52, color: 15,
+    top: H_([[-2.31, .26, 1], [-2.35, .42], [-2.27, .58], [-1.5, .7], [-.4, .82, 1], [1.1, .9], [2.0, .88], [2.3, .72], [2.33, .45], [2.3, .26, 1]], 1.0, .97), glass: H_([[-.45, .81, 1], [.1, 1.2], [.6, 1.26], [1.3, 1.1], [2.0, .9, 1]], 1.0, .97),
+    cabin: [-.4, .9], floor: .42, seats: [[-.4, .05], [.4, .05]], doors: [[-.4, .65]], doorY: [.3, .8]},
+  {key: 'fpuro', name: 'Ferrari Purosangue', item: 299, L: 4.97, W: 2.03, r: .4, axles: [-1.5, 1.52], badge: 'F', fy: .78, ry: .96, vmax: 46, color: 15,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.085, .95), glass: H_([[-1.0, 1.03, 1], [-.35, 1.5], [1.0, 1.55], [1.95, 1.28], [2.25, 1.1, 1]], 1.085, .95),
+    cabin: [-1.05, 1.9], floor: .7, seats: [[-.42, -.3], [.42, -.3], [-.42, .75], [.42, .75]], doors: [[-1.0, .3], [.35, 1.4, 'suicide']]},
+  {key: 'ftr', name: 'Ferrari Testarossa', item: 300, L: 4.49, W: 1.98, r: .34, axles: [-1.28, 1.27], yb: .22, badge: 'F', fy: .58, ry: .78, vmax: 46, color: 15, strakes: true,
+    top: [[-2.22, .25, 1], [-2.25, .5, 1], [-1.6, .66, 1], [-.55, .78, 1], [.55, .98, 1], [2.2, .9, 1], [2.25, .5, 1], [2.22, .25, 1]],
+    glass: [[-.6, .77, 1], [0, 1.12, 1], [.55, 1.15, 1], [.6, .97, 1]],
+    cabin: [-.55, .55], floor: .4, seats: [[-.4, 0], [.4, 0]], doors: [[-.55, .45]], doorY: [.28, .8]},
+  // Lamborghini
+  {key: 'lrev', name: 'Lamborghini Revuelto', item: 301, L: 4.95, W: 2.03, r: .36, axles: [-1.4, 1.45], yb: .18, badge: 'LB', fy: .5, ry: .8, vmax: 52, color: 11,
+    top: H_([[-2.46, .22, 1], [-2.48, .42, 1], [-1.6, .6, 1], [-.75, .76, 1], [.3, 1.0, 1], [1.5, .98, 1], [2.4, .85, 1], [2.48, .45, 1], [2.46, .22, 1]], 1.0), glass: H_([[-.78, .75, 1], [-.2, 1.1, 1], [.3, 1.13, 1], [.4, .98, 1]], 1.0),
+    cabin: [-0.75, 0.4], floor: .36, seats: [[-.4, -.15], [.4, -.15]], doors: [[-0.75, 0.4, 'scissor']], doorY: [.26, .8]},
+  {key: 'lave', name: 'Lamborghini Aventador', item: 302, L: 4.8, W: 2.03, r: .36, axles: [-1.36, 1.41], yb: .18, badge: 'LB', fy: .5, ry: .8, vmax: 52, color: 16,
+    top: H_([[-2.46, .22, 1], [-2.48, .42, 1], [-1.6, .6, 1], [-.75, .76, 1], [.3, 1.0, 1], [1.5, .98, 1], [2.4, .85, 1], [2.48, .45, 1], [2.46, .22, 1]], 0.97), glass: H_([[-.78, .75, 1], [-.2, 1.1, 1], [.3, 1.13, 1], [.4, .98, 1]], 0.97),
+    cabin: [-0.73, 0.39], floor: .36, seats: [[-.4, -.15], [.4, -.15]], doors: [[-0.73, 0.39, 'scissor']], doorY: [.26, .8]},
+  {key: 'lcou', name: 'Lamborghini Countach', item: 303, L: 4.2, W: 2.0, r: .34, axles: [-1.25, 1.25], yb: .2, badge: 'LB', fy: .48, ry: .8, vmax: 48, color: 0,
+    top: [[-2.07, .22, 1], [-2.1, .4, 1], [-.9, .68, 1], [.2, 1.02, 1], [1.5, .95, 1], [2.05, .85, 1], [2.1, .45, 1], [2.07, .22, 1]],
+    glass: [[-.92, .67, 1], [-.1, 1.0, 1], [.2, 1.03, 1], [.25, .95, 1]],
+    cabin: [-.85, .2], floor: .34, seats: [[-.4, -.3], [.4, -.3]], doors: [[-.85, .2, 'scissor']], doorY: [.26, .78]},
+  {key: 'lhur', name: 'Lamborghini Huracán', item: 304, L: 4.52, W: 2.03, r: .36, axles: [-1.28, 1.32], yb: .18, badge: 'LB', fy: .5, ry: .8, vmax: 52, color: 9,
+    top: H_([[-2.46, .22, 1], [-2.48, .42, 1], [-1.6, .6, 1], [-.75, .76, 1], [.3, 1.0, 1], [1.5, .98, 1], [2.4, .85, 1], [2.48, .45, 1], [2.46, .22, 1]], 0.913), glass: H_([[-.78, .75, 1], [-.2, 1.1, 1], [.3, 1.13, 1], [.4, .98, 1]], 0.913),
+    cabin: [-0.68, 0.37], floor: .36, seats: [[-.4, -.15], [.4, -.15]], doors: [[-0.68, 0.37, 'hinge']], doorY: [.26, .8]},
+  {key: 'ltem', name: 'Lamborghini Temerario', item: 305, L: 4.7, W: 2.03, r: .36, axles: [-1.33, 1.38], yb: .18, badge: 'LB', fy: .5, ry: .8, vmax: 52, color: 1,
+    top: H_([[-2.46, .22, 1], [-2.48, .42, 1], [-1.6, .6, 1], [-.75, .76, 1], [.3, 1.0, 1], [1.5, .98, 1], [2.4, .85, 1], [2.48, .45, 1], [2.46, .22, 1]], 0.95), glass: H_([[-.78, .75, 1], [-.2, 1.1, 1], [.3, 1.13, 1], [.4, .98, 1]], 0.95),
+    cabin: [-0.71, 0.38], floor: .36, seats: [[-.4, -.15], [.4, -.15]], doors: [[-0.71, 0.38, 'hinge']], doorY: [.26, .8]},
+  {key: 'lurus', name: 'Lamborghini Urus', item: 306, L: 5.11, W: 2.02, r: .4, axles: [-1.5, 1.5], badge: 'LB', fy: .8, ry: .98, vmax: 44, color: 16,
+    top: [[-2.55, .33, 1], [-2.58, .6, 1], [-2.5, .82, 1], [-1.6, .95, 1], [-.95, 1.0, 1], [1.7, 1.06, 1], [2.45, .98, 1], [2.57, .62, 1], [2.55, .33, 1]],
+    glass: [[-1.0, .99, 1], [-.35, 1.48, 1], [.9, 1.55, 1], [2.15, 1.2, 1], [2.4, 1.0, 1]],
+    cabin: [-.95, 2.05], floor: .74, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.45]]},
 ];
 MODELS.forEach((m, i) => { m.i = i; m.wb = m.axles[m.axles.length - 1] - m.axles[0]; m.yb = m.yb || .28; m.vmax = m.vmax || 33; m.Ht = Math.max(...m.top.map(p => p[1]), ...(m.glass || []).map(p => p[1])); });
 const MODEL_BY_ITEM = {}; MODELS.forEach(m => { MODEL_BY_ITEM[m.item] = m; });
@@ -6783,6 +6841,10 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
     for (let k = 0; k < (m.grille === 'g' ? 3 : m.grille === 'amg' ? 6 : 1); k++) { const sl = m.grille === 'amg' ? box(silver, .02, gh - .02, .03, -gw / 2 + .1 + k * (gw - .2) / 5, gy, gz(gy) - .005) : box(silver, gw - .06, .018, .03, 0, gy + (m.grille === 'g' ? (k - 1) * .06 : 0), gz(gy) - .005); } }
   if (m.grille === 'audi') { const gh = m.vmax > 40 ? .18 : .3, gy = m.fy - .08 - gh / 2; box(silver, .66, gh + .04, .02, 0, gy, gz(gy) + .005); box(black, .62, gh, .025, 0, gy, gz(gy)); }
   if (m.badge === 'AUDI') { const by = m.grille === 'audi' ? m.fy - .1 : m.fy + .04, bz = noseAt(m, by) - .05; for (let k = 0; k < 4; k++) { const rg = mesh(G.wheelRing, silver, -.075 + k * .05, by, bz); rg.scale.setScalar(.2); } }
+  if (m.badge === 'F' || m.badge === 'LB') { const by = m.fy + .03, bz = noseAt(m, by) - .03, gold = m.badge === 'F' ? 0xf5c518 : 0xc9a14a;
+    box(cMat('shield' + gold, () => new THREE.MeshPhongMaterial({color: gold, shininess: 90})), .07, .09, .012, 0, by, bz); box(black, .02, .05, .014, 0, by - .005, bz - .002);
+    if (m.badge === 'F') for (const [c, xx] of [[0x1a8f3a, -.025], [0xffffff, 0], [0xd10f0f, .025]]) box(cMat('it' + c, () => new THREE.MeshBasicMaterial({color: c})), .025, .012, .014, xx, by + .04, bz - .002); }
+  if (m.strakes) for (const s of [-1, 1]) for (let k = 0; k < 5; k++) box(black, .03, .025, 1.1, s * (m.W / 2 + .01), .45 + k * .07, .85);
   if (m.badge === 'P') { const by = m.fy + .02, bz = noseAt(m, by) - .03; box(cMat('pgold', () => new THREE.MeshPhongMaterial({color: 0xd4a62a, shininess: 90})), .07, .09, .012, 0, by, bz); box(tailM, .05, .025, .014, 0, by + .01, bz - .002); box(black, .05, .018, .014, 0, by - .02, bz - .002); }
   if (m.roundLamps) for (const s of [-1, 1]) { const ly = m.fy + .03, l = mesh(G.hub, lampM, s * (m.W / 2 - .34), ly, gz(ly) + .06); l.scale.set(1, 2.2, 1.6); l.rotation.y = Math.PI / 2; l.rotation.x = -.5; }
   if (m.grille === 'mbpanel') { const gy = m.fy - .14; box(black, .9, .14, .02, 0, gy, gz(gy)); }
@@ -6802,9 +6864,10 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
   const [dy0, dy1] = m.doorY || [m.yb + .1, Math.min(beltY - .04, m.floor + .38)];
   for (const [z0, z1, kind = 'hinge'] of m.doors) for (const s of [-1, 1]) {
     const pivot = new THREE.Group(), len = z1 - z0, hgt = dy1 - dy0, up = kind === 'falcon' || kind === 'butterfly';
-    pivot.position.set(s * (hw + .02), up ? dy1 : 0, up ? (z0 + z1) / 2 : z0); body.add(pivot);
-    const panel = box(paint, .05, hgt, len, 0, up ? -hgt / 2 : (dy0 + dy1) / 2, up ? 0 : len / 2, pivot);
-    box(silver, .03, .03, .16, s * .03, up ? -hgt * .35 : dy0 + hgt * .7, up ? len * .3 : len * .75, pivot); // the handle
+    const back = kind === 'suicide';
+    pivot.position.set(s * (hw + .02), up ? dy1 : 0, up ? (z0 + z1) / 2 : back ? z1 : z0); body.add(pivot);
+    const panel = box(paint, .05, hgt, len, 0, up ? -hgt / 2 : (dy0 + dy1) / 2, up ? 0 : back ? -len / 2 : len / 2, pivot);
+    box(silver, .03, .03, .16, s * .03, up ? -hgt * .35 : dy0 + hgt * .7, up ? len * .3 : back ? -len * .75 : len * .75, pivot); // the handle
     doors.push({pivot, panel, side: s, kind, z0, z1, t: 0, want: 0, pulse: 0});
   }
   // inside: dashboard, centre screen, steering wheel (not in a Cybercab) and the seats
@@ -6870,6 +6933,8 @@ function syncCar(c, dt) {
     const e = d.t * d.t * (3 - 2 * d.t);
     if (d.kind === 'falcon' || d.kind === 'butterfly') { d.pivot.rotation.set(0, 0, 0); d.pivot.rotation.z = d.side * e * 2.1; }
     else if (d.kind === 'slide') d.pivot.position.z = d.z0 + e * (d.z1 - d.z0) * .9, d.pivot.position.x = d.side * (c.m.W / 2 + .02 + e * .12);
+    else if (d.kind === 'scissor') d.pivot.rotation.x = -e * 1.2;
+    else if (d.kind === 'suicide') d.pivot.rotation.y = -d.side * e * 1.15;
     else d.pivot.rotation.y = d.side * e * 1.15;
   });
 }
@@ -7106,7 +7171,7 @@ function friendCar(a, p, dt) {
 // In your car, 1 / 2 / 3 paint it Stealth Grey, Blue or White (P swaps between them). Friends see the new colour.
 // 1 Stealth Grey, 2 Glacier Blue, 3 Pearl White, 4 Ultra Red, 5 Diamond Black, 6 Quicksilver, 7 Marine Blue,
 // 8 Midnight Cherry Red, 9 Ultra Violet; P goes through all of them and Sunset Orange, Bubblegum Pink, Lime Green, Gold and Mint
-const SWAP_COLORS = [1, 5, 0, 3, 4, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14], PAINT_KEYS = {};
+const SWAP_COLORS = [1, 5, 0, 3, 4, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], PAINT_KEYS = {};
 for (let k = 1; k <= 9; k++) PAINT_KEYS['Digit' + k] = SWAP_COLORS[k - 1];
 function paintCar(c, color, quietly) {
   if (!c || c.color === color) return;
@@ -7154,7 +7219,7 @@ function leaveSeat(why) {
   const ps = passenger;
   if (!ps) return;
   passenger = null; $('#bExit').hidden = true;
-  const c = findCar(ps.owner, ps.id);
+  const c = seatCar(ps);
   if (c) {
     const st = seatOf(c, ps.seat), co = Math.cos(c.yaw), si = Math.sin(c.yaw), lx = (st[0] > 0 ? 1 : -1) * (c.m.W / 2 + .75);
     openDoor(c, ps.seat + 1);
@@ -7165,7 +7230,7 @@ function leaveSeat(why) {
   if (why) toast(why);
 }
 function rideSeat(dt) {
-  const c = findCar(passenger.owner, passenger.id);
+  const c = seatCar(passenger);
   if (!c) { if ((passenger.lost += dt) > 2.5) leaveSeat('The car went away, so you got out'); return; }
   passenger.lost = 0;
   const [x, z] = seatPos(c, passenger.seat);
@@ -7173,7 +7238,7 @@ function rideSeat(dt) {
   if (Math.abs(c.speed) > 1) { let d = c.yaw - P.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); P.yaw += d * Math.min(1, 2.5 * dt); }
 }
 function seatCam() {
-  const c = findCar(passenger.owner, passenger.id);
+  const c = seatCar(passenger);
   if (!c) return;
   if (carView === 1) { const [x, z] = seatPos(c, passenger.seat); cam.position.set(x, c.vis + (c.m.eye || c.m.floor + .58), z); return; }
   chaseBehind(c);
@@ -7264,9 +7329,9 @@ function roadside(x, z) {
   for (const [axis, across, along] of [['x', z, x], ['z', x, z]]) {
     const line = nearLine(across), d = Math.abs(across - line);
     if (d <= ROAD_W + 3) return true;
-    if (d > 21) continue;
+    if (d > 26) continue;
     const j = Math.floor(along / GSLOT), g = garageSpec(axis, line, j);
-    if (g && Math.abs(along - g.along) <= 10 && (across - line) * g.s > 0) return true;
+    if (g && Math.abs(along - g.along) <= (g.kind === 'house' ? 12 : 10) && (across - line) * g.s > 0) return true;
   }
   return false;
 }
@@ -7517,6 +7582,7 @@ function trafficRoom(t) {
   // people in the lane ahead, on foot or in a car: you and your friends
   const across = t.line + LANE[t.axis][t.dir > 0 ? 0 : 1], people = [driving ? {x: driving.x, y: driving.y, z: driving.z, car: true} : {x: P.x, y: P.y, z: P.z}];
   for (const a of avatars.values()) if (a.g.visible && a.p) people.push(a.car ? {x: a.car.x, y: a.car.y, z: a.car.z, car: true} : {x: a.x, y: a.y, z: a.z});
+  if (passenger && passenger.t === t) people.shift(); // you're inside this one
   for (const who of people) {
     const yAcross = t.axis === 'x' ? who.z : who.x, yAlong = t.axis === 'x' ? who.x : who.z, gap = (yAlong - t.a) * t.dir;
     if (Math.abs(yAcross - across) > (who.car ? 2.4 : 1.6) || gap <= 0 || gap > 16 || Math.abs(who.y - t.c.y) > 3) continue;
@@ -7746,37 +7812,70 @@ CMDS.set = a => {
 // Houses: wooden walls with log corners, windows, a door facing the road, a brick roof and a bed, chest, crafting
 // table and furnace inside. Cave houses: a little stone hut with a spiral staircase going all the way down to a lit
 // room near the bedrock, with a bed, chest, crafting table, furnace, bookshelves and a rug.
+// Mansions: two storeys with a columned porch and a balcony over it, tall windows, a sloping roof, a grand staircase,
+// an elevator, living room, kitchen and bedrooms, hedges round the sides and a pool out the back.
 function buildHouse(g, inC, lay, set, at, fillUnder) {
   const F = g.F, v = Math.floor(hash2(g.along, g.line, 783) * 3);
-  const log = [LOG, B2.birch_log, B2.spruce_log][v], plank = [PLANKS, B2.birch_planks, B2.spruce_planks][v], roof = [BRICK, B2.terracotta, SBRICK][v];
-  for (let du = -5; du <= 5; du++) for (let off = 4; off <= 15; off++) {
+  const wall = [B2.quartz, B2.sandstone, BRICK][v], trim = [B2.smooth_stone, B2.smooth_stone, B2.quartz][v], roof = [B2.slate, B2.terracotta, B2.slate][v];
+  const R = 8, O0 = 8, O1 = 19, top = F + 9; // walls run du -R..R, off O0..O1; the second floor is at F + 5
+  for (let du = -10; du <= 10; du++) for (let off = 4; off <= 24; off++) {
     const [x, z] = gCell(g, du, off);
     if (!inC(x, z)) continue;
-    for (let y = F + 1; y <= Math.min(H - 1, F + 12); y++) set(x, y, z, AIR);
-    const house = Math.abs(du) <= 4 && off >= 6 && off <= 14;
-    set(x, F, z, house ? plank : off <= 5 && du === 0 ? B2.gravel : GRASS); fillUnder(x, F, z, 4);
-    if (house) {
-      const corner = Math.abs(du) === 4 && (off === 6 || off === 14), wall = Math.abs(du) === 4 || off === 6 || off === 14;
-      for (let y = F + 1; y <= F + 4; y++) {
-        let b = AIR;
-        if (corner) b = log;
-        else if (wall) {
-          const win = (y === F + 2 || y === F + 3) && ((off === 6 || off === 14) ? Math.abs(du) === 2 : off === 9 || off === 11);
-          b = off === 6 && du === 0 && y <= F + 2 ? AIR : win ? GLASS : plank;
-        }
-        set(x, y, z, b);
-      }
+    for (let y = F + 1; y <= Math.min(H - 1, F + 18); y++) set(x, y, z, AIR);
+    const inside = Math.abs(du) <= R && off >= O0 && off <= O1, pool = Math.abs(du) <= 5 && off >= 21 && off <= 24;
+    if (pool) { // the pool: quartz edge, two blocks deep
+      const edge = Math.abs(du) === 5 || off === 21 || off === 24;
+      set(x, F, z, edge ? B2.quartz : WATERB); set(x, F - 1, z, edge ? B2.quartz : WATERB); set(x, F - 2, z, B2.quartz); fillUnder(x, F - 2, z, 3);
+      continue;
     }
-    // a roof sloping down to both sides, with gables at the front and back
-    if (off >= 5 && off <= 15) for (let k = 0; k <= 5; k++) {
-      const y = F + 5 + k, edge = 5 - k;
-      if (Math.abs(du) === edge) set(x, y, z, roof);
-      else if (Math.abs(du) < edge && (off === 6 || off === 14)) set(x, y, z, plank);
+    set(x, F, z, inside ? PLANKS : (off <= 7 && Math.abs(du) <= 1) || (off >= 20 && Math.abs(du) <= 6) ? B2.smooth_stone : GRASS); fillUnder(x, F, z, 4);
+    if (!inside) {
+      if (Math.abs(du) >= 9 && off >= O0 && off <= 23) set(x, F + 1, z, LEAVES); // hedges
+      if (off >= 6 && off <= 7 && Math.abs(du) <= 4) { // the porch: columns and a roof with the balcony on it
+        if (Math.abs(du) === 3 || Math.abs(du) === 1) { if (off === 6) for (let y = F + 1; y <= F + 4; y++) set(x, y, z, B2.quartz); }
+        set(x, F + 5, z, trim);
+        if (off === 6) set(x, F + 6, z, GLASS);
+      }
+      continue;
+    }
+    const edge = Math.abs(du) === R || off === O0 || off === O1, corner = Math.abs(du) === R && (off === O0 || off === O1);
+    for (let y = F + 1; y <= top; y++) {
+      let b = AIR;
+      if (y === F + 5) b = edge ? trim : PLANKS; // the second floor
+      else if (edge) {
+        const fy = y < F + 5 ? y - F : y - F - 5, win = (fy === 2 || fy === 3) && !corner && ((off === O0 || off === O1) ? [2, 5, 7].includes(Math.abs(du)) : [11, 14, 17].includes(off));
+        b = corner ? trim : win ? GLASS : wall;
+        if (off === O0 && Math.abs(du) <= 1 && y <= F + 3) b = AIR; // the big front door
+        if (off === O0 && Math.abs(du) <= 2 && y >= F + 6 && y <= F + 8) b = Math.abs(du) <= 1 && y <= F + 7 ? AIR : b; // balcony door
+      }
+      set(x, y, z, b);
+    }
+    // the roof: sloping down to the front and back from a ridge along the middle
+    for (let k = 0; k <= 6; k++) {
+      const y = top + 1 + k, lo = O0 - 1 + k, hi = O1 + 1 - k;
+      if (lo > hi) break;
+      if (off === lo || off === hi) set(x, y, z, roof);
+      else if (off > lo && off < hi && Math.abs(du) === R) set(x, y, z, wall);
     }
   }
+  // the roof overhangs a little at the front and back
+  for (let du = -R; du <= R; du++) for (const off of [O0 - 1, O1 + 1]) { const [x, z] = gCell(g, du, off); if (inC(x, z)) set(x, top + 1, z, roof); }
   const put = (du, off, y, b) => { const [x, z] = gCell(g, du, off); if (inC(x, z)) set(x, y, z, b); };
-  put(-3, 13, F + 1, BED); put(3, 13, F + 1, CHEST); put(3, 12, F + 1, B2.crafting_table); put(3, 7, F + 1, B2.furnace); put(-3, 7, F + 1, B2.bookshelf);
-  put(0, 10, F + 4, B2.lamp);
+  // a grand staircase up the right side (with a hole in the floor above it)
+  for (let k = 0; k < 4; k++) for (const du of [6, 7]) { put(du, 10 + k, F + 1 + k, trim); for (let y = F + 2 + k; y <= F + 4; y++) put(du, 10 + k, y, k === 3 && y === F + 4 ? AIR : AIR); }
+  for (let k = 0; k < 4; k++) for (const du of [6, 7]) put(du, 10 + k, F + 5, AIR);
+  // the elevator on the left: a panel downstairs and one upstairs
+  put(-7, 10, F, B2.elevator); put(-7, 10, F + 5, B2.elevator);
+  put(-7, 9, F + 1, B2.lamp);
+  // living room, kitchen and lights downstairs
+  for (const du of [-3, -2, -1]) put(du, 17, F + 1, B2.red_wool); put(-4, 17, F + 1, B2.red_wool); put(-4, 16, F + 1, B2.red_wool); // a sofa
+  put(-7, 18, F + 1, B2.bookshelf); put(-7, 17, F + 1, B2.bookshelf); put(-7, 18, F + 2, B2.bookshelf); put(-7, 17, F + 2, B2.bookshelf);
+  put(4, 18, F + 1, B2.furnace); put(5, 18, F + 1, B2.crafting_table); put(6, 18, F + 1, CHEST); put(3, 18, F + 1, B2.furnace);
+  for (const [du, off] of [[-4, 12], [0, 12], [4, 12], [-4, 16], [0, 16], [3, 15]]) put(du, off, F + 5, B2.lamp);
+  // bedrooms upstairs
+  for (const du of [-6, -3, 3]) { put(du, 18, F + 6, BED); put(du + 1, 18, F + 6, CHEST); }
+  put(-7, 15, F + 6, B2.bookshelf); put(-7, 14, F + 6, B2.bookshelf);
+  for (const [du, off] of [[-4, 12], [3, 12], [-4, 16], [3, 16]]) put(du, off, top, B2.lamp);
 }
 const RING = [[0, 6], [1, 6], [1, 7], [1, 8], [0, 8], [-1, 8], [-1, 7], [-1, 6]]; // the spiral stairs, going down clockwise
 function buildCave(g, inC, lay, set, at, fillUnder) {
@@ -7924,6 +8023,62 @@ signTxt.addEventListener('keydown', e => {
 });
 signTxt.addEventListener('keyup', e => e.stopPropagation());
 
+/* ---------- elevators ---------- */
+// Stand still on an Elevator panel for a moment and a glass elevator car takes you to the next panel straight above
+// (or, if there isn't one, the one below). Mansions have them; you can build your own from the Creative inventory.
+let elevRide = null, elevT = 0, elevOff = true;
+const elevCab = new THREE.Group();
+{
+  const gm = new THREE.MeshPhongMaterial({color: 0x9fd8ff, transparent: true, opacity: .25, depthWrite: false, shininess: 120}), fr = new THREE.MeshLambertMaterial({color: 0x9aa0a8});
+  const b = (m, w, h, d, x, y, z) => { const o = new THREE.Mesh(boxG, m); o.scale.set(w, h, d); o.position.set(x, y, z); elevCab.add(o); };
+  b(gm, 1.1, 2.3, 1.1, 0, 1.15, 0); b(fr, 1.14, .08, 1.14, 0, 0, 0); b(fr, 1.14, .08, 1.14, 0, 2.3, 0);
+  for (const [x, z] of [[-.55, -.55], [.55, -.55], [-.55, .55], [.55, .55]]) b(fr, .06, 2.3, .06, x, 1.15, z);
+  elevCab.visible = false; scene.add(elevCab);
+}
+function findElevator(x, y, z) {
+  for (let yy = y + 2; yy < Math.min(H, y + 48); yy++) if (getBlock(x, yy, z) === B2.elevator) return yy;
+  for (let yy = y - 2; yy > Math.max(0, y - 48); yy--) if (getBlock(x, yy, z) === B2.elevator) return yy;
+  return null;
+}
+function updateElevator(dt) {
+  const fl = Math.floor;
+  if (elevRide) {
+    const r = elevRide;
+    r.t = Math.min(1, r.t + dt / r.dur);
+    const e = r.t * r.t * (3 - 2 * r.t);
+    P.x = r.x; P.z = r.z; P.y = r.y0 + (r.y1 - r.y0) * e; P.vx = P.vy = P.vz = 0; st.fallY = null;
+    elevCab.position.set(r.x, P.y - .04, r.z);
+    if (r.t >= 1) { elevRide = null; elevCab.visible = false; elevOff = false; tone(1046, 1046, .35, .1, 'sine'); tone(1318, 1318, .4, .08, 'sine', null, .18); }
+    return;
+  }
+  if (dead || driving || riding || passenger || P.fly) { elevT = 0; return; }
+  const bx = fl(P.x), bz = fl(P.z), on = P.onGround && getBlock(bx, fl(P.y - .1), bz) === B2.elevator;
+  if (!on) { elevT = 0; elevOff = true; return; }
+  if (!elevOff) return; // you just arrived: step off and back on to go again
+  if (Math.hypot(P.vx, P.vz) > .6) { elevT = 0; return; }
+  if ((elevT += dt) < .7) return;
+  elevT = 0;
+  const y0 = fl(P.y - .1), y1 = findElevator(bx, y0, bz);
+  if (y1 === null) { toast('This elevator has nowhere to go: put another Elevator block straight above or below'); elevOff = false; return; }
+  elevRide = {x: bx + .5, z: bz + .5, y0: y0 + 1, y1: y1 + 1, t: 0, dur: Math.max(1.2, Math.abs(y1 - y0) / 3.5)};
+  elevCab.visible = true; elevCab.position.set(bx + .5, y0 + 1, bz + .5);
+  noise(Math.abs(y1 - y0) / 3.5, 'lowpass', 220, 1, .25);
+  toast(y1 > y0 ? 'Going up!' : 'Going down!', 1200);
+}
+
+// riding along in a car from the traffic: right-click it, and Shift gets you out
+const seatCar = ps => ps.t ? (traffic.includes(ps.t) ? ps.t.c : null) : findCar(ps.owner, ps.id);
+function rideTraffic(t) {
+  if (!t) return;
+  if (mount) dismount();
+  const seat = t.c.m.seats.length > 1 ? 0 : -1;
+  passenger = {t, seat, lost: 0}; P.fly = false; P.yaw = t.c.yaw; P.pitch = -.15; mine.on = false; held = null;
+  $('#bExit').hidden = false;
+  openDoor(t.c, seat + 1);
+  tone(660, 660, .08, .06, 'sine'); tone(990, 990, .1, .06, 'sine', null, .1);
+  toast(`You hopped in a ${t.c.m.name}! It keeps driving its route. C changes the view · Shift gets out`, 4000);
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -7934,9 +8089,10 @@ function loop(now) {
     if (riding && !dead) flyPlane(dt);
     else if (driving && !dead) driveCar(dt);
     else if (passenger && !dead) rideSeat(dt);
+    else if (elevRide) updateElevator(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt); updateTrafficLights(dt); updateTraffic(dt); updateGarageDoors(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt); updateTrafficLights(dt); updateTraffic(dt); if (!elevRide) updateElevator(dt); updateGarageDoors(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateCars(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();

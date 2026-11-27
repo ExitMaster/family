@@ -246,9 +246,10 @@ build on it, fly over it. The world saves in the browser.
   empty the car only crawls: stop next to a pump or charger to fill it back up. Asphalt, the road lines, pumps,
   chargers and the GAS sign are in the Creative inventory.
 
-- **Houses and cave houses**: the roads are lined with buildings now. **Houses** have wooden walls with log
-  corners, windows, a door facing the road, a sloping roof, and a bed, chest, crafting table, furnace,
-  bookshelf and lamp inside. **Cave houses** are a little stone hut by the road with a spiral staircase that
+- **Houses and cave houses**: the roads are lined with buildings now. **Mansions** are two storeys tall, with a columned
+  porch and a balcony, tall windows, a sloping roof, a grand staircase, an **elevator**, a living room with a sofa,
+  a kitchen, three bedrooms, hedges and a pool out the back. **Elevators**: stand still on an Elevator panel and a
+  glass elevator takes you to the next panel straight above (or below); build your own with the Elevator block. **Cave houses** are a little stone hut by the road with a spiral staircase that
   goes all the way down (lamps light the way) to a room near the bedrock with a bed, chest, crafting table,
   furnace, bookshelves and a red rug.
 - **Signs you can write on**: take a Sign from the Creative inventory (or craft 3 from 6 planks and a stick).
@@ -256,14 +257,17 @@ build on it, fly over it. The world saves in the browser.
   to 4 lines (Enter is done, Shift+Enter starts a new line). Right-click a sign to change what it says,
   left-click to take it down. Signs are saved with your world, and in a room everyone sees them.
 
-- **Every Tesla, plus Hyundai (현대), Kia (기아), BMW, Mercedes-Benz, Audi and Porsche**: besides the Model Y L there's the **Model S**, **Model 3**, **Model X**,
+- **Every Tesla, plus Hyundai (현대), Kia (기아), BMW, Mercedes-Benz, Audi, Porsche, Ferrari and Lamborghini**: besides the Model Y L there's the **Model S**, **Model 3**, **Model X**,
   **Model Y**, **Cybertruck** (stainless steel), **Roadster** (a low convertible), **Semi** (a big truck cab on
   three axles) and **Cybercab** (two seats, no steering wheel), plus the **Hyundai Ioniq 5**, **Ioniq 6**,
   **Sonata**, **Avante**, **Tucson**, **Kona**, **Santa Fe**, **Palisade**, **Casper**, **Staria** and **Porter**
   truck, and the **Kia Morning**, **Ray**, **K5**, **K8**, **EV3**, **EV6**, **EV9**, **Sportage**, **Sorento**,
   **Carnival** and **Bongo** truck, and **BMW** (3 Series, 5 Series, 7 Series, X3, X5, X7, i4, iX, M4, Z4) and
   **Mercedes-Benz** (C-Class, E-Class, S-Class, CLA, EQS, GLC, GLE, G-Class, AMG GT, Sprinter van), **Audi** (A3, A4, A6, A8, Q3, Q5,
-  Q7, Q8, e-tron GT, R8) and **Porsche** (911, Taycan, Panamera, Cayenne, Macan, 718 Boxster, 918 Spyder). Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
+  Q7, Q8, e-tron GT, R8) and **Porsche** (911, Taycan, Panamera, Cayenne, Macan, 718 Boxster, 918 Spyder), **Ferrari** (SF90 Stradale, 296 GTB, F8 Tributo,
+  LaFerrari, Roma, 812 Superfast, Purosangue with back-hinged rear doors, Testarossa) and **Lamborghini** (Revuelto,
+  Aventador and Countach with scissor doors, Huracán, Temerario, Urus). You can also **ride in traffic**: right-click
+  a car on the road to hop in; it keeps driving its route and Shift gets you out. Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
   (or `/give cybertruck`, `/give hyundai porter`…) and drive, autopark, get borrowed and share like the Model Y L.
   Traffic and garages have all kinds now. **Doors open**: the driver's door opens when you get in or out (and a
   friend's door when they hop in), and **O** in the driver's seat opens or closes them all; the Model X's back
