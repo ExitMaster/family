@@ -230,9 +230,13 @@ build on it, fly over it. The world saves in the browser.
 
 - **Roads and garages**: roads cross the whole Overworld in a big grid (one every 128 blocks, the first about
   30 blocks from where the world starts). They're asphalt with a dashed yellow middle line and white edges,
-  smoothed over hills, cut through mountains as tunnels and carried over water on bridges. White garages with
-  a driveway, windows and a light stand along the roads, and the first time you come by each one there's a
-  Tesla Model Y L parked inside for you to drive. Asphalt and the road lines are in the Creative inventory.
+  smoothed over hills, cut through mountains as tunnels and carried over water on bridges. Every crossing
+  has **traffic lights** that go green, yellow and red (one road at a time). White **garages** with a driveway,
+  windows and a light stand along the roads; about one in 30 has a Tesla parked inside for you to drive.
+  **Gas stations** have a red canopy over two fuel pumps, two electric chargers, a little shop and a GAS sign.
+  The Tesla's battery runs down as you drive (about 8 minutes flat out; the info line shows it), and when it's
+  empty the car only crawls: stop next to a pump or charger to fill it back up. Asphalt, the road lines, pumps,
+  chargers and the GAS sign are in the Creative inventory.
 
 ## Multiplayer
 

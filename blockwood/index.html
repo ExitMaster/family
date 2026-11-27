@@ -707,6 +707,26 @@ one('dream_portal', 'Dream portal', r => { const st = spotsOf(r, 8, 1); return (
 one('asphalt', 'Asphalt', plainT([52, 54, 58], 14, [72, 74, 78], .12), 'stone');
 one('road_white', 'Road line (white)', plainT([226, 228, 230], 10, [190, 192, 196], .1), 'stone');
 one('road_yellow', 'Road line (yellow)', plainT([236, 190, 40], 12, [200, 160, 30], .1), 'stone');
+// gas stations: fuel pumps, electric chargers and a GAS sign
+{
+  const grey = tileOf(plainT([120, 122, 126], 8));
+  nb('fuel_pump', 'Fuel pump', grey, grey, tileOf(() => (x, y, r) => {
+    if (y >= 2 && y <= 6 && x >= 3 && x <= 10) return y === 4 && x >= 4 && x <= 9 && x % 2 ? [90, 255, 140] : [24, 30, 38]; // the price screen
+    if (x >= 12 && x <= 13 && y >= 7 && y <= 12) return [24, 24, 26]; // the nozzle
+    if (y >= 14) return J([90, 90, 94], r, 6);
+    return J([208, 40, 40], r, 10);
+  }));
+  const wtop = tileOf(plainT([236, 236, 240], 6));
+  nb('ev_charger', 'EV charger', wtop, wtop, tileOf(() => (x, y, r) => {
+    if (y <= 2) return [216, 30, 40];
+    if (y >= 4 && y <= 7 && x >= 4 && x <= 10) return y === 5 && x >= 5 && x <= 9 ? [80, 170, 255] : [20, 24, 30];
+    if ((x === 12 || x === 13) && y >= 6 && y <= 13) return [30, 30, 32]; // the cable
+    return J([238, 238, 242], r, 6);
+  }));
+  const L = {G: ['.##.', '#...', '#...', '#.##', '#..#', '#..#', '.##.'], A: ['.##.', '#..#', '#..#', '####', '#..#', '#..#', '#..#'], S: ['.###', '#...', '#...', '.##.', '...#', '...#', '###.']};
+  const sign = tileOf(() => (x, y, r) => { for (const [ch, x0] of [['G', 1], ['A', 6], ['S', 11]]) { const row = L[ch][y - 4]; if (row && x >= x0 && x < x0 + 4 && row[x - x0] === '#') return [255, 255, 255]; } return J([200, 30, 36], r, 8); });
+  nb('gas_sign', 'GAS sign', sign, sign, sign, 'light');
+}
 const WAKPPU = [B2.wakppu_pink, B2.wakppu_mint, B2.wakppu_purple], ASMR_BLOCKS = [B2.butter_squishy, B2.asmr_keyboard, ...WAKPPU];
 const asmrKind = b => b === B2.butter_squishy ? 'butter' : b === B2.asmr_keyboard ? 'keys' : WAKPPU.includes(b) ? 'ball' : null;
 // keyboards go clack-thock, butter squishies squish slowly, 왁뿌볼s squelch and bloop
@@ -901,7 +921,7 @@ function genData(cx, cz) {
       continue;
     }
     const h = hg[(tx + 2) + (tz + 2) * W];
-    if (h <= WATER + 1 || h > WATER + 17) continue;
+    if (h <= WATER + 1 || h > WATER + 17 || roadside(wx, wz)) continue;
     const th = 4 + Math.floor(hash2(wx, wz, 7) * 3), [tLog, tLeaf] = treeKind(wx, wz, h);
     for (let dy = th - 2; dy <= th + 1; dy++) {
       const r = dy >= th ? 1 : 2;
@@ -1432,7 +1452,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1503,6 +1523,7 @@ function applySave(s) {
     const okC = a => Array.isArray(a) ? a.filter(v => Array.isArray(v) && (v.length === 5 || v.length === 6) && v.every(Number.isFinite)) : [];
     okC(s.cars).forEach(a => addCar(a[0], a[1], a[2], a[3], a[4], false, a[5]));
     if (s.carsX && typeof s.carsX === 'object') for (const [k, v] of Object.entries(s.carsX)) if (/^([oneba]|w\d{1,3})$/.test(k)) carStash[k] = okC(v);
+    if (dim === 'o') dropGarageCars(); else if (Array.isArray(carStash.o)) carStash.o = carStash.o.filter(a => !strayGarageCar(a[0], a[2]));
     if (Array.isArray(s.p)) { [P.x, P.y, P.z, P.yaw, P.pitch] = s.p; return; }
   } else {
     SEED = Math.floor(Math.random() * 1e6);
@@ -6591,6 +6612,7 @@ function driveCar(dt) {
   else if (thr < -.2) c.speed -= (c.speed > .5 ? 16 : 4) * dt;
   else c.speed -= Math.sign(c.speed) * Math.min(Math.abs(c.speed), 1.6 * dt);
   c.speed = Math.max(-7, Math.min(33, c.speed));
+  carBattery(c, dt);
   const want = Math.max(-1, Math.min(1, turn)) * (.55 - Math.min(.35, Math.abs(c.speed) / 60)); // less steering at speed
   c.steer += (want - c.steer) * Math.min(1, 6 * dt);
   const inW = IS_WATER[getBlock(fl(c.x), fl(c.y + .4), fl(c.z))];
@@ -6852,7 +6874,18 @@ function garageSpec(axis, line, j) {
   if (hash2(j * 7 + (axis === 'x' ? 1 : 2), line, 777) > .45) return null;
   const s = hash2(j, line * 3 + (axis === 'x' ? 5 : 9), 778) < .5 ? -1 : 1, F = roadH(axis, line, along);
   if (F <= WATER + 2) return null; // not on bridges or beaches
-  return {axis, line, along, s, F};
+  return {axis, line, along, s, F, kind: hash2(j, line * 11 + (axis === 'x' ? 3 : 7), 781) < .3 ? 'gas' : 'garage'};
+}
+// no trees on or right beside a road, or where a garage or gas station stands
+function roadside(x, z) {
+  for (const [axis, across, along] of [['x', z, x], ['z', x, z]]) {
+    const line = nearLine(across), d = Math.abs(across - line);
+    if (d <= ROAD_W + 3) return true;
+    if (d > 21) continue;
+    const j = Math.floor(along / GSLOT), g = garageSpec(axis, line, j);
+    if (g && Math.abs(along - g.along) <= 10 && (across - line) * g.s > 0) return true;
+  }
+  return false;
 }
 // a garage cell: du runs along the road, off goes away from it
 const gCell = (g, du, off) => g.axis === 'x' ? [g.along + du, g.line + g.s * off] : [g.line + g.s * off, g.along + du];
@@ -6894,6 +6927,7 @@ function buildRoads(cx, cz, d) {
         const g = garageSpec(axis, line, j);
         if (!g) continue;
         const F = g.F;
+        if (g.kind === 'gas') { buildGas(g, inC, lay, set, at, fillUnder); continue; }
         for (let du = -3; du <= 3; du++) for (let off = 4; off <= 14; off++) {
           const [x, z] = gCell(g, du, off);
           if (!inC(x, z)) continue;
@@ -6913,6 +6947,35 @@ function buildRoads(cx, cz, d) {
     }
   }
 }
+// a gas station: a canopy on two fuel pumps over the forecourt, two chargers, and a little shop with a GAS sign
+function buildGas(g, inC, lay, set, at, fillUnder) {
+  const F = g.F;
+  for (let du = -6; du <= 6; du++) for (let off = 4; off <= 17; off++) {
+    const [x, z] = gCell(g, du, off);
+    if (!inC(x, z)) continue;
+    const shop = off >= 13 && du <= -1;
+    for (let y = F + 1; y <= Math.min(H - 1, F + 12); y++) set(x, y, z, AIR); // clear trees and hill out of the way
+    if (!shop) {
+      lay(x, z, F, off >= 13 && du === 0 ? B2.road_white : B2.asphalt);
+      if (off === 9 && Math.abs(du) === 3) { set(x, F + 1, z, B2.fuel_pump); set(x, F + 2, z, B2.fuel_pump); set(x, F + 3, z, B2.quartz); set(x, F + 4, z, B2.quartz); }
+      if (off >= 7 && off <= 11 && Math.abs(du) <= 5) set(x, F + 5, z, off === 7 || off === 11 || Math.abs(du) === 5 ? B2.red_wool : du === 0 && off === 9 ? B2.lamp : B2.quartz);
+      if (off === 16 && (du === 2 || du === 5)) set(x, F + 1, z, B2.ev_charger);
+      continue;
+    }
+    set(x, F, z, B2.smooth_stone); fillUnder(x, F, z, 4);
+    const wall = off === 13 || off === 17 || du === -6 || du === -1;
+    for (let y = F + 1; y <= F + 4; y++) {
+      let b = AIR;
+      if (wall) b = off === 13 && du === -4 && y <= F + 2 ? AIR : off === 13 && y === F + 4 && du >= -5 && du <= -2 ? B2.gas_sign : off === 13 && (y === F + 2 || y === F + 3) && du !== -6 && du !== -1 ? GLASS : B2.quartz;
+      set(x, y, z, b);
+    }
+    set(x, F + 5, z, B2.slate);
+    for (let y = F + 6; y <= F + 7; y++) if (!SOLID[at(x, y, z)] || LEAFY[at(x, y, z)]) set(x, y, z, AIR);
+  }
+  // the sign on a pole by the entrance
+  const [sx, sz] = gCell(g, 7, 4);
+  if (inC(sx, sz)) { for (let y = F + 1; y <= F + 4; y++) set(sx, y, sz, B2.quartz); set(sx, F + 5, sz, B2.gas_sign); set(sx, F + 6, sz, B2.gas_sign); }
+}
 // park a Tesla in each garage the first time you come near it (only one player in a room does it)
 const garagesDone = new Set();
 let garageT = 0;
@@ -6929,7 +6992,7 @@ function updateGarages(dt) {
         const key = `${axis}${line}_${j}`;
         if (garagesDone.has(key)) continue;
         const g = garageSpec(axis, line, j);
-        if (!g) { garagesDone.add(key); continue; }
+        if (!garageHasCar(g)) { garagesDone.add(key); continue; }
         const [x, z] = gCell(g, 0, 10);
         if (!chunks.has(ck(Math.floor(x / CS), Math.floor(z / CS))) || getBlock(Math.floor(x), g.F, Math.floor(z)) !== B2.smooth_stone) continue;
         garagesDone.add(key);
@@ -6940,6 +7003,88 @@ function updateGarages(dt) {
       }
     }
   }
+}
+
+/* ---------- traffic lights ---------- */
+// Every crossing has four traffic lights on its corners: two for the road along x, two for the road along z. They
+// run on the clock (so friends see the same colours): one road gets green, then yellow, then red while the other
+// goes. Only the crossings near you are built.
+const tLights = new Map(), TL_LAMP = {};
+for (const [k, on, off] of [['r', 0xff3030, 0x3a0d0d], ['y', 0xffc81a, 0x3a2e08], ['g', 0x2cff70, 0x0b3a18]]) TL_LAMP[k] = [new THREE.MeshBasicMaterial({color: off}), new THREE.MeshBasicMaterial({color: on})];
+const tlState = axis => { const k = (Date.now() / 1000 + (axis === 'x' ? 0 : 8)) % 16; return k < 6 ? 'g' : k < 8 ? 'y' : 'r'; };
+function makeTLight(x, y, z, axis) {
+  const g = new THREE.Group(), lamps = {r: [], y: [], g: []};
+  const dark = cMat('tlpole', () => new THREE.MeshLambertMaterial({color: 0x2a2c30})), head = cMat('tlhead', () => new THREE.MeshLambertMaterial({color: 0x121214}));
+  const b = (m, w, h, d, px, py, pz) => { const o = new THREE.Mesh(boxG, m); o.scale.set(w, h, d); o.position.set(px, py, pz); g.add(o); return o; };
+  b(dark, .16, 4.3, .16, 0, 2.15, 0); b(head, .42, 1.25, .34, 0, 4.55, 0);
+  ['r', 'y', 'g'].forEach((k, i) => { for (const sd of [-1, 1]) lamps[k].push(b(TL_LAMP[k][0], .26, .26, .04, 0, 4.95 - i * .4, sd * .18)); });
+  g.position.set(x, y, z); g.rotation.y = axis === 'x' ? Math.PI / 2 : 0; scene.add(g);
+  return {g, lamps, axis, shown: ''};
+}
+let tlT = 0;
+function updateTrafficLights(dt) {
+  if ((tlT -= dt) <= 0) {
+    tlT = 1;
+    const want = new Set();
+    if (dim === 'o') for (let X = nearLine(P.x - 110); X <= P.x + 110; X += ROAD_G) for (let Z = nearLine(P.z - 110); Z <= P.z + 110; Z += ROAD_G) {
+      if (Math.hypot(X - P.x, Z - P.z) > 120) continue;
+      const k = X + ',' + Z; want.add(k);
+      if (tLights.has(k)) continue;
+      const list = [[-2.5, -2.5, 'x'], [3.5, 3.5, 'x'], [3.5, -2.5, 'z'], [-2.5, 3.5, 'z']].map(([dx, dz, axis]) =>
+        makeTLight(X + dx, roadH('x', Z, Math.floor(X + dx)) + 1, Z + dz, axis));
+      tLights.set(k, list);
+    }
+    for (const [k, list] of tLights) if (!want.has(k)) { list.forEach(t => scene.remove(t.g)); tLights.delete(k); }
+  }
+  for (const list of tLights.values()) for (const t of list) {
+    const s = tlState(t.axis);
+    if (s === t.shown) continue;
+    t.shown = s;
+    for (const k of ['r', 'y', 'g']) for (const m of t.lamps[k]) m.material = TL_LAMP[k][k === s ? 1 : 0];
+  }
+}
+
+/* ---------- the Tesla's battery and filling up ---------- */
+// Driving slowly uses up the battery (about 8 minutes flat out). Stop next to a pump or charger at a gas station
+// and it fills back up. With an empty battery the car only crawls.
+function nearPump(c) {
+  const fl = Math.floor;
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = 0; dy <= 2; dy++) {
+    const b = getBlock(fl(c.x) + dx, fl(c.y) + dy, fl(c.z) + dz);
+    if (b === B2.fuel_pump || b === B2.ev_charger) return true;
+  }
+  return false;
+}
+function carBattery(c, dt) {
+  if (c.bat === undefined) c.bat = 100;
+  if (c.bat <= 0) c.speed = Math.max(-2, Math.min(3, c.speed));
+  c.bat = Math.max(0, c.bat - Math.abs(c.speed) * dt * .008);
+  if (c.bat < 15 && !c.lowWarned) { c.lowWarned = true; toast(c.bat <= 0 ? 'Out of battery! Crawl to a gas station to fill up' : 'Battery low! Find a gas station to fill up', 3500); }
+  if (Math.abs(c.speed) >= 1) { c.atPump = false; c.fillT = 0; return; }
+  c.fillT = (c.fillT || 0) - dt;
+  if (c.fillT <= 0) { c.fillT = .3; c.atPump = nearPump(c); }
+  if (!c.atPump || c.bat >= 100) return;
+  const was = Math.floor(c.bat / 10);
+  c.bat = Math.min(100, c.bat + 18 * dt);
+  if (c.bat >= 15) c.lowWarned = false;
+  if (Math.floor(c.bat / 10) !== was) { toast(c.bat >= 100 ? 'Full! Battery 100%' : `Filling up… ${Math.floor(c.bat)}%`, 1200); tone(700 + c.bat * 4, 700 + c.bat * 4, .06, .05, 'sine'); }
+}
+
+/* ---------- only a few garages have a car ---------- */
+// One garage in about 30 has a Tesla parked in it. Cars an earlier version parked in the others are taken away.
+const garageHasCar = g => g && g.kind === 'garage' && hash2(Math.floor(g.along / GSLOT), g.line * 5 + (g.axis === 'x' ? 1 : 2), 780) < 1 / 30;
+function strayGarageCar(x, z) {
+  for (const axis of ['x', 'z']) {
+    const line = nearLine(axis === 'x' ? z : x), g = garageSpec(axis, line, Math.floor((axis === 'x' ? x : z) / GSLOT));
+    if (!g) continue;
+    const [gx, gz] = gCell(g, 0, 10);
+    if (Math.abs(x - gx - .5) < .05 && Math.abs(z - gz - .5) < .05) return !garageHasCar(g);
+  }
+  return false;
+}
+function dropGarageCars() {
+  for (const c of cars.slice()) if (c !== driving && strayGarageCar(c.x, c.z)) removeCar(c);
+  if (Array.isArray(carStash.o)) carStash.o = carStash.o.filter(a => !strayGarageCar(a[0], a[2]));
 }
 
 /* ---------- main loop ---------- */
@@ -6954,7 +7099,7 @@ function loop(now) {
     else if (passenger && !dead) rideSeat(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt); updateTrafficLights(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateCars(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
