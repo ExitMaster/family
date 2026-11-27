@@ -6601,7 +6601,7 @@ function honk() {
   for (const m of mobs) if (Math.hypot(m.x - driving.x, m.z - driving.z) < 10 && !KINDS[m.kind].hostile) { m.flee = 2; m.walk = true; }
 }
 function driveCar(dt) {
-  const c = driving, fl = Math.floor;
+  const c = driving, fl = Math.floor, x0 = c.x, z0 = c.z;
   hornT -= dt;
   if (S.on && !carHum) humOn();
   const thr = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y;
@@ -6627,6 +6627,11 @@ function driveCar(dt) {
   } else {
     if (carHits(nx, c.y + .3, nz, c.yaw)) { c.y = fl(c.y + .3) + 1; c.tilt = Math.sign(c.speed) * .12; noise(.12, 'lowpass', 500, 1, .4); }
     c.x = nx; c.z = nz;
+  }
+  if (trafficHit(c)) { // crashed into another car
+    c.x = x0; c.z = z0;
+    if (Math.abs(c.speed) > 4) { noise(.3, 'lowpass', 350, 1, .9); shake = Math.min(1, Math.abs(c.speed) / 25); }
+    c.speed *= -.3;
   }
   carFall(c, dt);
   // bump into mobs: they get knocked aside (and hurt if you're going fast)
@@ -7087,6 +7092,133 @@ function dropGarageCars() {
   if (Array.isArray(carStash.o)) carStash.o = carStash.o.filter(a => !strayGarageCar(a[0], a[2]));
 }
 
+/* ---------- traffic ---------- */
+// Other cars drive along the roads near you, on the right-hand side, going straight through the crossings. They stop
+// at red (and late yellow) lights, keep their distance from the car in front, and stop and honk if you're in the way.
+// Each player sees their own traffic; they're just for show (you can't get in), but you can bump into them.
+const traffic = [], TRAFFIC_MAX = 7;
+let trafficT = 0;
+const LANE = {x: [2, -1], z: [-1, 2]}; // lane centre across the road (from the line) for going + and going -
+const laneYaw = (axis, dir) => axis === 'x' ? (dir > 0 ? -Math.PI / 2 : Math.PI / 2) : (dir > 0 ? Math.PI : 0);
+function placeTraffic(t) {
+  const fa = Math.floor(t.a);
+  if (t.hA !== fa) { t.hA = fa; t.c.y = roadH(t.axis, t.line, fa) + 1; }
+  const across = t.line + LANE[t.axis][t.dir > 0 ? 0 : 1];
+  if (t.axis === 'x') { t.c.x = t.a; t.c.z = across; } else { t.c.x = across; t.c.z = t.a; }
+}
+function spawnTraffic() {
+  const axis = Math.random() < .5 ? 'x' : 'z', across = axis === 'x' ? P.z : P.x, along = axis === 'x' ? P.x : P.z;
+  const line = nearLine(across + (Math.random() - .5) * 180);
+  const a = along + (Math.random() < .5 ? -1 : 1) * (45 + Math.random() * 45), dir = Math.random() < .5 ? -1 : 1;
+  if (Math.abs(a - nearLine(a)) < 8) return; // not in a crossing
+  const d = Math.hypot((axis === 'x' ? a : line) - P.x, (axis === 'x' ? line : a) - P.z);
+  if (d < 35 || d > 110) return;
+  if (traffic.some(o => o.axis === axis && o.line === line && o.dir === dir && Math.abs(o.a - a) < 14)) return;
+  const c = addCar(0, 0, 0, laneYaw(axis, dir), Math.floor(Math.random() * CAR_COLORS.length), true);
+  const t = {c, axis, line, dir, a, v: 8 + Math.random() * 6, cruise: 9 + Math.random() * 6, honkT: 0};
+  placeTraffic(t); c.vis = c.y;
+  traffic.push(t);
+}
+function removeTraffic(t) { scene.remove(t.c.g); traffic.splice(traffic.indexOf(t), 1); }
+// how far t can go before it must stop (Infinity if nothing's in the way)
+function trafficRoom(t) {
+  let room = Infinity;
+  // the next crossing's stop line, if its light isn't green for us
+  const L = t.dir > 0 ? ROAD_O + ROAD_G * Math.ceil((t.a + 5.3 - ROAD_O) / ROAD_G) : ROAD_O + ROAD_G * Math.floor((t.a - 6.3 - ROAD_O) / ROAD_G);
+  const stopAt = t.dir > 0 ? L - 5.8 : L + 6.8, toStop = (stopAt - t.a) * t.dir, light = tlState(t.axis);
+  if (toStop > -.5 && toStop < 30 && (light === 'r' || (light === 'y' && toStop > 3))) room = Math.max(0, toStop);
+  // cars in front in the same lane
+  for (const o of traffic) if (o !== t && o.axis === t.axis && o.line === t.line && o.dir === t.dir) {
+    const gap = (o.a - t.a) * t.dir;
+    if (gap > 0 && gap < 30) room = Math.min(room, Math.max(0, gap - 6.5));
+  }
+  // you (or your car) in the lane ahead
+  const across = t.line + LANE[t.axis][t.dir > 0 ? 0 : 1], you = driving || {x: P.x, z: P.z};
+  const yAcross = t.axis === 'x' ? you.z : you.x, yAlong = t.axis === 'x' ? you.x : you.z, gap = (yAlong - t.a) * t.dir;
+  if (Math.abs(yAcross - across) < (driving ? 2.4 : 1.6) && gap > 0 && gap < 16 && Math.abs((driving ? driving.y : P.y) - t.c.y) < 3) {
+    room = Math.min(room, Math.max(0, gap - (driving ? 6 : 4)));
+    if (gap < 10 && (t.honkT -= .1) <= 0) { t.honkT = 3; tone(400, 400, .25, .09, 'square', [t.c.x, t.c.y + 1, t.c.z]); tone(505, 505, .25, .07, 'square', [t.c.x, t.c.y + 1, t.c.z]); }
+  }
+  return room;
+}
+function updateTraffic(dt) {
+  if (dim !== 'o') { while (traffic.length) removeTraffic(traffic[0]); return; }
+  if ((trafficT -= dt) <= 0) {
+    trafficT = 1;
+    for (const t of traffic.slice()) if (Math.hypot(t.c.x - P.x, t.c.z - P.z) > 140) removeTraffic(t);
+    if (traffic.length < TRAFFIC_MAX) spawnTraffic();
+  }
+  for (const t of traffic) {
+    const room = trafficRoom(t), want = Math.min(t.cruise, room * 1.1);
+    t.v += Math.max(-14 * dt, Math.min(4 * dt, want - t.v));
+    if (room < .05) t.v = Math.min(t.v, 0);
+    t.v = Math.max(0, t.v);
+    t.a += t.v * t.dir * dt;
+    placeTraffic(t);
+    t.c.speed = t.v; t.c.brake = want < t.v - .5 || (t.v < .3 && room < 1);
+    syncCar(t.c, dt);
+  }
+}
+// bumping into traffic while you drive
+function trafficHit(c) {
+  for (const t of traffic) {
+    const dx = t.c.x - c.x, dz = t.c.z - c.z;
+    if (Math.abs(t.c.y - c.y) > 2 || dx * dx + dz * dz > 36) continue;
+    const lx = dx * Math.cos(c.yaw) - dz * Math.sin(c.yaw), lz = dx * Math.sin(c.yaw) + dz * Math.cos(c.yaw);
+    const along = Math.abs(Math.sin(t.c.yaw - c.yaw)) > .7; // crossing at right angles
+    if (Math.abs(lx) < (along ? 3.4 : 1.9) && Math.abs(lz) < (along ? 3.4 : 4.9)) return t;
+  }
+  return null;
+}
+
+/* ---------- garage doors ---------- */
+// Every garage has a roll-up door. It opens when you come within 26 blocks, closes behind you once you're inside,
+// and opens again when you head out (drive off, or walk up to it).
+const gDoors = new Map();
+let gDoorT = 0;
+function makeGDoor(g) {
+  const grp = new THREE.Group(), panel = cMat('gdoor', () => new THREE.MeshLambertMaterial({color: 0xdadde2})), slat = cMat('gslat', () => new THREE.MeshLambertMaterial({color: 0xa9adb4}));
+  const b = (m, w, h, d, y) => { const o = new THREE.Mesh(boxG, m); o.scale.set(w, h, d); o.position.set(0, y, 0); grp.add(o); };
+  b(panel, 5, 3, .12, -1.5);
+  for (let k = 1; k <= 4; k++) b(slat, 5.02, .05, .14, -k * .6);
+  b(slat, .5, .08, .16, -2.75); // the handle
+  const [cx, cz] = gCell(g, 0, 6);
+  grp.position.set(cx + .5, g.F + 4, cz + .5); grp.rotation.y = g.axis === 'x' ? 0 : Math.PI / 2;
+  scene.add(grp);
+  return {g, grp, open: 0, moving: false};
+}
+function insideGarage(g, x, z, y) {
+  const fx = Math.floor(x), fz = Math.floor(z), du = (g.axis === 'x' ? fx : fz) - g.along, off = ((g.axis === 'x' ? fz : fx) - g.line) * g.s;
+  return Math.abs(du) <= 2 && off >= 7 && off <= 13 && y > g.F && y < g.F + 4.5 ? off : 0;
+}
+function updateGarageDoors(dt) {
+  if ((gDoorT -= dt) <= 0) {
+    gDoorT = 1;
+    const want = new Set();
+    if (dim === 'o') for (const axis of ['x', 'z']) {
+      const across = axis === 'x' ? P.z : P.x, along = axis === 'x' ? P.x : P.z;
+      for (let line = nearLine(across - 70); line <= across + 70; line += ROAD_G) for (let j = Math.floor((along - 70) / GSLOT); j <= Math.floor((along + 70) / GSLOT); j++) {
+        const g = garageSpec(axis, line, j);
+        if (!g || g.kind !== 'garage') continue;
+        const k = `${axis}${line}_${j}`; want.add(k);
+        if (!gDoors.has(k)) gDoors.set(k, makeGDoor(g));
+      }
+    }
+    for (const [k, d] of gDoors) if (!want.has(k)) { scene.remove(d.grp); gDoors.delete(k); }
+  }
+  for (const d of gDoors.values()) {
+    const g = d.g, [cx, cz] = gCell(g, 0, 6), dist = Math.hypot(cx + .5 - P.x, cz + .5 - P.z), inside = insideGarage(g, P.x, P.z, P.y);
+    const leaving = inside && ((driving && Math.abs(driving.speed) > .3) || inside <= 8);
+    const target = dist <= 26 && (!inside || leaving) ? 1 : 0;
+    if (d.open !== target) {
+      if (!d.moving) noise(1.1, 'bandpass', 180, 2, .25, [cx + .5, g.F + 3, cz + .5]); // the motor
+      d.moving = true;
+      d.open = target > d.open ? Math.min(1, d.open + dt * .9) : Math.max(0, d.open - dt * .9);
+    } else d.moving = false;
+    d.grp.scale.y = Math.max(.04, 1 - d.open); d.grp.visible = d.open < .98;
+  }
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), frame = 0;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -7099,7 +7231,7 @@ function loop(now) {
     else if (passenger && !dead) rideSeat(dt);
     else if ((!dead || ghost) && !sleeping) physics(dt);
     updateSurvival(dt); updateMining(dt); ensureCobble();
-    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt); updateTrafficLights(dt);
+    updateWeather(dt); updateSurvFly(dt); updateLimit(dt); updateLavaMobs(dt); updateFluids(dt); updateAsmr(); updateGarages(dt); updateTrafficLights(dt); updateTraffic(dt); updateGarageDoors(dt);
     if (held && locked) { held.t -= dt; if (held.t <= 0) { act(held.b); held.t = .22; } }
     updateMobs(dt); updatePets(dt); updateClones(dt); secretLife(dt); updateTNT(dt); updatePlanes(dt); updateCars(dt); updateEnd(dt); updateArrows(dt); updateBow(dt); mpTick(dt);
     if (dim === 'b' && frame % 30 === 0 && getBlock(0, OB_Y, 0) === AIR) nextOneBlock();
