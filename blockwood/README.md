@@ -218,7 +218,8 @@ build on it, fly over it. The world saves in the browser.
   inventory; in Survival craft it from 8 iron ingots, 4 glass and 4 coal. Right-click the ground to park it (it
   comes in Pearl White, Stealth Grey, Quicksilver, Ultra Red, Diamond Black or Glacier Blue), right-click it to
   get in, left-click to pick it up. **W** drives, **S** brakes and reverses, **A/D** steer, **C** switches
-  between the chase camera and the driver's seat, **H** honks, **Shift** gets out. It hums like an electric car,
+  between the chase camera and the driver's seat, **H** honks, **L** switches the lights on and off, **Shift** gets out. Headlights glow and shine beams and a pool
+  of light on the road (much brighter at night) whenever a car is being driven. It hums like an electric car,
   climbs one-block bumps, stops at walls and knocks mobs aside. On a phone the stick drives it.
   In multiplayer, friends see your car: the one you're driving moves, steers, spins its wheels and lights its
   brake lights with you in the driver's seat, and your parked cars show up for them too. Friends can **ride with
