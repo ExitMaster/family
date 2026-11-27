@@ -256,13 +256,14 @@ build on it, fly over it. The world saves in the browser.
   to 4 lines (Enter is done, Shift+Enter starts a new line). Right-click a sign to change what it says,
   left-click to take it down. Signs are saved with your world, and in a room everyone sees them.
 
-- **Every Tesla, plus Hyundai (현대), Kia (기아), BMW and Mercedes-Benz**: besides the Model Y L there's the **Model S**, **Model 3**, **Model X**,
+- **Every Tesla, plus Hyundai (현대), Kia (기아), BMW, Mercedes-Benz, Audi and Porsche**: besides the Model Y L there's the **Model S**, **Model 3**, **Model X**,
   **Model Y**, **Cybertruck** (stainless steel), **Roadster** (a low convertible), **Semi** (a big truck cab on
   three axles) and **Cybercab** (two seats, no steering wheel), plus the **Hyundai Ioniq 5**, **Ioniq 6**,
   **Sonata**, **Avante**, **Tucson**, **Kona**, **Santa Fe**, **Palisade**, **Casper**, **Staria** and **Porter**
   truck, and the **Kia Morning**, **Ray**, **K5**, **K8**, **EV3**, **EV6**, **EV9**, **Sportage**, **Sorento**,
   **Carnival** and **Bongo** truck, and **BMW** (3 Series, 5 Series, 7 Series, X3, X5, X7, i4, iX, M4, Z4) and
-  **Mercedes-Benz** (C-Class, E-Class, S-Class, CLA, EQS, GLC, GLE, G-Class, AMG GT, Sprinter van). Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
+  **Mercedes-Benz** (C-Class, E-Class, S-Class, CLA, EQS, GLC, GLE, G-Class, AMG GT, Sprinter van), **Audi** (A3, A4, A6, A8, Q3, Q5,
+  Q7, Q8, e-tron GT, R8) and **Porsche** (911, Taycan, Panamera, Cayenne, Macan, 718 Boxster, 918 Spyder). Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
   (or `/give cybertruck`, `/give hyundai porter`…) and drive, autopark, get borrowed and share like the Model Y L.
   Traffic and garages have all kinds now. **Doors open**: the driver's door opens when you get in or out (and a
   friend's door when they hop in), and **O** in the driver's seat opens or closes them all; the Model X's back

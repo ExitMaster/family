@@ -6628,6 +6628,63 @@ const MODELS = [
   {key: 'mspr', name: 'Mercedes-Benz Sprinter', item: 275, L: 5.93, W: 2.02, r: .38, axles: [-1.85, 1.82], yb: .4, badge: 'MB', grille: 'mb', fy: .98, ry: 1.0, vmax: 28, big: true, van: true,
     top: [[-2.95, .4, 1], [-3.0, .75], [-2.9, 1.05], [-2.3, 1.2, 1], [-1.6, 2.1], [-1.2, 2.58, 1], [2.92, 2.6, 1], [2.96, .6, 1], [2.92, .4, 1]],
     glass: null, cabin: null, floor: .95, eye: 1.85, seats: [[-.45, -1.5], [.45, -1.5]], doors: [[-2.25, -1.3], [-.9, .4, 'slide']], doorY: [.5, 1.95]},
+  // Audi
+  {key: 'a3', name: 'Audi A3', item: 276, L: 4.5, W: 1.82, r: 0.33, axles: [-1.33, 1.3], badge: 'AUDI', grille: 'audi', fy: .7, ry: .9,
+    top: sedanTop(4.5), glass: [[-1.0, .9, 1], [-.25, 1.36], [.45, 1.42], [1.2, 1.3], [1.95, .98, 1]],
+    cabin: [-.95, 1.25], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.25]]},
+  {key: 'a4', name: 'Audi A4', item: 277, L: 4.76, W: 1.85, r: 0.34, axles: [-1.42, 1.42], badge: 'AUDI', grille: 'audi', fy: .7, ry: .9,
+    top: sedanTop(4.76), glass: [[-1.0, .9, 1], [-.25, 1.36], [.45, 1.42], [1.15, 1.33], [1.72, .98, 1]],
+    cabin: [-.95, 1.38], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.38]]},
+  {key: 'a6', name: 'Audi A6', item: 278, L: 4.94, W: 1.89, r: 0.35, axles: [-1.46, 1.46], badge: 'AUDI', grille: 'audi', fy: .7, ry: .9, color: 2,
+    top: sedanTop(4.94), glass: [[-1.0, .9, 1], [-.22, 1.38], [.55, 1.45], [1.25, 1.36], [1.8, .99, 1]],
+    cabin: [-.95, 1.47], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.45]]},
+  {key: 'a8', name: 'Audi A8', item: 279, L: 5.19, W: 1.95, r: 0.37, axles: [-1.58, 1.58], badge: 'AUDI', grille: 'audi', fy: .7, ry: .9, color: 4,
+    top: sedanTop(5.19), glass: [[-1.05, .92, 1], [-.25, 1.43], [.6, 1.51], [1.4, 1.41], [1.95, 1.0, 1]],
+    cabin: [-.95, 1.6], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.45]]},
+  {key: 'aq3', name: 'Audi Q3', item: 280, L: 4.48, W: 1.85, r: 0.35, axles: [-1.33, 1.33], badge: 'AUDI', grille: 'audi', fy: .84, ry: 1.0,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 0.968, 1.0), glass: H_([[-1.0, 1.03, 1], [-.35, 1.55], [1.35, 1.62], [2.05, 1.38], [2.25, 1.12, 1]], 0.968, 1.0),
+    cabin: [-0.97, 1.79], floor: .76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-0.92, .3], [.35, 1.36]]},
+  {key: 'aq5', name: 'Audi Q5', item: 281, L: 4.68, W: 1.89, r: 0.36, axles: [-1.4, 1.42], badge: 'AUDI', grille: 'audi', fy: .84, ry: 1.0,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.01, 1.0), glass: H_([[-1.0, 1.03, 1], [-.35, 1.55], [1.35, 1.62], [2.05, 1.38], [2.25, 1.12, 1]], 1.01, 1.0),
+    cabin: [-1.01, 1.87], floor: .76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-0.96, .3], [.35, 1.41]]},
+  {key: 'aq7', name: 'Audi Q7', item: 282, L: 5.06, W: 1.97, r: 0.38, axles: [-1.5, 1.5], badge: 'AUDI', grille: 'audi', fy: .84, ry: 1.0,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.09, 1.03), glass: H_([[-1.0, 1.03, 1], [-.35, 1.55], [1.35, 1.62], [2.05, 1.38], [2.25, 1.12, 1]], 1.09, 1.03),
+    cabin: [-1.09, 2.03], floor: .76, seats: [[-.42, -.3], [.42, -.3], [-.42, .65], [.42, .65], [-.42, 1.6], [.42, 1.6]], doors: [[-1.04, .3], [.35, 1.53]]},
+  {key: 'aq8', name: 'Audi Q8', item: 283, L: 4.99, W: 2.0, r: 0.38, axles: [-1.5, 1.5], badge: 'AUDI', grille: 'audi', fy: .84, ry: 1.0, color: 4,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.075, 0.98), glass: H_([[-1.0, 1.03, 1], [-.35, 1.5], [1.0, 1.55], [1.95, 1.28], [2.25, 1.1, 1]], 1.075, 0.98),
+    cabin: [-1.07, 2.0], floor: .76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.02, .3], [.35, 1.5]]},
+  {key: 'aetg', name: 'Audi e-tron GT', item: 284, L: 4.99, W: 1.96, r: 0.36, axles: [-1.5, 1.4], badge: 'AUDI', grille: 'audi', fy: .64, ry: .84, vmax: 44, color: 1,
+    top: H_([[-2.46, .28, 1], [-2.5, .46], [-2.43, .6], [-1.8, .7], [-1.0, .82, 1], [1.5, .92], [2.25, .92], [2.45, .8], [2.48, .48], [2.45, .28, 1]], 1.0), glass: H_([[-1.05, .81, 1], [-.35, 1.25], [.45, 1.33], [1.3, 1.2], [2.15, .95, 1]], 1.0),
+    cabin: [-1.0, 1.6], floor: .5, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.0, .25], [.3, 1.35]]},
+  {key: 'ar8', name: 'Audi R8', item: 285, L: 4.43, W: 1.94, r: .34, axles: [-1.33, 1.32], yb: .22, badge: 'AUDI', grille: 'audi', fy: .58, ry: .8, vmax: 47, color: 0,
+    top: [[-2.18, .25, 1], [-2.22, .42], [-2.14, .56], [-1.4, .68], [-.6, .8, 1], [.4, .95, 1], [1.7, .95], [2.15, .9], [2.22, .6], [2.18, .25, 1]],
+    glass: [[-.65, .79, 1], [-.1, 1.2], [.35, 1.24], [.45, .95, 1]],
+    cabin: [-.6, .4], floor: .4, seats: [[-.4, -.05], [.4, -.05]], doors: [[-.6, .4]], doorY: [.3, .82]},
+  // Porsche
+  {key: 'p911', name: 'Porsche 911', item: 286, L: 4.52, W: 1.85, r: .35, axles: [-1.25, 1.2], yb: .24, badge: 'P', roundLamps: true, fy: .64, ry: .82, vmax: 46, color: 3,
+    top: [[-2.24, .28, 1], [-2.28, .45], [-2.2, .6], [-1.6, .7], [-.75, .82, 1], [.75, .95], [1.6, .92], [2.1, .85], [2.26, .65], [2.25, .28, 1]],
+    glass: [[-.8, .81, 1], [-.2, 1.2], [.4, 1.28], [1.2, 1.08], [1.75, .93, 1]],
+    cabin: [-.75, .8], floor: .45, seats: [[-.4, -.05], [.4, -.05], [-.4, .62], [.4, .62]], doors: [[-.75, .5]], doorY: [.32, .82]},
+  {key: 'ptay', name: 'Porsche Taycan', item: 287, L: 4.96, W: 1.97, r: 0.36, axles: [-1.5, 1.4], badge: 'P', grille: 'none', fy: .64, ry: .84, vmax: 44, roundLamps: true, color: 5,
+    top: H_([[-2.46, .28, 1], [-2.5, .46], [-2.43, .6], [-1.8, .7], [-1.0, .82, 1], [1.5, .92], [2.25, .92], [2.45, .8], [2.48, .48], [2.45, .28, 1]], 1.0), glass: H_([[-1.05, .81, 1], [-.35, 1.25], [.45, 1.33], [1.3, 1.2], [2.15, .95, 1]], 1.0),
+    cabin: [-1.0, 1.6], floor: .5, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.0, .25], [.3, 1.35]]},
+  {key: 'ppan', name: 'Porsche Panamera', item: 288, L: 5.05, W: 1.94, r: 0.37, axles: [-1.52, 1.43], badge: 'P', grille: 'none', fy: .64, ry: .84, vmax: 44, roundLamps: true, color: 4,
+    top: H_([[-2.46, .28, 1], [-2.5, .46], [-2.43, .6], [-1.8, .7], [-1.0, .82, 1], [1.5, .92], [2.25, .92], [2.45, .8], [2.48, .48], [2.45, .28, 1]], 1.02), glass: H_([[-1.05, .81, 1], [-.35, 1.25], [.45, 1.33], [1.3, 1.2], [2.15, .95, 1]], 1.02),
+    cabin: [-1.02, 1.63], floor: .5, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.02, .25], [.3, 1.38]]},
+  {key: 'pcay', name: 'Porsche Cayenne', item: 289, L: 4.93, W: 1.98, r: 0.38, axles: [-1.47, 1.48], badge: 'P', grille: 'none', fy: .84, ry: 1.0, roundLamps: true, color: 2,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.065, 1.0), glass: H_([[-1.0, 1.03, 1], [-.35, 1.5], [1.0, 1.55], [1.95, 1.28], [2.25, 1.1, 1]], 1.065, 1.0),
+    cabin: [-1.06, 1.98], floor: .76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.01, .3], [.35, 1.49]]},
+  {key: 'pmac', name: 'Porsche Macan', item: 290, L: 4.78, W: 1.92, r: 0.37, axles: [-1.42, 1.43], badge: 'P', grille: 'none', fy: .84, ry: 1.0, roundLamps: true, color: 9,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.03, 0.97), glass: H_([[-1.0, 1.03, 1], [-.35, 1.5], [1.0, 1.55], [1.95, 1.28], [2.25, 1.1, 1]], 1.03, 0.97),
+    cabin: [-1.03, 1.91], floor: .76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-0.98, .3], [.35, 1.44]]},
+  {key: 'p718', name: 'Porsche 718 Boxster', item: 291, L: 4.38, W: 1.8, r: .34, axles: [-1.24, 1.24], yb: .22, badge: 'P', roundLamps: true, fy: .58, ry: .8, vmax: 44, color: 12,
+    top: [[-2.17, .26, 1], [-2.21, .42], [-2.13, .58], [-1.5, .68], [-.45, .8, 1], [.5, .84, 1], [1.4, .88], [2.08, .84], [2.19, .62], [2.17, .26, 1]],
+    glass: [[-.47, .8, 1], [-.12, 1.12], [0, 1.15, 1], [-.3, .81, 1]],
+    cabin: [-.45, .5], floor: .45, seats: [[-.4, .05], [.4, .05]], doors: [[-.45, .45]], doorY: [.3, .8]},
+  {key: 'p918', name: 'Porsche 918 Spyder', item: 292, L: 4.64, W: 1.94, r: .35, axles: [-1.36, 1.37], yb: .2, badge: 'P', roundLamps: true, fy: .56, ry: .78, vmax: 50, color: 2,
+    top: [[-2.3, .24, 1], [-2.34, .4], [-2.26, .54], [-1.5, .64], [-.5, .76, 1], [.45, .8, 1], [1.5, .9], [2.18, .86], [2.32, .6], [2.3, .24, 1]],
+    glass: [[-.52, .76, 1], [-.18, 1.06], [-.06, 1.09, 1], [-.36, .77, 1]],
+    cabin: [-.5, .45], floor: .4, seats: [[-.4, 0], [.4, 0]], doors: [[-.5, .4]], doorY: [.28, .76]},
 ];
 MODELS.forEach((m, i) => { m.i = i; m.wb = m.axles[m.axles.length - 1] - m.axles[0]; m.yb = m.yb || .28; m.vmax = m.vmax || 33; m.Ht = Math.max(...m.top.map(p => p[1]), ...(m.glass || []).map(p => p[1])); });
 const MODEL_BY_ITEM = {}; MODELS.forEach(m => { MODEL_BY_ITEM[m.item] = m; });
@@ -6712,7 +6769,7 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
   if (m.cabin) box(seatM, m.W - .3, .02, m.cabin[1] - m.cabin[0] - .1, 0, m.floor + .01, (m.cabin[0] + m.cabin[1]) / 2);
   // lights: front and back, as light bars (or Hyundai's little square "pixel" lights)
   const fz = noseAt(m, m.fy) - .03, rz = noseAt(m, m.ry, true) + .03;
-  if (m.grille === 'g') { box(tailM, m.W - .5, .05, .03, 0, m.ry, rz); }
+  if (m.grille === 'g' || m.roundLamps) { box(tailM, m.W - .3, .045, .03, 0, m.ry, rz); for (const s of [-1, 1]) box(tailM, .3, .07, .04, s * (m.W / 2 - .3), m.ry - .06, rz - .01); }
   else if (m.pixel) for (const s of [-1, 1]) for (let k = 0; k < 3; k++) for (let j = 0; j < 2; j++) { box(lampM, .07, .07, .03, s * (hw - .3 - k * .1), m.fy - j * .09, fz - .01); box(tailM, .07, .07, .03, s * (hw - .3 - k * .1), m.ry - j * .09, rz + .01); }
   else {
     box(lampM, m.W - .4, .025, .03, 0, m.fy, fz); for (const s of [-1, 1]) box(lampM, .34, .05, .04, s * (hw - .34), m.fy - .05, fz + .01);
@@ -6724,6 +6781,10 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
   if (m.grille === 'kidney') { const gh = m.bigGrille ? .26 : .15, gy = m.fy - .07 - gh / 2; for (const s of [-1, 1]) { box(silver, .27, gh + .04, .02, s * .15, gy, gz(gy) + .005); box(black, .23, gh, .025, s * .15, gy, gz(gy)); } }
   if (m.grille === 'mb' || m.grille === 'amg' || m.grille === 'g') { const gw = m.grille === 'g' ? .9 : .78, gh = m.grille === 'amg' ? .16 : .22, gy = m.fy - .06 - gh / 2; box(black, gw, gh, .025, 0, gy, gz(gy));
     for (let k = 0; k < (m.grille === 'g' ? 3 : m.grille === 'amg' ? 6 : 1); k++) { const sl = m.grille === 'amg' ? box(silver, .02, gh - .02, .03, -gw / 2 + .1 + k * (gw - .2) / 5, gy, gz(gy) - .005) : box(silver, gw - .06, .018, .03, 0, gy + (m.grille === 'g' ? (k - 1) * .06 : 0), gz(gy) - .005); } }
+  if (m.grille === 'audi') { const gh = m.vmax > 40 ? .18 : .3, gy = m.fy - .08 - gh / 2; box(silver, .66, gh + .04, .02, 0, gy, gz(gy) + .005); box(black, .62, gh, .025, 0, gy, gz(gy)); }
+  if (m.badge === 'AUDI') { const by = m.grille === 'audi' ? m.fy - .1 : m.fy + .04, bz = noseAt(m, by) - .05; for (let k = 0; k < 4; k++) { const rg = mesh(G.wheelRing, silver, -.075 + k * .05, by, bz); rg.scale.setScalar(.2); } }
+  if (m.badge === 'P') { const by = m.fy + .02, bz = noseAt(m, by) - .03; box(cMat('pgold', () => new THREE.MeshPhongMaterial({color: 0xd4a62a, shininess: 90})), .07, .09, .012, 0, by, bz); box(tailM, .05, .025, .014, 0, by + .01, bz - .002); box(black, .05, .018, .014, 0, by - .02, bz - .002); }
+  if (m.roundLamps) for (const s of [-1, 1]) { const ly = m.fy + .03, l = mesh(G.hub, lampM, s * (m.W / 2 - .34), ly, gz(ly) + .06); l.scale.set(1, 2.2, 1.6); l.rotation.y = Math.PI / 2; l.rotation.x = -.5; }
   if (m.grille === 'mbpanel') { const gy = m.fy - .14; box(black, .9, .14, .02, 0, gy, gz(gy)); }
   if (m.badge === 'BMW') { const by = m.fy + .04, bz = noseAt(m, by) - .04; box(black, .11, .11, .012, 0, by, bz); [[-1, 1, 0x2a6fd6], [1, 1, 0xffffff], [-1, -1, 0xffffff], [1, -1, 0x2a6fd6]].forEach(([a, b, c]) => box(cMat('bmw' + c, () => new THREE.MeshBasicMaterial({color: c})), .035, .035, .014, a * .02, by + b * .02, bz - .002)); }
   if (m.badge === 'MB') { const by = m.grille === 'g' || m.grille === 'mb' || m.grille === 'amg' ? m.fy - .06 - (m.grille === 'amg' ? .08 : .11) : m.fy + .04, bz = noseAt(m, by) - .05;
