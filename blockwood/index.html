@@ -1452,7 +1452,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving && autoPark ? '  · AUTOPARK' : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1644,6 +1644,7 @@ addEventListener('keydown', e => {
     if (e.code === 'KeyC' && !e.repeat) { carView = 1 - carView; toast(carView ? "Driver's seat" : 'Chase camera', 1200); }
     if (e.code === 'KeyH') honk();
     if (!e.repeat && PAINT_KEYS[e.code] !== undefined) paintCar(driving, PAINT_KEYS[e.code]);
+    if (e.code === 'KeyG' && !e.repeat) startAutoPark();
     if (e.code === 'KeyP' && !e.repeat) paintCar(driving, SWAP_COLORS[(SWAP_COLORS.indexOf(driving.color) + 1) % SWAP_COLORS.length]);
     if (e.code === 'KeyT' || e.code === 'Enter') { e.preventDefault(); openChat(''); return; }
     keys[e.code] = true;
@@ -6411,7 +6412,9 @@ function updateAsmr() {
 // big screen and a steering wheel. W/S drive and brake, A/D steer, C swaps between the chase view and the driver's
 // seat, H honks, Shift gets out. It climbs one-block bumps, stops at walls, and pushes mobs out of the way.
 const CAR = 96, WHEEL_R = .37, WHEELBASE = 3.04;
-const CAR_COLORS = [['Pearl White', 0xf3f3f1], ['Stealth Grey', 0x4a4e55], ['Quicksilver', 0xb9bdc2], ['Ultra Red', 0xa3121b], ['Diamond Black', 0x121316], ['Glacier Blue', 0x7fa3c4]];
+const CAR_COLORS = [['Pearl White', 0xf3f3f1], ['Stealth Grey', 0x4a4e55], ['Quicksilver', 0xb9bdc2], ['Ultra Red', 0xa3121b], ['Diamond Black', 0x121316], ['Glacier Blue', 0x7fa3c4],
+  ['Marine Blue', 0x1f3f7a], ['Midnight Cherry Red', 0x5c0f1f], ['Ultra Violet', 0x5b2a8a], ['Sunset Orange', 0xe8661c], ['Bubblegum Pink', 0xf08cbc],
+  ['Lime Green', 0x8ccf2a], ['Gold', 0xd4af37], ['Mint', 0x9fe3c8]];
 item(CAR, 'Tesla Model Y L', g => {
   rects(g, '#e8e8e8', [[1, 7, 14, 3], [3, 5, 9, 2], [2, 6, 2, 1]]);
   rects(g, '#1b222c', [[4, 5, 7, 2], [5, 4, 5, 1]]); rects(g, '#e8e8e8', [[7, 5, 1, 2]]);
@@ -6564,13 +6567,13 @@ function enterCar(c) {
   if (riding) exitPlane();
   driving = c; P.fly = false; P.yaw = c.yaw; P.pitch = -.2; mine.on = false; held = null;
   $('#bExit').hidden = false;
-  toast(TOUCH ? 'Push the stick up to drive, left and right to steer' : 'W drive · S brake/reverse · A/D steer · C view · H horn · 1 grey, 2 blue, 3 white (P swaps) · Shift get out', 6000);
+  toast(TOUCH ? 'Push the stick up to drive, left and right to steer' : 'W drive · S brake/reverse · A/D steer · G autopark · C view · H horn · 1–9 or P paint · Shift get out', 6000);
   tone(660, 660, .08, .08, 'sine'); tone(990, 990, .1, .08, 'sine', null, .1); // the welcome chime
 }
 function exitCar() {
   const c = driving;
   if (!c) return;
-  driving = null; c.brake = false; $('#bExit').hidden = true; humOff();
+  driving = null; autoPark = null; c.brake = false; $('#bExit').hidden = true; humOff();
   const side = [[-1.6, 0], [1.6, 0], [0, -3.4], [0, 3.4]], co = Math.cos(c.yaw), si = Math.sin(c.yaw);
   for (const [lx, lz] of side) {
     P.x = c.x + lx * co + lz * si; P.z = c.z - lx * si + lz * co; P.y = c.y + .05;
@@ -6606,6 +6609,15 @@ function driveCar(dt) {
   if (S.on && !carHum) humOn();
   const thr = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y;
   const turn = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x;
+  if (autoPark && (Math.abs(thr) > .2 || Math.abs(turn) > .2)) { autoPark = null; toast('You took over'); }
+  if (autoPark) {
+    autoParkStep(c, dt); carFall(c, dt); carBattery(c, dt);
+    P.x = c.x; P.z = c.z; P.y = c.y + .35; P.vx = P.vy = P.vz = 0; st.fallY = null;
+    { let d = c.yaw - P.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); P.yaw += d * Math.min(1, 2.5 * dt); }
+    if (carHum) { const t = S.ctx.currentTime; carHum.o.frequency.setTargetAtTime(70 + c.speed * 26, t, .05); carHum.o2.frequency.setTargetAtTime(140 + c.speed * 52, t, .05); carHum.g.gain.setTargetAtTime(.02, t, .08); }
+    syncCar(c, dt);
+    return;
+  }
   // electric: quick off the line, strong regenerative braking, gently coasts down when you let go
   c.brake = thr < -.2 && c.speed > .5;
   if (thr > .2) c.speed += (c.speed < 0 ? 16 : 8.5 - Math.max(0, c.speed - 20) * .3) * dt;
@@ -6733,7 +6745,10 @@ function friendCar(a, p, dt) {
 
 /* ---------- paint and passengers ---------- */
 // In your car, 1 / 2 / 3 paint it Stealth Grey, Blue or White (P swaps between them). Friends see the new colour.
-const SWAP_COLORS = [1, 5, 0], PAINT_KEYS = {Digit1: 1, Digit2: 5, Digit3: 0};
+// 1 Stealth Grey, 2 Glacier Blue, 3 Pearl White, 4 Ultra Red, 5 Diamond Black, 6 Quicksilver, 7 Marine Blue,
+// 8 Midnight Cherry Red, 9 Ultra Violet; P goes through all of them and Sunset Orange, Bubblegum Pink, Lime Green, Gold and Mint
+const SWAP_COLORS = [1, 5, 0, 3, 4, 2, 6, 7, 8, 9, 10, 11, 12, 13], PAINT_KEYS = {};
+for (let k = 1; k <= 9; k++) PAINT_KEYS['Digit' + k] = SWAP_COLORS[k - 1];
 function paintCar(c, color, quietly) {
   if (!c || c.color === color) return;
   c.color = color;
@@ -7216,6 +7231,79 @@ function updateGarageDoors(dt) {
       d.open = target > d.open ? Math.min(1, d.open + dt * .9) : Math.max(0, d.open - dt * .9);
     } else d.moving = false;
     d.grp.scale.y = Math.max(.04, 1 - d.open); d.grp.visible = d.open < .98;
+  }
+}
+
+/* ---------- autopark ---------- */
+// In the driver's seat, G finds the nearest free garage or gas-station pump within 70 blocks and the car drives itself
+// there: along the road, round into the driveway and in (the garage door opens for it and closes once you're in).
+// It follows a smooth path, steering its wheels as it goes. W, S, A or D takes back control.
+let autoPark = null;
+function parkSpots(c) {
+  const out = [];
+  for (const axis of ['x', 'z']) {
+    const across = axis === 'x' ? c.z : c.x, along = axis === 'x' ? c.x : c.z;
+    for (let line = nearLine(across - 70); line <= across + 70; line += ROAD_G) for (let j = Math.floor((along - 70) / GSLOT); j <= Math.floor((along + 70) / GSLOT); j++) {
+      const g = garageSpec(axis, line, j);
+      if (!g) continue;
+      const off = g.kind === 'gas' ? 9 : 10, [sx, sz] = gCell(g, 0, off).map(v => v + .5);
+      if (cars.some(o => o !== c && Math.hypot(o.x - sx, o.z - sz) < 3)) continue; // someone's parked there
+      const d = Math.hypot(sx - c.x, sz - c.z);
+      if (d < 70) out.push({g, off, d});
+    }
+  }
+  return out.sort((a, b) => a.d - b.d);
+}
+function startAutoPark() {
+  const c = driving;
+  if (!c) return;
+  if (autoPark) { autoPark = null; toast('Autopark off'); return; }
+  const spot = dim === 'o' && parkSpots(c)[0];
+  if (!spot) { toast('No free garage or gas station nearby to park in'); return; }
+  const {g, off} = spot, cAlong = g.axis === 'x' ? c.x : c.z, cAcross = g.axis === 'x' ? c.z : c.x, side = Math.sign(cAlong - g.along) || 1;
+  const P2 = (du, o) => gCell(g, du, o).map(v => v + .5);
+  const pts = [[c.x, c.z]];
+  if (Math.abs(cAlong - g.along) > 14) pts.push(P2(Math.max(-60, Math.min(60, cAlong - g.along)) - side * 4, Math.abs(cAcross - g.line) < 6 ? -1 : 0)); // onto the road
+  pts.push(P2(side * 9, -1), P2(side * 4.5, 1.2), P2(0, 4), P2(0, off - 2.5), P2(0, off));
+  // a smooth line through the points (Catmull-Rom), every quarter block
+  const path = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / .25));
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      path.push([0, 1].map(a => .5 * (2 * p1[a] + (-p0[a] + p2[a]) * t + (2 * p0[a] - 5 * p1[a] + 4 * p2[a] - p3[a]) * t2 + (-p0[a] + 3 * p1[a] - 3 * p2[a] + p3[a]) * t3)));
+    }
+  }
+  path.push(pts[pts.length - 1]);
+  autoPark = {path, s: 0, kind: g.kind};
+  toast(`Autopark: parking ${g.kind === 'gas' ? 'at the gas station' : 'in the garage'}… (W/S/A/D to take over)`, 3500);
+  tone(880, 880, .08, .06, 'sine'); tone(1320, 1320, .1, .06, 'sine', null, .1);
+}
+function autoParkStep(c, dt) {
+  const ap = autoPark, path = ap.path;
+  let left = 0;
+  for (let i = Math.floor(ap.s); i < path.length - 1; i++) left += Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]);
+  const v = Math.min(6, Math.max(1.2, left * .9));
+  let move = v * dt, i = Math.floor(ap.s);
+  while (move > 0 && i < path.length - 1) { // walk along the path
+    const seg = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]) || 1e-6, frac = ap.s - i, rest = seg * (1 - frac);
+    if (move < rest) { ap.s += move / seg; move = 0; } else { move -= rest; i++; ap.s = i; }
+  }
+  i = Math.min(path.length - 2, Math.floor(ap.s));
+  const f = ap.s - i, a = path[i], b = path[i + 1], nx = a[0] + (b[0] - a[0]) * f, nz = a[1] + (b[1] - a[1]) * f;
+  const dx = b[0] - a[0], dz = b[1] - a[1];
+  if (dx || dz) {
+    const nyaw = Math.atan2(-dx, -dz); let dy = nyaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    c.steer += (Math.max(-.55, Math.min(.55, Math.atan(-dy / dt * WHEELBASE / Math.max(v, .5)))) - c.steer) * Math.min(1, 8 * dt);
+    c.yaw += dy;
+  }
+  if (carHits(nx, c.y + .3, nz, c.yaw) && !carHits(nx, c.y + 1.3, nz, c.yaw)) c.y = Math.floor(c.y + .3) + 1; // up a kerb
+  c.x = nx; c.z = nz; c.speed = v; c.brake = left < 3;
+  if (left < .05 || ap.s >= path.length - 1.001) {
+    autoPark = null; c.speed = 0; c.steer = 0; c.brake = false;
+    toast(ap.kind === 'gas' ? 'Parked at the pump! Filling up…' : 'Parked in the garage!', 3000);
+    [660, 880].forEach((fq, k) => tone(fq, fq, .12, .07, 'sine', null, k * .12));
   }
 }
 

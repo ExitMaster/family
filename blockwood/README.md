@@ -225,8 +225,11 @@ build on it, fly over it. The world saves in the browser.
   you**: they right-click your car (parked or while you drive) to sit in the front passenger seat, or a back
   seat if that's taken (3 passengers at most), and Shift gets them out. Friends can also **drive your car**: right-clicking it
   while it's parked puts them in the driver's seat (your copy disappears until they're done), and when they get
-  out it stays parked where they stopped, still yours. In the driver's seat, **1**, **2** and
-  **3** paint the car Stealth Grey, Blue or White (**P** swaps between them).
+  out it stays parked where they stopped, still yours. In the driver's seat, **1** to **9** paint the
+  car (Stealth Grey, Glacier Blue, Pearl White, Ultra Red, Diamond Black, Quicksilver, Marine Blue, Midnight
+  Cherry Red, Ultra Violet) and **P** goes through all 14 colours (also Sunset Orange, Bubblegum Pink, Lime
+  Green, Gold and Mint). **G** is **autopark**: the car finds the nearest free garage or gas-station pump within
+  70 blocks and drives itself there and parks (W, S, A or D takes back control).
 
 - **Roads and garages**: roads cross the whole Overworld in a big grid (one every 128 blocks, the first about
   30 blocks from where the world starts). They're asphalt with a dashed yellow middle line and white edges,
