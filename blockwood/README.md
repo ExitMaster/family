@@ -223,7 +223,9 @@ build on it, fly over it. The world saves in the browser.
   In multiplayer, friends see your car: the one you're driving moves, steers, spins its wheels and lights its
   brake lights with you in the driver's seat, and your parked cars show up for them too. Friends can **ride with
   you**: they right-click your car (parked or while you drive) to sit in the front passenger seat, or a back
-  seat if that's taken (3 passengers at most), and Shift gets them out. In the driver's seat, **1**, **2** and
+  seat if that's taken (3 passengers at most), and Shift gets them out. Friends can also **drive your car**: right-clicking it
+  while it's parked puts them in the driver's seat (your copy disappears until they're done), and when they get
+  out it stays parked where they stopped, still yours. In the driver's seat, **1**, **2** and
   **3** paint the car Stealth Grey, Blue or White (**P** swaps between them).
 
 ## Multiplayer

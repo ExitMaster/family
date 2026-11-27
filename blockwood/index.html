@@ -1259,7 +1259,7 @@ function act(button) {
     const car = carHit(Math.min(5, far));
     if (car) { if (button === 2) enterCar(car); else pickCar(car); return; }
     const fcar = mp.on && carHit(Math.min(5, far), friendCarList());
-    if (fcar) { if (button === 2) takeSeat(fcar); else toast(`That's ${ownerName(fcar.owner)}'s car. Right-click to ride in it`); return; }
+    if (fcar) { if (button === 2) { if (fcar.parked) borrowCar(fcar); else takeSeat(fcar); } else toast(`That's ${ownerName(fcar.owner)}'s car. Right-click to ${fcar.parked ? 'drive' : 'ride in'} it`); return; }
     const pl = planeHit(Math.min(5, far));
     if (pl) { if (button === 2) board(pl); else pickPlane(pl); return; }
     const fr = mp.on && avatarHit(Math.min(5, far));
@@ -1427,7 +1427,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving ? `  · Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${ownerName(passenger.owner)}'s Tesla (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -3834,7 +3834,7 @@ async function mpJoinRoom() {
     fb.onValue(R('/players'), s => mpPlayers(s.val() || {})), fb.onValue(R('/sky'), s => mpSky(s.val())),
     fb.onValue(R('/meta/owner'), s => { mp.owner = s.val(); renderFriendButtons(); }),
     fb.onValue(R('/kicked/' + mp.uid), s => { const v = s.val(); if (v && mp.on && serverNow() - v.t < KICK_MS) beKicked(v); }),
-    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
+    fb.onValue(R('/mobs'), s => mpGhosts(s.val() || {})), fb.onValue(R('/cars'), s => mpCars(s.val() || {})), fb.onValue(R('/borrow'), s => mpBorrows(s.val() || {})), fb.onChildAdded(R('/hits/' + mp.uid), mpOnHit), fb.onChildAdded(R('/fx/' + mp.uid), mpOnFx), fb.onValue(R('/trades'), s => mpTrades(s.val())), fb.onValue(R('/chests'), s => mpChests(s.val())),
     fb.onValue(R('/dreams'), s => { for (const [k, v] of Object.entries(s.val() || {})) if (Number.isInteger(v) && (v === -1 || isBlock(v))) dreamPortals.set(k, v); }),
     fb.onChildAdded(fb.query(R('/chat'), fb.limitToLast(12)), s => { const v = s.val(); if (v && typeof v.m === 'string' && !(v.t < mp.joinedAt - 120000)) showChat(String(v.n || '?'), v.m); }));
   mpJoin.disabled = false; mpJoin.textContent = 'Leave'; mpRoom.disabled = mpName.disabled = true;
@@ -3844,6 +3844,8 @@ async function mpJoinRoom() {
 }
 function mpLeave() {
   if (!mp.on) return;
+  if (driving && driving.borrow) exitCar();
+  if (passenger) leaveSeat();
   const fb = mp.fb;
   if (tradeF) { closeInv(false); cancelTrade(); }
   hideAsk();
@@ -3863,7 +3865,7 @@ mpJoin.addEventListener('click', () => mp.on ? mpLeave() : mpJoinRoom());
 for (const el of [mpName, mpRoom]) el.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') mpJoin.click(); });
 
 function hashStr(t) { let h = 0; for (const ch of t || '') h = Math.imul(h, 31) + ch.codePointAt(0) | 0; return h; }
-const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2), driving.id] : 0, rc: passenger ? [passenger.owner, passenger.id, passenger.seat] : 0, t: mp.fb.serverTimestamp()});
+const mpMe = () => ({n: mp.name, c: mp.color, x: +P.x.toFixed(2), y: +P.y.toFixed(2), z: +P.z.toFixed(2), yaw: +P.yaw.toFixed(2), pitch: +P.pitch.toFixed(2), d: here(), s: mode === 's' && !dead ? 1 : 0, v: pvp ? 1 : 0, k: dead ? (ghost ? 2 : 1) : 0, r: mount ? +rideOff().toFixed(2) : 0, cb: driving && driving.borrow ? driving.borrow.owner : 0, cv: driving ? [driving.color, +driving.yaw.toFixed(2), +driving.steer.toFixed(2), +driving.speed.toFixed(1), driving.brake ? 1 : 0, +driving.y.toFixed(2), driving.id] : 0, rc: passenger ? [passenger.owner, passenger.id, passenger.seat] : 0, t: mp.fb.serverTimestamp()});
 // every block change in a shared world goes to the room (called from setBlock)
 function mpSendEdit(x, y, z, b) { quiet(mp.fb.set(R(`/edits/${here()}_${x}_${y}_${z}`), b)); }
 function mpApplyEdit(key, v) {
@@ -3886,7 +3888,7 @@ function mpPlayers(all) {
     if (!a) { a = buildAvatar(String(p.n || '?').slice(0, 12), SHIRTS.includes(p.c) ? p.c : SHIRTS[0]); a.uid = id; a.x = p.x; a.y = p.y; a.z = p.z; a.yaw = p.yaw || 0; avatars.set(id, a); if (Date.now() - mp.joinedAt > 3000) toast(`${p.n} joined`); }
     a.p = p; a.seen = Date.now();
   }
-  for (const [id, a] of avatars) if (!all[id]) { scene.remove(a.g); if (a.car) scene.remove(a.car.g); avatars.delete(id); toast(`${a.name} left`); }
+  for (const [id, a] of avatars) if (!all[id]) { carBack(id, a); scene.remove(a.g); if (a.car) scene.remove(a.car.g); avatars.delete(id); toast(`${a.name} left`); }
   mpStatus.textContent = `Room ${mp.room} · ${names.length} playing: ${names.join(', ')}`;
   renderFriendButtons();
 }
@@ -3911,6 +3913,7 @@ function buildAvatar(name, col) {
 function mpTick(dt) {
   if (!mp.on) return;
   updateGhosts(dt);
+  for (const f of friendParked.values()) for (const c of f.list) c.g.visible = f.d === here() && !(driving && driving.borrow && driving.id === c.id);
   if ((mp.mobT -= dt) <= 0) { mp.mobT = .25; mpPublishMobs(); }
   for (const a of avatars.values()) {
     const p = a.p, vis = !!p && p.d === here() && Date.now() - a.seen < 60000;
@@ -6487,7 +6490,7 @@ function syncCar(c, dt) {
   c.tailM.color.setHex(c.brake ? 0xff2a2a : 0x9a0f16);
 }
 function removeCar(c) { if (driving === c) exitCar(); scene.remove(c.g); cars.splice(cars.indexOf(c), 1); }
-function carList(parkedOnly) { return cars.filter(c => !parkedOnly || c !== driving).map(c => [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color, c.id)); }
+function carList(parkedOnly) { return cars.filter(c => !parkedOnly || (c !== driving && !c.borrowedBy)).map(c => [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color, c.id)); }
 function clearCars() { while (cars.length) removeCar(cars[0]); }
 // the corners and sides of the car, in the world
 function carPts(x, z, yaw) {
@@ -6508,6 +6511,7 @@ function carHit(maxD, list = cars) { // the car you're pointing at: test the ray
   let best = null, bt = maxD;
   dirV.set(0, 0, -1).applyQuaternion(cam.quaternion);
   for (const c of list) {
+    if (!c.g.visible) continue;
     const co = Math.cos(-c.yaw), si = Math.sin(-c.yaw), ox = cam.position.x - c.x, oz = cam.position.z - c.z;
     const o = [ox * co + oz * si, cam.position.y - c.y, -ox * si + oz * co], d = [dirV.x * co + dirV.z * si, dirV.y, -dirV.x * si + dirV.z * co];
     const mn = [-.98, 0, -2.56], mx = [.98, 1.7, 2.56];
@@ -6528,6 +6532,7 @@ function pickCar(c) {
   saveDirty = true;
 }
 function enterCar(c) {
+  if (c.borrowedBy) { toast(`${ownerName(c.borrowedBy)} is driving it right now`); return; }
   if (mount) dismount();
   if (riding) exitPlane();
   driving = c; P.fly = false; P.yaw = c.yaw; P.pitch = -.2; mine.on = false; held = null;
@@ -6547,6 +6552,7 @@ function exitCar() {
   }
   P.vx = P.vy = P.vz = 0; st.fallY = null; c.speed = 0; c.steer = 0;
   saveDirty = true;
+  if (c.borrow) returnCar(c);
 }
 function humOn() {
   const ctx = audio();
@@ -6661,7 +6667,7 @@ function mpCars(all) {
     if (old && old.sig === sig) continue;
     if (old) old.list.forEach(c => scene.remove(c.g));
     const made = list.map(a => addCar(a[0], a[1], a[2], a[3], a[4], true, a[5]));
-    made.forEach(c => { c.g.visible = v.d === here(); c.owner = id; });
+    made.forEach(c => { c.g.visible = v.d === here(); c.owner = id; c.parked = true; });
     friendParked.set(id, {sig, d: v.d, list: made});
   }
 }
@@ -6672,7 +6678,7 @@ function friendCar(a, p, dt) {
   if (!cv) { if (a.car) { scene.remove(a.car.g); a.car = null; a.legs.forEach(l => l.rotation.set(0, 0, 0)); a.g.scale.setScalar(1); } return; }
   const [color, yaw, steer, speed, brake, cy] = cv;
   if (!a.car || a.car.color !== color) { if (a.car) scene.remove(a.car.g); a.car = addCar(a.x, cy, a.z, yaw, color, true, cv[6]); a.car.vis = cy; }
-  a.car.id = cv[6] || a.car.id; a.car.owner = a.uid;
+  a.car.id = cv[6] || a.car.id; a.car.owner = typeof p.cb === 'string' && p.cb ? p.cb : a.uid; // p.cb: whose car they borrowed
   const c = a.car;
   let dy = yaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); c.yaw += dy * Math.min(1, 10 * dt);
   c.x = a.x; c.z = a.z; c.y = cy; c.steer = steer; c.speed = speed; c.brake = !!brake;
@@ -6687,11 +6693,12 @@ function friendCar(a, p, dt) {
 /* ---------- paint and passengers ---------- */
 // In your car, 1 / 2 / 3 paint it Stealth Grey, Blue or White (P swaps between them). Friends see the new colour.
 const SWAP_COLORS = [1, 5, 0], PAINT_KEYS = {Digit1: 1, Digit2: 5, Digit3: 0};
-function paintCar(c, color) {
+function paintCar(c, color, quietly) {
   if (!c || c.color === color) return;
   c.color = color;
   const paint = cMat('p' + color, () => new THREE.MeshPhongMaterial({color: CAR_COLORS[color][1], shininess: 90, specular: 0x777777}));
   for (const m of c.painted) m.material = paint;
+  if (quietly) return;
   noise(.5, 'highpass', 4000, 1, .25); // pssshh
   toast(`New paint: ${CAR_COLORS[color][0]}`, 1800);
   saveDirty = true;
@@ -6709,9 +6716,9 @@ function friendCarList() {
 }
 // where a car (by owner and id) is right now, wherever it is: someone driving it, parked, or one of yours
 function findCar(owner, id) {
-  if (owner === mp.uid) return cars.find(c => c.id === id) || null;
-  const a = avatars.get(owner);
-  if (a && a.car && a.car.id === id && a.car.g.visible) return a.car;
+  if (driving && driving.id === id && (driving.borrow ? driving.borrow.owner : mp.uid) === owner) return driving;
+  if (owner === mp.uid) { const c = cars.find(c => c.id === id); if (c && !c.borrowedBy) return c; }
+  for (const a of avatars.values()) if (a.car && a.car.id === id && a.car.owner === owner && a.car.g.visible) return a.car; // the owner, or a friend borrowing it
   const f = friendParked.get(owner);
   return f && f.d === here() ? f.list.find(c => c.id === id) || null : null;
 }
@@ -6763,6 +6770,52 @@ function seatFriend(a, p) {
   a.g.position.set(c.x + lx * co + (lz + .25) * si, c.vis + .25, c.z - lx * si + (lz + .25) * co); a.g.rotation.y = c.yaw; a.g.scale.setScalar(.7);
   a.legs[0].rotation.set(-1.45, 0, 0); a.legs[1].rotation.set(-1.45, 0, 0); a.arms[0].rotation.x = a.arms[1].rotation.x = -.3;
   return true;
+}
+
+
+/* ---------- friends can drive your car ---------- */
+// Right-click a friend's parked Tesla to drive it (if someone is already driving it, you ride along instead). While
+// you have it, /borrow/{owner}_{car} says so: the owner's copy hides and they see you driving it. When you get out
+// you leave it parked where you stopped, in whatever colour you gave it, and it's still theirs.
+const borrows = new Map();
+const borrowKey = (owner, id) => owner + '_' + id;
+function borrowCar(gc) {
+  const v = borrows.get(borrowKey(gc.owner, gc.id));
+  if (v && !v.done && v.by !== mp.uid) { takeSeat(gc); return; }
+  const c = addCar(gc.x, gc.y, gc.z, gc.yaw, gc.color, true, gc.id);
+  c.borrow = {owner: gc.owner}; c.owner = gc.owner;
+  quiet(mp.fb.set(R('/borrow/' + borrowKey(gc.owner, gc.id)), {by: mp.uid, t: mp.fb.serverTimestamp()}));
+  enterCar(c);
+  toast(`You're driving ${ownerName(gc.owner)}'s car! W to go · Shift to get out and leave it parked`, 4500);
+}
+function returnCar(c) {
+  scene.remove(c.g);
+  if (mp.on) quiet(mp.fb.set(R('/borrow/' + borrowKey(c.borrow.owner, c.id)), {by: mp.uid, done: 1, p: [c.x, c.y, c.z, c.yaw].map(v => Math.round(v * 100) / 100).concat(c.color)}));
+}
+function mpBorrows(all) {
+  borrows.clear();
+  for (const [k, v] of Object.entries(all)) if (v && typeof v.by === 'string') borrows.set(k, v);
+  for (const c of cars) {
+    const k = borrowKey(mp.uid, c.id), v = borrows.get(k);
+    if (v && v.done) { // they brought it back: park it where they left it
+      if (Array.isArray(v.p) && v.p.length === 5 && v.p.every(Number.isFinite)) { [c.x, c.y, c.z, c.yaw] = v.p; c.vis = c.y; c.vy = 0; paintCar(c, v.p[4], true); }
+      if (c.borrowedBy) toast(`${ownerName(c.borrowedBy)} parked your car`);
+      c.borrowedBy = null; c.g.visible = true; saveDirty = true;
+      quiet(mp.fb.remove(R('/borrow/' + k)));
+    } else if (v) {
+      if (driving === c) { quiet(mp.fb.remove(R('/borrow/' + k))); continue; } // you're in it yourself
+      if (!c.borrowedBy) toast(`${ownerName(v.by)} is driving your car!`, 3000);
+      c.borrowedBy = v.by; c.g.visible = false;
+    } else if (c.borrowedBy) { c.borrowedBy = null; c.g.visible = true; }
+  }
+}
+// a friend left the room while driving your car: it stays where they were
+function carBack(uid, a) {
+  for (const c of cars) if (c.borrowedBy === uid) {
+    if (a.car && a.car.id === c.id) { c.x = a.car.x; c.y = a.car.y; c.z = a.car.z; c.yaw = a.car.yaw; c.vis = c.y; paintCar(c, a.car.color, true); }
+    c.borrowedBy = null; c.g.visible = true; saveDirty = true;
+    quiet(mp.fb.remove(R('/borrow/' + borrowKey(mp.uid, c.id))));
+  }
 }
 
 /* ---------- main loop ---------- */
