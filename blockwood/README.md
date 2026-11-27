@@ -242,8 +242,8 @@ build on it, fly over it. The world saves in the browser.
   bump into them, but not get in). In multiplayer everyone sees the same traffic: one player near each group
   drives it and shares it.
   **Gas stations** have a red canopy over two fuel pumps, two electric chargers, a little shop and a GAS sign.
-  The Tesla's battery runs down as you drive (about 8 minutes flat out; the info line shows it), and when it's
-  empty the car only crawls: stop next to a pump or charger to fill it back up. Asphalt, the road lines, pumps,
+  The Tesla's battery runs down as you drive (about 4½ minutes flat out; the info line shows it), and when it's
+  empty the car only crawls: stop next to a pump or charger to fill it back up (about 30 seconds from empty). Asphalt, the road lines, pumps,
   chargers and the GAS sign are in the Creative inventory.
 
 - **Houses and cave houses**: the roads are lined with buildings now. **Mansions** are two storeys tall, with a columned

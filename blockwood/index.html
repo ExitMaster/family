@@ -7553,7 +7553,7 @@ function nearPump(c) {
 function carBattery(c, dt) {
   if (c.bat === undefined) c.bat = 100;
   if (c.bat <= 0) c.speed = Math.max(-2, Math.min(3, c.speed));
-  c.bat = Math.max(0, c.bat - Math.abs(c.speed) * dt * .008);
+  c.bat = Math.max(0, c.bat - Math.abs(c.speed) * dt * .011); // about 4½ minutes flat out
   if (c.bat < 15 && !c.lowWarned) { c.lowWarned = true; toast(c.bat <= 0 ? 'Out of battery! Crawl to a gas station to fill up' : 'Battery low! Find a gas station to fill up', 3500); }
   if (Math.abs(c.speed) >= 1) { c.atPump = false; c.fillT = 0; return; }
   c.fillT = (c.fillT || 0) - dt;
