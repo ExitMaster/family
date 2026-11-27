@@ -7560,7 +7560,7 @@ function carBattery(c, dt) {
   if (c.fillT <= 0) { c.fillT = .3; c.atPump = nearPump(c); }
   if (!c.atPump || c.bat >= 100) return;
   const was = Math.floor(c.bat / 10);
-  c.bat = Math.min(100, c.bat + 18 * dt);
+  c.bat = Math.min(100, c.bat + 3 * dt); // about 30 seconds from empty to full
   if (c.bat >= 15) c.lowWarned = false;
   if (Math.floor(c.bat / 10) !== was) { toast(c.bat >= 100 ? 'Full! Battery 100%' : `Filling up… ${Math.floor(c.bat)}%`, 1200); tone(700 + c.bat * 4, 700 + c.bat * 4, .06, .05, 'sine'); }
 }
