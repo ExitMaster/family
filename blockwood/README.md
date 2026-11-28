@@ -266,7 +266,9 @@ build on it, fly over it. The world saves in the browser.
   **Carnival** and **Bongo** truck, and **BMW** (3 Series, 5 Series, 7 Series, X3, X5, X7, i4, iX, M4, Z4) and
   **Mercedes-Benz** (C-Class, E-Class, S-Class, CLA, EQS, GLC, GLE, G-Class, AMG GT, Sprinter van), **Audi** (A3, A4, A6, A8, Q3, Q5,
   Q7, Q8, e-tron GT, R8) and **Porsche** (911, Taycan, Panamera, Cayenne, Macan, 718 Boxster, 918 Spyder), **Ferrari** (SF90 Stradale, 296 GTB, F8 Tributo,
-  LaFerrari, Roma, 812 Superfast, Purosangue with back-hinged rear doors, Testarossa) and **Lamborghini** (Revuelto,
+  LaFerrari, Roma, 812 Superfast, Purosangue with back-hinged rear doors, Testarossa) **Toyota** (Corolla, Camry, Prius, RAV4, Land Cruiser, Supra, Sienna, Tacoma),
+  **Honda** (Civic, Accord, CR-V, HR-V, Pilot, Odyssey, NSX, Ridgeline), the **2026 Tesla Roadster** (press **K** to fire
+  its SpaceX thrusters and launch into the air, twice before landing) and **Lamborghini** (Revuelto,
   Aventador and Countach with scissor doors, Huracán, Temerario, Urus). You can also **ride in traffic**: right-click
   a car on the road to hop in; it keeps driving its route and Shift gets you out. Each is its real size and shape, with its own number of seats; they're all in the Creative inventory
   (or `/give cybertruck`, `/give hyundai porter`…) and drive, autopark, get borrowed and share like the Model Y L.
@@ -274,7 +276,9 @@ build on it, fly over it. The world saves in the browser.
   friend's door when they hop in), and **O** in the driver's seat opens or closes them all; the Model X's back
   doors lift up like wings, the Cybercab's open upwards and the Staria's slide.
 
-- **A whole town**: the roads are lined with mansions, cave houses, garages and gas stations, and now also
+- **A whole town**: the roads are lined with mansions (the most common), **Maple Xe Apt** apartment towers (up to 8
+  floors, a MAPLE XE APT sign on the roof, homes on every floor, an elevator that stops at each one, and an
+  underground car park with a ramp down from the road, lights and EV chargers), cave houses, garages and gas stations, and now also
   **schools** (two storeys of red brick with a SCHOOL sign, a flagpole, classrooms with desks and chalkboards,
   stairs, an elevator, a playground with a slide and a swing, and a yellow **School Bus** you can drive),
   **convenience stores** (a MART sign, a green awning, shelves of snacks, a counter and a car park) and **parks**

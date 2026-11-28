@@ -718,11 +718,12 @@ one('elevator', 'Elevator', () => (x, y, r) => {
 // town blocks: signs with letters, a chalkboard, shop shelves, a flag
 {
   const FONT = {A: ['.#.', '#.#', '###', '#.#', '#.#'], C: ['.##', '#..', '#..', '#..', '.##'], H: ['#.#', '#.#', '###', '#.#', '#.#'], L: ['#..', '#..', '#..', '#..', '###'],
-    M: ['#.#', '###', '###', '#.#', '#.#'], O: ['.#.', '#.#', '#.#', '#.#', '.#.'], R: ['##.', '#.#', '##.', '#.#', '#.#'], S: ['.##', '#..', '.#.', '..#', '##.'], T: ['###', '.#.', '.#.', '.#.', '.#.']};
+    M: ['#.#', '###', '###', '#.#', '#.#'], P: ['##.', '#.#', '##.', '#..', '#..'], E: ['###', '#..', '##.', '#..', '###'], X: ['#.#', '#.#', '.#.', '#.#', '#.#'], O: ['.#.', '#.#', '#.#', '#.#', '.#.'], R: ['##.', '#.#', '##.', '#.#', '#.#'], S: ['.##', '#..', '.#.', '..#', '##.'], T: ['###', '.#.', '.#.', '.#.', '.#.']};
   const words = (txt, bg) => () => (x, y, r) => { const x0 = Math.floor((16 - (txt.length * 4 - 1)) / 2), i = Math.floor((x - x0) / 4), row = (FONT[txt[i]] || [])[y - 6];
     return x >= x0 && i < txt.length && (x - x0) % 4 < 3 && row && row[(x - x0) % 4] === '#' ? [255, 255, 255] : J(bg, r, 8); };
   one('school_sign_a', 'School sign (SC)', words('SC', [30, 70, 160]), 'light'); one('school_sign_b', 'School sign (HO)', words('HO', [30, 70, 160]), 'light'); one('school_sign_c', 'School sign (OL)', words('OL', [30, 70, 160]), 'light');
   one('mart_sign', 'MART sign', words('MART', [20, 140, 70]), 'light');
+  for (const [k, t] of [['a', 'MAP'], ['b', 'LE'], ['c', 'XE'], ['d', 'APT']]) one('apt_sign_' + k, `Maple Xe Apt sign (${t})`, words(t, [70, 40, 30]), 'light');
   one('chalkboard', 'Chalkboard', r => { const s = spotsOf(r, 6, 5); return (x, y, r) => x === 0 || y === 0 || x === 15 || y === 15 ? [120, 84, 44] : s.has(x + y * 16) ? [230, 236, 230] : J([38, 72, 48], r, 8); });
   one('shelf', 'Shop shelf', r => { const cols = [[220, 60, 60], [60, 120, 220], [240, 200, 60], [80, 180, 90], [240, 140, 40], [200, 90, 200]], pick = Array.from({length: 8}, () => cols[Math.floor(r() * cols.length)]);
     return (x, y, r) => y % 8 === 7 || x === 0 || x === 15 ? J([150, 110, 70], r, 8) : J(pick[(x >> 2) + (y > 7 ? 4 : 0)], r, 16); });
@@ -1485,7 +1486,7 @@ function clock() {
 }
 function updateInfo() {
   const f = Math.floor;
-  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${passenger.t ? 'a ' + passenger.t.c.m.name : ownerName(passenger.owner) + "'s " + (seatCar(passenger) || {m: {name: 'car'}}).m.name} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving && autoPark ? '  · AUTOPARK' : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}Tesla Model Y L ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
+  infoEl.textContent = `X ${f(P.x)}  Y ${f(P.y)}  Z ${f(P.z)}\n${mode === 's' ? 'Survival · ' : ''}${clock()}${limitedName() ? `  · ${Math.ceil(limitLeft() / 60)} min left today` : ''}${godMode ? '  · god mode' : ''}${speedMul > 1 ? `  · speed ×${speedMul}` : ''}${jumpMul > 1 ? `  · jump ×${jumpMul}` : ''}${P.fly ? (flyLeft > 0 ? `  · flying (${Math.ceil(flyLeft)}s left)` : '  · flying') : ''}${mount ? `  · riding a ${kindName(mount.kind).toLowerCase()} (${TOUCH ? 'Exit button' : 'Shift'} to get off)` : ''}${passenger ? `  · riding in ${passenger.t ? 'a ' + passenger.t.c.m.name : ownerName(passenger.owner) + "'s " + (seatCar(passenger) || {m: {name: 'car'}}).m.name} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${driving && autoPark ? '  · AUTOPARK' : ''}${driving ? `  · ${driving.borrow ? ownerName(driving.borrow.owner) + "'s " : ''}${driving.m.name} ${Math.round(Math.abs(driving.speed) * 3.6)} km/h · battery ${Math.ceil(driving.bat ?? 100)}%${driving.speed < -.3 ? ' (reverse)' : ''} (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${riding ? `  · airplane ${Math.round(riding.speed * 3.6)} km/h (${TOUCH ? 'Exit button' : 'Shift'} to get out)` : ''}${dim === 'n' ? '  · the Nether' : dim === 'e' ? '  · the End' : dim === 'w' ? `  · a world made of ${nameOf(dreamMat).toLowerCase()}` : dim === 'b' ? `  · OneBlock: ${obPhase(obN).n}, ${obN} broken` : dim === 'a' ? `  · ASMR mode${P.y > 3 ? ` · ${Math.floor(P.y - 2)} blocks up` : ''}` : Math.abs(P.x) > FAR / 4 ? '  · other side of the world' : ''}${S.on ? '' : '  · muted'}${mp.on ? `  · room ${mp.room} (${avatars.size + 1})` : ''}`;
 }
 
 /* ---------- save / load ---------- */
@@ -1681,6 +1682,7 @@ addEventListener('keydown', e => {
     if (!e.repeat && PAINT_KEYS[e.code] !== undefined) paintCar(driving, PAINT_KEYS[e.code]);
     if (e.code === 'KeyG' && !e.repeat) startAutoPark();
     if (e.code === 'KeyO' && !e.repeat) toggleDoors(driving);
+    if (e.code === 'KeyK' && !e.repeat && driving.m.spacex) thrusters(driving);
     if (e.code === 'KeyL' && !e.repeat) { driving.lightsOff = !driving.lightsOff; toast(driving.lightsOff ? 'Lights off' : 'Lights on', 1000); tone(500, 500, .05, .05, 'square'); }
     if (e.code === 'KeyP' && !e.repeat) paintCar(driving, SWAP_COLORS[(SWAP_COLORS.indexOf(driving.color) + 1) % SWAP_COLORS.length]);
     if (e.code === 'KeyT' || e.code === 'Enter') { e.preventDefault(); openChat(''); return; }
@@ -6766,6 +6768,51 @@ const MODELS = [
     top: [[-2.55, .33, 1], [-2.58, .6, 1], [-2.5, .82, 1], [-1.6, .95, 1], [-.95, 1.0, 1], [1.7, 1.06, 1], [2.45, .98, 1], [2.57, .62, 1], [2.55, .33, 1]],
     glass: [[-1.0, .99, 1], [-.35, 1.48, 1], [.9, 1.55, 1], [2.15, 1.2, 1], [2.4, 1.0, 1]],
     cabin: [-.95, 2.05], floor: .74, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.45]]},
+  // Toyota
+  {key: 'tcor', name: 'Toyota Corolla', item: 308, L: 4.63, W: 1.78, r: 0.33, axles: [-1.35, 1.35], badge: 'TY', fy: .7, ry: .9,
+    top: sedanTop(4.63), glass: [[-1.0, .9, 1], [-.25, 1.34], [.45, 1.41], [1.15, 1.32], [1.68, .98, 1]], cabin: [-.95, 1.31], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.31]]},
+  {key: 'tcam', name: 'Toyota Camry', item: 309, L: 4.92, W: 1.84, r: 0.35, axles: [-1.45, 1.38], badge: 'TY', fy: .7, ry: .9, color: 2,
+    top: sedanTop(4.92), glass: [[-1.0, .9, 1], [-.22, 1.37], [.55, 1.44], [1.25, 1.35], [1.82, .99, 1]], cabin: [-.95, 1.46], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.45]]},
+  {key: 'tpri', name: 'Toyota Prius', item: 310, L: 4.6, W: 1.78, r: .34, axles: [-1.38, 1.37], badge: 'TY', fy: .64, ry: .9, color: 0,
+    top: [[-2.28, .3, 1], [-2.32, .48], [-2.25, .62], [-1.6, .75], [-1.0, .85, 1], [1.6, .95], [2.25, .92, 1], [2.3, .5], [2.28, .3, 1]],
+    glass: [[-1.05, .84, 1], [-.3, 1.3], [.6, 1.42], [1.9, 1.0, 1], [2.22, .94, 1]], cabin: [-1.0, 1.65], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-1.0, .25], [.3, 1.3]]},
+  {key: 'trav', name: 'Toyota RAV4', item: 311, L: 4.6, W: 1.86, r: 0.37, axles: [-1.38, 1.37], badge: 'TY', fy: .82, ry: .98,
+    top: H_([[-2.39, .35, 1], [-2.42, .65], [-2.39, .95, 1], [-1.7, 1.04], [-1.02, 1.1, 1], [2.0, 1.15, 1], [2.39, 1.12, 1], [2.42, .62], [2.39, .35, 1]], 0.955, 0.97), glass: H_([[-1.05, 1.09, 1], [-.5, 1.64, 1], [2.2, 1.72, 1], [2.37, 1.16, 1]], 0.955, 0.97), cabin: [-.97, 1.95], floor: 0.76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.35]]},
+  {key: 'tlc', name: 'Toyota Land Cruiser', item: 312, L: 4.98, W: 1.98, r: 0.4, axles: [-1.45, 1.4], badge: 'TY', fy: .82, ry: .98, color: 4, yb: .4,
+    top: H_([[-2.39, .35, 1], [-2.42, .65], [-2.39, .95, 1], [-1.7, 1.04], [-1.02, 1.1, 1], [2.0, 1.15, 1], [2.39, 1.12, 1], [2.42, .62], [2.39, .35, 1]], 1.03, 1.05), glass: H_([[-1.05, 1.09, 1], [-.5, 1.64, 1], [2.2, 1.72, 1], [2.37, 1.16, 1]], 1.03, 1.05), cabin: [-1.05, 2.1], floor: 0.82, seats: [[-.42, -.3], [.42, -.3], [-.42, .65], [.42, .65], [-.42, 1.6], [.42, 1.6]], doors: [[-1.0, .3], [.35, 1.45]]},
+  {key: 'tsup', name: 'Toyota Supra', item: 313, L: 4.38, W: 1.85, r: .34, axles: [-1.23, 1.24], yb: .22, badge: 'TY', fy: .58, ry: .78, vmax: 44, color: 3,
+    top: [[-2.17, .26, 1], [-2.21, .42], [-2.13, .58], [-1.45, .7], [-.5, .82, 1], [1.0, .9], [1.9, .88], [2.17, .72], [2.2, .45], [2.17, .26, 1]],
+    glass: [[-.55, .81, 1], [0, 1.2], [.45, 1.25], [1.1, 1.06], [1.85, .9, 1]], cabin: [-.5, .95], floor: .42, seats: [[-.42, .15], [.42, .15]], doors: [[-.5, .6]], doorY: [.3, .82]},
+  {key: 'tsie', name: 'Toyota Sienna', item: 314, L: 5.18, W: 1.99, r: 0.37, axles: [-1.53, 1.53], badge: 'TY', fy: .82, ry: .98,
+    top: H_([[-2.56, .33, 1], [-2.6, .6], [-2.55, .86], [-2.0, .98], [-1.35, 1.06, 1], [2.15, 1.14, 1], [2.55, 1.1, 1], [2.58, .6], [2.55, .33, 1]], 1.0, 1.0), glass: H_([[-1.4, 1.05, 1], [-.75, 1.66], [2.3, 1.78, 1], [2.53, 1.15, 1]], 1.0, 1.0), cabin: [-1.35, 2.3], floor: 0.72, seats: [[-.45, -.75], [.45, -.75], [-.45, .25], [.45, .25], [-.45, 1.25], [.45, 1.25], [0, 1.95]], doors: [[-1.3, -.1], [0, 1.2, 'slide']]},
+  {key: 'ttac', name: 'Toyota Tacoma', item: 315, L: 5.4, W: 1.95, r: .4, axles: [-1.75, 1.85], yb: .45, badge: 'TY', fy: .95, ry: 1.0, color: 9, vmax: 32,
+    top: [[-2.65, .48, 1], [-2.70, .9], [-2.60, 1.15, 1], [-1.45, 1.22, 1], [.75, 1.25, 1], [2.68, 1.2, 1], [2.72, .55, 1], [2.67, .48, 1]],
+    glass: [[-1.45, 1.21, 1], [-.9, 1.82], [.6, 1.84, 1], [.72, 1.25, 1]],
+    cabin: [-1.4, .7], floor: .85, seats: [[-.42, -.85], [.42, -.85], [-.42, .2], [.42, .2]], doors: [[-1.4, -.35], [-.3, .65]]},
+  // Honda
+  {key: 'hciv', name: 'Honda Civic', item: 316, L: 4.67, W: 1.8, r: 0.33, axles: [-1.37, 1.36], badge: 'HO', fy: .7, ry: .9, color: 6,
+    top: sedanTop(4.67), glass: [[-1.0, .9, 1], [-.25, 1.33], [.45, 1.39], [1.3, 1.24], [2.05, .97, 1]], cabin: [-.95, 1.33], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.33]]},
+  {key: 'hacc', name: 'Honda Accord', item: 317, L: 4.97, W: 1.86, r: 0.35, axles: [-1.46, 1.42], badge: 'HO', fy: .7, ry: .9, color: 4,
+    top: sedanTop(4.97), glass: [[-1.0, .9, 1], [-.22, 1.37], [.55, 1.43], [1.4, 1.3], [2.05, .98, 1]], cabin: [-.95, 1.48], floor: .62, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.45]]},
+  {key: 'hcrv', name: 'Honda CR-V', item: 318, L: 4.7, W: 1.87, r: 0.37, axles: [-1.4, 1.42], badge: 'HO', fy: .82, ry: .98,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 1.015, 1.0), glass: H_([[-1.0, 1.03, 1], [-.35, 1.55], [1.35, 1.62], [2.05, 1.38], [2.25, 1.12, 1]], 1.015, 1.0), cabin: [-1.0, 1.88], floor: 0.76, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.95, .3], [.35, 1.4]]},
+  {key: 'hhrv', name: 'Honda HR-V', item: 319, L: 4.33, W: 1.79, r: 0.35, axles: [-1.3, 1.31], badge: 'HO', fy: .82, ry: .98, color: 10,
+    top: H_([[-2.29, .33, 1], [-2.33, .62], [-2.29, .86, 1], [-1.7, .96], [-.95, 1.04, 1], [1.75, 1.12], [2.22, 1.08], [2.32, .7], [2.29, .33, 1]], 0.945, 0.96), glass: H_([[-1.0, 1.03, 1], [-.35, 1.55], [1.35, 1.62], [2.05, 1.38], [2.25, 1.12, 1]], 0.945, 0.96), cabin: [-.94, 1.73], floor: 0.74, seats: [[-.42, -.2], [.42, -.2], [-.42, .85], [.42, .85]], doors: [[-.9, .25], [.3, 1.25]]},
+  {key: 'hpil', name: 'Honda Pilot', item: 320, L: 5.09, W: 1.99, r: 0.39, axles: [-1.5, 1.48], badge: 'HO', fy: .82, ry: .98,
+    top: H_([[-2.39, .35, 1], [-2.42, .65], [-2.39, .95, 1], [-1.7, 1.04], [-1.02, 1.1, 1], [2.0, 1.15, 1], [2.39, 1.12, 1], [2.42, .62], [2.39, .35, 1]], 1.05, 1.02), glass: H_([[-1.05, 1.09, 1], [-.5, 1.64, 1], [2.2, 1.72, 1], [2.37, 1.16, 1]], 1.05, 1.02), cabin: [-1.07, 2.15], floor: 0.8, seats: [[-.42, -.3], [.42, -.3], [-.42, .65], [.42, .65], [-.42, 1.6], [.42, 1.6]], doors: [[-1.0, .3], [.35, 1.5]]},
+  {key: 'hody', name: 'Honda Odyssey', item: 321, L: 5.21, W: 1.99, r: 0.37, axles: [-1.55, 1.53], badge: 'HO', fy: .82, ry: .98, color: 2,
+    top: H_([[-2.56, .33, 1], [-2.6, .6], [-2.55, .86], [-2.0, .98], [-1.35, 1.06, 1], [2.15, 1.14, 1], [2.55, 1.1, 1], [2.58, .6], [2.55, .33, 1]], 1.01, 0.98), glass: H_([[-1.4, 1.05, 1], [-.75, 1.66], [2.3, 1.78, 1], [2.53, 1.15, 1]], 1.01, 0.98), cabin: [-1.36, 2.32], floor: 0.72, seats: [[-.45, -.75], [.45, -.75], [-.45, .25], [.45, .25], [-.45, 1.25], [.45, 1.25], [0, 1.95]], doors: [[-1.3, -.1], [0, 1.2, 'slide']]},
+  {key: 'hnsx', name: 'Honda NSX', item: 322, L: 4.49, W: 1.94, r: .35, axles: [-1.27, 1.27], yb: .2, badge: 'HO', fy: .56, ry: .8, vmax: 48, color: 3,
+    top: H_([[-2.33, .24, 1], [-2.36, .4], [-2.28, .54], [-1.6, .64], [-.7, .78, 1], [.45, .95, 1], [1.6, .94], [2.2, .88], [2.35, .6], [2.33, .24, 1]], .953), glass: H_([[-.75, .77, 1], [-.15, 1.13], [.3, 1.19], [.5, .95, 1]], .953), cabin: [-.67, .43], floor: .38, seats: [[-.4, -.1], [.4, -.1]], doors: [[-.67, .43]], doorY: [.28, .8]},
+  {key: 'hrid', name: 'Honda Ridgeline', item: 323, L: 5.33, W: 1.95, r: .4, axles: [-1.75, 1.85], yb: .45, badge: 'HO', fy: .95, ry: 1.0, color: 1, vmax: 32,
+    top: [[-2.62, .48, 1], [-2.67, .9], [-2.56, 1.15, 1], [-1.45, 1.22, 1], [.75, 1.25, 1], [2.65, 1.2, 1], [2.69, .55, 1], [2.64, .48, 1]],
+    glass: [[-1.45, 1.21, 1], [-.9, 1.82], [.6, 1.84, 1], [.72, 1.25, 1]],
+    cabin: [-1.4, .7], floor: .85, seats: [[-.42, -.85], [.42, -.85], [-.42, .2], [.42, .2]], doors: [[-1.4, -.35], [-.3, .65]]},
+  // the 2026 Tesla Roadster, with the SpaceX package: K fires the thrusters
+  {key: 'rd26', name: 'Tesla Roadster (2026)', item: 324, L: 4.3, W: 2.0, r: .35, axles: [-1.35, 1.3], yb: .2, badge: 'T', fy: .56, ry: .8, vmax: 55, color: 3, spacex: true,
+    top: [[-2.12, .24, 1], [-2.16, .4], [-2.08, .54], [-1.5, .64], [-.62, .78, 1], [1.4, .9], [2.0, .86], [2.15, .66], [2.16, .42], [2.12, .24, 1]],
+    glass: [[-.66, .77, 1], [-.15, 1.1], [.55, 1.16], [1.25, 1.02], [1.75, .9, 1]],
+    cabin: [-.62, 1.2], floor: .38, seats: [[-.42, -.05], [.42, -.05], [-.42, .75], [.42, .75]], doors: [[-.62, .7]], doorY: [.26, .8]},
 ];
 MODELS.forEach((m, i) => { m.i = i; m.wb = m.axles[m.axles.length - 1] - m.axles[0]; m.yb = m.yb || .28; m.vmax = m.vmax || 33; m.Ht = Math.max(...m.top.map(p => p[1]), ...(m.glass || []).map(p => p[1])); });
 const MODEL_BY_ITEM = {}; MODELS.forEach(m => { MODEL_BY_ITEM[m.item] = m; });
@@ -6891,6 +6938,13 @@ function addCar(x, y, z, yaw, color = 0, remote = false, id = 0, mi = 0) {
   if (m.grille === 'g') for (const s of [-1, 1]) { const l = mesh(G.hub, lampM, s * (m.W / 2 - .3), m.fy - .02, gz(m.fy) - .02); l.scale.set(1, 2.4, 2.4); l.rotation.y = Math.PI / 2; }
   if (m.bus) { const ws = box(glassM, m.W - .3, 1.05, .05, 0, 2.38, -3.42); for (const s of [-1, 1]) { box(glassM, .03, .75, 6.8, s * (m.W / 2 + .01), 2.3, .6); box(black, .03, .07, 8.6, s * (m.W / 2 + .015), 1.55, .05); box(black, .03, .07, 8.6, s * (m.W / 2 + .015), 1.8, .05); } box(glassM, m.W - .4, .8, .03, 0, 2.3, 4.47); box(cMat('stop', () => new THREE.MeshBasicMaterial({color: 0xd10f0f})), .04, .35, .35, -m.W / 2 - .05, 2.1, -2.6); }
   if (m.van) { const ws = box(glassM, m.W - .3, 1.12, .05, 0, 1.66, -1.98); ws.rotation.x = .66; for (const s of [-1, 1]) box(glassM, .03, .55, 3.6, s * (m.W / 2 + .01), 1.95, .9); }
+  if (m.badge === 'TY') { const by = m.fy - .1, bz = noseAt(m, by) - .05, o1 = mesh(G.wheelRing, silver, 0, by, bz); o1.scale.set(.5, .32, .3); const o2 = mesh(G.wheelRing, silver, 0, by + .005, bz - .005); o2.scale.set(.18, .3, .3); }
+  if (m.badge === 'HO') { const by = m.fy - .1, bz = noseAt(m, by) - .04; box(silver, .02, .1, .012, -.04, by, bz); box(silver, .02, .1, .012, .04, by, bz); box(silver, .08, .02, .012, 0, by, bz); box(silver, .1, .015, .012, 0, by + .05, bz); }
+  if (m.spacex) { // thruster nozzles at the back, and their flames
+    const fl = []; for (const s of [-1, 1]) { const nz = mesh(G.hub, black, s * .35, .42, rz + .05); nz.rotation.y = Math.PI / 2; nz.scale.set(1, 1.6, 1.6);
+      const f = new THREE.Mesh(HL.beamGeo, cMat('flame', () => new THREE.MeshBasicMaterial({color: 0xff9a2a, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false}))); f.scale.set(.12, .12, .16); f.rotation.y = Math.PI; f.position.set(s * .35, .42, rz + .1); f.visible = false; body.add(f); fl.push(f); }
+    body.userData.flames = fl;
+  }
   if (m.badge === 'K') { const bz = noseAt(m, m.fy - .12) - .035, k1 = box(silver, .02, .1, .012, -.05, m.fy - .12, bz), k2 = box(silver, .02, .065, .012, -.015, m.fy - .1, bz), k3 = box(silver, .02, .065, .012, -.015, m.fy - .145, bz); k2.rotation.z = -.7; k3.rotation.z = .7; }
   if (m.badge === 'H') { const bz = noseAt(m, m.fy - .12) - .035; box(silver, .025, .09, .012, -.045, m.fy - .12, bz); box(silver, .025, .09, .012, .045, m.fy - .12, bz); const hb = box(silver, .09, .022, .012, 0, m.fy - .12, bz); hb.rotation.z = .3; }
   const cz = m.cabin ? m.cabin[0] : m.axles[0] + .9, beltY = m.cabin ? noseAtTop(m, cz) : m.floor + .5;
@@ -6966,7 +7020,8 @@ function syncCar(c, dt) {
   c.vis += (c.y - c.vis) * Math.min(1, dt * 12 || 1);
   c.tilt *= Math.exp(-dt * 5);
   c.g.position.set(c.x, c.vis, c.z); c.g.rotation.set(0, c.yaw, 0);
-  c.body.rotation.set(c.tilt, 0, -c.steer * Math.min(1, Math.abs(c.speed) / 20) * .06);
+  c.body.rotation.set(c.tilt + (c.thrust > 0 ? -.12 : 0), 0, -c.steer * Math.min(1, Math.abs(c.speed) / 20) * .06);
+  if (c.body.userData.flames) { c.thrust = Math.max(0, (c.thrust || 0) - dt); for (const f of c.body.userData.flames) { f.visible = c.thrust > 0; f.scale.z = .12 + Math.random() * .08; } }
   for (const w of c.wheels) { w.spin.rotation.x -= c.speed / c.m.r * dt; if (w.front) w.steerG.rotation.y = -c.steer; }
   c.tailM.color.setHex(c.brake ? 0xff2a2a : c.lightsOn ? 0xd01a20 : 0x9a0f16);
   c.beams.visible = !!c.lightsOn && !c.lightsOff;
@@ -7099,11 +7154,12 @@ function driveCar(dt) {
   const nyaw = c.yaw - c.speed / c.m.wb * Math.tan(c.steer) * dt, M = c.m;
   if (!carHits(c.x, c.y + 1.3, c.z, nyaw, M) && !carHits(c.x, c.y + .3, c.z, nyaw, M)) c.yaw = nyaw;
   const nx = c.x - Math.sin(c.yaw) * c.speed * dt, nz = c.z - Math.cos(c.yaw) * c.speed * dt;
-  if (carHits(nx, c.y + 1.3, nz, c.yaw, c.m) || (carHits(nx, c.y + .3, nz, c.yaw, c.m) && (carHits(nx, c.y + 2.3, nz, c.yaw, c.m) || carHits(nx, c.y + 1.3 + 1, nz, c.yaw, c.m)))) {
+  const fd = Math.sign(c.speed) || 1, hit = y => carFront(nx, y, nz, c.yaw, c.m, fd); // only what's ahead (the back of the car can be uphill on a ramp)
+  if (hit(c.y + 1.3) || (hit(c.y + .3) && (hit(c.y + 2.3) || hit(c.y + 1.3 + 1)))) {
     if (Math.abs(c.speed) > 7) { noise(.25, 'lowpass', 300, 1, .9); shake = Math.min(1, Math.abs(c.speed) / 25); if (Math.abs(c.speed) > 14) hurtPlayer(Math.floor(Math.abs(c.speed) / 7)); }
     c.speed *= -.2;
   } else {
-    if (carHits(nx, c.y + .3, nz, c.yaw, c.m)) { c.y = fl(c.y + .3) + 1; c.tilt = Math.sign(c.speed) * .12; noise(.12, 'lowpass', 500, 1, .4); }
+    if (hit(c.y + .3)) { c.y = fl(c.y + .3) + 1; c.tilt = Math.sign(c.speed) * .12; noise(.12, 'lowpass', 500, 1, .4); }
     c.x = nx; c.z = nz;
   }
   if (trafficHit(c)) { // crashed into another car
@@ -7132,11 +7188,25 @@ function driveCar(dt) {
   if (Math.abs(c.speed) > 1) { let d = c.yaw - P.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); P.yaw += d * Math.min(1, 2.5 * dt); }
   syncCar(c, dt);
 }
+// the SpaceX package: thrusters fire the car up into the air (twice in a row at most before it lands again)
+function thrusters(c) {
+  const ground = carHits(c.x, c.y - .05, c.z, c.yaw, c.m);
+  if (ground) c.boosts = 0;
+  if ((c.boosts || 0) >= 2) { toast('Thrusters recharging: land first', 1200); return; }
+  c.boosts = (c.boosts || 0) + 1;
+  c.vy = Math.max(c.vy, 0) + (ground ? 13 : 9); c.y += .15; c.thrust = .9;
+  c.speed = Math.min(c.m.vmax, c.speed + 6);
+  noise(1.2, 'lowpass', 400, 1, 1.0, null, 120); tone(90, 60, .9, .2, 'sawtooth');
+  toast(c.boosts > 1 ? 'Boost again!' : 'SpaceX thrusters!', 1200);
+}
+// the front half of the car (or the back half when reversing)
+const carFront = (x, y, z, yaw, m, dir) => carPts(x, z, yaw, m).filter((_, i, a) => { const n = a.length / 2, k = i % n; return dir > 0 ? k <= (n - 1) / 2 : k >= (n - 1) / 2; }).some(([px, pz]) => SOLID[getBlock(Math.floor(px), Math.floor(y), Math.floor(pz))] === 1);
+const carMid = (x, y, z, yaw, m) => carPts(x, z, yaw, m).filter((_, i, a) => { const n = a.length / 2, k = i % n; return Math.abs(k - (n - 1) / 2) <= Math.max(1, (n - 1) / 4); }).some(([px, pz]) => SOLID[getBlock(Math.floor(px), Math.floor(y), Math.floor(pz))] === 1);
 function carFall(c, dt) {
-  if (carHits(c.x, c.y - .05, c.z, c.yaw, c.m)) { if (c.vy < -12) noise(.2, 'lowpass', 260, 1, .7); c.vy = 0; c.y = Math.max(c.y, Math.floor(c.y - .05) + 1); return; }
+  if (carMid(c.x, c.y - .05, c.z, c.yaw, c.m)) { if (c.vy < -12) noise(.2, 'lowpass', 260, 1, .7); c.vy = 0; c.y = Math.max(c.y, Math.floor(c.y - .05) + 1); return; }
   c.vy = Math.max(-30, c.vy - 25 * dt);
   const ny = c.y + c.vy * dt;
-  if (carHits(c.x, ny, c.z, c.yaw, c.m)) { c.y = Math.floor(ny) + 1; c.vy = 0; c.tilt = -.05; } else c.y = ny;
+  if (carMid(c.x, ny, c.z, c.yaw, c.m)) { c.y = Math.floor(ny) + 1; c.vy = 0; c.tilt = -.05; } else c.y = ny;
   if (c.y < -20) { const g = groundAt(Math.floor(c.x), Math.floor(c.z)); c.y = g > 0 ? g : H - 2; c.vy = 0; }
 }
 function updateCars(dt) {
@@ -7365,11 +7435,13 @@ function roadH(axis, line, along) {
 function garageSpec(axis, line, j) {
   const along = GSLOT * j + GSLOT / 2;
   if (Math.abs(along - nearLine(along)) < 16) return null; // not right at a crossing
-  if (hash2(j * 7 + (axis === 'x' ? 1 : 2), line, 777) > .7) return null;
+  if (hash2(j * 7 + (axis === 'x' ? 1 : 2), line, 777) > .8) return null;
   const s = hash2(j, line * 3 + (axis === 'x' ? 5 : 9), 778) < .5 ? -1 : 1, F = roadH(axis, line, along);
   if (F <= WATER + 2) return null; // not on bridges or beaches
   const kr = hash2(j, line * 11 + (axis === 'x' ? 3 : 7), 781);
-  return {axis, line, along, s, F, kind: kr < .14 ? 'gas' : kr < .4 ? 'house' : kr < .5 ? 'cave' : kr < .6 ? 'garage' : kr < .69 ? 'school' : kr < .84 ? 'store' : 'park'};
+  let kind = kr < .1 ? 'gas' : kr < .45 ? 'house' : kr < .6 ? 'apt' : kr < .65 ? 'cave' : kr < .72 ? 'garage' : kr < .79 ? 'school' : kr < .9 ? 'store' : 'park';
+  if (kind === 'apt' && aptFloors(F) < 3) kind = 'house'; // up in the hills there's no room for a tower
+  return {axis, line, along, s, F, kind};
 }
 // no trees on or right beside a road, or where a garage or gas station stands
 function roadside(x, z) {
@@ -7378,7 +7450,7 @@ function roadside(x, z) {
     if (d <= ROAD_W + 3) return true;
     if (d > 26) continue;
     const j = Math.floor(along / GSLOT), g = garageSpec(axis, line, j);
-    if (g && Math.abs(along - g.along) <= ({house: 12, school: 14, park: 12}[g.kind] || 10) && (across - line) * g.s > 0) return true;
+    if (g && Math.abs(along - g.along) <= ({house: 12, school: 14, park: 12, apt: 15}[g.kind] || 10) && (across - line) * g.s > 0) return true;
   }
   return false;
 }
@@ -7428,6 +7500,7 @@ function buildRoads(cx, cz, d) {
         if (g.kind === 'school') { buildSchool(g, inC, lay, set, at, fillUnder); continue; }
         if (g.kind === 'store') { buildStore(g, inC, lay, set, at, fillUnder); continue; }
         if (g.kind === 'park') { buildPark(g, inC, lay, set, at, fillUnder); continue; }
+        if (g.kind === 'apt') { buildApt(g, inC, lay, set, at, fillUnder); continue; }
         buildGarageAt(g, inC, lay, set, at, fillUnder);
       }
     }
@@ -8153,6 +8226,61 @@ function rideTraffic(t) {
 /* ---------- a whole town: schools, shops and parks ---------- */
 // which way round to write a sign on a building's front so it reads left to right from the road
 const readsLeft = g => { const ox = g.axis === 'x' ? 0 : g.s, oz = g.axis === 'x' ? g.s : 0, ux = g.axis === 'x' ? 1 : 0, uz = g.axis === 'x' ? 0 : 1; return (ux * -oz + uz * ox) > 0 ? 1 : -1; };
+// Maple Xe Apt: an apartment tower (as many floors as fit, up to 8) with a MAPLE XE APT sign on the roof, a lobby,
+// homes on every floor, an elevator that stops at each one, and an underground car park with a ramp down from
+// the road, lights and EV chargers.
+function aptFloors(F) { return Math.min(8, Math.floor((H - 4 - F) / 4)); }
+function buildApt(g, inC, lay, set, at, fillUnder) {
+  const F = g.F, N = aptFloors(F), X0 = 10, O0 = 8, O1 = 18, PF = F - 5, top = F + 4 * N;
+  const put = (du, off, y, b) => { const [x, z] = gCell(g, du, off); if (inC(x, z)) set(x, y, z, b); };
+  for (let du = -14; du <= 14; du++) for (let off = 4; off <= 20; off++) {
+    const [x, z] = gCell(g, du, off);
+    if (!inC(x, z)) continue;
+    for (let y = F + 1; y <= Math.min(H - 1, top + 3); y++) set(x, y, z, AIR);
+    // the car park underneath, reached by a long ramp down beside the tower (one block down every two along)
+    const inB = Math.abs(du) <= X0 && off >= O0 && off <= O1, ramp = du >= 11 && du <= 13 && off >= 4 && off <= 12, ext = du >= 11 && du <= 14 && off >= 13 && off <= O1;
+    if (inB || ext) {
+      const pedge = (inB && (du === -X0 || off === O1 || off === O0 || (du === X0 && off < 13))) || (ext && (du === 14 || off === O1));
+      for (let y = PF; y <= F - 1; y++) set(x, y, z, pedge || y === PF ? (y === PF ? B2.asphalt : B2.smooth_stone) : AIR);
+      if (ext) { set(x, F, z, GRASS); fillUnder(x, PF, z, 3); continue; } // grass on the roof over the bottom of the ramp
+      if (inB && !pedge && (Math.abs(du) - 1) % 4 === 0 && (off === 11 || off === 15)) for (let y = PF + 1; y <= F - 1; y++) set(x, y, z, B2.smooth_stone); // pillars
+      if (inB && !pedge && off >= 16 && du % 3 === 0 && Math.abs(du) < X0) set(x, PF, z, B2.road_white); // parking lines
+      fillUnder(x, PF, z, 3);
+    }
+    if (ramp) {
+      const fl = F - Math.min(5, Math.floor((off - 3) / 2));
+      set(x, fl, z, B2.asphalt); for (let y = fl + 1; y <= F + 3; y++) set(x, y, z, AIR); for (let y = PF; y < fl; y++) set(x, y, z, B2.smooth_stone); fillUnder(x, PF, z, 3);
+      continue;
+    }
+    if (!inB) { set(x, F, z, off <= 7 && Math.abs(du) <= 1 ? B2.smooth_stone : GRASS); fillUnder(x, F, z, 4); continue; }
+    // the tower: a slab every 4 blocks, white walls with grey bands, rows of windows
+    const edge = Math.abs(du) === X0 || off === O0 || off === O1, corner = Math.abs(du) === X0 && (off === O0 || off === O1);
+    for (let y = F; y <= top; y++) {
+      const fy = (y - F) % 4;
+      let b = AIR;
+      if (fy === 0) b = edge ? B2.smooth_stone : (y === F ? B2.smooth_stone : PLANKS);
+      else if (edge) {
+        b = corner ? B2.smooth_stone : (fy === 2 || fy === 1 && y > F + 3) && (Math.abs(du) % 3 !== 0 || off !== O0 && off !== O1) && (off === O0 || off === O1 ? true : (off - O0) % 3 !== 0) ? GLASS : B2.quartz;
+        if (off === O0 && Math.abs(du) <= 1 && y >= F + 1 && y <= F + 3) b = y === F + 3 ? GLASS : AIR; // the lobby doors
+      }
+      set(x, y, z, b);
+    }
+    set(x, top + 1, z, edge ? B2.quartz : AIR); // the roof's parapet
+  }
+  // the name on the roof, facing the road
+  const rl = readsLeft(g);
+  put(-2 * rl, O0, top + 2, B2.apt_sign_a); put(-1 * rl, O0, top + 2, B2.apt_sign_b); put(1 * rl, O0, top + 2, B2.apt_sign_c); put(3 * rl, O0, top + 2, B2.apt_sign_d); // MAPLE XE APT
+  // the elevator: a panel in the car park and on every floor
+  put(0, 16, PF, B2.elevator); for (let k = 0; k < N; k++) put(0, 16, F + 4 * k, B2.elevator);
+  // lights, chargers in the car park, and a little home on each floor
+  for (const du of [-6, 0, 6]) for (const off of [11, 15]) put(du, off, F, B2.lamp);
+  for (const du of [-9, -6, -3, 3, 6, 9]) put(du, 17, PF + 1, B2.ev_charger);
+  for (let k = 0; k < N; k++) {
+    const y = F + 4 * k;
+    if (k > 0) { put(-8, 16, y + 1, BED); put(-7, 16, y + 1, CHEST); put(7, 16, y + 1, BED); put(4, 11, y + 1, B2.red_wool); put(5, 11, y + 1, B2.red_wool); put(-4, 11, y + 1, B2.crafting_table); put(-5, 11, y + 1, B2.furnace); }
+    for (const du of [-5, 5]) put(du, 13, y + 4 < top ? y + 4 : top, B2.lamp);
+  }
+}
 function buildSchool(g, inC, lay, set, at, fillUnder) {
   const F = g.F, X0 = 11, O0 = 10, O1 = 20, top = F + 10, put = (du, off, y, b) => { const [x, z] = gCell(g, du, off); if (inC(x, z)) set(x, y, z, b); };
   for (let du = -13; du <= 13; du++) for (let off = 4; off <= 23; off++) {
