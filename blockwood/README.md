@@ -234,7 +234,8 @@ build on it, fly over it. The world saves in the browser.
 
 - **Roads and garages**: roads cross the whole Overworld in a big grid (one every 128 blocks, the first about
   30 blocks from where the world starts). They're asphalt with a dashed yellow middle line and white edges,
-  smoothed over hills, cut through mountains as tunnels and carried over water on bridges. Every crossing
+  smoothed over hills, cut through mountains as tunnels and carried over water on bridges. **Streetlights** (a pole with a lamp over the edge of the road)
+  stand every 16 blocks and light up the road at night. Every crossing
   has **traffic lights** that go green, yellow and red (one road at a time). White **garages** with a driveway,
   windows, a light and an **EV charger** (park inside and your battery fills up) stand along the roads; about one in 30 has a Tesla parked inside for you to drive. Each
   garage has a **roll-up door** that opens when you come within 26 blocks, closes behind you once you're inside,

@@ -7485,6 +7485,23 @@ function buildRoads(cx, cz, d) {
       }
     }
   }
+  // streetlights: a pole on the roadside with a lamp hanging over the edge of the road, every 16 blocks, sides taking
+  // turns; not at crossings (the traffic lights are there) or in front of buildings
+  for (const axis of ['x', 'z']) {
+    const lo = axis === 'x' ? oz : ox, alo = axis === 'x' ? ox : oz;
+    for (let line = nearLine(lo - 5) - ROAD_G; line <= lo + CS + 5 + ROAD_G; line += ROAD_G) {
+      if (line + 5 < lo || line - 5 >= lo + CS) continue;
+      for (let a = Math.ceil(alo / 16) * 16; a < alo + CS; a += 16) {
+        if (Math.abs(a - nearLine(a)) < 8) continue;
+        const side = ((a / 16) % 2 + 2) % 2 ? -1 : 1, g = garageSpec(axis, line, Math.floor(a / GSLOT));
+        if (g && g.s === side && Math.abs(a - g.along) <= ({house: 12, school: 14, park: 12, apt: 15, gas: 8}[g.kind] || 6)) continue;
+        const h = roadH(axis, line, a), wp = side > 0 ? 4 : -4, wl = side > 0 ? 3 : -3;
+        const px = axis === 'x' ? a : line + wp, pz = axis === 'x' ? line + wp : a, lx = axis === 'x' ? a : line + wl, lz = axis === 'x' ? line + wl : a;
+        if (inC(px, pz)) { set(px, h, pz, B2.iron_block); fillUnder(px, h, pz, H); for (let y = h + 1; y <= h + 5; y++) set(px, y, pz, B2.iron_block); set(px, h + 6, pz, AIR); }
+        if (inC(lx, lz)) set(lx, h + 5, lz, B2.lamp);
+      }
+    }
+  }
   // garages whose footprint reaches into this chunk
   for (const axis of ['x', 'z']) {
     const lo = axis === 'x' ? oz : ox, alo = axis === 'x' ? ox : oz;
