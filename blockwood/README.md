@@ -251,7 +251,8 @@ build on it, fly over it. The world saves in the browser.
 - **Houses and cave houses**: the roads are lined with buildings now. **Mansions** are two storeys tall, with a columned
   porch and a balcony, tall windows, a sloping roof, a grand staircase, an **elevator**, a living room with a sofa,
   a kitchen, three bedrooms, hedges and a pool out the back. **Elevators**: stand still on an Elevator panel and a
-  glass elevator takes you to the next panel straight above (or below); build your own with the Elevator block. **Cave houses** are a little stone hut by the road with a spiral staircase that
+  glass elevator takes you to the next panel straight above (or below), and where there are lots of floors a
+  list pops up to pick one (click it, or type the number and Enter); build your own with the Elevator block. **Cave houses** are a little stone hut by the road with a spiral staircase that
   goes all the way down (lamps light the way) to a room near the bedrock with a bed, chest, crafting table,
   furnace, bookshelves and a red rug.
 - **Signs you can write on**: take a Sign from the Creative inventory (or craft 3 from 6 planks and a stick).
@@ -277,8 +278,8 @@ build on it, fly over it. The world saves in the browser.
   friend's door when they hop in), and **O** in the driver's seat opens or closes them all; the Model X's back
   doors lift up like wings, the Cybercab's open upwards and the Staria's slide.
 
-- **A whole town**: the roads are lined with mansions (the most common), **Maple Xe Apt** apartment towers (up to 8
-  floors, a MAPLE XE APT sign on the roof, homes on every floor, an elevator that stops at each one, and an
+- **A whole town**: the roads are lined with mansions (the most common), **Maple Xe Apt** apartment towers (up to 67
+  floors, a MAPLE XE APT sign on the roof, homes on every floor, an elevator where you pick your floor, and an
   underground car park with a ramp down from the road, lights and EV chargers), cave houses, garages and gas stations, and now also
   **schools** (two storeys of red brick with a SCHOOL sign, a flagpole, classrooms with desks and chalkboards,
   stairs, an elevator, a playground with a slide and a swing, and a yellow **School Bus** you can drive),
